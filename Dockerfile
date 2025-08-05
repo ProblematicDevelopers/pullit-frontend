@@ -1,5 +1,5 @@
 # 빌드 스테이지
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -7,23 +7,29 @@ WORKDIR /app
 COPY package*.json ./
 
 # 의존성 설치
-RUN npm ci --only=production
+RUN npm ci
 
 # 소스 코드 복사
 COPY . .
 
+# 빌드 시 API URL을 build argument로 받음
+ARG VITE_API_URL=http://localhost/api
+ENV VITE_API_URL=$VITE_API_URL
+
 # 프로덕션 빌드
 RUN npm run build
 
-# 빌드된 파일만 복사하는 최종 스테이지
-FROM alpine:latest
+# 실행 스테이지
+FROM nginx:alpine
 
-RUN apk add --no-cache ca-certificates
+# Nginx 설정 파일 복사
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-WORKDIR /app
+# 빌드된 파일을 Nginx html 디렉토리로 복사
+COPY --from=builder /app/dist /usr/share/nginx/html
 
-# 빌드된 dist 폴더만 복사
-COPY --from=builder /app/dist ./dist
+# Nginx 기본 포트 노출
+EXPOSE 80
 
-# Volume으로 dist 폴더 노출
-VOLUME ["/app/dist"]
+# Nginx 실행
+CMD ["nginx", "-g", "daemon off;"]
