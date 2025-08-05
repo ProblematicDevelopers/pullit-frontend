@@ -4,7 +4,7 @@
 
     <div class="test-buttons">
       <button @click="testHealth" :disabled="loading">
-        Health Check입니다
+        최종테스트
       </button>
 
       <button @click="testCors" :disabled="loading">
