@@ -1,0 +1,50 @@
+name: Frontend Deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build project
+      env:
+        VITE_API_URL: http://${{ secrets.EC2_HOST }}/api
+      run: npm run build
+    
+    - name: Deploy to EC2
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "dist/*"
+        target: "/home/ubuntu/app/pullit/frontend"
+        strip_components: 1
+    
+    - name: Update Nginx
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # Nginx 설정 업데이트 (필요시)
+          sudo nginx -s reload
+          
+          # 또는 Docker를 사용하는 경우
+          cd /home/ubuntu/app/pullit
+          docker-compose restart nginx
