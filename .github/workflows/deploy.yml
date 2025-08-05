@@ -47,16 +47,16 @@ jobs:
           docker load < pullit-frontend.tar.gz
           
           # 기존 컨테이너 중지 및 삭제
-          docker-compose -f docker-compose-server.yml stop frontend || true
-          docker-compose -f docker-compose-server.yml rm -f frontend || true
+          docker-compose stop frontend || true
+          docker-compose rm -f frontend || true
           
           # 새 컨테이너 시작
-          docker-compose -f docker-compose-server.yml up -d frontend
+          docker-compose up -d frontend
           
           # 이미지 파일 정리
           rm -f pullit-frontend.tar.gz
           
           # 상태 확인
-          docker-compose -f docker-compose-server.yml ps
+          docker-compose ps
           
           echo "Frontend deployment completed successfully!"
