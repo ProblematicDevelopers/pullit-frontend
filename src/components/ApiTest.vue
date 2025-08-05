@@ -4,8 +4,8 @@
 
     <div class="test-buttons">
       <button @click="testHealth" :disabled="loading">
-        Health Check
-      </button>ㅎ
+        Health Check입니다
+      </button>
 
       <button @click="testCors" :disabled="loading">
         CORS 테스트지롱롱롱
