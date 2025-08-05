@@ -64,8 +64,19 @@ jobs:
           # dist 디렉토리가 없으면 생성
           mkdir -p frontend
           
-          # 새 빌드로 심볼릭 링크 원자적 전환
-          ln -sfn $(pwd)/frontend-builds/${BUILD_ID} frontend/dist
+          # 최초 배포인지 확인
+          if [ ! -e "frontend/dist" ]; then
+            echo "🚀 First deployment detected!"
+            # 최초 배포 시 직접 복사
+            cp -r frontend-builds/${BUILD_ID} frontend/dist
+          else
+            # 새 빌드로 심볼릭 링크 원자적 전환
+            ln -sfn $(pwd)/frontend-builds/${BUILD_ID} frontend/dist
+          fi
+          
+          # 권한 설정
+          chmod -R 755 frontend-builds/${BUILD_ID}
+          chmod 755 frontend/
           
           # Nginx 설정 리로드 (무중단)
           if docker ps | grep -q pullit-nginx; then
