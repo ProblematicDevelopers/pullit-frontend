@@ -11,31 +11,30 @@ jobs:
     steps:
     - uses: actions/checkout@v3
     
-    - name: Use Node.js
-      uses: actions/setup-node@v3
-      with:
-        node-version: '20.x'
-        cache: 'npm'
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
     
-    - name: Install dependencies
-      run: npm ci
+    - name: Build Docker image
+      run: |
+        docker build \
+          --build-arg VITE_API_URL=http://${{ secrets.EC2_HOST }}/api \
+          -t pullit-frontend:latest \
+          -f Dockerfile \
+          .
     
-    - name: Build project
-      env:
-        VITE_API_URL: http://${{ secrets.EC2_HOST }}/api
-      run: npm run build
+    - name: Save Docker image
+      run: docker save pullit-frontend:latest | gzip > pullit-frontend.tar.gz
     
-    - name: Copy build files
+    - name: Copy Docker image to EC2
       uses: appleboy/scp-action@master
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
-        source: "dist/*"
-        target: "/home/ubuntu/app/pullit/frontend-builds/${{ github.sha }}"
-        strip_components: 1
+        source: "pullit-frontend.tar.gz"
+        target: "/home/ubuntu/app/pullit"
     
-    - name: Deploy with zero downtime
+    - name: Deploy on EC2
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.EC2_HOST }}
@@ -44,52 +43,20 @@ jobs:
         script: |
           cd /home/ubuntu/app/pullit
           
-          # 타임스탬프 생성
-          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-          BUILD_ID="${{ github.sha }}"
+          # Docker 이미지 로드
+          docker load < pullit-frontend.tar.gz
           
-          # 새 빌드 디렉토리 확인
-          if [ ! -d "frontend-builds/${BUILD_ID}" ]; then
-            echo "❌ Build directory not found!"
-            exit 1
-          fi
+          # 기존 컨테이너 중지 및 삭제
+          docker-compose -f docker-compose-server.yml stop frontend || true
+          docker-compose -f docker-compose-server.yml rm -f frontend || true
           
-          # 현재 frontend가 심볼릭 링크인지 확인
-          if [ -L "frontend/dist" ]; then
-            # 이전 빌드 디렉토리 저장
-            OLD_BUILD=$(readlink frontend/dist)
-            echo "Current build: $OLD_BUILD"
-          fi
+          # 새 컨테이너 시작
+          docker-compose -f docker-compose-server.yml up -d frontend
           
-          # dist 디렉토리가 없으면 생성
-          mkdir -p frontend
+          # 이미지 파일 정리
+          rm -f pullit-frontend.tar.gz
           
-          # 최초 배포인지 확인
-          if [ ! -e "frontend/dist" ]; then
-            echo "🚀 First deployment detected!"
-            # 최초 배포 시 직접 복사
-            cp -r frontend-builds/${BUILD_ID} frontend/dist
-          else
-            # 새 빌드로 심볼릭 링크 원자적 전환
-            ln -sfn $(pwd)/frontend-builds/${BUILD_ID} frontend/dist
-          fi
-          
-          # 권한 설정
-          chmod -R 755 frontend-builds/${BUILD_ID}
-          chmod 755 frontend/
-          
-          # Nginx 설정 리로드 (무중단)
-          if docker ps | grep -q pullit-nginx; then
-            docker exec pullit-nginx nginx -s reload
-            echo "✅ Nginx reloaded - Zero downtime deployment successful!"
-          else
-            echo "⚠️  Nginx not running - Starting services..."
-            docker-compose -f docker-compose-server.yml up -d
-          fi
-          
-          # 오래된 빌드 정리 (최근 3개만 유지)
-          cd frontend-builds
-          ls -t | tail -n +4 | xargs -r rm -rf
+          # 상태 확인
+          docker-compose -f docker-compose-server.yml ps
           
           echo "Frontend deployment completed successfully!"
-          echo "Build ID: ${BUILD_ID}"
