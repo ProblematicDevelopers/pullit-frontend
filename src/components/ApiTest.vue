@@ -5,10 +5,10 @@
     <div class="test-buttons">
       <button @click="testHealth" :disabled="loading">
         Health Check
-      </button>
+      </button>ㅎ
 
       <button @click="testCors" :disabled="loading">
-        CORS 테스트
+        CORS 테스트지롱롱롱
       </button>
 
       <button @click="testEcho" :disabled="loading">
