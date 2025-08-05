@@ -1,30 +1,30 @@
 <template>
   <div class="api-test">
     <h2>API 테스트</h2>
-    
+
     <div class="test-buttons">
       <button @click="testHealth" :disabled="loading">
         Health Check
       </button>
-      
+
       <button @click="testCors" :disabled="loading">
         CORS 테스트
       </button>
-      
+
       <button @click="testEcho" :disabled="loading">
         Echo 테스트
       </button>
     </div>
-    
+
     <div v-if="loading" class="loading">
       요청 중...
     </div>
-    
+
     <div v-if="response" class="response">
       <h3>응답 결과:</h3>
       <pre>{{ JSON.stringify(response, null, 2) }}</pre>
     </div>
-    
+
     <div v-if="error" class="error">
       <h3>에러 발생:</h3>
       <pre>{{ error }}</pre>
@@ -36,7 +36,7 @@
 import { ref } from 'vue'
 import axios from 'axios'
 
-const API_BASE_URL = 'http://localhost:8080/api'
+const API_BASE_URL = 'http://3.35.47.6/api'
 
 const loading = ref(false)
 const response = ref(null)
@@ -50,7 +50,7 @@ const clearState = () => {
 const testHealth = async () => {
   clearState()
   loading.value = true
-  
+
   try {
     const res = await axios.get(`${API_BASE_URL}/test/health`)
     response.value = res.data
@@ -66,7 +66,7 @@ const testHealth = async () => {
 const testCors = async () => {
   clearState()
   loading.value = true
-  
+
   try {
     const res = await axios.get(`${API_BASE_URL}/test/cors-test`)
     response.value = res.data
@@ -82,14 +82,14 @@ const testCors = async () => {
 const testEcho = async () => {
   clearState()
   loading.value = true
-  
+
   try {
     const testData = {
       message: 'Hello from Vue.js',
       timestamp: new Date().toISOString(),
       test: true
     }
-    
+
     const res = await axios.post(`${API_BASE_URL}/test/echo`, testData)
     response.value = res.data
     console.log('Echo test success:', res.data)
