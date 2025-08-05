@@ -12,7 +12,7 @@
       </button>
 
       <button @click="testEcho" :disabled="loading">
-        Echo 테스트
+        Echo 테스트지롱
       </button>
     </div>
 
