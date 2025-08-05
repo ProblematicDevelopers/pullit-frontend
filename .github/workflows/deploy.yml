@@ -25,16 +25,6 @@ jobs:
         VITE_API_URL: http://${{ secrets.EC2_HOST }}/api
       run: npm run build
     
-    - name: Deploy to EC2
-      uses: appleboy/ssh-action@master
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USERNAME }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        script: |
-          # 새 빌드 파일을 임시 디렉토리로 복사
-          mkdir -p /home/ubuntu/app/pullit/frontend-new
-          
     - name: Copy build files
       uses: appleboy/scp-action@master
       with:
@@ -42,10 +32,10 @@ jobs:
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
         source: "dist/*"
-        target: "/home/ubuntu/app/pullit/frontend-new"
+        target: "/home/ubuntu/app/pullit/frontend-builds/${{ github.sha }}"
         strip_components: 1
     
-    - name: Switch frontend with zero downtime
+    - name: Deploy with zero downtime
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.EC2_HOST }}
@@ -54,30 +44,41 @@ jobs:
         script: |
           cd /home/ubuntu/app/pullit
           
-          # 기존 frontend를 백업
-          if [ -d "frontend" ]; then
-            rm -rf frontend-old
-            mv frontend frontend-old
+          # 타임스탬프 생성
+          TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+          BUILD_ID="${{ github.sha }}"
+          
+          # 새 빌드 디렉토리 확인
+          if [ ! -d "frontend-builds/${BUILD_ID}" ]; then
+            echo "❌ Build directory not found!"
+            exit 1
           fi
           
-          # 새 frontend로 전환
-          mv frontend-new frontend
+          # 현재 frontend가 심볼릭 링크인지 확인
+          if [ -L "frontend/dist" ]; then
+            # 이전 빌드 디렉토리 저장
+            OLD_BUILD=$(readlink frontend/dist)
+            echo "Current build: $OLD_BUILD"
+          fi
           
-          # 권한 설정
-          chmod -R 755 frontend/
+          # dist 디렉토리가 없으면 생성
+          mkdir -p frontend
           
-          # Nginx 컨테이너가 실행 중이면 자동으로 새 파일 서빙
-          # 첫 배포가 아닌 경우 무중단 배포 완료
+          # 새 빌드로 심볼릭 링크 원자적 전환
+          ln -sfn $(pwd)/frontend-builds/${BUILD_ID} frontend/dist
           
-          # Docker 실행 상태 확인 및 처리
-          cd /home/ubuntu/app/pullit
+          # Nginx 설정 리로드 (무중단)
           if docker ps | grep -q pullit-nginx; then
-            echo "✅ Nginx is running - Zero downtime deployment successful!"
-            # 브라우저 캐시 무효화를 위한 reload (선택사항)
-            docker exec pullit-nginx nginx -s reload || true
+            docker exec pullit-nginx nginx -s reload
+            echo "✅ Nginx reloaded - Zero downtime deployment successful!"
           else
-            echo "⚠️  Nginx not running - Starting docker-compose..."
-            docker-compose up -d
+            echo "⚠️  Nginx not running - Starting services..."
+            docker-compose -f docker-compose-server.yml up -d
           fi
+          
+          # 오래된 빌드 정리 (최근 3개만 유지)
+          cd frontend-builds
+          ls -t | tail -n +4 | xargs -r rm -rf
           
           echo "Frontend deployment completed successfully!"
+          echo "Build ID: ${BUILD_ID}"
