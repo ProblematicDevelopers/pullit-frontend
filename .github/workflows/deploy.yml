@@ -26,25 +26,45 @@ jobs:
       run: npm run build
     
     - name: Deploy to EC2
-      uses: appleboy/scp-action@master
-      with:
-        host: ${{ secrets.EC2_HOST }}
-        username: ${{ secrets.EC2_USERNAME }}
-        key: ${{ secrets.EC2_SSH_KEY }}
-        source: "dist/*"
-        target: "/home/ubuntu/app/pullit/frontend"
-        strip_components: 1
-    
-    - name: Update Nginx
       uses: appleboy/ssh-action@master
       with:
         host: ${{ secrets.EC2_HOST }}
         username: ${{ secrets.EC2_USERNAME }}
         key: ${{ secrets.EC2_SSH_KEY }}
         script: |
-          # Nginx 설정 업데이트 (필요시)
-          sudo nginx -s reload
+          # 새 빌드 파일을 임시 디렉토리로 복사
+          mkdir -p /home/ubuntu/app/pullit/frontend-new
           
-          # 또는 Docker를 사용하는 경우
+    - name: Copy build files
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        source: "dist/*"
+        target: "/home/ubuntu/app/pullit/frontend-new"
+        strip_components: 1
+    
+    - name: Switch frontend with zero downtime
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
           cd /home/ubuntu/app/pullit
-          docker-compose restart nginx
+          
+          # 기존 frontend를 백업
+          if [ -d "frontend" ]; then
+            rm -rf frontend-old
+            mv frontend frontend-old
+          fi
+          
+          # 새 frontend로 전환
+          mv frontend-new frontend
+          
+          # Nginx는 이미 새 파일을 참조하게 됨 (심볼릭 링크 없이도 무중단)
+          # 필요시 Nginx 리로드 (설정 변경 없으면 불필요)
+          # docker exec pullit-nginx nginx -s reload
+          
+          echo "Frontend deployment completed successfully!"
