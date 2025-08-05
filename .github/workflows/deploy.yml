@@ -63,6 +63,9 @@ jobs:
           # 새 frontend로 전환
           mv frontend-new frontend
           
+          # 권한 설정
+          chmod -R 755 frontend/
+          
           # Nginx 컨테이너가 실행 중이면 자동으로 새 파일 서빙
           # 첫 배포가 아닌 경우 무중단 배포 완료
           
