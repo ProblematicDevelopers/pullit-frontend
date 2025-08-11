@@ -15,7 +15,7 @@ import ApiTest from './components/ApiTest.vue'
 
   <main>
     <ApiTest />
-    <TheWelcome />
+
   </main>
 </template>
 
