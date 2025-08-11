@@ -14,6 +14,7 @@
       <button @click="testEcho" :disabled="loading">
         Echo 테스트지롱asdfasdf
       </button>
+      <router-link to="/statistics">통계 테스트</router-link>
     </div>
 
     <div v-if="loading" class="loading">
@@ -99,6 +100,10 @@ const testEcho = async () => {
   } finally {
     loading.value = false
   }
+}
+
+const statisticsTest = async () => {
+
 }
 </script>
 
