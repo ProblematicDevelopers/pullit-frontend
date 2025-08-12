@@ -1,15 +1,15 @@
 <template>
   <div>
-    <h1>home</h1>
+    CBTStep1
   </div>
 </template>
 
 <script>
 export default {
-
+  name:"CBTstep01",
 }
 </script>
 
-<style lang="scss" scoped>
+<style scoped>
 
 </style>
