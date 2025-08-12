@@ -1,23 +1,22 @@
-<script setup>
-import HelloWorld from './components/HelloWorld.vue'
-import TheWelcome from './components/TheWelcome.vue'
-import ApiTest from './components/ApiTest.vue'
-</script>
-
 <template>
-  <header>
-    <img alt="Vue logo" class="logo" src="./assets/logo.svg" width="125" height="125" />
-
-    <div class="wrapper">
-      <HelloWorld msg="Pullit - 문제은행 사이트" />
-    </div>
-  </header>
-
-  <main>
-    <ApiTest />
-
-  </main>
+  <div class="app-container">
+    <Header />
+    <main class="main">
+      <router-view /> <!-- 페이지별 콘텐츠 표시 -->
+    </main>
+    <Footer />
+  </div>
 </template>
+<script>
+import HelloWorld from './components/HelloWorld.vue'
+import ApiTest from './components/ApiTest.vue'
+import Header from '@/components/common/Header.vue'
+import Footer from '@/components/common/Footer.vue'
+
+export default {
+  components: { Header, Footer, HelloWorld, ApiTest }
+}
+</script>
 
 <style scoped>
 header {
@@ -45,5 +44,15 @@ header {
     place-items: flex-start;
     flex-wrap: wrap;
   }
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+.main {
+  flex: 1;
+  padding: 1rem;
 }
 </style>
