@@ -4,6 +4,7 @@
     <nav>
       <router-link to="/">홈</router-link> |
       <router-link to="/statistics">통계</router-link>
+      <router-link to="/student/main">통계</router-link>
     </nav>
   </header>
 </template>
@@ -17,6 +18,6 @@ export default {
     const layoutStore = useLayoutStore()
     const { headerTitle } = storeToRefs(layoutStore)
     return { headerTitle }
-  }
+  },
 }
 </script>
