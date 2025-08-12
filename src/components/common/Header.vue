@@ -3,7 +3,7 @@
     <h1>{{ headerTitle }}</h1>
     <nav>
       <router-link to="/">홈</router-link> |
-      <router-link to="/statistics">통계</router-link>
+      <router-link to="/student/report">리포트</router-link>
       <router-link to="/student/main">통계</router-link>
     </nav>
   </header>
