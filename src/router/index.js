@@ -1,10 +1,10 @@
 
 import { createRouter, createWebHistory } from 'vue-router'
-import app from '../App.vue'
+import Home from '../Home.vue'
 import statistics from '../components/statistics/StatisticsTest.vue'
 
 const routes = [
-  { path: '/', name: 'App', component: app },
+  { path: '/', name: 'Home', component: Home },
   { path: '/statistics', name: 'statistics', component: statistics},
 ]
 
