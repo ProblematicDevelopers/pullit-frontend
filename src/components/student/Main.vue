@@ -5,7 +5,7 @@
 
       <router-link to="/student/cbtstep01" class="col-4">
         <div class="card">
-          <img src="..." class="card-img-top" alt="...">
+          <img src="" class="card-img-top" alt="...">
           <div class="card-body">
             <h3 class="card-title">CBT</h3>
             <p class="card-text">CBT 기출문제 연습</p>
@@ -14,7 +14,7 @@
       </router-link>
       <router-link to="" class="col-4">
         <div class="card">
-          <img src="..." class="card-img-top" alt="...">
+          <img src="" class="card-img-top" alt="...">
           <div class="card-body">
             <h3 class="card-title">ClassRoom</h3>
             <p class="card-text">ClassRoom</p>
@@ -24,7 +24,7 @@
       <router-link to="" class="col-4">
         <div></div>
         <div class="card">
-          <img src="..." class="card-img-top" alt="...">
+          <img src="" class="card-img-top" alt="...">
           <div class="card-body">
             <h3 class="card-title">Report</h3>
             <p class="card-text">Report</p>
