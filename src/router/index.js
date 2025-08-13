@@ -3,8 +3,7 @@ import Home from '../Home.vue'
 import Report from '../components/student/report/BasicReport.vue'
 import StudentMain from '../components/student/Main.vue'
 import StudentLayout from '@/components/student/StudentLayout.vue'
-import CBTstep01 from '@/components/student/cbt/CBTstep01.vue'
-import CBTstep02 from '@/components/student/cbt/CBTstep02.vue'
+import CBTStep01 from '@/components/student/cbt/CBTStep01.vue'
 const routes = [
   { path: '/', name: 'Home', component: Home },
   {
@@ -16,7 +15,7 @@ const routes = [
       { path: 'report', name: 'student.report', component: Report},
       // { path: 'exam/:id', name: 'student.exam', component: StudentExam },
 
-      { path: 'cbtstep01', name: 'student.cbt',component: CBTstep01 }
+      { path: 'cbtstep01', name: 'student.cbt',component: CBTStep01 }
 
       // { path: 'result/:id', name: 'student.result', component: StudentResult },
     ],
