@@ -14,6 +14,8 @@ import { useLayoutStore } from '@/store/layoutStore'
 import { storeToRefs } from 'pinia'
 
 export default {
+  // eslint-disable-next-line vue/multi-word-component-names,vue/no-reserved-component-names
+  name:'Header',
   setup() {
     const layoutStore = useLayoutStore()
     const { headerTitle } = storeToRefs(layoutStore)
