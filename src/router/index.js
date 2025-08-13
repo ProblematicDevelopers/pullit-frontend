@@ -1,15 +1,14 @@
-import { createRouter, createWebHistory } from 'vue-router'
+import {createRouter, createWebHistory} from 'vue-router'
 import Home from '../Home.vue'
 import Report from '../components/student/report/BasicReport.vue'
 import StudentMain from '../components/student/Main.vue'
 import StudentLayout from '@/components/student/StudentLayout.vue'
-import CBTstep01 from '@/components/student/cbt/CBTstep01.vue'
-import CBTstep02 from '@/components/student/cbt/CBTstep02.vue'
 
 // 시험지 마법사 컴포넌트 import
 import TestWizardView from '@/views/TestWizardView.vue'
 
 import CBTStep01 from '@/components/student/cbt/CBTStep01.vue'
+
 const routes = [
   { path: '/', name: 'Home', component: Home },
 
