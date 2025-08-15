@@ -518,8 +518,7 @@ const quickFilters = ref([
 
 // 필터 옵션 데이터
 const schoolLevels = ref([
-  { id: 'middle', name: '중학교', count: 876 },
-  { id: 'high', name: '고등학교', count: 224 }
+  { id: 'middle', name: '중학교', count: 876 }
 ])
 
 const subjects = ref([
@@ -533,9 +532,6 @@ const subjects = ref([
 const availableGrades = computed(() => {
   if (filters.schoolLevel.includes('middle')) {
     return ['중1', '중2', '중3']
-  }
-  if (filters.schoolLevel.includes('high')) {
-    return ['고1', '고2', '고3']
   }
   return []
 })
