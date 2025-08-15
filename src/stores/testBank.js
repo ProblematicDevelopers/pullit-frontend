@@ -26,7 +26,7 @@ export const useTestBankStore = defineStore('testBank', {
       name: '수학 1', // 기본값으로 수학 1 설정
       curriculum: '이준열(2015)', // 교육과정 정보
       publisher: '이준열', // 출판사
-      grade: '고등학교 1학년' // 학년 정보
+      grade: '중학교 1학년' // 학년 정보
     },
     
     // ===== 단원 및 챕터 정보 =====

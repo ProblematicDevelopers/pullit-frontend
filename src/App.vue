@@ -12,20 +12,21 @@
 <script>
 import { computed } from 'vue'
 import { useRoute } from 'vue-router'
-import HelloWorld from './components/HelloWorld.vue'
-import ApiTest from './components/ApiTest.vue'
 import Header from '@/components/common/Header.vue'
 import Footer from '@/components/common/Footer.vue'
 
 export default {
-  components: { Header, Footer, HelloWorld, ApiTest },
+  components: { Header, Footer },
   setup() {
     const route = useRoute()
     
     // 팝업 창인지 확인 (라우터 메타 정보 또는 경로로 판단)
     const isPopup = computed(() => {
       // test-wizard 경로이거나 메타에 isPopup이 true인 경우
-      return route.path.includes('/test-wizard') || route.meta.isPopup === true
+      // 또는 로그인 페이지인 경우 헤더/푸터 숨김
+      return route.path.includes('/test-wizard') || 
+             route.meta.isPopup === true ||
+             route.meta.hideHeader === true
     })
     
     return {
@@ -36,41 +37,21 @@ export default {
 </script>
 
 <style scoped>
-header {
-  line-height: 1.5;
-}
-
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
-}
-
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
-}
-
 .app-container {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
 }
+
 .main {
   flex: 1;
-  padding: 1rem;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
 }
 
 /* 팝업 창일 때 main의 padding 제거 및 전체 화면 사용 */
@@ -82,5 +63,6 @@ header {
   position: fixed;
   top: 0;
   left: 0;
+  z-index: 9999;
 }
 </style>

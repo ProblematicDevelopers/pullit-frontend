@@ -1,0 +1,198 @@
+import axios from 'axios'
+
+// API 기본 URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+
+// Axios 인스턴스 생성
+const authApi = axios.create({
+  baseURL: `${API_BASE_URL}/api/auth`,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  withCredentials: true // CORS 쿠키 전송 허용
+})
+
+// 토큰 관리 유틸리티
+const tokenManager = {
+  getAccessToken: () => localStorage.getItem('accessToken'),
+  getRefreshToken: () => localStorage.getItem('refreshToken'),
+  
+  setTokens: (accessToken, refreshToken) => {
+    localStorage.setItem('accessToken', accessToken)
+    localStorage.setItem('refreshToken', refreshToken)
+  },
+  
+  clearTokens: () => {
+    localStorage.removeItem('accessToken')
+    localStorage.removeItem('refreshToken')
+    localStorage.removeItem('userInfo')
+    localStorage.removeItem('userType')
+    localStorage.removeItem('isLoggedIn')
+  }
+}
+
+// 요청 인터셉터 - 모든 요청에 토큰 추가
+authApi.interceptors.request.use(
+  (config) => {
+    const token = tokenManager.getAccessToken()
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`
+    }
+    return config
+  },
+  (error) => {
+    return Promise.reject(error)
+  }
+)
+
+// 응답 인터셉터 - 토큰 만료 처리
+authApi.interceptors.response.use(
+  (response) => response,
+  async (error) => {
+    const originalRequest = error.config
+    
+    if (error.response?.status === 401 && !originalRequest._retry) {
+      originalRequest._retry = true
+      
+      try {
+        const refreshToken = tokenManager.getRefreshToken()
+        if (refreshToken) {
+          const response = await authService.refreshToken(refreshToken)
+          tokenManager.setTokens(response.data.accessToken, response.data.refreshToken)
+          originalRequest.headers.Authorization = `Bearer ${response.data.accessToken}`
+          return authApi(originalRequest)
+        }
+      } catch (refreshError) {
+        tokenManager.clearTokens()
+        window.location.href = '/login'
+      }
+    }
+    
+    return Promise.reject(error)
+  }
+)
+
+// 인증 서비스
+const authService = {
+  /**
+   * 로그인
+   * @param {string} username - 사용자 ID
+   * @param {string} password - 비밀번호
+   * @returns {Promise} 로그인 응답
+   */
+  async login(username, password) {
+    try {
+      const response = await authApi.post('/login', {
+        username,
+        password
+      })
+      
+      if (response.data.success) {
+        const { accessToken, refreshToken, user } = response.data.data
+        
+        // 토큰 저장
+        tokenManager.setTokens(accessToken, refreshToken)
+        
+        // 사용자 정보 저장
+        localStorage.setItem('userInfo', JSON.stringify(user))
+        localStorage.setItem('userType', user.role === 'TEACHER' ? 'teacher' : 'student')
+        localStorage.setItem('isLoggedIn', 'true')
+        
+        return response.data
+      }
+      
+      throw new Error(response.data.message || '로그인 실패')
+    } catch (error) {
+      console.error('Login error:', error)
+      throw error
+    }
+  },
+  
+  /**
+   * 회원가입
+   * @param {Object} userData - 회원가입 정보
+   * @returns {Promise} 회원가입 응답
+   */
+  async register(userData) {
+    try {
+      const response = await authApi.post('/register', userData)
+      return response.data
+    } catch (error) {
+      console.error('Register error:', error)
+      throw error
+    }
+  },
+  
+  /**
+   * 토큰 재발급
+   * @param {string} refreshToken - 리프레시 토큰
+   * @returns {Promise} 새로운 토큰
+   */
+  async refreshToken(refreshToken) {
+    try {
+      const response = await authApi.post('/refresh', {
+        refreshToken
+      })
+      
+      if (response.data.success) {
+        const { accessToken, refreshToken: newRefreshToken } = response.data.data
+        tokenManager.setTokens(accessToken, newRefreshToken)
+      }
+      
+      return response.data
+    } catch (error) {
+      console.error('Token refresh error:', error)
+      throw error
+    }
+  },
+  
+  /**
+   * 로그아웃
+   * @returns {Promise} 로그아웃 응답
+   */
+  async logout() {
+    try {
+      const response = await authApi.post('/logout')
+      tokenManager.clearTokens()
+      return response.data
+    } catch (error) {
+      console.error('Logout error:', error)
+      tokenManager.clearTokens()
+      throw error
+    }
+  },
+  
+  /**
+   * 토큰 검증
+   * @returns {Promise} 토큰 유효성
+   */
+  async validateToken() {
+    try {
+      const response = await authApi.get('/validate')
+      return response.data
+    } catch (error) {
+      console.error('Token validation error:', error)
+      throw error
+    }
+  },
+  
+  /**
+   * 현재 로그인 사용자 정보 가져오기
+   * @returns {Object|null} 사용자 정보
+   */
+  getCurrentUser() {
+    const userInfo = localStorage.getItem('userInfo')
+    return userInfo ? JSON.parse(userInfo) : null
+  },
+  
+  /**
+   * 로그인 여부 확인
+   * @returns {boolean} 로그인 상태
+   */
+  isAuthenticated() {
+    return !!tokenManager.getAccessToken()
+  }
+}
+
+export default authService
+export { tokenManager }
