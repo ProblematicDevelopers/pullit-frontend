@@ -120,6 +120,17 @@ import WizardHeader from '@/components/wizard/WizardHeader.vue'
 import Step0SelectMode from '@/components/wizard/Step0SelectMode.vue'
 import Step1UnitSelection from '@/components/wizard/Step1UnitSelection.vue'
 
+// Props 정의
+const props = defineProps({
+  isModal: {
+    type: Boolean,
+    default: false
+  }
+})
+
+// Emit 정의
+const emit = defineEmits(['close'])
+
 // Pinia store 사용
 const store = useTestBankStore()
 const { currentStep } = storeToRefs(store)
@@ -299,12 +310,13 @@ const handleClose = () => {
   // 데이터 정리
   resetWizard()
   
+  // 모달 모드인 경우
+  if (props.isModal) {
+    emit('close')
+  } 
   // 팝업인 경우 창 닫기
-  if (isPopupWindow()) {
+  else if (isPopupWindow()) {
     closePopup({ action: 'closed' })
-  } else {
-    // 일반 모달인 경우 부모에 닫기 이벤트 전달
-    // emit('close')
   }
 }
 </script>

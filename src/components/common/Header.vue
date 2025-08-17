@@ -352,14 +352,14 @@ export default {
 
     const createNewTest = () => {
       // 팝업으로 시험지 제작 마법사 열기
-      const width = 1200
-      const height = 800
+      const width = 1400
+      const height = 900
       const left = (window.screen.width - width) / 2
       const top = (window.screen.height - height) / 2
       
       const features = `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes`
       
-      window.open('/test-wizard', 'TestWizardPopup', features)
+      window.open('/exam/wizard', 'TestWizardPopup', features)
     }
 
     const takeExam = () => {

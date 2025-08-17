@@ -31,16 +31,12 @@ const routes = [
     }
   },
 
-  // 시험지 마법사 팝업 전용 경로
-  // 새창 팝업에서 로드되는 독립적인 페이지입니다
+  // 시험지 마법사 경로 (통일)
   {
-    path: '/test-wizard',
-    name: 'TestWizard',
+    path: '/exam/wizard',
+    name: 'ExamWizard',
     component: TestWizardView,
     meta: {
-      // 팝업 전용 페이지임을 표시
-      isPopup: true,
-      // 인증이 필요한 경우 설정 (향후 구현)
       requiresAuth: false
     }
   },
