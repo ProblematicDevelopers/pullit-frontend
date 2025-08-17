@@ -21,7 +21,7 @@
                 </svg>
               </div>
               <div class="stat-content">
-                <div class="stat-value">24</div>
+                <div class="stat-value">{{ stats.createdExams }}</div>
                 <div class="stat-label">생성한 시험지</div>
               </div>
             </div>
@@ -33,7 +33,7 @@
                 </svg>
               </div>
               <div class="stat-content">
-                <div class="stat-value">186</div>
+                <div class="stat-value">{{ stats.completedGrading }}</div>
                 <div class="stat-label">완료된 채점</div>
               </div>
             </div>
@@ -45,7 +45,7 @@
                 </svg>
               </div>
               <div class="stat-content">
-                <div class="stat-value">142</div>
+                <div class="stat-value">{{ stats.managedStudents }}</div>
                 <div class="stat-label">관리 학생 수</div>
               </div>
             </div>
@@ -57,7 +57,7 @@
                 </svg>
               </div>
               <div class="stat-content">
-                <div class="stat-value">3,847</div>
+                <div class="stat-value">{{ stats.totalQuestions.toLocaleString() }}</div>
                 <div class="stat-label">문제 보유</div>
               </div>
             </div>
@@ -296,9 +296,18 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import authService from '@/services/auth'
+import examApi from '@/services/examApi'
 
 // 사용자 타입 확인
 const userType = ref('teacher')
+
+// 통계 데이터
+const stats = ref({
+  createdExams: 0,
+  completedGrading: 186, // 임시 고정값 (실제 API 필요)
+  managedStudents: 142, // 임시 고정값 (실제 API 필요)
+  totalQuestions: 0
+})
 
 // 시험지 제작 팝업 열기
 const openTestWizardPopup = () => {
@@ -313,7 +322,37 @@ const openTestWizardPopup = () => {
   window.open('/test-wizard', 'TestWizardPopup', features)
 }
 
-onMounted(() => {
+// 통계 데이터 로드
+const loadStatistics = async () => {
+  try {
+    // 내 시험지 목록 조회
+    const myExamsResponse = await examApi.get('/my', {
+      params: { page: 0, size: 100 }
+    })
+    
+    if (myExamsResponse.data.success) {
+      stats.value.createdExams = myExamsResponse.data.data.totalElements || 0
+      
+      // 총 문항 수 계산
+      const exams = myExamsResponse.data.data.content || []
+      stats.value.totalQuestions = exams.reduce((total, exam) => {
+        return total + (exam.totalItems || 0)
+      }, 0)
+    }
+    
+    // 필터 옵션에서 추가 통계 가져오기
+    const filterResponse = await examApi.get('/filters')
+    if (filterResponse.data.success) {
+      // 필터 데이터에서 추가 통계 활용 가능
+      const filterData = filterResponse.data.data
+      // 예: 과목별 문제 수 등
+    }
+  } catch (error) {
+    console.error('통계 데이터 로드 실패:', error)
+  }
+}
+
+onMounted(async () => {
   const user = authService.getCurrentUser()
   if (user) {
     userType.value = user.role === 'TEACHER' ? 'teacher' : 'student'
@@ -321,6 +360,9 @@ onMounted(() => {
     // 로그인하지 않은 경우 localStorage에서 확인
     userType.value = localStorage.getItem('userType') || 'teacher'
   }
+  
+  // 통계 데이터 로드
+  await loadStatistics()
 })
 </script>
 

@@ -244,7 +244,7 @@
  * 단원 선택 및 문항 설정 로직을 처리합니다.
  */
 
-import { defineEmits } from 'vue'
+import { defineEmits, onMounted, ref } from 'vue'
 import { useTestBankStore } from '@/stores/testBank'
 import { storeToRefs } from 'pinia'
 import { closePopup, sendToParent } from '@/utils/popup'
@@ -260,6 +260,13 @@ const emit = defineEmits([
 // Pinia store 사용
 const store = useTestBankStore()
 
+// 로컬 상태
+const isLoading = ref(false)
+const searchKeyword = ref('')
+const selectedGrade = ref('08') // 중2
+const selectedTerm = ref('01')  // 1학기
+const selectedArea = ref('MA')  // 수학 (MA: 수학, KO: 국어, EN: 영어, SC: 과학, SO: 사회, HS: 역사, MO: 도덕)
+
 // 반응형 상태 데이터 가져오기
 const { 
   subject, 
@@ -269,7 +276,8 @@ const {
   totalSelectedQuestions, 
   totalWizardQuestions,
   availableQuestionsByDifficulty,
-  canProceedToStep2
+  canProceedToStep2,
+  filterOptions
 } = storeToRefs(store)
 
 // Store actions 가져오기
@@ -373,6 +381,148 @@ const handleShowScope = () => {
   emit('show-scope', selectedPapersData)
   sendToParent('SHOW_SCOPE_REQUESTED', selectedPapersData)
 }
+
+// ===== API 연동 함수들 =====
+
+/**
+ * 시험지 데이터 로드
+ */
+const loadExams = async () => {
+  try {
+    isLoading.value = true
+    
+    const searchParams = {
+      gradeCode: selectedGrade.value,
+      termCode: selectedTerm.value,
+      areaCode: selectedArea.value,
+      page: 0,
+      size: 50,
+      keyword: searchKeyword.value
+    }
+    
+    console.log('시험지 검색 파라미터:', searchParams)
+    const result = await store.searchExams(searchParams)
+    console.log('시험지 목록 로드 완료:', result)
+    
+    // API 데이터를 chapters 구조로 변환
+    if (result && result.content) {
+      transformExamData(result.content)
+    }
+  } catch (error) {
+    console.error('시험지 로드 실패:', error)
+    alert('시험지 목록을 불러오는데 실패했습니다.')
+  } finally {
+    isLoading.value = false
+  }
+}
+
+/**
+ * API 데이터를 UI 구조로 변환
+ */
+const transformExamData = (exams) => {
+  const chaptersMap = new Map()
+  
+  exams.forEach(exam => {
+    // 챕터 이름 결정 (실제 데이터 구조에 맞게 수정 필요)
+    const chapterName = exam.chapterName || exam.unitName || '기타'
+    
+    if (!chaptersMap.has(chapterName)) {
+      chaptersMap.set(chapterName, {
+        id: Math.random() * 10000,
+        name: chapterName,
+        expanded: false,
+        papers: []
+      })
+    }
+    
+    // papers 추가
+    chaptersMap.get(chapterName).papers.push({
+      id: exam.id,
+      title: exam.examName,
+      questionCount: exam.totalItems || 0,
+      selected: false,
+      difficulty: {
+        easy: exam.easyCount || exam.totalItems ? Math.floor(exam.totalItems * 0.4) : 10,
+        medium: exam.mediumCount || exam.totalItems ? Math.floor(exam.totalItems * 0.4) : 10,
+        hard: exam.hardCount || exam.totalItems ? Math.floor(exam.totalItems * 0.2) : 5
+      },
+      // 실제 문제 데이터 저장 (나중에 사용)
+      originalData: exam
+    })
+  })
+  
+  // store의 chapters 업데이트
+  store.chapters = Array.from(chaptersMap.values())
+  console.log('변환된 chapters:', store.chapters)
+}
+
+/**
+ * 사용 가능한 문항 수 업데이트
+ */
+const updateAvailableQuestions = () => {
+  // 선택된 papers에서 난이도별 문항 수 계산
+  let easyTotal = 0
+  let mediumTotal = 0
+  let hardTotal = 0
+  
+  chapters.value.forEach(chapter => {
+    chapter.papers.forEach(paper => {
+      if (paper.selected) {
+        easyTotal += paper.difficulty.easy || 0
+        mediumTotal += paper.difficulty.medium || 0
+        hardTotal += paper.difficulty.hard || 0
+      }
+    })
+  })
+  
+  // store에 업데이트 (실제 데이터 기반)
+  store.availableQuestionsByDifficulty = {
+    '하': easyTotal,
+    '중': mediumTotal,
+    '상': hardTotal
+  }
+}
+
+/**
+ * 필터 옵션 로드
+ */
+const loadFilterOptions = async () => {
+  try {
+    await store.fetchFilterOptions()
+    console.log('필터 옵션 로드 완료')
+    
+    // 필터 옵션에서 과목 정보 가져오기
+    if (filterOptions.value && filterOptions.value.subjects) {
+      // 현재 선택된 과목 정보 업데이트
+      const currentSubjectCode = selectedArea.value || 'MA'
+      const currentSubject = filterOptions.value.subjects.find(s => s.code === currentSubjectCode)
+      
+      if (currentSubject) {
+        subject.value = {
+          name: currentSubject.name,
+          curriculum: '현행 교육과정',
+          code: currentSubject.code
+        }
+      }
+    }
+  } catch (error) {
+    console.error('필터 옵션 로드 실패:', error)
+  }
+}
+
+// 컴포넌트 마운트 시 초기화
+onMounted(async () => {
+  console.log('Step1 컴포넌트 마운트됨')
+  
+  // 필터 옵션 로드
+  await loadFilterOptions()
+  
+  // 초기 시험지 목록 로드
+  await loadExams()
+  
+  // 실제 데이터로 난이도별 문항 수 업데이트
+  updateAvailableQuestions()
+})
 </script>
 
 <style scoped>
