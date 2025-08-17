@@ -17,7 +17,15 @@
     <div class="search-header">
       <div class="header-top">
         <h2 class="main-title">시험지 선택</h2>
-        <span class="exam-count">총 {{ totalExamCount }}개</span>
+        <div class="header-actions">
+          <span class="exam-count">총 {{ totalExamCount }}개</span>
+          <button class="btn-create-new" @click="createNewExam">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M12 4v16m8-8H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            새 시험지 만들기
+          </button>
+        </div>
       </div>
       
       <!-- 검색 및 필터 영역 -->
@@ -135,10 +143,14 @@
             교과서
           </h4>
           <div class="filter-options">
-            <label class="checkbox-item" v-for="textbook in availableTextbooks" :key="textbook.id">
-              <input type="checkbox" v-model="filters.textbooks" :value="textbook.id">
+            <label class="checkbox-item" v-for="textbook in availableTextbooks" :key="`textbook-${textbook.id}`">
+              <input 
+                type="checkbox" 
+                :id="`textbook-checkbox-${textbook.id}`"
+                v-model="filters.textbooks" 
+                :value="textbook.id">
               <span>{{ textbook.name }}</span>
-              <span class="count">{{ textbook.count }}</span>
+              <span class="count">{{ textbook.count || 0 }}</span>
             </label>
           </div>
         </div>
@@ -149,28 +161,19 @@
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="2"/>
             </svg>
-            단원
+            대단원
           </h4>
-          <div class="chapter-tree">
-            <div v-for="chapter in availableChapters" :key="chapter.id" class="chapter-item">
-              <button @click="toggleChapter(chapter.id)" class="chapter-toggle">
-                <svg v-if="!chapter.expanded" width="12" height="12" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2"/>
-                </svg>
-                <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none">
-                  <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2"/>
-                </svg>
-                {{ chapter.name }}
-                <span class="count">{{ chapter.count }}</span>
-              </button>
-              <div v-if="chapter.expanded" class="sub-chapters">
-                <label v-for="sub in chapter.subChapters" :key="sub.id" class="checkbox-item">
-                  <input type="checkbox" v-model="filters.chapters" :value="sub.id">
-                  <span>{{ sub.name }}</span>
-                  <span class="count">{{ sub.count }}</span>
-                </label>
-              </div>
-            </div>
+          <div class="filter-options">
+            <label v-for="(chapter, index) in availableChapters" :key="`chapter-${index}-${chapter.id}`" class="checkbox-item">
+              <input 
+                type="checkbox" 
+                :id="`chapter-checkbox-${index}-${chapter.id}`"
+                :name="`chapter-checkbox-${index}`"
+                :checked="filters.chapters.includes(String(chapter.code || chapter.id))"
+                @change="toggleChapterSelection(String(chapter.code || chapter.id))">
+              <span>{{ chapter.name }}</span>
+              <span class="count">{{ chapter.count || 0 }}</span>
+            </label>
           </div>
         </div>
 
@@ -484,6 +487,26 @@
         </button>
       </div>
     </div>
+    
+    <!-- 선택한 시험지 하단 패널 -->
+    <transition name="slide-up">
+      <div v-if="showSelectedExamPanel" class="selected-exam-panel">
+        <div class="panel-content">
+          <div class="panel-info">
+            <h3>선택한 시험지</h3>
+            <p class="exam-name">{{ selectedExamName }}</p>
+          </div>
+          <div class="panel-actions">
+            <button class="btn btn-secondary" @click="showSelectedExamPanel = false">
+              취소
+            </button>
+            <button class="btn btn-primary" @click="proceedWithSelectedExam">
+              이 시험지로 하기
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
@@ -492,6 +515,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useTestBankStore } from '@/stores/testBank'
 import { storeToRefs } from 'pinia'
 import examApi from '@/services/examApi'
+import axios from 'axios'
 
 // Props & Emits
 const emit = defineEmits(['next', 'cancel', 'selectNew', 'selectExisting'])
@@ -499,6 +523,9 @@ const emit = defineEmits(['next', 'cancel', 'selectNew', 'selectExisting'])
 // Store
 const store = useTestBankStore()
 const { loading, examSearchResults } = storeToRefs(store)
+
+// API URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 // 통계 데이터
 const totalExamCount = ref(0)
@@ -557,6 +584,7 @@ const sortBy = ref('relevance')
 const selectedExamId = ref(null)
 const selectedExamName = ref('')
 const isCreatingNew = ref(false)
+const showSelectedExamPanel = ref(false)
 const popularFilter = ref('week')
 
 // 추천 시험지 데이터 (임시)
@@ -661,6 +689,9 @@ const handleSearchWithDebounce = (() => {
 })()
 
 const performSearch = async () => {
+  console.log('===== performSearch 시작 =====')
+  console.log('현재 filters.grades:', filters.grades)
+  
   // 검색어와 필터가 모두 없을 때는 전체 검색
   const isEmptySearch = !searchQuery.value && !hasActiveFilters.value
   
@@ -673,12 +704,16 @@ const performSearch = async () => {
   
   try {
     // 검색 파라미터 준비 - 여러 과목 선택 지원
+    const gradeCodeValue = filters.grades.length > 0 ? filters.grades.join(',') : null
+    console.log('gradeCode 계산 결과:', gradeCodeValue)
+    
     const searchParams = {
       keyword: searchQuery.value,
-      gradeCode: filters.grades.length > 0 ? filters.grades.join(',') : null,
+      gradeCode: gradeCodeValue,
       termCode: filters.terms.length > 0 ? filters.terms.join(',') : null,
       areaCode: filters.subjects.length > 0 ? filters.subjects.join(',') : null,  // 과목 코드
       subjectId: filters.textbooks.length > 0 ? filters.textbooks[0] : null,    // 교과서 ID (단일 선택)
+      largeChapterCode: filters.chapters.length > 0 ? filters.chapters.join(',') : null, // 대단원 코드 (복수 선택 지원)
       visibility: filters.visibility !== 'all' ? filters.visibility : null,  // visibility 필터 추가
       page: currentPage.value,  // 이미 0부터 시작
       size: pageSize,
@@ -689,7 +724,12 @@ const performSearch = async () => {
     console.log('=== 시험지 검색 시작 ===')
     console.log('검색 파라미터:', searchParams)
     console.log('선택된 과목 코드:', filters.subjects)
-    console.log('선택된 학년:', filters.grades)
+    console.log('선택된 학년 코드:', filters.grades)
+    console.log('학년 필터 상세:', {
+      grades: filters.grades,
+      gradeCode: searchParams.gradeCode,
+      전체필터: JSON.stringify(filters)
+    })
     
     // API 호출
     const result = await store.searchExams(searchParams)
@@ -822,21 +862,48 @@ const loadTextbooksForSubject = async () => {
     
     console.log('선택된 과목의 교과서 목록 로드 중...', filters.subjects)
     
-    // store의 filterOptions에서 textbooks 데이터 사용
-    const filterOptions = store.filterOptions
-    if (filterOptions && filterOptions.textbooks) {
-      // 선택된 과목과 학년에 맞는 교과서 필터링
-      const filteredTextbooks = filterOptions.textbooks.filter(textbook => {
-        const matchesSubject = filters.subjects.includes(textbook.areaCode)
-        const matchesGrade = filters.grades.length === 0 || filters.grades.includes(textbook.gradeCode)
-        return matchesSubject && matchesGrade
-      })
-      
-      availableTextbooks.value = filteredTextbooks
-      console.log('교과서 목록 로드 완료:', availableTextbooks.value)
-    } else {
-      availableTextbooks.value = []
-    }
+    // 선택된 학년과 과목 코드
+    const gradeCode = filters.grades.length > 0 ? filters.grades[0] : null
+    const areaCode = filters.subjects[0] // 첫 번째 과목 코드
+    
+    // store의 fetchTextbooks 함수 사용
+    const textbooks = await store.fetchTextbooks(gradeCode, areaCode)
+    
+    // 각 교과서별 시험지 개수 조회
+    const textbooksWithCount = await Promise.all(textbooks.map(async t => {
+      try {
+        const countResponse = await axios.get(`${API_BASE_URL}/api/exams/count`, {
+          params: {
+            subjectId: t.subjectId,
+            gradeCode: gradeCode,
+            areaCode: areaCode
+          }
+        })
+        const count = countResponse.data.totalCount || 0
+        
+        return {
+          id: t.subjectId,
+          code: t.subjectId,
+          name: t.subjectName,
+          areaCode: t.areaCode,
+          gradeCode: t.gradeCode,
+          count: count
+        }
+      } catch (error) {
+        console.error(`교과서 ${t.subjectId} 카운트 조회 실패:`, error)
+        return {
+          id: t.subjectId,
+          code: t.subjectId,
+          name: t.subjectName,
+          areaCode: t.areaCode,
+          gradeCode: t.gradeCode,
+          count: 0
+        }
+      }
+    }))
+    
+    availableTextbooks.value = textbooksWithCount
+    console.log('교과서 목록 로드 완료 (카운트 포함):', availableTextbooks.value)
   } catch (error) {
     console.error('교과서 목록 로드 실패:', error)
     availableTextbooks.value = []
@@ -853,55 +920,66 @@ const loadChaptersForFilters = async () => {
   }
 
   try {
-    // 선택된 첫 번째 값들을 사용
-    const areaCode = filters.subjects[0] || ''
-    const gradeCode = filters.grades.length > 0 ? filters.grades[0] : ''
-    const textbook = filters.textbooks[0]
+    // 선택된 첫 번째 교과서 ID
+    const subjectId = filters.textbooks[0]
     
-    console.log(`단원 로드 중... 과목: ${areaCode}, 학년: ${gradeCode}, 교과서: ${textbook}`)
+    console.log(`대단원 로드 중... 교과서 ID: ${subjectId}`)
     
-    const response = await examApi.get(`/chapters/${areaCode}`, {
-      params: {
-        gradeCode: gradeCode,
-        textbook: textbook
-      }
-    })
+    // store의 fetchChapters 함수 사용
+    const chapters = await store.fetchChapters(subjectId)
     
-    if (response.data && response.data.success && response.data.data) {
-      console.log(`단원 로드 성공:`, response.data.data)
+    if (chapters && chapters.length > 0) {
+      console.log(`대단원 로드 성공:`, chapters)
       
-      // 대단원별로 그룹화
-      const groupedChapters = {}
-      response.data.data.forEach(chapter => {
-        const largeChapterKey = chapter.largeChapterCode || 'etc'
-        if (!groupedChapters[largeChapterKey]) {
-          groupedChapters[largeChapterKey] = {
-            id: largeChapterKey,
-            name: chapter.largeChapterName || '기타',
-            count: 0,
-            expanded: false,
-            subChapters: []
-          }
+      // API 응답이 LargeNode 형식 (id, name, children)
+      // 각 대단원별로 시험지 개수 조회
+      const chaptersWithCount = []
+      
+      for (const largeChapter of chapters) {
+        // LargeNode 구조: { id: Long, name: String, children: [] }
+        const chapterCode = String(largeChapter.id)
+        const chapterName = largeChapter.name
+        
+        // 각 대단원별 시험지 개수를 개별 조회
+        try {
+          const countResponse = await axios.get(`${API_BASE_URL}/api/exams/count`, {
+            params: {
+              largeChapterCode: chapterCode,
+              subjectId: subjectId,
+              gradeCode: filters.grades.length > 0 ? filters.grades[0] : null,
+              areaCode: filters.subjects.length > 0 ? filters.subjects[0] : null
+            }
+          })
+          
+          const count = countResponse.data.totalCount || 0
+          console.log(`대단원 "${chapterName}" (코드: ${chapterCode}): ${count}개 시험지`)
+          
+          chaptersWithCount.push({
+            id: chapterCode,
+            code: chapterCode,
+            name: chapterName,
+            count: count
+          })
+        } catch (error) {
+          console.error(`대단원 ${chapterCode} 카운트 조회 실패:`, error)
+          chaptersWithCount.push({
+            id: chapterCode,
+            code: chapterCode,
+            name: chapterName,
+            count: 0
+          })
         }
-        
-        groupedChapters[largeChapterKey].subChapters.push({
-          id: chapter.middleChapterCode,
-          name: chapter.middleChapterName,
-          count: chapter.examCount || 0
-        })
-        
-        groupedChapters[largeChapterKey].count += chapter.examCount || 0
-      })
+      }
       
-      availableChapters.value = Object.values(groupedChapters)
-      filters.chapters = [] // 기존 선택된 단원 초기화
+      availableChapters.value = chaptersWithCount
+      console.log('대단원 로드 완료 (카운트 포함):', availableChapters.value)
     } else {
-      console.log('단원 데이터가 없습니다')
+      console.log('대단원 데이터가 없습니다')
       availableChapters.value = []
       filters.chapters = []
     }
   } catch (error) {
-    console.error('단원 로드 실패:', error)
+    console.error('대단원 로드 실패:', error)
     availableChapters.value = []
     filters.chapters = []
   }
@@ -916,6 +994,29 @@ const loadChaptersForSubject = async (areaCode) => {
 // 교과서 변경 시 챕터 다시 로드
 const onTextbookChange = () => {
   loadChaptersForFilters()
+}
+
+// 대단원 선택 토글 함수
+const toggleChapterSelection = (chapterCode) => {
+  console.log('토글 전 chapters 배열:', [...filters.chapters])
+  console.log('토글할 chapterCode:', chapterCode)
+  
+  const index = filters.chapters.findIndex(code => code === chapterCode)
+  
+  if (index > -1) {
+    // 이미 선택되어 있으면 제거
+    filters.chapters.splice(index, 1)
+    console.log(`대단원 ${chapterCode} 제거됨`)
+  } else {
+    // 선택되어 있지 않으면 추가
+    filters.chapters.push(chapterCode)
+    console.log(`대단원 ${chapterCode} 추가됨`)
+  }
+  
+  console.log('토글 후 chapters 배열:', [...filters.chapters])
+  
+  // 강제로 Vue의 반응성 트리거
+  filters.chapters = [...filters.chapters]
 }
 
 const clearAllFilters = () => {
@@ -936,20 +1037,32 @@ const clearAllFilters = () => {
 }
 
 const createNewExam = () => {
+  console.log('새 시험지 만들기 클릭')
   isCreatingNew.value = true
   store.setMode('new')
+  // 다음 단계로 이동
+  emit('next', { mode: 'create' })
 }
 
 const selectExam = (exam) => {
+  console.log('기존 시험지 선택:', exam)
   selectedExamId.value = exam.id
-  selectedExamName.value = exam.title
+  selectedExamName.value = exam.title || exam.examName
   store.setMode('edit')
   store.setSelectedExam(exam)
+  // 하단 패널 표시 (바로 이동하지 않고 사용자가 선택)
+  showSelectedExamPanel.value = true
 }
 
 const editExam = (exam) => {
   selectExam(exam)
   proceedToNext()
+}
+
+const proceedWithSelectedExam = () => {
+  if (selectedExamId.value) {
+    emit('next', { mode: 'edit', examId: selectedExamId.value })
+  }
 }
 
 const previewExam = (exam) => {
@@ -1140,7 +1253,8 @@ const transformSearchResults = (exams) => {
     id: exam.id,
     title: exam.examName,
     subject: exam.subjectName || 'Unknown', // subjectName 사용
-    grade: exam.gradeName || '중1',
+    grade: exam.gradeName || '', // gradeName 그대로 사용
+    gradeCode: exam.gradeCode || '', // gradeCode도 저장
     chapterName: exam.chapterName || exam.examType || '단원평가',
     questionCount: exam.itemCount || 0, // itemCount 사용
     updatedAt: exam.updatedDate || new Date(),
@@ -1245,9 +1359,13 @@ const handleClickOutside = (event) => {
 // Watch 함수들
 
 // 1. 학년 변경 시
-watch(() => filters.grades, () => {
+watch(() => filters.grades, (newVal) => {
+  console.log('===== 학년 필터 변경 =====')
+  console.log('선택된 학년 코드:', newVal)
+  console.log('학년 데이터:', grades.value)
+  console.log('전체 필터 상태:', JSON.stringify(filters))
   performSearch()
-})
+}, { deep: true })
 
 // 2. 과목 변경 시 - 교과서 목록 로드
 watch(() => filters.subjects, async (newVal, oldVal) => {
@@ -1312,9 +1430,41 @@ watch([() => filters.itemCount, () => filters.visibility], () => {
 
 .header-top {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 0.75rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.btn-create-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-create-new:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-create-new svg {
+  flex-shrink: 0;
 }
 
 .main-title {
@@ -1522,6 +1672,7 @@ watch([() => filters.itemCount, () => filters.visibility], () => {
   font-size: 0.875rem;
   cursor: pointer;
   padding: 0.25rem 0;
+  position: relative;
 }
 
 .checkbox-item:hover,
@@ -1529,9 +1680,19 @@ watch([() => filters.itemCount, () => filters.visibility], () => {
   color: #0366d6;
 }
 
-.checkbox-item input,
-.radio-item input {
+.checkbox-item input[type="checkbox"],
+.radio-item input[type="radio"] {
   cursor: pointer;
+  margin: 0;
+  width: 16px;
+  height: 16px;
+}
+
+/* 체크박스 독립성 보장 */
+.checkbox-item input[type="checkbox"] {
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .checkbox-item .count {
@@ -2351,5 +2512,86 @@ watch([() => filters.itemCount, () => filters.visibility], () => {
   .results-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* 선택한 시험지 하단 패널 */
+.selected-exam-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 2px solid #3b82f6;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  padding: 1.5rem 2rem;
+}
+
+.panel-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-info h3 {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+.panel-info .exam-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.panel-actions .btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.panel-actions .btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.panel-actions .btn-secondary:hover {
+  background: #e5e7eb;
+}
+
+.panel-actions .btn-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.panel-actions .btn-primary:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* 슬라이드 업 애니메이션 */
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(100%);
 }
 </style>

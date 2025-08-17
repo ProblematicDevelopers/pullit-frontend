@@ -2,6 +2,8 @@ import { defineStore } from 'pinia'
 import examApi from '@/services/examApi'
 import axios from 'axios'
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+
 export const useTestBankStore = defineStore('testBank', {
   state: () => ({
     // ===== 마법사 진행 상태 =====
@@ -11,6 +13,14 @@ export const useTestBankStore = defineStore('testBank', {
 
     // ===== 선택된 기존 시험지 (편집 모드용) =====
     selectedExam: null, // 편집할 기존 시험지 정보
+    
+    // ===== 시험지 기본 정보 =====
+    examInfo: {
+      gradeCode: null,
+      gradeName: '',
+      subjectId: null,
+      subjectName: ''
+    },
     
     // ===== 시험지 타입 =====
     examType: 'ALL', // 'TESTWIZARD', 'USER_CREATED', 'ALL'
@@ -172,6 +182,14 @@ export const useTestBankStore = defineStore('testBank', {
         this.subject.name = exam.subjectName || exam.subject
         // 기타 데이터 매핑...
       }
+    },
+
+    /**
+     * 시험지 기본 정보 설정
+     * @param {Object} examInfo - 시험지 정보
+     */
+    setExamInfo(examInfo) {
+      this.examInfo = { ...this.examInfo, ...examInfo }
     },
 
     /**
@@ -357,8 +375,25 @@ export const useTestBankStore = defineStore('testBank', {
      */
     async fetchFilterOptions() {
       try {
-        const response = await examApi.get('/filters')
-        const data = response.data
+        // 임시로 하드코딩된 데이터 사용
+        const data = {
+          grades: [
+            { code: '07', name: '1학년', count: 500 },
+            { code: '08', name: '2학년', count: 600 },
+            { code: '09', name: '3학년', count: 587 }
+          ],
+          subjects: [
+            { code: 'MA', name: '수학', count: 228 },
+            { code: 'KO', name: '국어', count: 156 },
+            { code: 'EN', name: '영어', count: 189 },
+            { code: 'SC', name: '과학', count: 145 },
+            { code: 'SO', name: '사회', count: 132 }
+          ],
+          terms: [
+            { code: '01', name: '1학기', count: 850 },
+            { code: '02', name: '2학기', count: 837 }
+          ]
+        }
         
         // 기존 배열에도 할당
         this.grades = data.grades || []
@@ -372,12 +407,51 @@ export const useTestBankStore = defineStore('testBank', {
           subjects: data.subjects || []
         }
         
-        console.log('필터 옵션 로드 성공:', data)
+        console.log('필터 옵션 로드 성공 (임시 데이터):', data)
         
         return data
       } catch (error) {
         console.error('필터 옵션 조회 실패:', error)
         throw error
+      }
+    },
+    
+    /**
+     * 교과서 목록 가져오기
+     */
+    async fetchTextbooks(gradeCode, areaCode) {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/subject`)
+        const textbooks = response.data.data || []
+        
+        // 학년과 과목에 맞는 교과서만 필터링
+        const filtered = textbooks.filter(textbook => {
+          const matchGrade = !gradeCode || textbook.gradeCode === gradeCode
+          const matchArea = !areaCode || textbook.areaCode === areaCode
+          return matchGrade && matchArea
+        })
+        
+        console.log('교과서 목록 로드:', filtered.length)
+        return filtered
+      } catch (error) {
+        console.error('교과서 목록 조회 실패:', error)
+        return []
+      }
+    },
+    
+    /**
+     * 대단원 목록 가져오기
+     */
+    async fetchChapters(subjectId) {
+      try {
+        const response = await axios.get(`${API_BASE_URL}/api/chapter/${subjectId}/tree`)
+        const chapters = response.data.data || []
+        
+        console.log('대단원 목록 로드:', chapters.length)
+        return chapters
+      } catch (error) {
+        console.error('대단원 목록 조회 실패:', error)
+        return []
       }
     },
 
@@ -404,14 +478,15 @@ export const useTestBankStore = defineStore('testBank', {
           sort: searchParams.sort || 'createdDate,desc'
         }
         
-        // null 값 제거
+        // null 값 제거 (빈 문자열은 유지)
+        console.log('파라미터 정리 전:', params)
         Object.keys(params).forEach(key => {
-          if (params[key] === null || params[key] === '') {
+          if (params[key] === null) {
             delete params[key]
           }
         })
         
-        console.log('시험지 검색 요청:', params)
+        console.log('시험지 검색 요청 (최종):', params)
         const response = await examApi.get('/search', { params })
         
         // 응답 데이터 처리
