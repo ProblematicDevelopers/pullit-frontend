@@ -38,18 +38,32 @@
             </h3>
             <span class="section-desc">여러 교과서의 문제를 함께 선택할 수 있습니다</span>
           </div>
-          <div class="textbook-grid">
+          <!-- 교과서 로딩 중 -->
+          <div v-if="isLoadingTextbooks" class="textbook-loading">
+            <div class="spinner"></div>
+            <p>교과서 목록을 불러오는 중...</p>
+          </div>
+          
+          <!-- 교과서 그리드 -->
+          <div v-else-if="availableTextbooks.length > 0" class="textbook-grid">
             <div 
               v-for="textbook in availableTextbooks" 
               :key="textbook.id"
-              :class="['textbook-card', { 'selected': selectedTextbooks.includes(textbook.id) }]"
-              @click="toggleTextbook(textbook.id)"
+              :class="['textbook-card', { 'selected': selectedTextbook === textbook.id }]"
+              @click="selectTextbook(textbook)"
             >
               <div class="textbook-check">
-                <span v-if="selectedTextbooks.includes(textbook.id)">✓</span>
+                <span v-if="selectedTextbook === textbook.id">✓</span>
               </div>
+              <!-- 교과서 이미지 또는 아이콘 -->
               <div class="textbook-icon">
-                📖
+                <img 
+                  v-if="textbook.imageUrl" 
+                  :src="textbook.imageUrl" 
+                  :alt="textbook.name"
+                  @error="handleTextbookImageError($event)"
+                />
+                <span v-else>📖</span>
               </div>
               <div class="textbook-info">
                 <h4>{{ textbook.name }}</h4>
@@ -57,8 +71,46 @@
                 <span class="year-badge">{{ textbook.year }}</span>
               </div>
               <div class="item-count">
-                <span class="count-number">{{ textbook.itemCount }}</span>
+                <span class="count-number">{{ textbook.itemCount || '-' }}</span>
                 <span class="count-label">문항</span>
+              </div>
+            </div>
+          </div>
+          
+          <!-- 교과서가 없을 때 -->
+          <div v-else class="no-textbooks">
+            <p>해당 학년과 과목에 맞는 교과서가 없습니다.</p>
+          </div>
+        </div>
+
+        <!-- 선택된 교과서의 대단원 목록 -->
+        <div v-if="selectedTextbook && textbookChapters.length > 0" class="chapters-section">
+          <div class="section-header">
+            <h3>
+              <span class="section-icon">📚</span>
+              대단원 목록
+            </h3>
+          </div>
+          <div class="chapters-list">
+            <div 
+              v-for="chapter in textbookChapters" 
+              :key="chapter.id"
+              :class="['chapter-item', { 'selected': selectedChapters.includes(chapter.id) }]"
+              @click="toggleChapterSelection(chapter.id)"
+            >
+              <div class="chapter-checkbox">
+                <input 
+                  type="checkbox" 
+                  :checked="selectedChapters.includes(chapter.id)"
+                  @click.stop="toggleChapterSelection(chapter.id)"
+                />
+              </div>
+              <div class="chapter-info">
+                <span class="chapter-number">{{ chapter.chapterNo }}단원</span>
+                <span class="chapter-name">{{ chapter.chapterName }}</span>
+              </div>
+              <div class="chapter-count">
+                <span>{{ chapter.itemCount || 0 }}문항</span>
               </div>
             </div>
           </div>
@@ -138,28 +190,43 @@
                   :class="['type-btn', { 'active': filters.questionForm.includes('MC') }]"
                   @click="toggleQuestionType('MC')"
                 >
-                  <span class="type-icon">🔘</span>
+                  <svg class="type-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <circle cx="12" cy="12" r="3"></circle>
+                  </svg>
                   <span>객관식</span>
                 </button>
                 <button 
                   :class="['type-btn', { 'active': filters.questionForm.includes('SA') }]"
                   @click="toggleQuestionType('SA')"
                 >
-                  <span class="type-icon">✏️</span>
+                  <svg class="type-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                  </svg>
                   <span>주관식</span>
                 </button>
                 <button 
                   :class="['type-btn', { 'active': filters.questionForm.includes('ES') }]"
                   @click="toggleQuestionType('ES')"
                 >
-                  <span class="type-icon">📄</span>
+                  <svg class="type-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                    <line x1="16" y1="13" x2="8" y2="13"></line>
+                    <line x1="16" y1="17" x2="8" y2="17"></line>
+                  </svg>
                   <span>서술형</span>
                 </button>
               </div>
             </div>
 
             <button class="btn-search" @click="searchItems">
-              <span>🔍</span> 검색하기
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="11" cy="11" r="8"></circle>
+                <path d="m21 21-4.35-4.35"></path>
+              </svg>
+              <span>검색하기</span>
             </button>
           </div>
         </div>
@@ -167,7 +234,12 @@
         <!-- 문항 목록 -->
         <div class="items-section">
           <div class="items-header">
-            <span>검색 결과 ({{ totalItems }}개)</span>
+            <div class="header-left">
+              <span>검색 결과 ({{ totalItems }}개)</span>
+              <span v-if="selectedTextbook" class="selected-textbook-info">
+                | {{ getSelectedTextbookName() }}
+              </span>
+            </div>
             <label class="select-all">
               <input type="checkbox" @change="toggleSelectAll" :checked="isAllSelected">
               전체 선택
@@ -245,8 +317,14 @@
 
           <!-- 빈 상태 -->
           <div v-if="!isLoading && items.length === 0" class="empty-state">
-            <p>검색 결과가 없습니다.</p>
-            <p class="empty-hint">다른 검색 조건을 시도해보세요.</p>
+            <div v-if="!selectedTextbook">
+              <p>교과서를 선택해주세요.</p>
+              <p class="empty-hint">왼쪽에서 교과서를 선택하면 해당 문제들이 표시됩니다.</p>
+            </div>
+            <div v-else>
+              <p>검색 결과가 없습니다.</p>
+              <p class="empty-hint">다른 검색 조건을 시도해보세요.</p>
+            </div>
           </div>
 
           <!-- 페이지네이션 -->
@@ -364,6 +442,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useItemSelectionStore } from '@/stores/itemSelection'
 import { useTestBankStore } from '@/stores/testBank'
 import { storeToRefs } from 'pinia'
+import axios from 'axios'
 
 // Props
 const props = defineProps({
@@ -401,14 +480,11 @@ const modalImageUrl = ref('')
 const draggedIndex = ref(null)
 
 // 교과서 관련 상태
-const selectedTextbooks = ref([])
-const availableTextbooks = ref([
-  { id: 1, name: '중학교 수학 1', publisher: '천재교육', year: '2024', itemCount: 342 },
-  { id: 2, name: '중학교 수학 1', publisher: '비상교육', year: '2024', itemCount: 285 },
-  { id: 3, name: '중학교 수학 1', publisher: '동아출판', year: '2024', itemCount: 298 },
-  { id: 4, name: '중학교 수학 1', publisher: '미래엔', year: '2024', itemCount: 315 },
-  { id: 5, name: '중학교 수학 1', publisher: '신사고', year: '2024', itemCount: 326 }
-])
+const selectedTextbook = ref(null) // 현재 선택된 교과서 (단일 선택)
+const availableTextbooks = ref([])
+const isLoadingTextbooks = ref(false)
+const textbookChapters = ref([]) // 선택된 교과서의 대단원 목록
+const selectedChapters = ref([]) // 선택된 대단원들
 
 // Computed
 const displayPages = computed(() => {
@@ -445,15 +521,137 @@ const displayPages = computed(() => {
 })
 
 // Methods
-const toggleTextbook = (textbookId) => {
-  const index = selectedTextbooks.value.indexOf(textbookId)
-  if (index > -1) {
-    selectedTextbooks.value.splice(index, 1)
-  } else {
-    selectedTextbooks.value.push(textbookId)
+// 학년과 과목에 맞는 교과서 목록 가져오기
+const fetchTextbooks = async () => {
+  try {
+    isLoadingTextbooks.value = true
+    
+    // Step1에서 이미 areaCode를 전달받음 (MA, KO, EN, SC, SO)
+    const areaCode = props.examInfo.subjectId  // 이제 subjectId가 직접 areaCode임
+    const gradeCode = props.examInfo.gradeCode
+    
+    console.log('교과서 조회 요청:', { gradeCode, areaCode })
+    
+    const response = await axios.get('/api/subject/filter', {
+      params: {
+        gradeCode: gradeCode,
+        areaCode: areaCode
+      }
+    })
+    
+    console.log('교과서 API 응답:', response.data)
+    
+    if (response.data.success) {
+      // 백엔드 응답을 프론트엔드 형식으로 변환
+      availableTextbooks.value = response.data.data.map(subject => ({
+        id: subject.subjectId,
+        name: subject.subjectName || '교과서명 없음',
+        publisher: extractPublisher(subject.subjectName), // 교과서명에서 출판사 추출
+        year: subject.curriculumCode ? `20${subject.curriculumCode.substring(0, 2)}` : '2024',
+        itemCount: 0, // 실제 문항 수는 별도 API 필요
+        imageUrl: subject.subjectThumbnail || null,
+        gradeCode: subject.gradeCode,
+        areaCode: subject.areaCode
+      }))
+      
+      console.log('교과서 목록 로드 완료:', availableTextbooks.value.length, '개')
+    } else {
+      console.warn('API 응답 success가 false:', response.data)
+      availableTextbooks.value = []
+    }
+  } catch (error) {
+    console.error('교과서 목록 로드 실패:', error.response || error)
+    console.error('에러 상세:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    })
+    // 에러 시 빈 배열 유지
+    availableTextbooks.value = []
+  } finally {
+    isLoadingTextbooks.value = false
   }
-  // 교과서 선택 변경시 자동 검색
+}
+
+// 교과서명에서 출판사 추출 (예: "중학교 수학 1 (천재교육)" -> "천재교육")
+const extractPublisher = (subjectName) => {
+  if (!subjectName) return '출판사 정보 없음'
+  const match = subjectName.match(/\(([^)]+)\)/)
+  return match ? match[1] : '출판사 정보 없음'
+}
+
+const selectTextbook = async (textbook) => {
+  // 같은 교과서를 다시 클릭하면 선택 해제
+  if (selectedTextbook.value === textbook.id) {
+    selectedTextbook.value = null
+    // 선택 해제시 초기화
+    items.value = []
+    totalItems.value = 0
+    textbookChapters.value = []
+    selectedChapters.value = []
+  } else {
+    // 새로운 교과서 선택
+    selectedTextbook.value = textbook.id
+    console.log('선택된 교과서:', textbook)
+    
+    // 해당 교과서의 대단원 정보 가져오기
+    await fetchTextbookChapters(textbook.id)
+    
+    // 교과서 선택시 해당 교과서의 문제 자동 검색
+    searchItems()
+  }
+}
+
+// 교과서의 대단원 정보 가져오기
+const fetchTextbookChapters = async (textbookId) => {
+  try {
+    console.log('대단원 정보 조회 - 교과서 ID:', textbookId)
+    
+    // API 호출해서 해당 교과서의 대단원 정보 가져오기
+    const response = await axios.get(`/api/subject/${textbookId}/chapters`)
+    
+    if (response.data.success) {
+      textbookChapters.value = response.data.data || []
+      console.log('대단원 목록:', textbookChapters.value)
+    } else {
+      // 임시 데이터 (API가 없을 경우)
+      textbookChapters.value = [
+        { id: 1, chapterNo: 1, chapterName: '수와 연산', itemCount: 45 },
+        { id: 2, chapterNo: 2, chapterName: '문자와 식', itemCount: 38 },
+        { id: 3, chapterNo: 3, chapterName: '함수', itemCount: 42 },
+        { id: 4, chapterNo: 4, chapterName: '기하', itemCount: 35 },
+        { id: 5, chapterNo: 5, chapterName: '확률과 통계', itemCount: 30 }
+      ]
+    }
+  } catch (error) {
+    console.error('대단원 정보 조회 실패:', error)
+    // 임시 데이터
+    textbookChapters.value = [
+      { id: 1, chapterNo: 1, chapterName: '수와 연산', itemCount: 45 },
+      { id: 2, chapterNo: 2, chapterName: '문자와 식', itemCount: 38 },
+      { id: 3, chapterNo: 3, chapterName: '함수', itemCount: 42 },
+      { id: 4, chapterNo: 4, chapterName: '기하', itemCount: 35 },
+      { id: 5, chapterNo: 5, chapterName: '확률과 통계', itemCount: 30 }
+    ]
+  }
+}
+
+// 대단원 선택/해제
+const toggleChapterSelection = (chapterId) => {
+  const index = selectedChapters.value.indexOf(chapterId)
+  if (index > -1) {
+    selectedChapters.value.splice(index, 1)
+  } else {
+    selectedChapters.value.push(chapterId)
+  }
+  // 대단원 선택 변경 시 문항 검색
   searchItems()
+}
+
+const getSelectedTextbookName = () => {
+  if (!selectedTextbook.value) return ''
+  const textbook = availableTextbooks.value.find(t => t.id === selectedTextbook.value)
+  return textbook ? textbook.name : ''
 }
 
 const toggleChapter = (chapterId) => {
@@ -487,12 +685,25 @@ const resetFilters = () => {
   filters.value.chapterIds = []
   filters.value.difficulty = []
   filters.value.questionForm = []
-  selectedTextbooks.value = []
+  selectedTextbook.value = null
+  // 필터 초기화시 문항 목록도 초기화
+  items.value = []
+  totalItems.value = 0
 }
 
 const searchItems = async () => {
+  // 교과서가 선택되지 않았으면 검색하지 않음
+  if (!selectedTextbook.value) {
+    console.log('교과서가 선택되지 않았습니다.')
+    items.value = []
+    totalItems.value = 0
+    return
+  }
+  
+  // 선택된 교과서의 문항을 검색
+  console.log('문항 검색 시작 - 교과서 ID:', selectedTextbook.value)
   await itemStore.searchItems({
-    subjectId: props.examInfo.subjectId,
+    subjectId: selectedTextbook.value, // 교과서 ID를 subjectId로 전달
     gradeCode: props.examInfo.gradeCode,
     page: currentPage.value
   })
@@ -533,6 +744,12 @@ const handleImageError = (event, item) => {
   event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHRleHQtYW5jaG9yPSJtaWRkbGUiIHg9IjE1MCIgeT0iMTAwIiBzdHlsZT0iZmlsbDojYWFhO2ZvbnQtd2VpZ2h0OmJvbGQ7Zm9udC1zaXplOjE5cHg7Zm9udC1mYW1pbHk6QXJpYWwsSGVsdmV0aWNhLHNhbnMtc2VyaWY7ZG9taW5hbnQtYmFzZWxpbmU6Y2VudHJhbCI+SU1BR0UgTE9BRCBFUlJPUjwvdGV4dD48L3N2Zz4='
 }
 
+const handleTextbookImageError = (event) => {
+  console.error('교과서 이미지 로드 실패')
+  // 이미지 요소를 숨기고 부모의 아이콘이 보이도록
+  event.target.style.display = 'none'
+}
+
 const showImageModal = (imageUrl) => {
   modalImageUrl.value = imageUrl
   showModal.value = true
@@ -569,10 +786,15 @@ const handleDrop = (event, dropIndex) => {
 }
 
 const handleBack = () => {
+  console.log('Step2 handleBack 호출됨')
   if (selectedItems.value.length > 0) {
     const confirmBack = confirm('선택한 문항이 있습니다. 이전 단계로 돌아가시겠습니까?')
-    if (!confirmBack) return
+    if (!confirmBack) {
+      console.log('뒤로가기 취소됨')
+      return
+    }
   }
+  console.log('Step2에서 back 이벤트 emit')
   emit('back')
 }
 
@@ -584,6 +806,11 @@ const proceedToNext = () => {
 
 // Lifecycle
 onMounted(async () => {
+  console.log('Step2 마운트, examInfo:', props.examInfo)
+  
+  // 교과서 목록 가져오기
+  await fetchTextbooks()
+  
   // 임시 단원 데이터 설정 (개선된 형식)
   itemStore.setChapters([
     { id: 1, number: '1', name: '수와 연산' },
@@ -593,8 +820,8 @@ onMounted(async () => {
     { id: 5, number: '5', name: '확률과 통계' }
   ])
   
-  // 초기 데이터 로드
-  await searchItems()
+  // 교과서가 선택될 때까지 문항 검색하지 않음
+  // await searchItems() <- 제거
 })
 
 // Cleanup
@@ -714,8 +941,118 @@ onUnmounted(() => {
 }
 
 .textbook-icon {
-  font-size: 2.5rem;
+  width: 80px;
+  height: 100px;
   margin-bottom: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.textbook-icon img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.textbook-icon > span {
+  font-size: 2.5rem;
+}
+
+.textbook-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem;
+  color: #64748b;
+}
+
+.textbook-loading p {
+  margin-top: 1rem;
+  font-size: 0.875rem;
+}
+
+.no-textbooks {
+  text-align: center;
+  padding: 2rem;
+  color: #64748b;
+  font-size: 0.9375rem;
+}
+
+/* 대단원 섹션 */
+.chapters-section {
+  margin-top: 1rem;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+}
+
+.chapters-list {
+  max-height: 300px;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+.chapter-item {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  margin-bottom: 0.5rem;
+  background: #f9fafb;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.chapter-item:hover {
+  background: #f3f4f6;
+  border-color: #d1d5db;
+  transform: translateX(2px);
+}
+
+.chapter-item.selected {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #3b82f6;
+}
+
+.chapter-checkbox {
+  margin-right: 0.75rem;
+}
+
+.chapter-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+}
+
+.chapter-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.chapter-number {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #3b82f6;
+}
+
+.chapter-name {
+  font-size: 0.9375rem;
+  color: #24292e;
+}
+
+.chapter-count {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-weight: 500;
 }
 
 .textbook-info {
@@ -1032,7 +1369,9 @@ onUnmounted(() => {
 }
 
 .type-icon {
-  font-size: 1rem;
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 
@@ -1047,11 +1386,19 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all 0.2s ease;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
 }
 
 .btn-search:hover {
   transform: translateY(-1px);
   box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+.btn-search svg {
+  flex-shrink: 0;
 }
 
 /* 문항 섹션 */
@@ -1060,6 +1407,10 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  min-height: 0; /* flexbox 내부 스크롤을 위해 중요 */
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .items-header {
@@ -1068,7 +1419,20 @@ onUnmounted(() => {
   align-items: center;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid #e1e4e8;
-  background: white;
+  background: #fafbfc;
+  flex-shrink: 0; /* 헤더가 축소되지 않도록 */
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.selected-textbook-info {
+  color: #3b82f6;
+  font-weight: 600;
+  font-size: 0.9375rem;
 }
 
 .items-header span {
@@ -1091,10 +1455,31 @@ onUnmounted(() => {
   flex: 1;
   padding: 1.5rem;
   overflow-y: auto;
+  overflow-x: hidden;
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
   gap: 1rem;
   align-content: start;
+  max-height: calc(100vh - 400px); /* 전체 뷰포트에서 다른 요소들 높이 빼기 */
+}
+
+/* 스크롤바 스타일링 */
+.items-grid::-webkit-scrollbar {
+  width: 8px;
+}
+
+.items-grid::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.items-grid::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.items-grid::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 .item-card {
