@@ -1,11 +1,10 @@
-// src/stores/subject.js
+// src/store/userStore.js
 import { defineStore } from 'pinia'
 import axios from 'axios'
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL // 환경변수 권장
 
-export const useSubjectStore = defineStore
-('subject', {
+export const useUserStore = defineStore('userStore', {
   state: () => ({
     list: [],
     loading: false,
@@ -18,22 +17,20 @@ export const useSubjectStore = defineStore
       this.loading = false
       this.error = null
     },
-    async fetchSubjects({ force = false } = {}) {
-      // 캐시가 있고 강제 새로고침이 아니면 스킵 (옵션)
+    async fetchUsers({ force = false } = {}) {
       if (!force && this.list.length > 0) return
-
       this.clearState()
       this.loading = true
       try {
-        const { data } = await axios.get(`${API_BASE_URL}/subject`)
-        this.list = data
+        const { data } = await axios.get(`${API_BASE_URL}/users/me`)
+        this.list = Array.isArray(data) ? data : (data.content ?? [])
         this.lastFetchedAt = Date.now()
       } catch (e) {
-        this.error = e?.message || 'Failed to fetch subjects'
-        throw e // 컴포넌트에서 필요시 catch 가능
+        this.error = e?.message || 'Failed to fetch users'
+        throw e
       } finally {
         this.loading = false
       }
-    }
-  }
+    },
+  },
 })
