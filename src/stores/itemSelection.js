@@ -1,9 +1,11 @@
 /**
  * 문항 선택 Store
  * Step2 문항 선택 컴포넌트에서 사용하는 상태 관리
+ * Backend API 및 Elasticsearch 연동
  */
 
 import { defineStore } from 'pinia'
+import itemApiService from '../services/itemApi.js'
 
 export const useItemSelectionStore = defineStore('itemSelection', {
   state: () => ({
@@ -21,31 +23,53 @@ export const useItemSelectionStore = defineStore('itemSelection', {
     
     // 필터 설정
     filters: {
-      chapterIds: [],
-      difficulty: [],
-      questionForm: [],
-      keyword: ''
+      subjects: [], // 과목 필터
+      grades: [], // 학년 필터
+      difficulties: [], // 난이도 필터
+      categories: [], // 카테고리 필터
+      keyword: '', // 검색 키워드
+      chapterIds: [] // 단원 ID 필터 (기존 호환성)
     },
     
     // 로딩 상태
     isLoading: false,
+    isSimilarItemsLoading: false,
+    isSubjectsLoading: false,
     
     // 에러 상태
     error: null,
+    similarItemsError: null,
+    subjectsError: null,
     
-    // 단원 목록 (캐시)
-    chapters: [],
+    // 교과서/과목 정보
+    subjects: [],
+    textbooks: {},
+    chapters: [], // 기존 호환성 유지
     
     // 정렬 설정
-    sortBy: 'chapterCode', // chapterCode, difficulty, questionForm
-    sortOrder: 'asc', // asc, desc
+    sortBy: 'createdAt', // createdAt, difficulty, chapterCode
+    sortOrder: 'desc', // asc, desc
     
     // 문항 상세 정보 캐시
     itemDetailsCache: new Map(),
     
+    // 유사 문항 캐시 (Elasticsearch)
+    similarItemsCache: new Map(),
+    
+    // 검색 기록 (UX 개선용)
+    searchHistory: [],
+    maxSearchHistory: 10,
+    
     // 이미지 미리보기 설정
     previewItem: null,
-    showPreview: false
+    showPreview: false,
+    
+    // 통계 정보
+    chapterCounts: {},
+    itemStats: null,
+    
+    // 마지막 검색 파라미터 (캐싱용)
+    lastSearchParams: null
   }),
 
   getters: {
@@ -88,9 +112,11 @@ export const useItemSelectionStore = defineStore('itemSelection', {
      * 필터가 적용되었는지 확인
      */
     hasActiveFilters: (state) => {
-      return state.filters.chapterIds.length > 0 ||
-             state.filters.difficulty.length > 0 ||
-             state.filters.questionForm.length > 0 ||
+      return state.filters.subjects.length > 0 ||
+             state.filters.grades.length > 0 ||
+             state.filters.difficulties.length > 0 ||
+             state.filters.categories.length > 0 ||
+             state.filters.chapterIds.length > 0 ||
              state.filters.keyword !== ''
     },
 
@@ -99,7 +125,7 @@ export const useItemSelectionStore = defineStore('itemSelection', {
      */
     totalPoints: (state) => {
       return state.selectedItems.reduce((sum, item) => {
-        return sum + (item.points || 5) // 기본 배점 5점
+        return sum + (item.points || item.score || 5) // 기본 배점 5점
       }, 0)
     },
 
@@ -107,12 +133,27 @@ export const useItemSelectionStore = defineStore('itemSelection', {
      * 난이도별 선택 문항 수
      */
     selectedByDifficulty: (state) => {
-      const counts = { H: 0, M: 0, L: 0 }
+      const counts = { H: 0, M: 0, L: 0, high: 0, medium: 0, low: 0 }
       state.selectedItems.forEach(item => {
-        const difficulty = item.difficulty?.code
-        if (difficulty && counts[difficulty] !== undefined) {
-          counts[difficulty]++
+        const difficulty = item.difficulty?.code || item.difficulty
+        if (difficulty) {
+          // Handle both legacy (H/M/L) and new (high/medium/low) formats
+          if (counts[difficulty] !== undefined) {
+            counts[difficulty]++
+          }
         }
+      })
+      return counts
+    },
+
+    /**
+     * 과목별 선택 문항 수
+     */
+    selectedBySubject: (state) => {
+      const counts = {}
+      state.selectedItems.forEach(item => {
+        const subject = item.subject?.name || item.subjectName || '기타'
+        counts[subject] = (counts[subject] || 0) + 1
       })
       return counts
     },
@@ -123,19 +164,63 @@ export const useItemSelectionStore = defineStore('itemSelection', {
     selectedByType: (state) => {
       const counts = {}
       state.selectedItems.forEach(item => {
-        const type = item.questionForm?.name || '기타'
+        const type = item.questionForm?.name || item.questionType || '기타'
         counts[type] = (counts[type] || 0) + 1
       })
       return counts
+    },
+
+    /**
+     * 로딩 상태 확인 (전체)
+     */
+    isAnyLoading: (state) => {
+      return state.isLoading || state.isSimilarItemsLoading || state.isSubjectsLoading
+    },
+
+    /**
+     * 에러 상태 확인 (전체)
+     */
+    hasAnyError: (state) => {
+      return state.error || state.similarItemsError || state.subjectsError
+    },
+
+    /**
+     * 검색 기록에서 최근 검색어 목록
+     */
+    recentSearchKeywords: (state) => {
+      return state.searchHistory
+        .filter(history => history.keyword && history.keyword.trim())
+        .map(history => history.keyword)
+        .slice(0, 5) // 최근 5개만
+    },
+
+    /**
+     * 유사 문항 캐시에서 특정 문항의 유사 항목
+     */
+    getSimilarItems: (state) => {
+      return (itemId) => {
+        return state.similarItemsCache.get(itemId) || []
+      }
+    },
+
+    /**
+     * 텍스트북 정보를 과목별로 정리
+     */
+    textbooksBySubject: (state) => {
+      return state.textbooks
     }
   },
 
   actions: {
+    // ===============================
+    // 문항 목록 관리 Actions
+    // ===============================
+
     /**
      * 문항 목록 설정
      */
     setItems(items) {
-      this.items = items
+      this.items = items || []
     },
 
     /**
@@ -228,6 +313,241 @@ export const useItemSelectionStore = defineStore('itemSelection', {
       this.selectedItems = shuffled
     },
 
+    // ===============================
+    // API 연동 Actions
+    // ===============================
+
+    /**
+     * 문항 검색 (실제 API 호출)
+     */
+    async searchItems(searchParams = {}) {
+      this.isLoading = true
+      this.error = null
+      
+      try {
+        // 검색 파라미터 준비
+        const params = {
+          keyword: this.filters.keyword || searchParams.keyword || '',
+          subjects: this.filters.subjects.length > 0 ? this.filters.subjects : (searchParams.subjects || []),
+          grades: this.filters.grades.length > 0 ? this.filters.grades : (searchParams.grades || []),
+          difficulties: this.filters.difficulties.length > 0 ? this.filters.difficulties : (searchParams.difficulties || []),
+          categories: this.filters.categories.length > 0 ? this.filters.categories : (searchParams.categories || []),
+          page: (searchParams.page || this.currentPage) - 1, // 0-based indexing
+          size: searchParams.size || this.itemsPerPage,
+          sortBy: this.sortBy,
+          sortDirection: this.sortOrder
+        }
+
+        // 검색 기록에 추가
+        if (params.keyword && params.keyword.trim()) {
+          this.addToSearchHistory({
+            keyword: params.keyword,
+            timestamp: new Date().toISOString(),
+            resultCount: 0 // 결과 받은 후 업데이트
+          })
+        }
+
+        // API 호출
+        const result = await itemApiService.searchItems(params)
+        
+        if (result.success) {
+          this.setItems(result.data)
+          this.setPaginationInfo({
+            currentPage: result.currentPage + 1, // 1-based for UI
+            totalPages: result.totalPages,
+            totalItems: result.totalElements
+          })
+
+          // 검색 기록 업데이트 (결과 수)
+          if (params.keyword && params.keyword.trim()) {
+            this.updateSearchHistoryResultCount(params.keyword, result.totalElements)
+          }
+
+          // 마지막 검색 파라미터 저장
+          this.lastSearchParams = params
+
+        } else {
+          throw new Error(result.error || 'Search failed')
+        }
+        
+      } catch (error) {
+        console.error('문항 검색 실패:', error)
+        this.error = error.message || 'Failed to search items'
+        this.setItems([])
+        this.setPaginationInfo({ currentPage: 1, totalPages: 0, totalItems: 0 })
+      } finally {
+        this.isLoading = false
+      }
+    },
+
+    /**
+     * 문항 상세 정보 가져오기
+     */
+    async getItemDetail(itemId, useCache = true) {
+      if (!itemId) {
+        throw new Error('Item ID is required')
+      }
+
+      // 캐시 확인
+      if (useCache && this.itemDetailsCache.has(itemId)) {
+        return this.itemDetailsCache.get(itemId)
+      }
+
+      try {
+        const result = await itemApiService.getItemDetail(itemId)
+        
+        if (result.success) {
+          // 캐시에 저장
+          this.itemDetailsCache.set(itemId, result.data)
+          return result.data
+        } else {
+          throw new Error(result.error || 'Failed to load item details')
+        }
+      } catch (error) {
+        console.error('문항 상세 정보 가져오기 실패:', error)
+        throw error
+      }
+    },
+
+    /**
+     * Elasticsearch를 사용한 유사 문항 검색
+     */
+    async searchSimilarItems(itemId, options = {}) {
+      if (!itemId) {
+        throw new Error('Item ID is required for similarity search')
+      }
+
+      // 캐시 확인
+      const cacheKey = `${itemId}_${JSON.stringify(options)}`
+      if (this.similarItemsCache.has(cacheKey)) {
+        return this.similarItemsCache.get(cacheKey)
+      }
+
+      this.isSimilarItemsLoading = true
+      this.similarItemsError = null
+      
+      try {
+        const params = {
+          itemId,
+          subjects: options.subjects || this.filters.subjects,
+          grades: options.grades || this.filters.grades,
+          limit: options.limit || 10,
+          minScore: options.minScore || 0.1,
+          content: options.content || ''
+        }
+
+        const result = await itemApiService.getSimilarItems(params)
+        
+        if (result.success) {
+          // 캐시에 저장
+          this.similarItemsCache.set(cacheKey, result.data)
+          return result.data
+        } else {
+          throw new Error(result.error || 'Failed to find similar items')
+        }
+        
+      } catch (error) {
+        console.error('유사 문항 검색 실패:', error)
+        this.similarItemsError = error.message || 'Failed to search similar items'
+        throw error
+      } finally {
+        this.isSimilarItemsLoading = false
+      }
+    },
+
+    /**
+     * 과목/교과서 정보 가져오기
+     */
+    async loadSubjects(options = {}) {
+      this.isSubjectsLoading = true
+      this.subjectsError = null
+      
+      try {
+        const params = {
+          includeTextbooks: options.includeTextbooks !== false, // 기본적으로 포함
+          grades: options.grades || []
+        }
+
+        const result = await itemApiService.getSubjects(params)
+        
+        if (result.success) {
+          this.subjects = result.data
+          
+          // 텍스트북 정보 별도 저장
+          if (params.includeTextbooks) {
+            const textbooks = {}
+            result.data.forEach(subject => {
+              if (subject.textbooks && subject.textbooks.length > 0) {
+                textbooks[subject.code] = subject.textbooks
+              }
+            })
+            this.textbooks = textbooks
+          }
+          
+          return result.data
+        } else {
+          throw new Error(result.error || 'Failed to load subjects')
+        }
+        
+      } catch (error) {
+        console.error('과목 정보 가져오기 실패:', error)
+        this.subjectsError = error.message || 'Failed to load subjects'
+        throw error
+      } finally {
+        this.isSubjectsLoading = false
+      }
+    },
+
+    /**
+     * 단원별 문항 수 통계 가져오기
+     */
+    async loadChapterCounts(filters = {}) {
+      try {
+        const params = {
+          subjects: filters.subjects || this.filters.subjects,
+          grades: filters.grades || this.filters.grades,
+          categories: filters.categories || this.filters.categories
+        }
+
+        const result = await itemApiService.getChapterCounts(params)
+        
+        if (result.success) {
+          this.chapterCounts = result.data
+          return result.data
+        } else {
+          throw new Error(result.error || 'Failed to load chapter counts')
+        }
+        
+      } catch (error) {
+        console.error('단원별 통계 가져오기 실패:', error)
+        throw error
+      }
+    },
+
+    /**
+     * 문항 통계 정보 가져오기
+     */
+    async loadItemStats(filters = {}) {
+      try {
+        const result = await itemApiService.getItemStats(filters)
+        
+        if (result.success) {
+          this.itemStats = result.data
+          return result.data
+        } else {
+          throw new Error(result.error || 'Failed to load item statistics')
+        }
+        
+      } catch (error) {
+        console.error('문항 통계 가져오기 실패:', error)
+        throw error
+      }
+    },
+
+    // ===============================
+    // 필터 및 검색 관리 Actions
+    // ===============================
+
     /**
      * 필터 설정
      */
@@ -240,12 +560,62 @@ export const useItemSelectionStore = defineStore('itemSelection', {
      */
     resetFilters() {
       this.filters = {
-        chapterIds: [],
-        difficulty: [],
-        questionForm: [],
-        keyword: ''
+        subjects: [],
+        grades: [],
+        difficulties: [],
+        categories: [],
+        keyword: '',
+        chapterIds: []
       }
     },
+
+    /**
+     * 검색 기록 추가
+     */
+    addToSearchHistory(searchData) {
+      // 중복 제거 (동일한 키워드가 있으면 제거)
+      this.searchHistory = this.searchHistory.filter(
+        item => item.keyword !== searchData.keyword
+      )
+      
+      // 새 항목을 맨 앞에 추가
+      this.searchHistory.unshift(searchData)
+      
+      // 최대 개수 제한
+      if (this.searchHistory.length > this.maxSearchHistory) {
+        this.searchHistory = this.searchHistory.slice(0, this.maxSearchHistory)
+      }
+    },
+
+    /**
+     * 검색 기록에서 결과 수 업데이트
+     */
+    updateSearchHistoryResultCount(keyword, resultCount) {
+      const historyItem = this.searchHistory.find(item => item.keyword === keyword)
+      if (historyItem) {
+        historyItem.resultCount = resultCount
+      }
+    },
+
+    /**
+     * 검색 기록 삭제
+     */
+    removeFromSearchHistory(keyword) {
+      this.searchHistory = this.searchHistory.filter(
+        item => item.keyword !== keyword
+      )
+    },
+
+    /**
+     * 검색 기록 전체 삭제
+     */
+    clearSearchHistory() {
+      this.searchHistory = []
+    },
+
+    // ===============================
+    // 상태 관리 Actions
+    // ===============================
 
     /**
      * 페이지 변경
@@ -257,10 +627,11 @@ export const useItemSelectionStore = defineStore('itemSelection', {
     /**
      * 페이지네이션 정보 설정
      */
-    setPaginationInfo({ currentPage, totalPages, totalItems }) {
-      this.currentPage = currentPage || this.currentPage
-      this.totalPages = totalPages || this.totalPages
-      this.totalItems = totalItems || this.totalItems
+    setPaginationInfo({ currentPage, totalPages, totalItems, size }) {
+      if (currentPage !== undefined) this.currentPage = currentPage
+      if (totalPages !== undefined) this.totalPages = totalPages
+      if (totalItems !== undefined) this.totalItems = totalItems
+      if (size !== undefined) this.itemsPerPage = size
     },
 
     /**
@@ -278,10 +649,10 @@ export const useItemSelectionStore = defineStore('itemSelection', {
     },
 
     /**
-     * 단원 목록 설정
+     * 단원 목록 설정 (기존 호환성)
      */
     setChapters(chapters) {
-      this.chapters = chapters
+      this.chapters = chapters || []
     },
 
     /**
@@ -323,81 +694,11 @@ export const useItemSelectionStore = defineStore('itemSelection', {
     },
 
     /**
-     * 문항 검색 (API 호출 예시)
+     * 캐시 정리
      */
-    async searchItems({ subjectId, gradeCode, page = 1 }) {
-      this.setLoading(true)
-      this.setError(null)
-      
-      try {
-        // API 호출 예시 (백엔드 구현 후 활성화)
-        // const params = {
-        //   subjectId,
-        //   gradeCode,
-        //   chapterIds: this.filters.chapterIds,
-        //   difficulty: this.filters.difficulty,
-        //   questionForm: this.filters.questionForm,
-        //   keyword: this.filters.keyword,
-        //   page: page - 1,
-        //   size: this.itemsPerPage,
-        //   sort: `${this.sortBy},${this.sortOrder}`
-        // }
-        
-        // const response = await axios.get('/api/items/search', { params })
-        // this.setItems(response.data.content)
-        // this.setPaginationInfo({
-        //   currentPage: page,
-        //   totalPages: response.data.totalPages,
-        //   totalItems: response.data.totalElements
-        // })
-        
-        // 임시 Mock 데이터
-        const mockItems = this.generateMockItems(page)
-        this.setItems(mockItems)
-        this.setPaginationInfo({
-          currentPage: page,
-          totalPages: 5,
-          totalItems: 100
-        })
-        
-      } catch (error) {
-        console.error('문항 검색 실패:', error)
-        this.setError(error.message)
-      } finally {
-        this.setLoading(false)
-      }
-    },
-
-    /**
-     * Mock 데이터 생성 (개발용)
-     */
-    generateMockItems(page) {
-      const items = []
-      const startId = (page - 1) * this.itemsPerPage + 1
-      
-      for (let i = 0; i < this.itemsPerPage; i++) {
-        items.push({
-          itemId: startId + i,
-          hasImageData: i % 3 === 0,
-          hasHtmlData: i % 3 !== 0,
-          questionImageUrl: i % 3 === 0 
-            ? `https://via.placeholder.com/300x200?text=Item+${startId + i}` 
-            : null,
-          questionHtml: `<p>문항 ${startId + i}의 내용입니다.</p>`,
-          difficulty: {
-            code: ['H', 'M', 'L'][i % 3],
-            name: ['상', '중', '하'][i % 3]
-          },
-          questionForm: {
-            code: ['MC', 'SA', 'ES'][i % 3],
-            name: ['객관식', '주관식', '서술형'][i % 3]
-          },
-          chapterName: `${Math.floor(i / 4) + 1}단원`,
-          points: 5 // 기본 배점
-        })
-      }
-      
-      return items
+    clearCaches() {
+      this.itemDetailsCache.clear()
+      this.similarItemsCache.clear()
     },
 
     /**
@@ -409,18 +710,83 @@ export const useItemSelectionStore = defineStore('itemSelection', {
       this.currentPage = 1
       this.totalPages = 1
       this.totalItems = 0
+      this.itemsPerPage = 20
+      
       this.filters = {
-        chapterIds: [],
-        difficulty: [],
-        questionForm: [],
-        keyword: ''
+        subjects: [],
+        grades: [],
+        difficulties: [],
+        categories: [],
+        keyword: '',
+        chapterIds: []
       }
+      
       this.isLoading = false
+      this.isSimilarItemsLoading = false
+      this.isSubjectsLoading = false
+      
       this.error = null
+      this.similarItemsError = null
+      this.subjectsError = null
+      
+      this.subjects = []
+      this.textbooks = {}
       this.chapters = []
-      this.itemDetailsCache.clear()
+      this.chapterCounts = {}
+      this.itemStats = null
+      
+      this.searchHistory = []
+      this.lastSearchParams = null
+      
+      this.clearCaches()
+      
       this.previewItem = null
       this.showPreview = false
+    },
+
+    // ===============================
+    // 유틸리티 Actions
+    // ===============================
+
+    /**
+     * 현재 검색 조건으로 재검색
+     */
+    async refreshSearch() {
+      if (this.lastSearchParams) {
+        await this.searchItems(this.lastSearchParams)
+      }
+    },
+
+    /**
+     * 선택된 문항들의 유사 문항 일괄 검색
+     */
+    async loadSimilarItemsForSelected(options = {}) {
+      const promises = this.selectedItems.map(item => 
+        this.searchSimilarItems(item.itemId, options).catch(error => {
+          console.warn(`유사 문항 검색 실패 (itemId: ${item.itemId}):`, error)
+          return []
+        })
+      )
+      
+      return await Promise.all(promises)
+    },
+
+    /**
+     * 문항 벌크 작업
+     */
+    async bulkItemOperation(operation, itemIds, operationData = {}) {
+      try {
+        const result = await itemApiService.bulkItemOperation(operation, itemIds, operationData)
+        
+        if (result.success) {
+          return result
+        } else {
+          throw new Error(result.error || 'Bulk operation failed')
+        }
+      } catch (error) {
+        console.error('벌크 작업 실패:', error)
+        throw error
+      }
     }
   }
 })
