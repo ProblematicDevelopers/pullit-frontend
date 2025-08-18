@@ -4,9 +4,13 @@ import { tokenManager } from './auth'
 // API 기본 URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
+// 프로덕션 환경인지 확인 (nginx 프록시 사용 여부)
+const isProduction = import.meta.env.PROD
+
 // Axios 인스턴스 생성
 const api = axios.create({
-  baseURL: `${API_BASE_URL}/api`,
+  // 프로덕션: nginx가 /api 프록시 처리, 로컬: 직접 /api 경로 추가
+  baseURL: isProduction ? API_BASE_URL : `${API_BASE_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
   },
@@ -40,7 +44,11 @@ api.interceptors.response.use(
       try {
         const refreshToken = tokenManager.getRefreshToken()
         if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
+          // 리프레시 토큰 요청도 환경에 따라 분기
+          const refreshUrl = isProduction 
+            ? `${API_BASE_URL}/auth/refresh`
+            : `${API_BASE_URL}/api/auth/refresh`
+          const response = await axios.post(refreshUrl, {
             refreshToken
           })
           
