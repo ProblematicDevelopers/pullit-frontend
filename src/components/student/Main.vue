@@ -1,6 +1,6 @@
 <!-- src/components/student/StudentMain.vue -->
 <template>
-  <div class="hero-wrap py-5">
+<div class="hero-wrap py-5">
     <!-- 기능 카드 3개 -->
     <div class="container mt-4">
       <div class="row g-4">
