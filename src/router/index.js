@@ -18,7 +18,7 @@ import { requireAuth, requireRole, preventAuthenticated } from './guards'
 
 const routes = [
   { path: '/', name: 'Home', component: Home },
-  
+
   // 로그인 페이지
   {
     path: '/login',
@@ -36,8 +36,10 @@ const routes = [
     path: '/exam/wizard',
     name: 'ExamWizard',
     component: TestWizardView,
+    beforeEnter: requireAuth,  // 인증 가드 추가
     meta: {
-      requiresAuth: false
+      requiresAuth: true,
+      role: 'teacher'  // 선생님만 접근 가능
     }
   },
 
@@ -55,7 +57,7 @@ const routes = [
       // { path: 'result/:id', name: 'student.result', component: StudentResult },
     ],
   },
-  
+
   // 학급관리 페이지 (대시보드)
   {
     path: '/class-management',

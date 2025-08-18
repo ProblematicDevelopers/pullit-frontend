@@ -583,6 +583,7 @@ const viewMode = ref('card') // 'card' or 'list'
 const sortBy = ref('relevance')
 const selectedExamId = ref(null)
 const selectedExamName = ref('')
+const selectedExamObject = ref(null) // 선택한 exam 객체 전체 저장
 const isCreatingNew = ref(false)
 const showSelectedExamPanel = ref(false)
 const popularFilter = ref('week')
@@ -1048,6 +1049,7 @@ const selectExam = (exam) => {
   console.log('기존 시험지 선택:', exam)
   selectedExamId.value = exam.id
   selectedExamName.value = exam.title || exam.examName
+  selectedExamObject.value = exam // exam 객체 전체 저장
   store.setMode('edit')
   store.setSelectedExam(exam)
   // 하단 패널 표시 (바로 이동하지 않고 사용자가 선택)
@@ -1060,7 +1062,9 @@ const editExam = (exam) => {
 }
 
 const proceedWithSelectedExam = () => {
-  if (selectedExamId.value) {
+  if (selectedExamId.value && selectedExamObject.value) {
+    // exam 객체 전체를 emit - TestWizardView에서 examInfo를 설정하기 위해
+    emit('selectExisting', selectedExamObject.value)
     emit('next', { mode: 'edit', examId: selectedExamId.value })
   }
 }
@@ -1073,6 +1077,7 @@ const previewExam = (exam) => {
 const cancelSelection = () => {
   selectedExamId.value = null
   selectedExamName.value = ''
+  selectedExamObject.value = null
   isCreatingNew.value = false
 }
 
@@ -1252,9 +1257,12 @@ const transformSearchResults = (exams) => {
   return exams.map(exam => ({
     id: exam.id,
     title: exam.examName,
-    subject: exam.subjectName || 'Unknown', // subjectName 사용
+    subject: exam.subjectName || exam.areaName || 'Unknown', // subjectName 또는 areaName 사용
     grade: exam.gradeName || '', // gradeName 그대로 사용
     gradeCode: exam.gradeCode || '', // gradeCode도 저장
+    areaCode: exam.areaCode || '', // areaCode 추가
+    areaName: exam.areaName || '', // areaName 추가
+    subjectId: exam.subjectId, // 교과서 ID도 추가
     chapterName: exam.chapterName || exam.examType || '단원평가',
     questionCount: exam.itemCount || 0, // itemCount 사용
     updatedAt: exam.updatedDate || new Date(),
