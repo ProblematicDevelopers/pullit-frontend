@@ -7,6 +7,9 @@
     </main>
     <!-- 팝업 창이 아닐 때만 푸터 표시 -->
     <Footer v-if="!isPopup" />
+    
+    <!-- 전역 Toast 컴포넌트 -->
+    <Toast />
   </div>
 </template>
 <script>
@@ -14,9 +17,10 @@ import { computed } from 'vue'
 import { useRoute } from 'vue-router'
 import Header from '@/components/common/Header.vue'
 import Footer from '@/components/common/Footer.vue'
+import Toast from '@/components/common/Toast.vue'
 
 export default {
-  components: { Header, Footer },
+  components: { Header, Footer, Toast },
   setup() {
     const route = useRoute()
     
