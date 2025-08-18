@@ -13,7 +13,7 @@ RUN npm ci
 COPY . .
 
 # 빌드 시 API URL을 build argument로 받음
-ARG VITE_API_URL=http://localhost/api
+ARG VITE_API_URL=/api
 ENV VITE_API_URL=$VITE_API_URL
 
 # 프로덕션 빌드
