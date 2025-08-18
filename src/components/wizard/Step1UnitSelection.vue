@@ -94,8 +94,8 @@
         </div>
         <div class="footer-center">
           <span class="selection-status">
-            <span v-if="examInfo.gradeCode && examInfo.subjectId" class="status-complete">
-              {{ examInfo.gradeName }} {{ examInfo.subjectName }} 선택됨
+            <span v-if="examInfo.gradeCode && examInfo.areaCode" class="status-complete">
+              {{ examInfo.gradeName }} {{ examInfo.areaName }} 선택됨
             </span>
             <span v-else class="status-incomplete">
               학년과 과목을 선택해주세요
@@ -159,7 +159,7 @@ const examInfo = ref({
 // 학년 옵션
 const grades = ref([
   { code: '07', name: '중학교 1학년', grade: '1', desc: '중등 1학년 과정' },
-  { code: '08', name: '중학교 2학년', grade: '2', desc: '중등 2학년 과정' },
+  { code: '08', name: '중학교 2학년', grade: '2', desc: '중등 2학년 과정' },  
   { code: '09', name: '중학교 3학년', grade: '3', desc: '중등 3학년 과정' }
 ])
 
@@ -185,7 +185,7 @@ const terms = ref([
  * 문제 선택 단계로 진행 가능 여부
  */
 const canProceedToItemSelection = computed(() => {
-  return examInfo.value.gradeCode && examInfo.value.subjectId
+  return examInfo.value.gradeCode && examInfo.value.areaCode
 })
 
 // ===== 메서드 =====
@@ -203,8 +203,12 @@ const selectGrade = (grade) => {
  * 과목 선택
  */
 const selectSubject = (subject) => {
-  examInfo.value.subjectId = subject.id
-  examInfo.value.subjectName = subject.name
+  // subject.id는 areaCode (MA, KO 등)이고
+  // 실제 subjectId는 Step2에서 교과서 선택시 결정됨
+  examInfo.value.areaCode = subject.id // MA, KO, EN, SC, SO
+  examInfo.value.areaName = subject.name // 수학, 국어, 영어, 과학, 사회
+  examInfo.value.subjectArea = subject.name // 과목 영역 추가 (수학, 국어 등)
+  examInfo.value.subject = subject.name // 호환성을 위해 subject 필드도 추가
   console.log('과목 선택:', examInfo.value)
   console.log('진행 가능:', canProceedToItemSelection.value)
 }

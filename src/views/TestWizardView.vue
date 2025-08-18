@@ -202,8 +202,9 @@ const handleSelectExisting = (exam) => {
   store.setExamInfo({
     gradeCode: exam.gradeCode,
     gradeName: exam.gradeName || exam.grade,
-    subjectId: exam.areaCode, // areaCode를 subjectId로 사용
-    subjectName: exam.areaName || exam.subject
+    areaCode: exam.areaCode, // 과목 코드 (MA, KO, EN, SC, SO)
+    areaName: exam.areaName || exam.subject, // 과목명 (수학, 국어 등)
+    subject: exam.areaName || exam.subject // 호환성
   })
   
   console.log('설정된 examInfo:', store.examInfo)
