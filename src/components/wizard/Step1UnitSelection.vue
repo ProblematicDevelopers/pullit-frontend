@@ -1,341 +1,206 @@
 <!--
-  시험지 마법사 Step 1: 단원선택 컴포넌트
+  시험지 마법사 Step 1: 모드 선택 및 시험지 설정
   
   이 컴포넌트는 시험지 생성 마법사의 첫 번째 단계를 담당합니다.
   주요 기능:
-  - 과목 정보 표시 (상단 헤더)
-  - 왼쪽 패널: 단원 트리 구조로 챕터 및 단원지 선택
-  - 오른쪽 패널: 문제 유형 설정 및 문항 수 설정
-  - 하단: 다음 단계 진행 버튼
-  
-  데이터 흐름:
-  - Pinia store에서 단원 데이터 및 설정 관리
-  - 사용자 선택에 따른 실시간 문항 수 계산
-  - 선택 완료 시 Step 2로 진행
+  - 모드 선택: 새로 만들기 vs 기존 수정
+  - 학년/과목 선택
+  - 기존 시험지 선택
+  - 시험지 기본 정보 설정
 -->
 
 <template>
   <div class="step1-container">
-    <!-- 과목 정보 헤더 -->
-    <div class="subject-header">
-      <div class="subject-info">
-        <!-- 과목명과 교육과정 정보 표시 -->
-        <h3 class="subject-title">{{ subject.name }}</h3>
-        <p class="subject-curriculum">{{ subject.curriculum }}</p>
+    <!-- 학년/과목 선택 화면 -->
+    <div class="selection-container">
+      <div class="selection-header">
+        <button class="btn-back" @click="handleCancel">← 이전</button>
+        <h2>학년 및 과목 선택</h2>
+        <p class="header-desc">시험지를 만들 학년과 과목을 선택해주세요</p>
       </div>
-      
-      <!-- 헤더 액션 버튼들 -->
-      <div class="header-actions">
-        <button 
-          class="btn btn-secondary btn-sm" 
-          @click="handleResearch"
-          title="다른 과목 검색"
-        >
-          재검색
-        </button>
-        <button 
-          class="btn btn-primary btn-sm" 
-          @click="handleShowScope"
-          title="선택된 단원의 출제범위 보기"
-        >
-          출제범위
-        </button>
-      </div>
-    </div>
 
-    <!-- 메인 콘텐츠 영역 -->
-    <div class="main-content">
-      <!-- 왼쪽 패널: 단원 트리 -->
-      <div class="left-panel">
-        <!-- 단원 선택 패널 헤더 -->
-        <div class="panel-header">
-          <h4>단원 선택</h4>
-          <div class="select-actions">
-            <!-- 전체 선택/해제 버튼 -->
-            <button 
-              class="btn btn-text btn-sm" 
-              @click="selectAll"
-              title="모든 단원지 선택"
+      <div class="selection-content">
+        <!-- 학년 선택 섹션 -->
+        <div class="section-card">
+          <div class="section-title">
+            <span class="section-icon">🎓</span>
+            <h3>학년 선택</h3>
+          </div>
+          <div class="grade-grid">
+            <div 
+              v-for="grade in grades" 
+              :key="grade.code"
+              :class="['grade-card', { 'selected': examInfo.gradeCode === grade.code }]"
+              @click="selectGrade(grade)"
             >
-              전체선택
-            </button>
-            <button 
-              class="btn btn-text btn-sm" 
-              @click="deselectAll"
-              title="모든 단원지 선택 해제"
-            >
-              전체해제
-            </button>
+              <div class="grade-icon">
+                <span v-if="examInfo.gradeCode === grade.code">✓</span>
+                <span v-else>{{ grade.icon }}</span>
+              </div>
+              <div class="grade-name">{{ grade.name }}</div>
+              <div class="grade-desc">{{ grade.desc }}</div>
+            </div>
           </div>
         </div>
-        
-        <!-- 단원 트리 구조 -->
-        <div class="unit-tree">
-          <div 
-            v-for="chapter in chapters" 
-            :key="chapter.id"
-            class="chapter-item"
+
+        <!-- 과목 선택 섹션 -->
+        <div class="section-card">
+          <div class="section-title">
+            <span class="section-icon">📚</span>
+            <h3>과목 선택</h3>
+          </div>
+          <div class="subject-grid">
+            <div 
+              v-for="subject in subjects" 
+              :key="subject.id"
+              :class="['subject-card', { 'selected': examInfo.subjectId === subject.id }]"
+              @click="selectSubject(subject)"
+            >
+              <div class="subject-icon">{{ subject.icon }}</div>
+              <div class="subject-name">{{ subject.name }}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 하단 액션 버튼들 -->
+      <div class="footer-actions">
+        <div class="footer-left">
+          <button 
+            class="btn btn-secondary" 
+            @click="handleCancel"
           >
-            <!-- 챕터 헤더 (클릭 시 펼치기/접기) -->
-            <div 
-              class="chapter-header"
-              @click="toggleChapter(chapter.id)"
-            >
-              <div class="chapter-info">
-                <!-- 펼침/접힘 표시 화살표 -->
-                <span 
-                  class="expand-icon"
-                  :class="{ expanded: chapter.expanded }"
-                >
-                  ▶
-                </span>
-                <span class="chapter-name">{{ chapter.name }}</span>
-              </div>
-              <!-- 챕터 내 선택된 문항 수 표시 -->
-              <span class="question-count">
-                {{ getChapterQuestionCount(chapter) }}문항
-              </span>
-            </div>
-
-            <!-- 단원지 목록 (챕터가 펼쳐졌을 때만 표시) -->
-            <div 
-              v-if="chapter.expanded" 
-              class="papers-list"
-            >
-              <div 
-                v-for="paper in chapter.papers"
-                :key="paper.id"
-                class="paper-item"
-              >
-                <!-- 단원지 체크박스 -->
-                <label class="form-check">
-                  <input
-                    type="checkbox"
-                    v-model="paper.selected"
-                    @change="updateQuestionCounts"
-                  />
-                  <span class="paper-title">{{ paper.title }}</span>
-                  <span class="paper-count">({{ paper.questionCount }}문항)</span>
-                </label>
-              </div>
-            </div>
-          </div>
+            취소
+          </button>
+        </div>
+        <div class="footer-center">
+          <span class="selection-status">
+            <span v-if="examInfo.gradeCode && examInfo.subjectId" class="status-complete">
+              {{ examInfo.gradeName }} {{ examInfo.subjectName }} 선택됨
+            </span>
+            <span v-else class="status-incomplete">
+              학년과 과목을 선택해주세요
+            </span>
+          </span>
+        </div>
+        <div class="footer-right">
+          <button 
+            class="btn btn-primary"
+            :disabled="!canProceedToItemSelection"
+            @click="proceedToItemSelection"
+          >
+            다음 단계 →
+          </button>
         </div>
       </div>
-
-      <!-- 오른쪽 패널: 문제 설정 -->
-      <div class="right-panel">
-        <!-- 문제 유형 설정 섹션 -->
-        <div class="settings-section">
-          <h4>문제 유형</h4>
-          
-          <!-- 문제 정렬 방식 선택 -->
-          <div class="form-group">
-            <label>문제 유형</label>
-            <select class="form-control" v-model="wizardData.testType">
-              <option value="단원순">단원순</option>
-              <option value="난이도순">난이도순</option>
-              <option value="혼합">혼합</option>
-            </select>
-          </div>
-          
-          <!-- 기본 난이도 설정 -->
-          <div class="form-group">
-            <label>기본 난이도</label>
-            <select class="form-control" v-model="wizardData.difficulty">
-              <option value="하">하</option>
-              <option value="중">중</option>
-              <option value="상">상</option>
-            </select>
-          </div>
-        </div>
-
-        <!-- 문항 수 설정 섹션 -->
-        <div class="settings-section">
-          <h4>문항 수 설정</h4>
-          
-          <!-- 난이도별 문항 수 입력 -->
-          <div class="difficulty-settings">
-            <div class="difficulty-item">
-              <label>하 수준</label>
-              <input 
-                type="number" 
-                class="form-control"
-                v-model.number="wizardData.questionTypes['하']"
-                :max="availableQuestionsByDifficulty['하']"
-                min="0"
-                @input="validateQuestionCount('하')"
-              />
-              <span class="available-count">
-                / {{ availableQuestionsByDifficulty['하'] }}
-              </span>
-            </div>
-            
-            <div class="difficulty-item">
-              <label>중 수준</label>
-              <input 
-                type="number" 
-                class="form-control"
-                v-model.number="wizardData.questionTypes['중']"
-                :max="availableQuestionsByDifficulty['중']"
-                min="0"
-                @input="validateQuestionCount('중')"
-              />
-              <span class="available-count">
-                / {{ availableQuestionsByDifficulty['중'] }}
-              </span>
-            </div>
-            
-            <div class="difficulty-item">
-              <label>상 수준</label>
-              <input 
-                type="number" 
-                class="form-control"
-                v-model.number="wizardData.questionTypes['상']"
-                :max="availableQuestionsByDifficulty['상']"
-                min="0"
-                @input="validateQuestionCount('상')"
-              />
-              <span class="available-count">
-                / {{ availableQuestionsByDifficulty['상'] }}
-              </span>
-            </div>
-          </div>
-          
-          <!-- 문항 수 요약 -->
-          <div class="total-summary">
-            <div class="summary-item">
-              <span class="label">선택된 문항:</span>
-              <span class="value">{{ totalSelectedQuestions }}문항</span>
-            </div>
-            <div class="summary-item">
-              <span class="label">출제할 문항:</span>
-              <span class="value primary">{{ totalWizardQuestions }}문항</span>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 하단 액션 버튼들 -->
-    <div class="footer-actions">
-      <button 
-        class="btn btn-secondary" 
-        @click="handleCancel"
-      >
-        취소
-      </button>
-      <button 
-        class="btn btn-primary btn-lg"
-        :disabled="!canProceedToStep2"
-        @click="handleNextStep"
-      >
-        STEP 2 문항 편집 →
-      </button>
     </div>
   </div>
 </template>
 
 <script setup>
-/**
- * Step1UnitSelection 컴포넌트 스크립트
- * 
- * Vue 3 Composition API와 Pinia를 사용하여 구현되었습니다.
- * 단원 선택 및 문항 설정 로직을 처리합니다.
- */
-
-import { defineEmits } from 'vue'
+import { defineProps, defineEmits, onMounted, ref, computed } from 'vue'
 import { useTestBankStore } from '@/stores/testBank'
 import { storeToRefs } from 'pinia'
 import { closePopup, sendToParent } from '@/utils/popup'
+import axios from 'axios'
 
 // Events 정의
 const emit = defineEmits([
   'next',      // 다음 단계로 진행
   'cancel',    // 취소
-  'research',  // 재검색
-  'show-scope' // 출제범위 보기
 ])
 
 // Pinia store 사용
 const store = useTestBankStore()
 
-// 반응형 상태 데이터 가져오기
-const { 
-  subject, 
-  chapters, 
-  wizardData, 
-  selectedPapers,
-  totalSelectedQuestions, 
-  totalWizardQuestions,
-  availableQuestionsByDifficulty,
-  canProceedToStep2
-} = storeToRefs(store)
+// Props 정의
+const props = defineProps({
+  mode: {
+    type: String,
+    default: 'new', // 'new' or 'edit'
+  },
+  examId: {
+    type: Number,
+    default: null
+  }
+})
 
-// Store actions 가져오기
-const { 
-  toggleChapter, 
-  selectAll, 
-  deselectAll, 
-  setCurrentStep,
-  updateQuestionCounts,
-  setQuestionCount,
-  proceedToStep2
-} = store
+// 로컬 상태
+const isLoading = ref(false)
+const mode = computed(() => props.mode)
+
+// 시험지 정보 (간소화 - 학년과 과목만)
+const examInfo = ref({
+  gradeCode: null,
+  gradeName: '',
+  subjectId: null,
+  subjectName: ''
+})
+
+// 학년 옵션
+const grades = ref([
+  { code: '07', name: '중학교 1학년', icon: '1️⃣', desc: '중등 1학년 과정' },
+  { code: '08', name: '중학교 2학년', icon: '2️⃣', desc: '중등 2학년 과정' },
+  { code: '09', name: '중학교 3학년', icon: '3️⃣', desc: '중등 3학년 과정' }
+])
+
+// 과목 옵션 (고정값)
+const subjects = ref([
+  { id: 1, name: '수학', icon: '🔢' },
+  { id: 2, name: '국어', icon: '📖' },
+  { id: 3, name: '영어', icon: '🔤' },
+  { id: 4, name: '과학', icon: '🔬' },
+  { id: 5, name: '사회', icon: '🌍' }
+])
+
+// 학기 옵션
+const terms = ref([
+  { code: '01', name: '1학기' },
+  { code: '02', name: '2학기' }
+])
+
+
+// ===== Computed Properties =====
 
 /**
- * 챕터 내 선택된 문항 수 계산
- * @param {Object} chapter - 챕터 객체
- * @returns {Number} 선택된 문항 수
+ * 문제 선택 단계로 진행 가능 여부
  */
-const getChapterQuestionCount = (chapter) => {
-  return chapter.papers.reduce((sum, paper) => {
-    return sum + (paper.selected ? paper.questionCount : 0)
-  }, 0)
+const canProceedToItemSelection = computed(() => {
+  return examInfo.value.gradeCode && examInfo.value.subjectId
+})
+
+// ===== 메서드 =====
+
+/**
+ * 학년 선택
+ */
+const selectGrade = (grade) => {
+  examInfo.value.gradeCode = grade.code
+  examInfo.value.gradeName = grade.name
+  console.log('학년 선택:', examInfo.value)
 }
 
 /**
- * 문항 수 입력값 유효성 검사
- * 사용 가능한 문항 수를 초과하지 않도록 제한합니다.
- * @param {String} difficulty - 난이도 ('하', '중', '상')
+ * 과목 선택
  */
-const validateQuestionCount = (difficulty) => {
-  const currentValue = wizardData.value.questionTypes[difficulty]
-  const maxValue = availableQuestionsByDifficulty.value[difficulty]
-  
-  // 최대값 초과 시 최대값으로 제한
-  if (currentValue > maxValue) {
-    setQuestionCount(difficulty, maxValue)
-  }
-  
-  // 음수 방지
-  if (currentValue < 0) {
-    setQuestionCount(difficulty, 0)
-  }
+const selectSubject = (subject) => {
+  examInfo.value.subjectId = subject.id
+  examInfo.value.subjectName = subject.name
+  console.log('과목 선택:', examInfo.value)
+  console.log('진행 가능:', canProceedToItemSelection.value)
 }
 
 /**
- * 다음 단계 진행 핸들러
- * Step 2로 이동합니다.
+ * 날짜 포맷팅
  */
-const handleNextStep = () => {
-  if (canProceedToStep2.value) {
-    // Pinia store를 통해 Step 2로 진행
-    const success = proceedToStep2()
-    
-    if (success) {
-      // 부모 컴포넌트나 팝업에 진행 완료 알림
-      emit('next')
-      
-      // 팝업인 경우 부모 창에 알림
-      sendToParent('STEP_CHANGED', { step: 2 })
-    }
-  }
+const formatDate = (dateString) => {
+  if (!dateString) return ''
+  const date = new Date(dateString)
+  return `${date.getFullYear()}.${String(date.getMonth() + 1).padStart(2, '0')}.${String(date.getDate()).padStart(2, '0')}`
 }
 
 /**
  * 취소 버튼 핸들러
- * 마법사를 종료하고 팝업을 닫습니다.
  */
 const handleCancel = () => {
   const confirmCancel = confirm('시험지 작성을 취소하시겠습니까? 입력한 내용이 삭제됩니다.')
@@ -350,228 +215,673 @@ const handleCancel = () => {
 }
 
 /**
- * 재검색 버튼 핸들러
- * 과목 선택 화면으로 돌아갑니다.
+ * 문제 선택 단계로 진행
  */
-const handleResearch = () => {
-  emit('research')
-  sendToParent('RESEARCH_REQUESTED')
+const proceedToItemSelection = () => {
+  // Store에 시험지 정보 저장
+  store.setExamInfo(examInfo.value)
+  
+  // 다음 단계로 진행
+  emit('next')
+  sendToParent('PROCEED_TO_ITEM_SELECTION', examInfo.value)
+}
+
+// ===== API 연동 함수들 =====
+
+
+/**
+ * 사용자의 기존 시험지 목록 로드
+ */
+const loadUserExams = async () => {
+  try {
+    isLoading.value = true
+    const params = {
+      page: 0,
+      size: 20,
+      keyword: examSearchKeyword.value
+    }
+    
+    const response = await axios.get('/api/user-exams/my', { params })
+    userExams.value = response.data.content || []
+  } catch (error) {
+    console.error('시험지 목록 로드 실패:', error)
+    userExams.value = []
+  } finally {
+    isLoading.value = false
+  }
 }
 
 /**
- * 출제범위 보기 핸들러
- * 선택된 단원들의 상세 출제범위를 표시합니다.
+ * 시험지 검색
  */
-const handleShowScope = () => {
-  const selectedPapersData = selectedPapers.value
-  
-  if (selectedPapersData.length === 0) {
-    alert('먼저 단원을 선택해주세요.')
-    return
+const searchUserExams = debounce(() => {
+  loadUserExams()
+}, 300)
+
+/**
+ * 기존 시험지의 문제 목록 로드
+ */
+const loadExamItems = async (examId) => {
+  try {
+    const response = await axios.get(`/api/user-exams/${examId}/items`)
+    // 문제 목록을 store에 저장
+    store.setExamItems(response.data.data || [])
+  } catch (error) {
+    console.error('시험지 문제 로드 실패:', error)
   }
+}
+
+/**
+ * 디바운스 유틸리티
+ */
+function debounce(func, wait) {
+  let timeout
+  return function executedFunction(...args) {
+    const later = () => {
+      clearTimeout(timeout)
+      func(...args)
+    }
+    clearTimeout(timeout)
+    timeout = setTimeout(later, wait)
+  }
+}
+
+// Lifecycle - 컴포넌트 마운트 시 초기화
+onMounted(async () => {
+  console.log('Step1 컴포넌트 마운트됨', { mode: props.mode, examId: props.examId })
   
-  emit('show-scope', selectedPapersData)
-  sendToParent('SHOW_SCOPE_REQUESTED', selectedPapersData)
+  if (props.mode === 'edit' && props.examId) {
+    // 수정 모드: 기존 시험지 정보 로드
+    await loadExamData(props.examId)
+  }
+  // 새로 만들기 모드는 과목이 이미 정의되어 있음
+})
+
+// 기존 시험지 데이터 로드
+const loadExamData = async (examId) => {
+  try {
+    const response = await axios.get(`/api/user-exams/${examId}`)
+    const exam = response.data.data
+    
+    examInfo.value = {
+      examName: exam.examName,
+      gradeCode: exam.gradeCode,
+      gradeName: exam.gradeName,
+      subjectId: exam.subjectId,
+      subjectName: exam.subjectName || '',
+      examType: exam.examType || '단원평가',
+      visibility: exam.visibility || 'PRIVATE',
+      description: exam.description || ''
+    }
+    
+    // 문제 목록도 로드
+    await loadExamItems(examId)
+  } catch (error) {
+    console.error('시험지 정보 로드 실패:', error)
+  }
 }
 </script>
 
 <style scoped>
-/**
- * Step1UnitSelection 컴포넌트 스타일
- * 
- * 레이아웃:
- * - 상단: 과목 정보 헤더
- * - 중간: 좌우 분할 레이아웃 (단원 선택 + 설정 패널)
- * - 하단: 액션 버튼
- */
-
 .step1-container {
   display: flex;
   flex-direction: column;
   height: 100%;
-  background: var(--bg-secondary, #f9fafb);
+  background: linear-gradient(135deg, #f8faff 0%, #f3f7ff 100%);
 }
 
-/* 과목 정보 헤더 */
-.subject-header {
+/* 선택 컨테이너 */
+.selection-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* 헤더 */
+.selection-header {
+  padding: 2rem 2.5rem;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.selection-header h2 {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0.5rem 0;
+}
+
+.header-desc {
+  font-size: 0.9375rem;
+  color: #64748b;
+  margin: 0;
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: none;
+  border: none;
+  color: #64748b;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+  margin-bottom: 1rem;
+}
+
+.btn-back:hover {
+  background: #f1f5f9;
+  color: #3b82f6;
+}
+
+/* 컨텐츠 영역 */
+.selection-content {
+  flex: 1;
+  padding: 2rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+/* 섹션 카드 */
+.section-card {
+  background: white;
+  border-radius: 16px;
+  padding: 2rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.section-title {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 1.5rem 2rem;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.section-icon {
+  font-size: 1.5rem;
+}
+
+.section-title h3 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin: 0;
+}
+
+/* 학년 그리드 */
+.grade-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 1rem;
+}
+
+.grade-card {
+  position: relative;
+  padding: 1.5rem;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.grade-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  border-color: #3b82f6;
+}
+
+.grade-card.selected {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #3b82f6;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
+}
+
+.grade-icon {
+  font-size: 2rem;
+  margin-bottom: 0.75rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.grade-card.selected .grade-icon {
+  color: #3b82f6;
+  font-weight: bold;
+}
+
+.grade-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 0.25rem;
+}
+
+.grade-desc {
+  font-size: 0.8125rem;
+  color: #64748b;
+}
+
+/* 과목 그리드 */
+.subject-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+}
+
+.subject-card {
+  padding: 1.25rem;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  border-radius: 12px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.subject-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.1);
+  border-color: #3b82f6;
+}
+
+.subject-card.selected {
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
+  border-color: #3b82f6;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
+}
+
+.subject-icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+}
+
+.subject-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a202c;
+}
+
+/* 모드 선택 화면 */
+.mode-selection {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  padding: 2rem;
+}
+
+.mode-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.mode-header h2 {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary, #111827);
+  margin-bottom: 0.5rem;
+}
+
+.mode-header p {
+  font-size: 1.125rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.mode-options {
+  display: flex;
+  gap: 2rem;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.mode-card {
   background: white;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+  border: 2px solid var(--border-color, #e5e7eb);
+  border-radius: 12px;
+  padding: 2.5rem;
+  width: 280px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
   box-shadow: var(--shadow-sm, 0 1px 3px 0 rgb(0 0 0 / 0.1));
 }
 
-.subject-info {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+.mode-card:hover {
+  border-color: var(--primary, #3b82f6);
+  box-shadow: var(--shadow-lg, 0 10px 15px -3px rgb(0 0 0 / 0.1));
+  transform: translateY(-4px);
 }
 
-.subject-title {
-  font-size: 1.125rem;
+.mode-icon {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+.mode-card h3 {
+  font-size: 1.25rem;
   font-weight: 600;
   color: var(--text-primary, #111827);
-  margin: 0;
+  margin-bottom: 0.5rem;
 }
 
-.subject-curriculum {
+.mode-card p {
   font-size: 0.875rem;
   color: var(--text-secondary, #6b7280);
+}
+
+/* 학년/과목 선택 화면 */
+.grade-subject-selection,
+.exam-list-selection {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #f8f9fa;
+}
+
+.selection-header {
+  background: white;
+  padding: 1.5rem 2rem;
+  border-bottom: 1px solid #e1e4e8;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.selection-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.btn-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: none;
+  border: none;
+  color: #586069;
+  cursor: pointer;
+  font-size: 0.9375rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.btn-back:hover {
+  background: #f3f4f6;
+  color: #3b82f6;
+}
+
+.selection-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #24292e;
   margin: 0;
 }
 
-.header-actions {
+.selection-content {
+  flex: 1;
+  padding: 2.5rem;
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.selection-group {
+  background: white;
+  border-radius: 12px;
+  padding: 1.75rem;
+  margin-bottom: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.selection-group label {
   display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #586069;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  margin-bottom: 1rem;
+}
+
+.selection-group label::before {
+  content: '';
+  width: 4px;
+  height: 16px;
+  background: #3b82f6;
+  border-radius: 2px;
+}
+
+.grade-options,
+.subject-options,
+.term-options {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
   gap: 0.75rem;
 }
 
-/* 메인 콘텐츠 영역 */
-.main-content {
-  display: flex;
-  flex: 1;
-  gap: 1rem;
-  padding: 1.5rem 2rem;
-  overflow: hidden;
-}
-
-/* 왼쪽 패널: 단원 트리 */
-.left-panel {
-  flex: 2;
+.grade-btn,
+.subject-btn,
+.term-btn {
+  padding: 1rem;
+  border: 2px solid #e1e4e8;
   background: white;
-  border-radius: 8px;
-  box-shadow: var(--shadow-sm, 0 1px 3px 0 rgb(0 0 0 / 0.1));
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-/* 오른쪽 패널: 설정 */
-.right-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-/* 패널 헤더 */
-.panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.25rem;
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
-  background: var(--gray-50, #f9fafb);
-}
-
-.panel-header h4 {
-  margin: 0;
-  font-size: 1rem;
+  border-radius: 10px;
+  font-size: 0.9375rem;
   font-weight: 600;
-  color: var(--text-primary, #111827);
+  color: #24292e;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
 }
 
-.select-actions {
+.grade-btn::before,
+.subject-btn::before,
+.term-btn::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.grade-btn:hover,
+.subject-btn:hover,
+.term-btn:hover {
+  border-color: #3b82f6;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.15);
+}
+
+.grade-btn.active,
+.subject-btn.active,
+.term-btn.active {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+/* 과목 버튼에 아이콘 추가 */
+.subject-btn {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   gap: 0.5rem;
+  padding: 1.25rem 1rem;
 }
 
-/* 단원 트리 */
-.unit-tree {
+.subject-btn::after {
+  content: '';
+  width: 32px;
+  height: 32px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+  margin-bottom: 0.25rem;
+}
+
+/* 과목별 아이콘 */
+.subject-btn:nth-child(1)::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23586069'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z'%3E%3C/path%3E%3C/svg%3E"); }
+.subject-btn:nth-child(2)::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23586069'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253'%3E%3C/path%3E%3C/svg%3E"); }
+.subject-btn:nth-child(3)::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23586069'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M3 21v-4m0 0V5a2 2 0 012-2h6.5l1 1H21l-3 6 3 6h-8.5l-1-1H5a2 2 0 00-2 2zm9-13.5V9'%3E%3C/path%3E%3C/svg%3E"); }
+.subject-btn:nth-child(4)::after { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%23586069'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z'%3E%3C/path%3E%3C/svg%3E"); }
+
+.subject-btn.active::after {
+  filter: brightness(0) invert(1);
+}
+
+.selection-footer {
+  padding: 1.5rem 2rem;
+  border-top: 1px solid var(--border-color, #e5e7eb);
+  display: flex;
+  justify-content: flex-end;
+}
+
+/* 시험지 목록 화면 */
+.exam-list {
   flex: 1;
   overflow-y: auto;
+  padding: 1.5rem 2rem;
 }
 
-.chapter-item {
-  border-bottom: 1px solid var(--border-color, #e5e7eb);
+.exam-filters {
+  margin-bottom: 1.5rem;
 }
 
-.chapter-header {
+.search-input {
+  width: 100%;
+  max-width: 400px;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
+  font-size: 1rem;
+  transition: border-color 0.2s ease;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--primary, #3b82f6);
+  box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
+}
+
+.exam-items {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.exam-item {
+  display: flex;
   justify-content: space-between;
-  padding: 1rem 1.25rem;
+  align-items: center;
+  padding: 1.25rem;
+  background: white;
+  border: 1px solid var(--border-color, #e5e7eb);
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
-.chapter-header:hover {
-  background: var(--gray-50, #f9fafb);
+.exam-item:hover {
+  border-color: var(--primary, #3b82f6);
+  box-shadow: var(--shadow-md, 0 4px 6px -1px rgb(0 0 0 / 0.1));
 }
 
-.chapter-info {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.expand-icon {
-  font-size: 0.75rem;
-  color: var(--text-secondary, #6b7280);
-  transition: transform 0.2s ease;
-}
-
-.expand-icon.expanded {
-  transform: rotate(90deg);
-}
-
-.chapter-name {
-  font-size: 0.9375rem;
-  font-weight: 500;
-  color: var(--text-primary, #111827);
-}
-
-.question-count {
-  font-size: 0.875rem;
-  color: var(--text-secondary, #6b7280);
-}
-
-/* 단원지 목록 */
-.papers-list {
-  background: var(--gray-50, #f9fafb);
-  padding: 0.5rem 0;
-}
-
-.paper-item {
-  padding: 0.5rem 1.25rem 0.5rem 3rem;
-}
-
-.form-check {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  cursor: pointer;
-}
-
-.paper-title {
-  flex: 1;
-  font-size: 0.875rem;
-  color: var(--text-primary, #111827);
-}
-
-.paper-count {
-  font-size: 0.75rem;
-  color: var(--text-secondary, #6b7280);
-}
-
-/* 설정 섹션 */
-.settings-section {
-  background: white;
-  border-radius: 8px;
-  box-shadow: var(--shadow-sm, 0 1px 3px 0 rgb(0 0 0 / 0.1));
-  padding: 1.25rem;
-}
-
-.settings-section h4 {
-  margin: 0 0 1rem 0;
-  font-size: 1rem;
+.exam-info h4 {
+  font-size: 1.125rem;
   font-weight: 600;
   color: var(--text-primary, #111827);
+  margin-bottom: 0.5rem;
+}
+
+.exam-meta {
+  display: flex;
+  gap: 1rem;
+  font-size: 0.875rem;
+  color: var(--text-secondary, #6b7280);
+}
+
+.exam-meta span {
+  display: inline-flex;
+  align-items: center;
+}
+
+.exam-meta span::after {
+  content: '•';
+  margin-left: 1rem;
+  color: var(--border-color, #e5e7eb);
+}
+
+.exam-meta span:last-child::after {
+  display: none;
+}
+
+/* 시험지 설정 화면 */
+.exam-setup {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: white;
+}
+
+.exam-header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1.5rem 2rem;
+  background: white;
+  border-bottom: 1px solid var(--border-color, #e5e7eb);
+}
+
+.exam-header h2 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #24292e;
+  margin: 0;
+}
+
+/* 시험지 설정 폼 */
+.exam-form {
+  flex: 1;
+  overflow-y: auto;
+  padding: 2rem;
+  display: flex;
+  gap: 2rem;
+}
+
+.form-section {
+  flex: 1;
+  min-width: 300px;
+}
+
+.form-section h4 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary, #111827);
+  margin-bottom: 1.5rem;
 }
 
 .form-group {
-  margin-bottom: 1rem;
+  margin-bottom: 1.5rem;
 }
 
 .form-group label {
@@ -584,9 +894,9 @@ const handleShowScope = () => {
 
 .form-control {
   width: 100%;
-  padding: 0.5rem;
+  padding: 0.625rem 0.875rem;
   border: 1px solid var(--border-color, #e5e7eb);
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 0.875rem;
   transition: border-color 0.2s ease;
 }
@@ -597,91 +907,95 @@ const handleShowScope = () => {
   box-shadow: 0 0 0 3px rgb(59 130 246 / 0.1);
 }
 
-/* 난이도별 문항 수 설정 */
-.difficulty-settings {
-  display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
-}
-
-.difficulty-item {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.difficulty-item label {
-  width: 60px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: var(--text-secondary, #6b7280);
-  margin: 0;
-}
-
-.difficulty-item input {
-  flex: 1;
-  max-width: 80px;
-}
-
-.available-count {
-  font-size: 0.75rem;
-  color: var(--text-secondary, #6b7280);
-  white-space: nowrap;
-}
-
-/* 문항 수 요약 */
-.total-summary {
-  border-top: 1px solid var(--border-color, #e5e7eb);
-  padding-top: 1rem;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.summary-item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.summary-item .label {
-  font-size: 0.875rem;
-  color: var(--text-secondary, #6b7280);
-}
-
-.summary-item .value {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: var(--text-primary, #111827);
-}
-
-.summary-item .value.primary {
-  color: var(--primary, #3b82f6);
-  font-size: 1rem;
+textarea.form-control {
+  resize: vertical;
+  min-height: 80px;
 }
 
 /* 하단 액션 버튼 */
 .footer-actions {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
   padding: 1.5rem 2rem;
   background: white;
-  border-top: 1px solid var(--border-color, #e5e7eb);
-  box-shadow: var(--shadow-sm, 0 1px 3px 0 rgb(0 0 0 / 0.1));
+  border-top: 1px solid #e2e8f0;
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.footer-left {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.footer-center {
+  display: flex;
+  justify-content: center;
+}
+
+.footer-right {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.selection-status {
+  font-size: 0.9375rem;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  background: #f1f5f9;
+}
+
+.status-complete {
+  color: #059669;
+  font-weight: 600;
+}
+
+.status-incomplete {
+  color: #64748b;
+}
+
+/* 선택 버튼 그룹 */
+.select-buttons {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.select-btn {
+  padding: 0.75rem 1.5rem;
+  border: 2px solid #e1e4e8;
+  background: white;
+  border-radius: 8px;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: #24292e;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.select-btn:hover {
+  border-color: #3b82f6;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
+}
+
+.select-btn.active {
+  border-color: #3b82f6;
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
 }
 
 /* 버튼 기본 스타일 */
 .btn {
   padding: 0.5rem 1rem;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   font-size: 0.875rem;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s ease;
-  text-decoration: none;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -720,46 +1034,18 @@ const handleShowScope = () => {
   background: var(--gray-300, #d1d5db);
 }
 
-.btn-text {
-  background: transparent;
-  color: var(--primary, #3b82f6);
-}
-
-.btn-text:hover {
-  background: var(--primary-light, #dbeafe);
-}
-
-/* 태블릿 반응형 */
-@media (max-width: 1024px) {
-  .main-content {
-    flex-direction: column;
-    gap: 1.5rem;
-  }
-  
-  .left-panel {
-    flex: none;
-    max-height: 400px;
-  }
-  
-  .right-panel {
-    flex: none;
-  }
-}
-
-/* 모바일 반응형 */
+/* 반응형 */
 @media (max-width: 768px) {
-  .subject-header {
+  .mode-options {
     flex-direction: column;
-    gap: 1rem;
-    align-items: flex-start;
+    align-items: center;
   }
   
-  .main-content {
-    padding: 1rem;
+  .exam-form {
+    flex-direction: column;
   }
   
   .footer-actions {
-    padding: 1rem;
     flex-direction: column;
     gap: 1rem;
   }
