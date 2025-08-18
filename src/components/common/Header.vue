@@ -5,7 +5,7 @@
       <div class="utility-bar-content">
         <!-- Dev Toggle (temporary for testing) -->
         <div class="dev-section">
-          <button 
+          <button
             @click="toggleUserType"
             class="dev-toggle"
             v-if="!isLoggedIn"
@@ -157,6 +157,17 @@
               </svg>
               <span>분석리포트</span>
             </router-link>
+
+            <router-link
+              to="/item-processing"
+              class="nav-item"
+              :class="{ 'active': isCurrentRoute('/item-processing') }"
+            >
+              <svg viewBox="0 0 24 24" class="nav-icon">
+                <path d="M19 3H5C3.89 3 3 3.89 3 5V19C3 20.11 3.89 21 5 21H19C20.11 21 21 20.11 21 19V5C21 3.89 20.11 3 19 3M19 19H5V5H19V19M17 17H7V7H17V17M15 15H9V9H15V15M13 13H11V11H13V13Z"/>
+              </svg>
+              <span>문제 등록</span>
+            </router-link>
           </template>
 
           <!-- Student-specific menu items -->
@@ -232,7 +243,7 @@
             </svg>
             <span>시험지 생성</span>
           </button>
-          
+
           <!-- Student action button -->
           <button
             v-else
@@ -356,9 +367,9 @@ export default {
       const height = 900
       const left = (window.screen.width - width) / 2
       const top = (window.screen.height - height) / 2
-      
+
       const features = `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes`
-      
+
       window.open('/exam/wizard', 'TestWizardPopup', features)
     }
 
@@ -382,7 +393,7 @@ export default {
 
     onMounted(() => {
       document.addEventListener('click', handleClickOutside)
-      
+
       // 로그인 상태 확인 및 사용자 정보 로드
       if (isLoggedIn.value) {
         const user = authService.getCurrentUser()

@@ -12,13 +12,15 @@ import TestWizardView from '@/views/TestWizardView.vue'
 import Login from '@/views/Login.vue'
 
 import CBTStep01 from '@/components/student/cbt/CBTStep01.vue'
+import ItemProcessing from '@/views/ItemProcessing.vue'
 
 // 라우트 가드 import
 import { requireAuth, requireRole, preventAuthenticated } from './guards'
 
 const routes = [
   { path: '/', name: 'Home', component: Home },
-  
+
+
   // 로그인 페이지
   {
     path: '/login',
@@ -41,6 +43,7 @@ const routes = [
     }
   },
 
+
   {
     path: '/student',
     component: StudentLayout, // 공통 레이아웃 or StudentMain 같은 것
@@ -55,7 +58,6 @@ const routes = [
       // { path: 'result/:id', name: 'student.result', component: StudentResult },
     ],
   },
-  
   // 학급관리 페이지 (대시보드)
   {
     path: '/class-management',
@@ -67,6 +69,38 @@ const routes = [
       role: 'teacher'
     }
   },
+
+    // 문제 가공
+    {
+      path: '/item-processing',
+      name: "ItemProcessing",
+      component: ItemProcessing,
+      beforeEnter: requireAuth,
+      meta: {
+        requiresAuth: true,
+        role: 'teacher'
+      }
+    },
+    {
+      path: '/item-processing/textbook',
+      name: "ItemProcessingTextbook",
+      component: ItemProcessing,
+      beforeEnter: requireAuth,
+      meta: {
+        requiresAuth: true,
+        role: 'teacher'
+      }
+    },
+    {
+      path: '/item-processing/cbt',
+      name: "ItemProcessingCBT",
+      component: ItemProcessing,
+      beforeEnter: requireAuth,
+      meta: {
+        requiresAuth: true,
+        role: 'teacher'
+      }
+    },
 ]
 
 const router = createRouter({
