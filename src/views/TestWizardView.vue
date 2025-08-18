@@ -37,39 +37,21 @@
       <!-- Step 1: 단원선택 -->
       <Step1UnitSelection
         v-else-if="currentStep === 1"
+        :mode="store.mode"
+        :examId="store.selectedExam?.id"
         @next="handleStep1Next"
         @cancel="handleCancel"
         @research="handleResearch"
         @show-scope="handleShowScope"
       />
       
-      <!-- Step 2: 문항편집 (향후 구현) -->
-      <div 
+      <!-- Step 2: 문항선택 -->
+      <Step2ItemSelection
         v-else-if="currentStep === 2"
-        class="step-placeholder"
-      >
-        <div class="placeholder-content">
-          <h3>Step 2: 문항편집</h3>
-          <p>선택된 문제들을 편집하고 순서를 조정하는 단계입니다.</p>
-          <p>현재 개발 중입니다.</p>
-          
-          <!-- 임시 네비게이션 버튼 -->
-          <div class="temp-navigation">
-            <button 
-              class="btn btn-secondary"
-              @click="goToStep(1)"
-            >
-              ← Step 1로 돌아가기
-            </button>
-            <button 
-              class="btn btn-primary"
-              @click="goToStep(3)"
-            >
-              Step 3로 계속하기 →
-            </button>
-          </div>
-        </div>
-      </div>
+        :examInfo="store.examInfo"
+        @back="handleStep2Back"
+        @next="handleStep2Next"
+      />
       
       <!-- Step 3: 시험지저장 (향후 구현) -->
       <div 
@@ -119,6 +101,18 @@ import { isPopupWindow, closePopup, sendToParent } from '@/utils/popup'
 import WizardHeader from '@/components/wizard/WizardHeader.vue'
 import Step0SelectMode from '@/components/wizard/Step0SelectMode.vue'
 import Step1UnitSelection from '@/components/wizard/Step1UnitSelection.vue'
+import Step2ItemSelection from '@/components/wizard/Step2ItemSelection.vue'
+
+// Props 정의
+const props = defineProps({
+  isModal: {
+    type: Boolean,
+    default: false
+  }
+})
+
+// Emit 정의
+const emit = defineEmits(['close'])
 
 // Pinia store 사용
 const store = useTestBankStore()
@@ -172,10 +166,17 @@ const handleBeforeUnload = (event) => {
  * Step 0 완료 및 Step 1로 진행 핸들러
  */
 const handleStep0Next = () => {
-  console.log('Step 0 완료, Step 1로 진행')
+  console.log('Step 0 완료, 다음 단계로 진행')
   // mode가 설정되어 있어야 진행 가능
   if (store.mode) {
-    setCurrentStep(1)
+    // 기존 시험지 편집 모드면 Step2로 바로 이동
+    if (store.mode === 'edit' && store.selectedExam) {
+      console.log('기존 시험지 편집 모드 - Step2로 바로 이동')
+      setCurrentStep(2)
+    } else {
+      // 새 시험지 생성 모드면 Step1로 이동
+      setCurrentStep(1)
+    }
   }
 }
 
@@ -203,7 +204,28 @@ const handleSelectExisting = (exam) => {
  */
 const handleStep1Next = () => {
   console.log('Step 1 완료, Step 2로 진행')
-  // Pinia store에서 이미 currentStep이 2로 설정됨
+  setCurrentStep(2)
+}
+
+/**
+ * Step 2에서 뒤로가기 핸들러
+ */
+const handleStep2Back = () => {
+  console.log('Step 2에서 뒤로가기, mode:', store.mode)
+  // 새 시험지 모드면 Step1로, 기존 시험지 편집 모드면 Step0로
+  if (store.mode === 'new') {
+    setCurrentStep(1)
+  } else {
+    setCurrentStep(0)
+  }
+}
+
+/**
+ * Step 2 완료 및 Step 3로 진행 핸들러
+ */
+const handleStep2Next = () => {
+  console.log('Step 2 완료, Step 3로 진행')
+  setCurrentStep(3)
 }
 
 /**
@@ -299,12 +321,13 @@ const handleClose = () => {
   // 데이터 정리
   resetWizard()
   
+  // 모달 모드인 경우
+  if (props.isModal) {
+    emit('close')
+  } 
   // 팝업인 경우 창 닫기
-  if (isPopupWindow()) {
+  else if (isPopupWindow()) {
     closePopup({ action: 'closed' })
-  } else {
-    // 일반 모달인 경우 부모에 닫기 이벤트 전달
-    // emit('close')
   }
 }
 </script>

@@ -17,7 +17,15 @@
     <div class="search-header">
       <div class="header-top">
         <h2 class="main-title">시험지 선택</h2>
-        <span class="exam-count">총 1,100개</span>
+        <div class="header-actions">
+          <span class="exam-count">총 {{ totalExamCount }}개</span>
+          <button class="btn-create-new" @click="createNewExam">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M12 4v16m8-8H4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            새 시험지 만들기
+          </button>
+        </div>
       </div>
       
       <!-- 검색 및 필터 영역 -->
@@ -92,30 +100,20 @@
           </button>
         </div>
 
-        <!-- 학교급/학년 필터 -->
+        <!-- 학년 필터 -->
         <div class="filter-group">
           <h4 class="filter-title">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M12 14l9-5-9-5-9 5 9 5z M12 14l6.16-3.422a12.083 12.083 0 01.665 6.479A11.952 11.952 0 0012 20.055a11.952 11.952 0 00-6.824-2.998 12.078 12.078 0 01.665-6.479L12 14z" stroke="currentColor" stroke-width="2"/>
             </svg>
-            학교급/학년
+            학년
           </h4>
           <div class="filter-options">
-            <label class="checkbox-item" v-for="level in schoolLevels" :key="level.id">
-              <input type="checkbox" v-model="filters.schoolLevel" :value="level.id">
-              <span>{{ level.name }}</span>
-              <span class="count">{{ level.count }}</span>
+            <label class="checkbox-item" v-for="grade in grades" :key="grade.code">
+              <input type="checkbox" v-model="filters.grades" :value="grade.code">
+              <span>{{ grade.name }}</span>
+              <span class="count">{{ grade.count }}</span>
             </label>
-            
-            <!-- 학년 선택 (학교급 선택시 표시) -->
-            <div v-if="filters.schoolLevel.length > 0" class="sub-filter">
-              <select v-model="filters.grade" class="grade-select">
-                <option value="">학년 선택</option>
-                <option v-for="grade in availableGrades" :key="grade" :value="grade">
-                  {{ grade }}
-                </option>
-              </select>
-            </div>
           </div>
         </div>
 
@@ -128,42 +126,54 @@
             과목
           </h4>
           <div class="filter-options">
-            <label class="checkbox-item" v-for="subject in subjects" :key="subject.id">
-              <input type="checkbox" v-model="filters.subjects" :value="subject.id">
+            <label class="checkbox-item" v-for="subject in subjects" :key="subject.code">
+              <input type="checkbox" v-model="filters.subjects" :value="subject.code" @change="onSubjectFilterChange">
               <span>{{ subject.name }}</span>
               <span class="count">{{ subject.count }}</span>
             </label>
           </div>
         </div>
 
-        <!-- 단원 필터 (과목 선택시 표시) -->
-        <div v-if="filters.subjects.length > 0" class="filter-group">
+        <!-- 교과서 필터 (과목 선택시 표시) -->
+        <div v-if="filters.subjects.length > 0 && availableTextbooks.length > 0" class="filter-group">
+          <h4 class="filter-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            교과서
+          </h4>
+          <div class="filter-options">
+            <label class="checkbox-item" v-for="textbook in availableTextbooks" :key="`textbook-${textbook.id}`">
+              <input 
+                type="checkbox" 
+                :id="`textbook-checkbox-${textbook.id}`"
+                v-model="filters.textbooks" 
+                :value="textbook.id">
+              <span>{{ textbook.name }}</span>
+              <span class="count">{{ textbook.count || 0 }}</span>
+            </label>
+          </div>
+        </div>
+
+        <!-- 단원 필터 (교과서 선택시 표시) -->
+        <div v-if="filters.textbooks.length > 0 && availableChapters.length > 0" class="filter-group">
           <h4 class="filter-title">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
               <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="2"/>
             </svg>
-            단원
+            대단원
           </h4>
-          <div class="chapter-tree">
-            <div v-for="chapter in availableChapters" :key="chapter.id" class="chapter-item">
-              <button @click="toggleChapter(chapter.id)" class="chapter-toggle">
-                <svg v-if="!chapter.expanded" width="12" height="12" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 5l7 7-7 7" stroke="currentColor" stroke-width="2"/>
-                </svg>
-                <svg v-else width="12" height="12" viewBox="0 0 24 24" fill="none">
-                  <path d="M19 9l-7 7-7-7" stroke="currentColor" stroke-width="2"/>
-                </svg>
-                {{ chapter.name }}
-                <span class="count">{{ chapter.count }}</span>
-              </button>
-              <div v-if="chapter.expanded" class="sub-chapters">
-                <label v-for="sub in chapter.subChapters" :key="sub.id" class="checkbox-item">
-                  <input type="checkbox" v-model="filters.chapters" :value="sub.id">
-                  <span>{{ sub.name }}</span>
-                  <span class="count">{{ sub.count }}</span>
-                </label>
-              </div>
-            </div>
+          <div class="filter-options">
+            <label v-for="(chapter, index) in availableChapters" :key="`chapter-${index}-${chapter.id}`" class="checkbox-item">
+              <input 
+                type="checkbox" 
+                :id="`chapter-checkbox-${index}-${chapter.id}`"
+                :name="`chapter-checkbox-${index}`"
+                :checked="filters.chapters.includes(String(chapter.code || chapter.id))"
+                @change="toggleChapterSelection(String(chapter.code || chapter.id))">
+              <span>{{ chapter.name }}</span>
+              <span class="count">{{ chapter.count || 0 }}</span>
+            </label>
           </div>
         </div>
 
@@ -203,15 +213,15 @@
               <span>전체</span>
             </label>
             <label class="radio-item">
-              <input type="radio" v-model="filters.visibility" value="public">
+              <input type="radio" v-model="filters.visibility" value="PUBLIC">
               <span>공개</span>
             </label>
             <label class="radio-item">
-              <input type="radio" v-model="filters.visibility" value="school">
+              <input type="radio" v-model="filters.visibility" value="SCHOOL">
               <span>학교</span>
             </label>
             <label class="radio-item">
-              <input type="radio" v-model="filters.visibility" value="private">
+              <input type="radio" v-model="filters.visibility" value="PRIVATE">
               <span>비공개</span>
             </label>
           </div>
@@ -477,91 +487,88 @@
         </button>
       </div>
     </div>
+    
+    <!-- 선택한 시험지 하단 패널 -->
+    <transition name="slide-up">
+      <div v-if="showSelectedExamPanel" class="selected-exam-panel">
+        <div class="panel-content">
+          <div class="panel-info">
+            <h3>선택한 시험지</h3>
+            <p class="exam-name">{{ selectedExamName }}</p>
+          </div>
+          <div class="panel-actions">
+            <button class="btn btn-secondary" @click="showSelectedExamPanel = false">
+              취소
+            </button>
+            <button class="btn btn-primary" @click="proceedWithSelectedExam">
+              이 시험지로 하기
+            </button>
+          </div>
+        </div>
+      </div>
+    </transition>
   </div>
 </template>
 
 <script setup>
 import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useTestBankStore } from '@/stores/testBank'
+import { storeToRefs } from 'pinia'
+import examApi from '@/services/examApi'
+import axios from 'axios'
 
 // Props & Emits
 const emit = defineEmits(['next', 'cancel', 'selectNew', 'selectExisting'])
 
 // Store
 const store = useTestBankStore()
+const { loading, examSearchResults } = storeToRefs(store)
+
+// API URL
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+
+// 통계 데이터
+const totalExamCount = ref(0)
+const myExamCount = ref(0)
+const publicExamCount = ref(0)
 
 // 검색 관련 상태
 const searchQuery = ref('')
 const searchSuggestions = ref([])
-const recentSearches = ref(['2024 중간고사', '수학 1단원', '영어 모의고사'])
+const recentSearches = ref([])
 const showSuggestions = ref(false)
 const isLoading = ref(false)
 const isLoadingMore = ref(false)
 
 // 필터 상태
 const filters = reactive({
-  schoolLevel: [],
-  grade: '',
-  subjects: [],
-  chapters: [],
+  grades: [], // 학년 (1학년, 2학년, 3학년)
+  terms: [], // 학기
+  subjects: [], // 과목
+  textbooks: [], // 교과서
+  chapters: [], // 단원
   itemCount: [5, 50],
   visibility: 'all'
 })
 
 // 빠른 필터
 const quickFilters = ref([
-  { id: 1, label: '최근 업데이트', count: 156, active: false },
-  { id: 2, label: '내가 만든 시험지', count: 23, active: false },
-  { id: 3, label: '우리 학교', count: 89, active: false },
-  { id: 4, label: '공개 시험지', count: 734, active: false }
+  { id: 1, label: '최근 업데이트', count: 0, active: false },
+  { id: 2, label: '내가 만든 시험지', count: 0, active: false },
+  { id: 3, label: '우리 학교', count: 0, active: false },
+  { id: 4, label: '공개 시험지', count: 0, active: false }
 ])
 
-// 필터 옵션 데이터
-const schoolLevels = ref([
-  { id: 'middle', name: '중학교', count: 876 },
-  { id: 'high', name: '고등학교', count: 224 }
-])
+// 필터 옵션 데이터 (실제 API에서 로드)
+const grades = ref([])
+const subjects = ref([])
+const terms = ref([])
 
-const subjects = ref([
-  { id: 'math', name: '수학', count: 423 },
-  { id: 'korean', name: '국어', count: 267 },
-  { id: 'english', name: '영어', count: 198 },
-  { id: 'science', name: '과학', count: 156 },
-  { id: 'social', name: '사회', count: 56 }
-])
+// 교과서 목록 (과목 선택 시 동적으로 로드)
+const availableTextbooks = ref([])
 
-const availableGrades = computed(() => {
-  if (filters.schoolLevel.includes('middle')) {
-    return ['중1', '중2', '중3']
-  }
-  if (filters.schoolLevel.includes('high')) {
-    return ['고1', '고2', '고3']
-  }
-  return []
-})
-
-const availableChapters = ref([
-  {
-    id: 1,
-    name: '1. 자연수의 성질',
-    count: 45,
-    expanded: false,
-    subChapters: [
-      { id: 11, name: '소인수분해', count: 23 },
-      { id: 12, name: '최대공약수와 최소공배수', count: 22 }
-    ]
-  },
-  {
-    id: 2,
-    name: '2. 방정식과 부등식',
-    count: 38,
-    expanded: false,
-    subChapters: [
-      { id: 21, name: '일차방정식', count: 20 },
-      { id: 22, name: '일차부등식', count: 18 }
-    ]
-  }
-])
+// 단원 목록 (교과서 선택 시 동적으로 로드)
+const availableChapters = ref([])
 
 // 검색 결과 관련
 const searchResults = ref([])
@@ -577,6 +584,7 @@ const sortBy = ref('relevance')
 const selectedExamId = ref(null)
 const selectedExamName = ref('')
 const isCreatingNew = ref(false)
+const showSelectedExamPanel = ref(false)
 const popularFilter = ref('week')
 
 // 추천 시험지 데이터 (임시)
@@ -650,9 +658,9 @@ const popularExams = ref([
 
 // Computed
 const hasActiveFilters = computed(() => {
-  return filters.schoolLevel.length > 0 ||
-         filters.grade ||
+  return filters.grades.length > 0 ||
          filters.subjects.length > 0 ||
+         filters.textbooks.length > 0 ||
          filters.chapters.length > 0 ||
          filters.visibility !== 'all' ||
          quickFilters.value.some(f => f.active)
@@ -681,37 +689,69 @@ const handleSearchWithDebounce = (() => {
 })()
 
 const performSearch = async () => {
-  if (!searchQuery.value && !hasActiveFilters.value) {
-    searchResults.value = []
-    return
-  }
+  console.log('===== performSearch 시작 =====')
+  console.log('현재 filters.grades:', filters.grades)
+  
+  // 검색어와 필터가 모두 없을 때는 전체 검색
+  const isEmptySearch = !searchQuery.value && !hasActiveFilters.value
+  
+  // 초기화
+  searchResults.value = []
+  visibleExams.value = []
 
   isLoading.value = true
-  currentPage.value = 1
+  currentPage.value = 0  // 0부터 시작
   
-  // API 호출 시뮬레이션
-  setTimeout(() => {
-    // 임시 검색 결과 생성
-    const mockResults = []
-    for (let i = 1; i <= 100; i++) {
-      mockResults.push({
-        id: 100 + i,
-        title: `${searchQuery.value || '시험지'} - ${i}`,
-        subject: ['math', 'korean', 'english', 'science', 'social'][Math.floor(Math.random() * 5)],
-        chapterName: '1. 자연수의 성질',
-        grade: ['중1', '중2', '중3'][Math.floor(Math.random() * 3)],
-        questionCount: Math.floor(Math.random() * 30) + 10,
-        visibility: ['public', 'school', 'private'][Math.floor(Math.random() * 3)],
-        updatedAt: new Date(Date.now() - Math.random() * 30 * 24 * 60 * 60 * 1000),
-        useCount: Math.floor(Math.random() * 500)
-      })
+  try {
+    // 검색 파라미터 준비 - 여러 과목 선택 지원
+    const gradeCodeValue = filters.grades.length > 0 ? filters.grades.join(',') : null
+    console.log('gradeCode 계산 결과:', gradeCodeValue)
+    
+    const searchParams = {
+      keyword: searchQuery.value,
+      gradeCode: gradeCodeValue,
+      termCode: filters.terms.length > 0 ? filters.terms.join(',') : null,
+      areaCode: filters.subjects.length > 0 ? filters.subjects.join(',') : null,  // 과목 코드
+      subjectId: filters.textbooks.length > 0 ? filters.textbooks[0] : null,    // 교과서 ID (단일 선택)
+      largeChapterCode: filters.chapters.length > 0 ? filters.chapters.join(',') : null, // 대단원 코드 (복수 선택 지원)
+      visibility: filters.visibility !== 'all' ? filters.visibility : null,  // visibility 필터 추가
+      page: currentPage.value,  // 이미 0부터 시작
+      size: pageSize,
+      examType: 'ALL'
     }
     
-    searchResults.value = mockResults
-    visibleExams.value = mockResults.slice(0, pageSize)
-    totalCount.value = mockResults.length
-    hasMore.value = mockResults.length > pageSize
-    isLoading.value = false
+    // 디버깅용 로그
+    console.log('=== 시험지 검색 시작 ===')
+    console.log('검색 파라미터:', searchParams)
+    console.log('선택된 과목 코드:', filters.subjects)
+    console.log('선택된 학년 코드:', filters.grades)
+    console.log('학년 필터 상세:', {
+      grades: filters.grades,
+      gradeCode: searchParams.gradeCode,
+      전체필터: JSON.stringify(filters)
+    })
+    
+    // API 호출
+    const result = await store.searchExams(searchParams)
+    
+    console.log('API 응답 결과:', result)
+    console.log('응답 content 개수:', result?.content?.length || 0)
+    console.log('총 개수:', result?.totalElements || 0)
+    
+    if (result && result.content && Array.isArray(result.content)) {
+      searchResults.value = transformSearchResults(result.content)
+      visibleExams.value = [...searchResults.value]  // 첫 페이지 전체 표시
+      totalCount.value = result.totalElements || 0
+      hasMore.value = result.totalPages > 1  // 다음 페이지 존재 여부
+      currentPage.value = 1  // 다음 로드를 위해 1로 설정
+      
+      console.log('변환된 검색 결과:', searchResults.value.slice(0, 3)) // 처음 3개만 로그
+    } else {
+      console.warn('검색 결과가 없거나 형식이 잘못됨:', result)
+      searchResults.value = []
+      visibleExams.value = []
+      totalCount.value = 0
+    }
     
     // 검색 제안 업데이트
     if (searchQuery.value) {
@@ -722,7 +762,13 @@ const performSearch = async () => {
         `${searchQuery.value} 모의고사`
       ]
     }
-  }, 500)
+  } catch (error) {
+    console.error('검색 실패:', error)
+    searchResults.value = []
+    visibleExams.value = []
+  } finally {
+    isLoading.value = false
+  }
 }
 
 const handleScroll = (event) => {
@@ -734,21 +780,46 @@ const handleScroll = (event) => {
   }
 }
 
-const loadMoreExams = () => {
+const loadMoreExams = async () => {
   if (isLoadingMore.value || !hasMore.value) return
   
   isLoadingMore.value = true
-  currentPage.value++
   
-  setTimeout(() => {
-    const startIndex = (currentPage.value - 1) * pageSize
-    const endIndex = startIndex + pageSize
-    const newExams = searchResults.value.slice(startIndex, endIndex)
+  try {
+    // 다음 페이지 데이터를 서버에서 가져오기
+    const searchParams = {
+      keyword: searchQuery.value,
+      gradeCode: filters.grades.length > 0 ? filters.grades.join(',') : '',
+      termCode: filters.terms.length > 0 ? filters.terms.join(',') : '',
+      areaCode: filters.subjects.length > 0 ? filters.subjects.join(',') : '',
+      textbook: filters.textbooks.length > 0 ? filters.textbooks.join(',') : '',
+      page: currentPage.value, // 현재 페이지 (0부터 시작이므로 증가 전 값 사용)
+      size: pageSize,
+      includeSystemExams: true,
+      includeUserExams: true
+    }
     
-    visibleExams.value.push(...newExams)
-    hasMore.value = endIndex < searchResults.value.length
+    console.log('더 많은 시험지 로드 중... 페이지:', currentPage.value + 1)
+    
+    const result = await store.searchExams(searchParams)
+    
+    if (result && result.content) {
+      const newExams = transformSearchResults(result.content)
+      visibleExams.value.push(...newExams)
+      searchResults.value.push(...newExams)
+      
+      // 다음 페이지 여부 확인
+      hasMore.value = currentPage.value < result.totalPages - 1
+      currentPage.value++
+      
+      console.log(`추가 로드 완료: ${newExams.length}개, 전체: ${visibleExams.value.length}개`)
+    }
+  } catch (error) {
+    console.error('추가 로드 실패:', error)
+    hasMore.value = false
+  } finally {
     isLoadingMore.value = false
-  }, 300)
+  }
 }
 
 const selectSuggestion = (suggestion) => {
@@ -769,33 +840,229 @@ const toggleChapter = (chapterId) => {
   }
 }
 
+// 과목 필터 변경 이벤트 핸들러
+const onSubjectFilterChange = async () => {
+  console.log('과목 필터 변경됨:', filters.subjects)
+  
+  // 교과서 목록 로드
+  await loadTextbooksForSubject()
+  
+  // 검색 수행
+  console.log('과목 변경으로 검색 시작')
+  performSearch()
+}
+
+// 과목별 교과서 로드 (실제 subjects 테이블에서 로드)
+const loadTextbooksForSubject = async () => {
+  try {
+    if (filters.subjects.length === 0) {
+      availableTextbooks.value = []
+      return
+    }
+    
+    console.log('선택된 과목의 교과서 목록 로드 중...', filters.subjects)
+    
+    // 선택된 학년과 과목 코드
+    const gradeCode = filters.grades.length > 0 ? filters.grades[0] : null
+    const areaCode = filters.subjects[0] // 첫 번째 과목 코드
+    
+    // store의 fetchTextbooks 함수 사용
+    const textbooks = await store.fetchTextbooks(gradeCode, areaCode)
+    
+    // 각 교과서별 시험지 개수 조회
+    const textbooksWithCount = await Promise.all(textbooks.map(async t => {
+      try {
+        const countResponse = await axios.get(`${API_BASE_URL}/api/exams/count`, {
+          params: {
+            subjectId: t.subjectId,
+            gradeCode: gradeCode,
+            areaCode: areaCode
+          }
+        })
+        const count = countResponse.data.totalCount || 0
+        
+        return {
+          id: t.subjectId,
+          code: t.subjectId,
+          name: t.subjectName,
+          areaCode: t.areaCode,
+          gradeCode: t.gradeCode,
+          count: count
+        }
+      } catch (error) {
+        console.error(`교과서 ${t.subjectId} 카운트 조회 실패:`, error)
+        return {
+          id: t.subjectId,
+          code: t.subjectId,
+          name: t.subjectName,
+          areaCode: t.areaCode,
+          gradeCode: t.gradeCode,
+          count: 0
+        }
+      }
+    }))
+    
+    availableTextbooks.value = textbooksWithCount
+    console.log('교과서 목록 로드 완료 (카운트 포함):', availableTextbooks.value)
+  } catch (error) {
+    console.error('교과서 목록 로드 실패:', error)
+    availableTextbooks.value = []
+  }
+}
+
+// 교과서에 따른 단원 로드
+const loadChaptersForFilters = async () => {
+  // 필수 조건: 교과서가 선택되어야 함
+  if (filters.textbooks.length === 0) {
+    availableChapters.value = []
+    filters.chapters = [] // 단원 선택도 초기화
+    return
+  }
+
+  try {
+    // 선택된 첫 번째 교과서 ID
+    const subjectId = filters.textbooks[0]
+    
+    console.log(`대단원 로드 중... 교과서 ID: ${subjectId}`)
+    
+    // store의 fetchChapters 함수 사용
+    const chapters = await store.fetchChapters(subjectId)
+    
+    if (chapters && chapters.length > 0) {
+      console.log(`대단원 로드 성공:`, chapters)
+      
+      // API 응답이 LargeNode 형식 (id, name, children)
+      // 각 대단원별로 시험지 개수 조회
+      const chaptersWithCount = []
+      
+      for (const largeChapter of chapters) {
+        // LargeNode 구조: { id: Long, name: String, children: [] }
+        const chapterCode = String(largeChapter.id)
+        const chapterName = largeChapter.name
+        
+        // 각 대단원별 시험지 개수를 개별 조회
+        try {
+          const countResponse = await axios.get(`${API_BASE_URL}/api/exams/count`, {
+            params: {
+              largeChapterCode: chapterCode,
+              subjectId: subjectId,
+              gradeCode: filters.grades.length > 0 ? filters.grades[0] : null,
+              areaCode: filters.subjects.length > 0 ? filters.subjects[0] : null
+            }
+          })
+          
+          const count = countResponse.data.totalCount || 0
+          console.log(`대단원 "${chapterName}" (코드: ${chapterCode}): ${count}개 시험지`)
+          
+          chaptersWithCount.push({
+            id: chapterCode,
+            code: chapterCode,
+            name: chapterName,
+            count: count
+          })
+        } catch (error) {
+          console.error(`대단원 ${chapterCode} 카운트 조회 실패:`, error)
+          chaptersWithCount.push({
+            id: chapterCode,
+            code: chapterCode,
+            name: chapterName,
+            count: 0
+          })
+        }
+      }
+      
+      availableChapters.value = chaptersWithCount
+      console.log('대단원 로드 완료 (카운트 포함):', availableChapters.value)
+    } else {
+      console.log('대단원 데이터가 없습니다')
+      availableChapters.value = []
+      filters.chapters = []
+    }
+  } catch (error) {
+    console.error('대단원 로드 실패:', error)
+    availableChapters.value = []
+    filters.chapters = []
+  }
+}
+
+// 과목별 챕터 로드 (레거시 호환성 유지)
+const loadChaptersForSubject = async (areaCode) => {
+  // 새 함수로 리다이렉트
+  await loadChaptersForFilters()
+}
+
+// 교과서 변경 시 챕터 다시 로드
+const onTextbookChange = () => {
+  loadChaptersForFilters()
+}
+
+// 대단원 선택 토글 함수
+const toggleChapterSelection = (chapterCode) => {
+  console.log('토글 전 chapters 배열:', [...filters.chapters])
+  console.log('토글할 chapterCode:', chapterCode)
+  
+  const index = filters.chapters.findIndex(code => code === chapterCode)
+  
+  if (index > -1) {
+    // 이미 선택되어 있으면 제거
+    filters.chapters.splice(index, 1)
+    console.log(`대단원 ${chapterCode} 제거됨`)
+  } else {
+    // 선택되어 있지 않으면 추가
+    filters.chapters.push(chapterCode)
+    console.log(`대단원 ${chapterCode} 추가됨`)
+  }
+  
+  console.log('토글 후 chapters 배열:', [...filters.chapters])
+  
+  // 강제로 Vue의 반응성 트리거
+  filters.chapters = [...filters.chapters]
+}
+
 const clearAllFilters = () => {
-  filters.schoolLevel = []
-  filters.grade = ''
+  filters.grades = []
   filters.subjects = []
+  filters.textbooks = []
   filters.chapters = []
   filters.itemCount = [5, 50]
   filters.visibility = 'all'
   quickFilters.value.forEach(f => f.active = false)
   searchQuery.value = ''
+  searchResults.value = []
+  visibleExams.value = []
+  availableTextbooks.value = []
+  availableChapters.value = []
+  totalCount.value = 0
   performSearch()
 }
 
 const createNewExam = () => {
+  console.log('새 시험지 만들기 클릭')
   isCreatingNew.value = true
   store.setMode('new')
+  // 다음 단계로 이동
+  emit('next', { mode: 'create' })
 }
 
 const selectExam = (exam) => {
+  console.log('기존 시험지 선택:', exam)
   selectedExamId.value = exam.id
-  selectedExamName.value = exam.title
+  selectedExamName.value = exam.title || exam.examName
   store.setMode('edit')
   store.setSelectedExam(exam)
+  // 하단 패널 표시 (바로 이동하지 않고 사용자가 선택)
+  showSelectedExamPanel.value = true
 }
 
 const editExam = (exam) => {
   selectExam(exam)
   proceedToNext()
+}
+
+const proceedWithSelectedExam = () => {
+  if (selectedExamId.value) {
+    emit('next', { mode: 'edit', examId: selectedExamId.value })
+  }
 }
 
 const previewExam = (exam) => {
@@ -824,13 +1091,21 @@ const proceedToNext = () => {
 
 const getSubjectName = (subject) => {
   const subjects = {
+    MA: '수학',
+    KO: '국어',
+    EN: '영어',
+    SC: '과학',
+    SO: '사회',
+    HS: '역사',
+    MO: '도덕',
+    // 소문자 호환성 유지
     math: '수학',
     korean: '국어',
     english: '영어',
     science: '과학',
     social: '사회'
   }
-  return subjects[subject] || subject
+  return subjects[subject] || subjects[subject?.toUpperCase()] || subject
 }
 
 const formatDate = (date) => {
@@ -846,9 +1121,227 @@ const formatDate = (date) => {
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
 }
 
+// Helper 함수들 추가
+const loadAccessibleExams = async () => {
+  try {
+    // 초기 시험지 목록 로드 (전체 검색)
+    const searchParams = {
+      page: 0,
+      size: 20,
+      examType: 'ALL',
+      sort: 'createdDate,desc'
+    }
+    
+    console.log('초기 시험지 목록 로드 중...')
+    const result = await store.searchExams(searchParams)
+    
+    if (result && result.content) {
+      // 검색 결과를 searchResults와 visibleExams에 설정
+      searchResults.value = transformSearchResults(result.content)
+      visibleExams.value = [...searchResults.value]
+      totalCount.value = result.totalElements || 0
+      hasMore.value = result.totalPages > 1
+      currentPage.value = 1  // 다음 페이지 로드를 위해 1로 설정
+      
+      // 최근 시험지도 동일한 데이터로 설정
+      recentExams.value = searchResults.value.slice(0, 10)
+      
+      console.log(`초기 시험지 ${result.content.length}개 로드 완료, 전체: ${result.totalElements}개`)
+      
+      // 빠른 필터 업데이트
+      const myExamFilter = quickFilters.value.find(f => f.id === 2)
+      if (myExamFilter) {
+        myExamFilter.count = result.totalElements || 0
+      }
+    }
+  } catch (error) {
+    console.error('초기 시험지 로드 실패:', error)
+    // 실패 시 빈 배열로 초기화
+    searchResults.value = []
+    visibleExams.value = []
+    recentExams.value = []
+  }
+}
+
+const loadStatistics = async () => {
+  try {
+    // 전체 시험지 수 조회
+    const allExamsResult = await store.searchExams({
+      page: 0,
+      size: 1,
+      includeSystemExams: true,
+      includeUserExams: true
+    })
+    
+    if (allExamsResult) {
+      totalExamCount.value = allExamsResult.totalElements || 0
+    }
+    
+    // 공개 시험지 수 조회
+    const publicExamsResult = await store.searchExams({
+      page: 0,
+      size: 1,
+      visibility: 'public'
+    })
+    
+    if (publicExamsResult) {
+      publicExamCount.value = publicExamsResult.totalElements || 0
+      
+      // 빠른 필터 업데이트
+      const publicFilter = quickFilters.value.find(f => f.id === 4)
+      if (publicFilter) {
+        publicFilter.count = publicExamsResult.totalElements || 0
+      }
+    }
+    
+    // 각 과목별 시험지 수 조회 - count API 사용
+    console.log('=== 과목별 통계 로드 시작 ===')
+    for (const subject of subjects.value) {
+      try {
+        const response = await examApi.getExamCounts({
+          areaCode: subject.code  // subject.id가 아니라 subject.code 사용
+        })
+        
+        if (response.data) {
+          // API 응답에서 직접 카운트 추출
+          subject.count = response.data.totalCount || 0
+          console.log(`✓ ${subject.name} (${subject.code}): ${subject.count}개`)
+        }
+      } catch (error) {
+        console.error(`✗ ${subject.name} (${subject.code}) 카운트 로드 실패:`, error.response?.data || error.message)
+        // 에러 시 기존 searchExams API 사용 (폴백)
+        try {
+          const result = await store.searchExams({
+            areaCode: subject.code,  // subject.code 사용
+            page: 0,
+            size: 1,
+            examType: 'ALL'
+          })
+          
+          if (result) {
+            subject.count = result.totalElements || 0
+            console.log(`${subject.name} (${subject.code}): ${subject.count}개 (폴백)`)
+          }
+        } catch (fallbackError) {
+          console.error(`${subject.name} 폴백 카운트도 실패:`, fallbackError)
+        }
+      }
+    }
+    
+    // 필터 옵션에서 학교급별 통계 업데이트 (schoolLevels 제거)
+    console.log('통계 로드 완료 - 중학교 과목별 통계 집계 완료')
+    
+    // 최근 업데이트 시험지 수 (임시로 전체의 일부로 설정)
+    const recentFilter = quickFilters.value.find(f => f.id === 1)
+    if (recentFilter) {
+      recentFilter.count = Math.floor(totalExamCount.value * 0.15) // 임시로 15%
+    }
+    
+    // 우리 학교 시험지 수 (임시로 설정)
+    const schoolFilter = quickFilters.value.find(f => f.id === 3)
+    if (schoolFilter) {
+      schoolFilter.count = Math.floor(totalExamCount.value * 0.1) // 임시로 10%
+    }
+  } catch (error) {
+    console.error('통계 데이터 로드 실패:', error)
+  }
+}
+
+const transformSearchResults = (exams) => {
+  console.log('변환 중인 시험지 데이터:', exams.slice(0, 2)) // 디버깅용
+  return exams.map(exam => ({
+    id: exam.id,
+    title: exam.examName,
+    subject: exam.subjectName || 'Unknown', // subjectName 사용
+    grade: exam.gradeName || '', // gradeName 그대로 사용
+    gradeCode: exam.gradeCode || '', // gradeCode도 저장
+    chapterName: exam.chapterName || exam.examType || '단원평가',
+    questionCount: exam.itemCount || 0, // itemCount 사용
+    updatedAt: exam.updatedDate || new Date(),
+    useCount: exam.useCount || 0,
+    visibility: exam.visibility ? exam.visibility.toLowerCase() : 'private'
+  }))
+}
+
+const getGradeCode = (gradeName) => {
+  const gradeMap = {
+    '중1': '07',
+    '중2': '08', 
+    '중3': '09'
+  }
+  return gradeMap[gradeName] || ''
+}
+
+// 인기 시험지 로드
+const loadPopularExams = async () => {
+  try {
+    const result = await store.fetchPopularExams(10)
+    if (result && Array.isArray(result)) {
+      popularExams.value = transformSearchResults(result)
+    }
+  } catch (error) {
+    console.error('인기 시험지 로드 실패:', error)
+  }
+}
+
 // Lifecycle
-onMounted(() => {
+onMounted(async () => {
   document.addEventListener('click', handleClickOutside)
+  
+  // 필터 옵션 로드
+  try {
+    await store.fetchFilterOptions()
+    console.log('필터 옵션 로드 완료')
+    
+    // store에서 가져온 데이터로 업데이트
+    const filterOptions = store.filterOptions
+    
+    if (filterOptions) {
+      // 학년 데이터 업데이트
+      if (filterOptions.grades && filterOptions.grades.length > 0) {
+        grades.value = filterOptions.grades.map(grade => ({
+          code: grade.code,
+          name: grade.name,
+          count: grade.count || 0
+        }))
+      }
+      
+      // 과목 데이터 업데이트  
+      if (filterOptions.subjects && filterOptions.subjects.length > 0) {
+        subjects.value = filterOptions.subjects.map(subj => ({
+          code: subj.code,
+          name: subj.name,
+          count: subj.count || 0
+        }))
+      }
+      
+      // 학기 데이터 업데이트
+      if (filterOptions.terms && filterOptions.terms.length > 0) {
+        terms.value = filterOptions.terms.map(term => ({
+          code: term.code,
+          name: term.name,
+          count: term.count || 0
+        }))
+      }
+      
+      console.log('필터 옵션 업데이트 완료:', {
+        grades: grades.value.length,
+        subjects: subjects.value.length,
+        terms: terms.value.length
+      })
+    }
+    
+    // 초기 시험지 목록 로드 (접근 가능한 시험지)
+    await loadAccessibleExams()
+    
+    // 인기 시험지 로드
+    await loadPopularExams()
+    
+    // 통계 데이터 로드
+    await loadStatistics()
+  } catch (error) {
+    console.error('초기 데이터 로드 실패:', error)
+  }
 })
 
 onUnmounted(() => {
@@ -861,10 +1354,62 @@ const handleClickOutside = (event) => {
   }
 }
 
-// Watchers
-watch(() => filters, () => {
+// Watchers - 순차적 필터링을 위한 감시자
+
+// Watch 함수들
+
+// 1. 학년 변경 시
+watch(() => filters.grades, (newVal) => {
+  console.log('===== 학년 필터 변경 =====')
+  console.log('선택된 학년 코드:', newVal)
+  console.log('학년 데이터:', grades.value)
+  console.log('전체 필터 상태:', JSON.stringify(filters))
   performSearch()
 }, { deep: true })
+
+// 2. 과목 변경 시 - 교과서 목록 로드
+watch(() => filters.subjects, async (newVal, oldVal) => {
+  console.log('과목 필터 변경됨:', { 이전: oldVal, 현재: newVal })
+  
+  if (newVal.length === 0) {
+    // 과목 해제 시 하위 필터 초기화
+    filters.textbooks = []
+    filters.chapters = []
+    availableTextbooks.value = []
+    availableChapters.value = []
+    console.log('과목 필터 해제 - 하위 필터 초기화')
+  } else {
+    // 과목 선택 시 교과서 목록 로드
+    console.log('과목 선택됨 - 교과서 로드 시작:', newVal)
+    await loadTextbooksForSubject()
+  }
+  
+  console.log('과목 변경으로 인한 검색 시작')
+  performSearch()
+}, { deep: true })
+
+// 3. 교과서 변경 시 - 단원 목록 로드
+watch(() => filters.textbooks, async (newVal) => {
+  if (newVal.length === 0) {
+    // 교과서 해제 시 단원 초기화
+    filters.chapters = []
+    availableChapters.value = []
+  } else {
+    // 교과서 선택 시 단원 로드
+    await loadChaptersForFilters()
+  }
+  performSearch()
+})
+
+// 4. 단원 변경 시 - 검색만 수행
+watch(() => filters.chapters, () => {
+  performSearch()
+})
+
+// 5. 기타 필터 변경 시 - 검색만 수행
+watch([() => filters.itemCount, () => filters.visibility], () => {
+  performSearch()
+})
 </script>
 
 <style scoped>
@@ -885,9 +1430,41 @@ watch(() => filters, () => {
 
 .header-top {
   display: flex;
+  justify-content: space-between;
   align-items: center;
   gap: 0.75rem;
   margin-bottom: 0.75rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.btn-create-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-create-new:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.btn-create-new svg {
+  flex-shrink: 0;
 }
 
 .main-title {
@@ -1095,6 +1672,7 @@ watch(() => filters, () => {
   font-size: 0.875rem;
   cursor: pointer;
   padding: 0.25rem 0;
+  position: relative;
 }
 
 .checkbox-item:hover,
@@ -1102,9 +1680,19 @@ watch(() => filters, () => {
   color: #0366d6;
 }
 
-.checkbox-item input,
-.radio-item input {
+.checkbox-item input[type="checkbox"],
+.radio-item input[type="radio"] {
   cursor: pointer;
+  margin: 0;
+  width: 16px;
+  height: 16px;
+}
+
+/* 체크박스 독립성 보장 */
+.checkbox-item input[type="checkbox"] {
+  pointer-events: auto;
+  position: relative;
+  z-index: 1;
 }
 
 .checkbox-item .count {
@@ -1670,29 +2258,46 @@ watch(() => filters, () => {
   font-weight: 500;
 }
 
-.subject-math {
+/* 교과서 필터 스타일 */
+.checkbox-item .publisher {
+  font-size: 0.75rem;
+  color: #959da5;
+  margin-left: 0.25rem;
+}
+
+.subject-MA, .subject-math {
   background: #dbeafe;
   color: #1e40af;
 }
 
-.subject-korean {
+.subject-KO, .subject-korean {
   background: #fce7f3;
   color: #be185d;
 }
 
-.subject-english {
+.subject-EN, .subject-english {
   background: #ede9fe;
   color: #7c3aed;
 }
 
-.subject-science {
+.subject-SC, .subject-science {
   background: #d1fae5;
   color: #065f46;
 }
 
-.subject-social {
+.subject-SO, .subject-social {
   background: #fed7aa;
   color: #c2410c;
+}
+
+.subject-HS {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.subject-MO {
+  background: #e0e7ff;
+  color: #3730a3;
 }
 
 .visibility-badge {
@@ -1907,5 +2512,86 @@ watch(() => filters, () => {
   .results-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* 선택한 시험지 하단 패널 */
+.selected-exam-panel {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-top: 2px solid #3b82f6;
+  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
+  z-index: 1000;
+  padding: 1.5rem 2rem;
+}
+
+.panel-content {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.panel-info h3 {
+  font-size: 0.875rem;
+  color: #6b7280;
+  margin-bottom: 0.25rem;
+  font-weight: 500;
+}
+
+.panel-info .exam-name {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.panel-actions {
+  display: flex;
+  gap: 1rem;
+}
+
+.panel-actions .btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.9375rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+}
+
+.panel-actions .btn-secondary {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.panel-actions .btn-secondary:hover {
+  background: #e5e7eb;
+}
+
+.panel-actions .btn-primary {
+  background: #3b82f6;
+  color: white;
+}
+
+.panel-actions .btn-primary:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+/* 슬라이드 업 애니메이션 */
+.slide-up-enter-active,
+.slide-up-leave-active {
+  transition: transform 0.3s ease;
+}
+
+.slide-up-enter-from,
+.slide-up-leave-to {
+  transform: translateY(100%);
 }
 </style>
