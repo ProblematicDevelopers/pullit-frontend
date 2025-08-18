@@ -3,9 +3,13 @@ import axios from 'axios'
 // API 기본 URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
+// 프로덕션 환경인지 확인
+const isProduction = import.meta.env.PROD
+
 // Axios 인스턴스 생성
 const authApi = axios.create({
-  baseURL: `${API_BASE_URL}/api/auth`,
+  // 프로덕션: nginx가 /api 프록시 처리, 로컬: 직접 /api 경로 추가
+  baseURL: isProduction ? `${API_BASE_URL}/auth` : `${API_BASE_URL}/api/auth`,
   headers: {
     'Content-Type': 'application/json',
   },
