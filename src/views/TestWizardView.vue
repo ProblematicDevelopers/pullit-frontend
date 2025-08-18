@@ -1,13 +1,13 @@
 <!--
   시험지 마법사 메인 뷰 컴포넌트
-  
+
   이 컴포넌트는 팝업 창에서 실행되는 시험지 생성 마법사의 메인 페이지입니다.
   3단계로 구성된 마법사의 전체 흐름을 관리합니다:
-  
+
   Step 1: 단원선택 - 과목, 단원 선택 및 문제 설정
   Step 2: 문항편집 - 선택된 문제들의 편집 및 순서 조정
   Step 3: 시험지저장 - 최종 시험지 생성 및 저장
-  
+
   주요 기능:
   - 단계별 컴포넌트 전환
   - 진행 상태 관리
@@ -18,11 +18,11 @@
 <template>
   <div class="test-wizard-view">
     <!-- 마법사 헤더: 진행 단계 표시 및 닫기 버튼 -->
-    <WizardHeader 
+    <WizardHeader
       :currentStep="currentStep"
       @close="handleClose"
     />
-    
+
     <!-- 마법사 콘텐츠 영역 -->
     <div class="wizard-content">
       <!-- Step 0: 모드 선택 (신규/편집) -->
@@ -33,7 +33,7 @@
         @selectNew="handleSelectNew"
         @selectExisting="handleSelectExisting"
       />
-      
+
       <!-- Step 1: 단원선택 -->
       <Step1UnitSelection
         v-else-if="currentStep === 1"
@@ -44,7 +44,7 @@
         @research="handleResearch"
         @show-scope="handleShowScope"
       />
-      
+
       <!-- Step 2: 문항선택 -->
       <Step2ItemSelection
         v-else-if="currentStep === 2"
@@ -52,9 +52,9 @@
         @back="handleStep2Back"
         @next="handleStep2Next"
       />
-      
+
       <!-- Step 3: 시험지저장 (향후 구현) -->
-      <div 
+      <div
         v-else-if="currentStep === 3"
         class="step-placeholder"
       >
@@ -62,16 +62,16 @@
           <h3>Step 3: 시험지저장</h3>
           <p>완성된 시험지를 저장하고 다운로드하는 단계입니다.</p>
           <p>현재 개발 중입니다.</p>
-          
+
           <!-- 임시 네비게이션 버튼 -->
           <div class="temp-navigation">
-            <button 
+            <button
               class="btn btn-secondary"
               @click="goToStep(2)"
             >
               ← Step 2로 돌아가기
             </button>
-            <button 
+            <button
               class="btn btn-success"
               @click="handleComplete"
             >
@@ -87,7 +87,7 @@
 <script setup>
 /**
  * TestWizardView 컴포넌트 스크립트
- * 
+ *
  * 시험지 마법사의 전체 흐름을 관리하는 메인 컴포넌트입니다.
  * Pinia store를 통해 상태를 관리하고, 각 단계 간의 전환을 처리합니다.
  */
@@ -125,7 +125,7 @@ const { setCurrentStep, resetWizard } = store
  */
 onMounted(() => {
   console.log('시험지 마법사가 시작되었습니다.')
-  
+
   // localStorage에서 전달받은 과목 데이터 확인
   const subjectData = localStorage.getItem('wizard_subject_data')
   if (subjectData) {
@@ -137,7 +137,7 @@ onMounted(() => {
       console.error('과목 데이터 파싱 실패:', error)
     }
   }
-  
+
   // 브라우저 새로고침 방지 경고
   window.addEventListener('beforeunload', handleBeforeUnload)
 })
@@ -197,6 +197,16 @@ const handleSelectExisting = (exam) => {
   console.log('기존 시험지 편집 선택:', exam)
   store.setMode('edit')
   store.setSelectedExam(exam)
+  
+  // examInfo 설정 - Step2에서 교과서 필터링에 필요
+  store.setExamInfo({
+    gradeCode: exam.gradeCode,
+    gradeName: exam.gradeName || exam.grade,
+    subjectId: exam.areaCode, // areaCode를 subjectId로 사용
+    subjectName: exam.areaName || exam.subject
+  })
+  
+  console.log('설정된 examInfo:', store.examInfo)
 }
 
 /**
@@ -211,13 +221,16 @@ const handleStep1Next = () => {
  * Step 2에서 뒤로가기 핸들러
  */
 const handleStep2Back = () => {
-  console.log('Step 2에서 뒤로가기, mode:', store.mode)
+  console.log('TestWizardView handleStep2Back 호출됨, mode:', store.mode)
   // 새 시험지 모드면 Step1로, 기존 시험지 편집 모드면 Step0로
   if (store.mode === 'new') {
+    console.log('새 시험지 모드 - Step1로 이동')
     setCurrentStep(1)
   } else {
+    console.log('기존 시험지 편집 모드 - Step0로 이동')
     setCurrentStep(0)
   }
+  console.log('현재 step 변경됨:', store.currentStep)
 }
 
 /**
@@ -242,7 +255,7 @@ const goToStep = (step) => {
  */
 const handleCancel = () => {
   const confirmCancel = confirm('시험지 작성을 취소하시겠습니까? 입력한 내용이 삭제됩니다.')
-  
+
   if (confirmCancel) {
     handleClose()
   }
@@ -269,7 +282,7 @@ const handleResearch = () => {
  */
 const handleShowScope = (selectedPapers) => {
   console.log('출제범위 보기:', selectedPapers)
-  
+
   // 출제범위 모달 또는 팝업 열기 (향후 구현)
   // 현재는 콘솔 로그로 대체
   alert(`선택된 ${selectedPapers.length}개 단원의 출제범위를 표시합니다.`)
@@ -280,7 +293,7 @@ const handleShowScope = (selectedPapers) => {
  */
 const handleComplete = () => {
   const confirmComplete = confirm('시험지 생성을 완료하시겠습니까?')
-  
+
   if (confirmComplete) {
     // 최종 결과 데이터 생성
     const result = {
@@ -291,9 +304,9 @@ const handleComplete = () => {
       selectedQuestions: store.selectedQuestions,
       completedAt: new Date().toISOString()
     }
-    
+
     console.log('마법사 완료:', result)
-    
+
     // 팝업인 경우 결과와 함께 닫기
     if (isPopupWindow()) {
       closePopup(result)
@@ -310,21 +323,21 @@ const handleComplete = () => {
 const handleClose = () => {
   // 작업 중인 내용이 있는지 확인
   const hasUnsavedWork = store.selectedPapers.length > 0 || store.totalWizardQuestions > 0
-  
+
   if (hasUnsavedWork) {
     const confirmClose = confirm('작업 중인 내용이 있습니다. 정말 닫으시겠습니까?')
     if (!confirmClose) {
       return
     }
   }
-  
+
   // 데이터 정리
   resetWizard()
-  
+
   // 모달 모드인 경우
   if (props.isModal) {
     emit('close')
-  } 
+  }
   // 팝업인 경우 창 닫기
   else if (isPopupWindow()) {
     closePopup({ action: 'closed' })
@@ -335,7 +348,7 @@ const handleClose = () => {
 <style scoped>
 /**
  * TestWizardView 컴포넌트 스타일
- * 
+ *
  * 팝업 창 전체를 사용하는 전체 화면 레이아웃입니다.
  * 헤더와 콘텐츠 영역으로 구성됩니다.
  */
@@ -447,11 +460,11 @@ const handleClose = () => {
     margin: 1rem;
     padding: 1.5rem;
   }
-  
+
   .temp-navigation {
     flex-direction: column;
   }
-  
+
   .temp-navigation .btn {
     width: 100%;
   }

@@ -23,7 +23,12 @@
         <!-- 학년 선택 섹션 -->
         <div class="section-card">
           <div class="section-title">
-            <span class="section-icon">🎓</span>
+            <div class="title-icon grade-title-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M22 10v6M2 10l10-5 10 5-10 5z"/>
+                <path d="M6 12v5c0 1.1 2.7 2 6 2s6-.9 6-2v-5"/>
+              </svg>
+            </div>
             <h3>학년 선택</h3>
           </div>
           <div class="grade-grid">
@@ -33,9 +38,13 @@
               :class="['grade-card', { 'selected': examInfo.gradeCode === grade.code }]"
               @click="selectGrade(grade)"
             >
-              <div class="grade-icon">
-                <span v-if="examInfo.gradeCode === grade.code">✓</span>
-                <span v-else>{{ grade.icon }}</span>
+              <div class="grade-number">
+                <span v-if="examInfo.gradeCode === grade.code" class="check-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="20 6 9 17 4 12"></polyline>
+                  </svg>
+                </span>
+                <span v-else class="grade-num">{{ grade.grade }}</span>
               </div>
               <div class="grade-name">{{ grade.name }}</div>
               <div class="grade-desc">{{ grade.desc }}</div>
@@ -46,7 +55,12 @@
         <!-- 과목 선택 섹션 -->
         <div class="section-card">
           <div class="section-title">
-            <span class="section-icon">📚</span>
+            <div class="title-icon subject-title-icon">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>
+                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/>
+              </svg>
+            </div>
             <h3>과목 선택</h3>
           </div>
           <div class="subject-grid">
@@ -55,8 +69,13 @@
               :key="subject.id"
               :class="['subject-card', { 'selected': examInfo.subjectId === subject.id }]"
               @click="selectSubject(subject)"
+              :style="{ '--subject-color': subject.color }"
             >
-              <div class="subject-icon">{{ subject.icon }}</div>
+              <div class="subject-icon-wrapper">
+                <div class="subject-icon" :style="{ backgroundColor: examInfo.subjectId === subject.id ? subject.color : '#F3F4F6' }">
+                  <span>{{ subject.name.charAt(0) }}</span>
+                </div>
+              </div>
               <div class="subject-name">{{ subject.name }}</div>
             </div>
           </div>
@@ -139,18 +158,18 @@ const examInfo = ref({
 
 // 학년 옵션
 const grades = ref([
-  { code: '07', name: '중학교 1학년', icon: '1️⃣', desc: '중등 1학년 과정' },
-  { code: '08', name: '중학교 2학년', icon: '2️⃣', desc: '중등 2학년 과정' },
-  { code: '09', name: '중학교 3학년', icon: '3️⃣', desc: '중등 3학년 과정' }
+  { code: '07', name: '중학교 1학년', grade: '1', desc: '중등 1학년 과정' },
+  { code: '08', name: '중학교 2학년', grade: '2', desc: '중등 2학년 과정' },
+  { code: '09', name: '중학교 3학년', grade: '3', desc: '중등 3학년 과정' }
 ])
 
-// 과목 옵션 (고정값)
+// 과목 옵션 (고정값) - 백엔드 areaCode와 매칭
 const subjects = ref([
-  { id: 1, name: '수학', icon: '🔢' },
-  { id: 2, name: '국어', icon: '📖' },
-  { id: 3, name: '영어', icon: '🔤' },
-  { id: 4, name: '과학', icon: '🔬' },
-  { id: 5, name: '사회', icon: '🌍' }
+  { id: 'MA', name: '수학', color: '#3B82F6' },
+  { id: 'KO', name: '국어', color: '#10B981' },
+  { id: 'EN', name: '영어', color: '#F59E0B' },
+  { id: 'SC', name: '과학', color: '#8B5CF6' },
+  { id: 'SO', name: '사회', color: '#EF4444' }
 ])
 
 // 학기 옵션
@@ -403,8 +422,22 @@ const loadExamData = async (examId) => {
   margin-bottom: 1.5rem;
 }
 
-.section-icon {
-  font-size: 1.5rem;
+.title-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  background: #f1f5f9;
+}
+
+.grade-title-icon {
+  color: #3b82f6;
+}
+
+.subject-title-icon {
+  color: #10b981;
 }
 
 .section-title h3 {
@@ -444,18 +477,39 @@ const loadExamData = async (examId) => {
   box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
 }
 
-.grade-icon {
-  font-size: 2rem;
-  margin-bottom: 0.75rem;
-  height: 2.5rem;
+.grade-number {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto 0.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
+  border-radius: 12px;
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
+  transition: all 0.3s ease;
 }
 
-.grade-card.selected .grade-icon {
-  color: #3b82f6;
-  font-weight: bold;
+.grade-card.selected .grade-number {
+  background: #3b82f6;
+  border-color: #3b82f6;
+}
+
+.grade-num {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+.grade-card.selected .grade-num {
+  color: white;
+}
+
+.check-icon {
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .grade-name {
@@ -499,9 +553,29 @@ const loadExamData = async (examId) => {
   box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
 }
 
-.subject-icon {
-  font-size: 2.5rem;
+.subject-icon-wrapper {
   margin-bottom: 0.75rem;
+}
+
+.subject-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.subject-icon span {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1a202c;
+}
+
+.subject-card.selected .subject-icon span {
+  color: white;
 }
 
 .subject-name {
