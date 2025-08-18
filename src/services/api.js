@@ -6,6 +6,7 @@ import { tokenManager } from './auth'
 // 개발: http://localhost:8080
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
+
 // Axios 인스턴스 생성
 const api = axios.create({
   baseURL: API_BASE_URL ? `${API_BASE_URL}/api` : '/api',
@@ -34,18 +35,18 @@ api.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
-    
+
     // 401 에러 처리 (토큰 만료)
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
-      
+
       try {
         const refreshToken = tokenManager.getRefreshToken()
         if (refreshToken) {
           const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
             refreshToken
           })
-          
+
           if (response.data.success) {
             const { accessToken, refreshToken: newRefreshToken } = response.data.data
             tokenManager.setTokens(accessToken, newRefreshToken)
@@ -58,9 +59,27 @@ api.interceptors.response.use(
         window.location.href = '/login'
       }
     }
-    
+
     return Promise.reject(error)
   }
 )
+
+// CBT 관련 API 함수들
+export const cbtAPI = {
+  // CBT 생성
+  createCBT: (data) => {
+    return api.post('/cbt/create', data)
+  },
+
+  // CBT 목록 조회
+  getCBTList: () => {
+    return api.get('/cbt/list')
+  },
+
+  // CBT 상세 조회
+  getCBTDetail: (cbtId) => {
+    return api.get(`/cbt/${cbtId}`)
+  }
+}
 
 export default api
