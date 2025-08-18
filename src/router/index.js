@@ -12,6 +12,7 @@ import TestWizardView from '@/views/TestWizardView.vue'
 import Login from '@/views/Login.vue'
 
 import CBTStep01 from '@/components/student/cbt/CBTStep01.vue'
+import ItemProcessing from '@/views/ItemProcessing.vue'
 
 // 라우트 가드 import
 import { requireAuth, requireRole, preventAuthenticated } from './guards'
@@ -69,6 +70,38 @@ const routes = [
       role: 'teacher'
     }
   },
+
+    // 문제 가공
+    {
+      path: '/item-processing',
+      name: "ItemProcessing",
+      component: ItemProcessing,
+      beforeEnter: requireAuth,
+      meta: {
+        requiresAuth: true,
+        role: 'teacher'
+      }
+    },
+    {
+      path: '/item-processing/textbook',
+      name: "ItemProcessingTextbook",
+      component: ItemProcessing,
+      beforeEnter: requireAuth,
+      meta: {
+        requiresAuth: true,
+        role: 'teacher'
+      }
+    },
+    {
+      path: '/item-processing/cbt',
+      name: "ItemProcessingCBT",
+      component: ItemProcessing,
+      beforeEnter: requireAuth,
+      meta: {
+        requiresAuth: true,
+        role: 'teacher'
+      }
+    },
 ]
 
 const router = createRouter({
