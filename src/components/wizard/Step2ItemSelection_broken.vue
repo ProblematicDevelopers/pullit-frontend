@@ -1,6 +1,6 @@
 <!--
   시험지 마법사 Step 2: 문항 선택 (Enhanced)
-  
+
   이 컴포넌트는 시험지에 포함할 문항들을 선택하는 단계입니다.
   주요 기능:
   - 실제 Backend API 연동
@@ -52,7 +52,6 @@
       </div>
     </div>
 
-    <!-- 메인 콘텐츠 영역 -->
     <div class="content-wrapper">
       <!-- 왼쪽 사이드바: 교과서 선택 및 필터 -->
       <div class="left-sidebar">
@@ -66,51 +65,50 @@
               </h3>
               <span class="section-desc">하나의 교과서를 선택하여 문제를 검색합니다</span>
             </div>
-          
-            <!-- 로딩 상태 -->
-            <div v-if="isSubjectsLoading" class="textbook-loading">
-              <div class="spinner"></div>
-              <p>교과서 정보를 불러오는 중...</p>
-            </div>
-          
-            <!-- 교과서 그리드 -->
-            <div v-else class="textbook-grid">
-              <div 
-                v-for="subject in subjects" 
-                :key="subject.subjectId"
-                :class="['textbook-card', { 'selected': selectedTextbook === subject.subjectId }]"
-                @click="selectTextbook(subject.subjectId)"
-              >
-                <!-- 교과서 표지 이미지 -->
-                <div class="textbook-icon">
-                  <img 
-                    v-if="subject.subjectThumbnail" 
-                    :src="subject.subjectThumbnail" 
-                    :alt="subject.subjectName"
-                    class="textbook-cover"
-                    @error="handleCoverImageError($event)"
-                  />
-                  <span v-else>📖</span>
-                </div>
-                
-                <div class="textbook-info">
-                  <h5>{{ subject.subjectName }}</h5>
-                  <p class="publisher">{{ subject.gradeName }} | {{ subject.areaName }}</p>
-                  <span class="year-badge">{{ subject.termName || '전체' }}</span>
-                </div>
-                
-                <div class="item-count">
-                  <span class="count-number">{{ subject.itemCount || 0 }}</span>
-                  <span class="count-label">문항</span>
-                </div>
-                
-                <div class="textbook-radio">
-                  <span v-if="selectedTextbook === subject.subjectId">●</span>
-                  <span v-else>○</span>
-                </div>
+
+          <!-- 로딩 상태 -->
+          <div v-if="isSubjectsLoading" class="textbook-loading">
+            <div class="spinner"></div>
+            <p>교과서 정보를 불러오는 중...</p>
+          </div>
+
+          <!-- 교과서 그리드 -->
+          <div v-else class="textbook-grid">
+            <div
+              v-for="subject in subjects"
+              :key="subject.subjectId"
+              :class="['textbook-card', { 'selected': selectedTextbook === subject.subjectId }]"
+              @click="selectTextbook(subject.subjectId)"
+            >
+              <!-- 교과서 표지 이미지 -->
+              <div class="textbook-icon">
+                <img
+                  v-if="subject.subjectThumbnail"
+                  :src="subject.subjectThumbnail"
+                  :alt="subject.subjectName"
+                  class="textbook-cover"
+                  @error="handleCoverImageError($event)"
+                />
+                <span v-else>📖</span>
+              </div>
+
+              <div class="textbook-info">
+                <h5>{{ subject.subjectName }}</h5>
+                <p class="publisher">{{ subject.gradeName }} | {{ subject.areaName }}</p>
+                <span class="year-badge">{{ subject.termName || '전체' }}</span>
+              </div>
+
+              <div class="item-count">
+                <span class="count-number">{{ subject.itemCount || 0 }}</span>
+                <span class="count-label">문항</span>
+              </div>
+
+              <div class="textbook-radio">
+                <span v-if="selectedTextbook === subject.subjectId">●</span>
+                <span v-else>○</span>
               </div>
             </div>
-          </div> <!-- textbook-section 닫기 -->
+          </div>
 
           <!-- 필터 섹션 -->
           <div class="filter-section">
@@ -120,313 +118,312 @@
                 상세 필터
               </h3>
               <button class="btn-reset" @click="resetFilters">
-                <span>↻</span> 초기화
-              </button>
-            </div>
-          
-            <div class="filter-content">
-              <!-- 단원 선택 (트리 구조) -->
-              <div class="filter-group" v-if="selectedTextbook && chapterTree.length > 0">
-                <label class="filter-label">
-                  <span class="label-icon">📑</span>
-                  단원 선택
-                  <span class="filter-subtitle">대단원을 클릭하여 중단원을 선택하세요</span>
-                </label>
-                <div class="chapter-tree-container">
-                  <div class="chapter-tree">
-                    <div v-for="largeChapter in chapterTree" :key="largeChapter.id" class="large-chapter">
-                      <div 
-                        class="large-chapter-header" 
-                        @click="toggleLargeChapter(largeChapter.id)"
-                        :class="{ 'expanded': expandedChapters.includes(largeChapter.id) }"
-                      >
-                        <div class="chapter-header-left">
-                          <span class="expand-icon">
-                            <svg v-if="!expandedChapters.includes(largeChapter.id)" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                              <path d="M9 5L16 12L9 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none">
-                              <path d="M5 9L12 16L19 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                          </span>
-                          <span class="chapter-name">{{ largeChapter.name }}</span>
+              <span>↻</span> 초기화
+            </button>
+          </div>
+
+          <div class="filter-content">
+            <!-- 단원 선택 (트리 구조) -->
+            <div class="filter-group" v-if="selectedTextbook && chapterTree.length > 0">
+              <label class="filter-label">
+                <span class="label-icon">📑</span>
+                단원 선택
+                <span class="filter-subtitle">대단원을 클릭하여 중단원을 선택하세요</span>
+              </label>
+              <div class="chapter-tree-container">
+                <div class="chapter-tree">
+                  <div v-for="largeChapter in chapterTree" :key="largeChapter.id" class="large-chapter">
+                    <div
+                      class="large-chapter-header"
+                      @click="toggleLargeChapter(largeChapter.id)"
+                      :class="{ 'expanded': expandedChapters.includes(largeChapter.id) }"
+                    >
+                      <div class="chapter-header-left">
+                        <span class="expand-icon">
+                          <svg v-if="!expandedChapters.includes(largeChapter.id)" width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M9 5L16 12L9 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                          </svg>
+                          <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none">
+                            <path d="M5 9L12 16L19 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                          </svg>
+                        </span>
+                        <span class="chapter-name">{{ largeChapter.name }}</span>
+                      </div>
+                      <div class="chapter-header-right">
+                        <span class="item-count">
+                          <span class="count-value">{{ largeChapter.itemCount || 0 }}</span>
+                          <span class="count-label">문항</span>
+                        </span>
+                        <span v-if="getSelectedCountInChapter(largeChapter) > 0" class="selected-indicator">
+                          {{ getSelectedCountInChapter(largeChapter) }}개 선택
+                        </span>
+                      </div>
+                    </div>
+
+                    <transition name="slide">
+                      <div v-if="expandedChapters.includes(largeChapter.id)" class="medium-chapters">
+                        <div v-if="largeChapter.mediumChapters && largeChapter.mediumChapters.length > 0">
+                          <label
+                            v-for="mediumChapter in largeChapter.mediumChapters"
+                            :key="mediumChapter.id"
+                            class="medium-chapter-item"
+                            :class="{ 'selected': selectedMediumChapters.includes(mediumChapter.id) }"
+                          >
+                            <div class="checkbox-wrapper">ㄴ
+                              <input
+                                type="checkbox"
+                                :id="`medium-${mediumChapter.id}`"
+                                :value="mediumChapter.id"
+                                v-model="selectedMediumChapters"
+                                @change="updateChapterFilter"
+                              />
+                              <label :for="`medium-${mediumChapter.id}`" class="custom-checkbox">
+                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="check-icon">
+                                  <path d="M5 12L10 17L20 7" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                              </label>
+                            </div>
+                            <div class="chapter-info">
+                              <span class="chapter-name">{{ mediumChapter.name }}</span>
+                            </div>
+                            <span class="item-count">
+                              <span class="count-value">{{ mediumChapter.itemCount || 0 }}</span>
+                              <span class="count-label">문항</span>
+                            </span>
+                          </label>
                         </div>
-                        <div class="chapter-header-right">
-                          <span class="item-count">
-                            <span class="count-value">{{ largeChapter.itemCount || 0 }}</span>
-                            <span class="count-label">문항</span>
-                          </span>
-                          <span v-if="getSelectedCountInChapter(largeChapter) > 0" class="selected-indicator">
-                            {{ getSelectedCountInChapter(largeChapter) }}개 선택
-                          </span>
+                        <div v-else class="no-medium-chapters">
+                          중단원이 없습니다
                         </div>
                       </div>
-                      
-                      <transition name="slide">
-                        <div v-if="expandedChapters.includes(largeChapter.id)" class="medium-chapters">
-                          <div v-if="largeChapter.mediumChapters && largeChapter.mediumChapters.length > 0">
-                            <label 
-                              v-for="mediumChapter in largeChapter.mediumChapters" 
-                              :key="mediumChapter.id"
-                              class="medium-chapter-item"
-                              :class="{ 'selected': selectedMediumChapters.includes(mediumChapter.id) }"
-                            >
-                              <div class="checkbox-wrapper">ㄴ
-                                <input 
-                                  type="checkbox"
-                                  :id="`medium-${mediumChapter.id}`"
-                                  :value="mediumChapter.id"
-                                  v-model="selectedMediumChapters"
-                                  @change="updateChapterFilter"
-                                />
-                                <label :for="`medium-${mediumChapter.id}`" class="custom-checkbox">
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="check-icon">
-                                    <path d="M5 12L10 17L20 7" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                                  </svg>
-                                </label>
-                              </div>
-                              <div class="chapter-info">
-                                <span class="chapter-name">{{ mediumChapter.name }}</span>
-                              </div>
-                              <span class="item-count">
-                                <span class="count-value">{{ mediumChapter.itemCount || 0 }}</span>
-                                <span class="count-label">문항</span>
-                              </span>
-                            </label>
-                          </div>
-                          <div v-else class="no-medium-chapters">
-                            중단원이 없습니다
-                          </div>
-                        </div>
-                      </transition>
-                    </div>
+                    </transition>
                   </div>
                 </div>
               </div>
-
-              <!-- 교과서 미선택 안내 -->
-              <div v-else-if="!selectedTextbook" class="filter-group">
-                <div class="no-textbook-message">
-                  <span class="icon">📚</span>
-                  <p>먼저 교과서를 선택해주세요</p>
-                </div>
-              </div>
-
-              <!-- 난이도 선택 (실제 DB 코드 사용) -->
-              <div class="filter-group">
-                <label class="filter-label">
-                  <span class="label-icon">📊</span>
-                  난이도
-                </label>
-                <div class="difficulty-buttons">
-                  <button 
-                    :class="['difficulty-btn', 'diff-high', { 'active': filters.difficulties.includes('4') }]"
-                    @click="toggleDifficulty('4')"
-                  >
-                    <span class="diff-icon">🔴</span>
-                    <span>상</span>
-                  </button>
-                  <button 
-                    :class="['difficulty-btn', 'diff-medium', { 'active': filters.difficulties.includes('3') }]"
-                    @click="toggleDifficulty('3')"
-                  >
-                    <span class="diff-icon">🟡</span>
-                    <span>중</span>
-                  </button>
-                  <button 
-                    :class="['difficulty-btn', 'diff-low', { 'active': filters.difficulties.includes('2') }]"
-                    @click="toggleDifficulty('2')"
-                  >
-                    <span class="diff-icon">🟢</span>
-                    <span>하</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- 문제 유형 (실제 DB 코드 사용) -->
-              <div class="filter-group">
-                <label class="filter-label">
-                  <span class="label-icon">📝</span>
-                  문제 유형
-                </label>
-                <div class="type-buttons">
-                  <button 
-                    :class="['type-btn', { 'active': questionFormFilters.includes('50') }]"
-                    @click="toggleQuestionForm('50')"
-                  >
-                    <span class="type-icon">🔘</span>
-                    <span>5지선택</span>
-                  </button>
-                  <button 
-                    :class="['type-btn', { 'active': questionFormFilters.includes('60') }]"
-                    @click="toggleQuestionForm('60')"
-                  >
-                    <span class="type-icon">✏️</span>
-                    <span>단답유순</span>
-                  </button>
-                  <button 
-                    :class="['type-btn', { 'active': questionFormFilters.includes('70') }]"
-                    @click="toggleQuestionForm('70')"
-                  >
-                    <span class="type-icon">📄</span>
-                    <span>서술형</span>
-                  </button>
-                </div>
-              </div>
-
-              <button class="btn-search" @click="searchItems">
-                <span>🔍</span> 검색하기
-              </button>
             </div>
-          </div> <!-- filter-section 닫기 -->
-        </div> <!-- sidebar-scroll 닫기 -->
-      </div> <!-- left-sidebar 닫기 -->
+
+            <!-- 교과서 미선택 안내 -->
+            <div v-else-if="!selectedTextbook" class="filter-group">
+              <div class="no-textbook-message">
+                <span class="icon">📚</span>
+                <p>먼저 교과서를 선택해주세요</p>
+              </div>
+            </div>
+
+            <!-- 난이도 선택 (실제 DB 코드 사용) -->
+            <div class="filter-group">
+              <label class="filter-label">
+                <span class="label-icon">📊</span>
+                난이도
+              </label>
+              <div class="difficulty-buttons">
+                <button
+                  :class="['difficulty-btn', 'diff-high', { 'active': filters.difficulties.includes('4') }]"
+                  @click="toggleDifficulty('4')"
+                >
+                  <span class="diff-icon">🔴</span>
+                  <span>상</span>
+                </button>
+                <button
+                  :class="['difficulty-btn', 'diff-medium', { 'active': filters.difficulties.includes('3') }]"
+                  @click="toggleDifficulty('3')"
+                >
+                  <span class="diff-icon">🟡</span>
+                  <span>중</span>
+                </button>
+                <button
+                  :class="['difficulty-btn', 'diff-low', { 'active': filters.difficulties.includes('2') }]"
+                  @click="toggleDifficulty('2')"
+                >
+                  <span class="diff-icon">🟢</span>
+                  <span>하</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- 문제 유형 (실제 DB 코드 사용) -->
+            <div class="filter-group">
+              <label class="filter-label">
+                <span class="label-icon">📝</span>
+                문제 유형
+              </label>
+              <div class="type-buttons">
+                <button
+                  :class="['type-btn', { 'active': questionFormFilters.includes('50') }]"
+                  @click="toggleQuestionForm('50')"
+                >
+                  <span class="type-icon">🔘</span>
+                  <span>5지선택</span>
+                </button>
+                <button
+                  :class="['type-btn', { 'active': questionFormFilters.includes('60') }]"
+                  @click="toggleQuestionForm('60')"
+                >
+                  <span class="type-icon">✏️</span>
+                  <span>단답유순</span>
+                </button>
+                <button
+                  :class="['type-btn', { 'active': questionFormFilters.includes('70') }]"
+                  @click="toggleQuestionForm('70')"
+                >
+                  <span class="type-icon">📄</span>
+                  <span>서술형</span>
+                </button>
+              </div>
+            </div>
+
+            <button class="btn-search" @click="searchItems">
+              <span>🔍</span> 검색하기
+            </button>
+          </div>
+        </div>
+      </div>
 
       <!-- 중앙: 문항 목록 -->
       <div class="center-panel">
-        <div class="items-header">
-          <span>검색 결과 ({{ totalItems }}개)</span>
-          <label class="select-all">
-            <input type="checkbox" @change="toggleSelectAll" :checked="isAllSelected">
-            전체 선택
-          </label>
-        </div>
+          <div class="items-header">
+            <span>검색 결과 ({{ totalItems }}개)</span>
+            <label class="select-all">
+              <input type="checkbox" @change="toggleSelectAll" :checked="isAllSelected">
+              전체 선택
+            </label>
+          </div>
 
-        <!-- 로딩 상태 -->
-        <div v-if="isLoading" class="loading-state">
-          <div class="spinner"></div>
-          <p>문항을 불러오는 중...</p>
-        </div>
+          <!-- 로딩 상태 -->
+          <div v-if="isLoading" class="loading-state">
+            <div class="spinner"></div>
+            <p>문항을 불러오는 중...</p>
+          </div>
 
-        <!-- 문항 그리드 (가상 스크롤링 적용) -->
-        <div v-else class="items-grid" ref="itemsContainer">
-          <div 
-            v-for="item in visibleItems" 
-            :key="item.itemId"
-            :class="['item-card', { selected: isSelected(item.itemId) }]"
-            :style="{ transform: `translateY(${offsetY}px)` }"
-            @click="toggleSelection(item)"
-          >
-            <!-- 가상 스크롤 스페이서 -->
-            <div class="virtual-spacer" :style="{ height: totalHeight + 'px' }"></div>
-            
-            <!-- 카드 헤더 -->
-            <div class="item-card-header">
-              <div class="item-header-left">
-                <label class="custom-item-checkbox">
-                  <input 
-                    type="checkbox" 
-                    :checked="isSelected(item.itemId)"
-                    @click.stop="toggleSelection(item)"
-                  />
-                  <span class="checkbox-mark">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path d="M5 12L10 17L20 7" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
+          <!-- 문항 그리드 (가상 스크롤링 적용) -->
+          <div v-else class="items-grid" ref="itemsContainer">
+            <div
+              v-for="item in visibleItems"
+              :key="item.itemId"
+              :class="['item-card', { selected: isSelected(item.itemId) }]"
+              :style="{ transform: `translateY(${offsetY}px)` }"
+              @click="toggleSelection(item)"
+            >
+              <!-- 가상 스크롤 스페이서 -->
+              <div class="virtual-spacer" :style="{ height: totalHeight + 'px' }"></div>
+
+              <!-- 카드 헤더 -->
+              <div class="item-card-header">
+                <div class="item-header-left">
+                  <label class="custom-item-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="isSelected(item.itemId)"
+                      @click.stop="toggleSelection(item)"
+                    />
+                    <span class="checkbox-mark">
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M5 12L10 17L20 7" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+                      </svg>
+                    </span>
+                  </label>
+                  <span class="item-number">No. {{ item.itemId }}</span>
+                </div>
+                <div class="item-header-right">
+                  <span :class="['difficulty-badge', `difficulty-${item.difficulty?.code}`]">
+                    {{ getDifficultyName(item.difficulty?.code) }}
                   </span>
-                </label>
-                <span class="item-number">No. {{ item.itemId }}</span>
+                  <span class="type-badge">
+                    {{ getQuestionFormName(item.questionForm?.code) }}
+                  </span>
+                </div>
               </div>
-              <div class="item-header-right">
-                <span :class="['difficulty-badge', `difficulty-${item.difficulty?.code}`]">
-                  {{ getDifficultyName(item.difficulty?.code) }}
-                </span>
-                <span class="type-badge">
-                  {{ getQuestionFormName(item.questionForm?.code) }}
-                </span>
-              </div>
-            </div>
 
-            <!-- 문항 내용 -->
-            <div class="item-content">
-              <!-- 이미지가 있는 경우 -->
-              <div v-if="item.hasImageData && item.questionImageUrl" class="item-image-container">
-                <img 
-                  :src="item.questionImageUrl" 
-                  :alt="`문항 ${item.itemId}`"
-                  loading="lazy"
-                  @error="handleImageError($event, item)"
-                  @click.stop="showImageModal(item.questionImageUrl)"
-                  class="item-image"
-                />
-                <button class="btn-zoom" @click.stop="showImageModal(item.questionImageUrl)">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <!-- 문항 내용 -->
+              <div class="item-content">
+                <!-- 이미지가 있는 경우 -->
+                <div v-if="item.hasImageData && item.questionImageUrl" class="item-image-container">
+                  <img
+                    :src="item.questionImageUrl"
+                    :alt="`문항 ${item.itemId}`"
+                    loading="lazy"
+                    @error="handleImageError($event, item)"
+                    @click.stop="showImageModal(item.questionImageUrl)"
+                    class="item-image"
+                  />
+                  <button class="btn-zoom" @click.stop="showImageModal(item.questionImageUrl)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                      <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                  </button>
+                </div>
+
+                <!-- HTML 콘텐츠가 있는 경우 -->
+                <div v-else-if="item.hasHtmlData" class="item-html-content">
+                  <div class="question-text" v-html="truncateHtml(item.questionHtml, 200)"></div>
+                </div>
+
+                <!-- 콘텐츠가 없는 경우 -->
+                <div v-else class="item-placeholder">
+                  <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 12H15M9 16H15M17 21H7C5.89543 21 5 20.1046 5 19V5C5 3.89543 5.89543 3 7 3H12.5858C12.851 3 13.1054 3.10536 13.2929 3.29289L18.7071 8.70711C18.8946 8.89464 19 9.149 19 9.41421V19C19 20.1046 18.1046 21 17 21Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
                   </svg>
+                  <span>문항 내용이 없습니다</span>
+                </div>
+              </div>
+
+              <!-- 카드 푸터 -->
+              <div class="item-card-footer">
+                <div class="chapter-info">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 6V12L16 14M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                  <span>{{ item.chapterName || item.chapter?.name || '단원 미지정' }}</span>
+                </div>
+                <button
+                  class="btn-similar"
+                  @click.stop="showSimilarItems(item)"
+                  :disabled="isSimilarItemsLoading"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 9L3 3M9 3L3 9M15 9L21 3M21 9L15 3M15 15L21 21M15 21L21 15M9 15L3 21M3 15L9 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                  유사
                 </button>
               </div>
-
-              <!-- HTML 콘텐츠가 있는 경우 -->
-              <div v-else-if="item.hasHtmlData" class="item-html-content">
-                <div class="question-text" v-html="truncateHtml(item.questionHtml, 200)"></div>
-              </div>
-
-              <!-- 콘텐츠가 없는 경우 -->
-              <div v-else class="item-placeholder">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 12H15M9 16H15M17 21H7C5.89543 21 5 20.1046 5 19V5C5 3.89543 5.89543 3 7 3H12.5858C12.851 3 13.1054 3.10536 13.2929 3.29289L18.7071 8.70711C18.8946 8.89464 19 9.149 19 9.41421V19C19 20.1046 18.1046 21 17 21Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <span>문항 내용이 없습니다</span>
-              </div>
-            </div>
-
-            <!-- 카드 푸터 -->
-            <div class="item-card-footer">
-              <div class="chapter-info">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 6V12L16 14M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                <span>{{ item.chapterName || item.chapter?.name || '단원 미지정' }}</span>
-              </div>
-              <button 
-                class="btn-similar"
-                @click.stop="showSimilarItems(item)"
-                :disabled="isSimilarItemsLoading"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 9L3 3M9 3L3 9M15 9L21 3M21 9L15 3M15 15L21 21M15 21L21 15M9 15L3 21M3 15L9 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                유사
-              </button>
             </div>
           </div>
-        </div>
 
-        <!-- 빈 상태 -->
-        <div v-if="!isLoading && items.length === 0" class="empty-state">
-          <p>검색 결과가 없습니다.</p>
-          <p class="empty-hint">다른 검색 조건을 시도해보세요.</p>
-        </div>
+          <!-- 빈 상태 -->
+          <div v-if="!isLoading && items.length === 0" class="empty-state">
+            <p>검색 결과가 없습니다.</p>
+            <p class="empty-hint">다른 검색 조건을 시도해보세요.</p>
+          </div>
 
-        <!-- 페이지네이션 -->
-        <div v-if="totalPages > 1" class="pagination">
-          <button 
-            class="page-btn prev"
-            :disabled="currentPage === 1"
-            @click="loadPage(currentPage - 1)"
-          >
-            ‹
-          </button>
-          
-          <button 
-            v-for="page in displayPages" 
-            :key="page"
-            :class="['page-btn', { active: page === currentPage }]"
-            @click="loadPage(page)"
-            :disabled="page === '...'"
-          >
-            {{ page }}
-          </button>
-          
-          <button 
-            class="page-btn next"
-            :disabled="currentPage === totalPages"
-            @click="loadPage(currentPage + 1)"
-          >
-            ›
-          </button>
-        </div>
-      </div> <!-- center-panel 닫기 -->
+          <!-- 페이지네이션 -->
+          <div v-if="totalPages > 1" class="pagination">
+            <button
+              class="page-btn prev"
+              :disabled="currentPage === 1"
+              @click="loadPage(currentPage - 1)"
+            >
+              ‹
+            </button>
+
+            <button
+              v-for="page in displayPages"
+              :key="page"
+              :class="['page-btn', { active: page === currentPage }]"
+              @click="loadPage(page)"
+              :disabled="page === '...'"
+            >
+              {{ page }}
+            </button>
+
+            <button
+              class="page-btn next"
+              :disabled="currentPage === totalPages"
+              @click="loadPage(currentPage + 1)"
+            >
+              ›
+            </button>
+          </div>
+      </div>
 
       <!-- 오른쪽: 선택된 문항 -->
       <div class="right-sidebar">
@@ -444,8 +441,8 @@
         <!-- 선택된 문항 목록 (드래그 가능) -->
         <div v-else class="selected-items-list">
           <transition-group name="list" tag="div">
-            <div 
-              v-for="(item, index) in selectedItems" 
+            <div
+              v-for="(item, index) in selectedItems"
               :key="item.itemId"
               class="selected-item"
               draggable="true"
@@ -477,7 +474,8 @@
             순서 섞기
           </button>
         </div>
-      </div> <!-- right-sidebar 닫기 -->
+      </div>
+    </div>
     </div> <!-- content-wrapper 닫기 -->
 
     <!-- 하단 액션 버튼 -->
@@ -488,7 +486,7 @@
       <div class="footer-info">
         <span>선택된 문항: {{ selectedItems.length }}개</span>
       </div>
-      <button 
+      <button
         class="btn btn-primary"
         :disabled="selectedItems.length === 0"
         @click="proceedToNext"
@@ -512,7 +510,7 @@
           <h3>유사 문항 검색 결과</h3>
           <button class="modal-close" @click="closeSimilarModal">×</button>
         </div>
-        
+
         <div class="similar-modal-body">
           <!-- 기준 문항 -->
           <div class="base-item-section">
@@ -532,19 +530,19 @@
           <!-- 유사 문항 목록 -->
           <div class="similar-items-section">
             <h4>유사 문항 ({{ currentSimilarItems.length }}개)</h4>
-            
+
             <div v-if="isSimilarItemsLoading" class="similar-loading">
               <div class="spinner"></div>
               <p>유사 문항을 검색하는 중...</p>
             </div>
-            
+
             <div v-else-if="currentSimilarItems.length === 0" class="no-similar-items">
               <p>유사한 문항을 찾을 수 없습니다.</p>
             </div>
-            
+
             <div v-else class="similar-items-list">
-              <div 
-                v-for="similar in currentSimilarItems" 
+              <div
+                v-for="similar in currentSimilarItems"
                 :key="similar.itemId"
                 :class="['similar-item-card', { 'selected': isSelected(similar.itemId) }]"
                 @click="toggleSelection(similar)"
@@ -552,17 +550,17 @@
                 <div class="similarity-score">
                   유사도: {{ Math.round(similar.score * 100) }}%
                 </div>
-                
+
                 <div class="item-checkbox">
-                  <input 
+                  <input
                     type="checkbox"
                     :checked="isSelected(similar.itemId)"
                     @click.stop="toggleSelection(similar)"
                   />
                 </div>
-                
+
                 <div class="item-number">문항 #{{ similar.itemId }}</div>
-                
+
                 <div class="item-content-small">
                   <div v-if="similar.questionImageUrl" class="item-image-small">
                     <img :src="similar.questionImageUrl" :alt="`문항 ${similar.itemId}`" loading="lazy" />
@@ -570,7 +568,7 @@
                   <div v-else-if="similar.questionHtml" class="item-html-small" v-html="truncateHtml(similar.questionHtml, 100)"></div>
                   <div v-else class="no-content">문항 내용 없음</div>
                 </div>
-                
+
                 <div class="similar-item-meta">
                   <span class="difficulty-badge">{{ getDifficultyName(similar.difficulty?.code) }}</span>
                   <span class="type-badge">{{ getQuestionFormName(similar.questionForm?.code) }}</span>
@@ -579,7 +577,7 @@
             </div>
           </div>
         </div>
-        
+
         <div class="similar-modal-footer">
           <button class="btn btn-secondary" @click="closeSimilarModal">
             취소
@@ -594,8 +592,8 @@
     <!-- Toast 알림 컨테이너 -->
     <div class="toast-container">
       <transition-group name="toast" tag="div">
-        <div 
-          v-for="toast in toasts" 
+        <div
+          v-for="toast in toasts"
           :key="toast.id"
           :class="['toast', `toast-${toast.type}`]"
         >
@@ -610,6 +608,7 @@
         </div>
       </transition-group>
     </div>
+  </div>
   </div> <!-- step2-container 닫기 -->
 </template>
 
@@ -1280,11 +1279,8 @@ onUnmounted(() => {
 
 /* 교과서 선택 섹션 */
 .textbook-section {
-  padding: 1.5rem;
-  background: linear-gradient(135deg, #ffffff 0%, #f0f4ff 100%);
-  border-radius: 12px;
-  margin-bottom: 1.5rem;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+  padding: 1rem;
+  background: linear-gradient(135deg, #f8faff 0%, #f3f7ff 100%);
 }
 
 .textbook-loading {
@@ -1335,29 +1331,22 @@ onUnmounted(() => {
 .section-header h3 {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: #0f172a;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a202c;
   margin: 0;
-  letter-spacing: -0.02em;
 }
 
 .section-icon {
-  font-size: 1.5rem;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  font-size: 1.25rem;
 }
 
 .section-desc {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: #64748b;
   margin-left: auto;
   margin-right: 1rem;
-  font-weight: 500;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  padding: 0.25rem 0.75rem;
-  border-radius: 6px;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .textbook-grid {
@@ -1370,30 +1359,25 @@ onUnmounted(() => {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1.25rem;
-  min-height: 100px;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
+  gap: 0.75rem;
+  padding: 0.75rem;
+  background: white;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
 }
 
 .textbook-card:hover {
-  background: linear-gradient(135deg, #f8fafc 0%, #e7f2ff 100%);
-  border-color: #60a5fa;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.12), 0 4px 10px rgba(0, 0, 0, 0.06);
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  border-color: #3b82f6;
 }
 
 .textbook-card.selected {
-  background: linear-gradient(135deg, #e7f2ff 0%, #c7dbff 100%);
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
   border-color: #3b82f6;
-  border-width: 2.5px;
-  box-shadow: 0 10px 25px rgba(59, 130, 246, 0.18), 0 4px 10px rgba(59, 130, 246, 0.12);
-  transform: scale(1.02);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
 }
 
 .textbook-check {
@@ -1421,31 +1405,23 @@ onUnmounted(() => {
 }
 
 .textbook-icon {
-  width: 60px;
-  height: 75px;
+  width: 40px;
+  height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border-radius: 4px;
+  background: #f8fafc;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  font-size: 2rem;
 }
 
 .textbook-cover {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 6px;
-  transition: transform 0.3s ease;
-}
-
-.textbook-card:hover .textbook-cover {
-  transform: scale(1.05);
+  border-radius: 4px;
 }
 
 .textbook-info {
@@ -1458,59 +1434,50 @@ onUnmounted(() => {
 
 .textbook-info h4,
 .textbook-info h5 {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #1a202c;
   margin: 0;
-  line-height: 1.4;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  letter-spacing: -0.01em;
 }
 
 .textbook-info .publisher {
-  font-size: 0.875rem;
+  font-size: 0.6875rem;
   color: #64748b;
   margin: 0;
-  line-height: 1.4;
-  font-weight: 500;
 }
 
 .year-badge {
   display: inline-block;
-  padding: 0.25rem 0.5rem;
-  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
-  color: #4338ca;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: 0.125rem 0.25rem;
+  background: #f1f5f9;
+  color: #475569;
+  border-radius: 3px;
+  font-size: 0.625rem;
+  font-weight: 600;
 }
 
 .item-count {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  border-radius: 8px;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: #f0f4f8;
+  border-radius: 6px;
   flex-shrink: 0;
-  box-shadow: 0 2px 4px rgba(251, 191, 36, 0.15);
-  border: 1px solid rgba(251, 191, 36, 0.2);
 }
 
 .count-number {
-  font-size: 1rem;
-  font-weight: 800;
-  color: #92400e;
-  letter-spacing: -0.02em;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #3b82f6;
 }
 
 .count-label {
-  font-size: 0.75rem;
-  color: #b45309;
-  font-weight: 600;
+  font-size: 0.6875rem;
+  color: #64748b;
 }
 
 .header-left {
@@ -1576,13 +1543,13 @@ onUnmounted(() => {
 
 /* 왼쪽 사이드바 - 교과서 및 필터 (개선) */
 .left-sidebar {
-  width: 340px;
+  width: 240px;
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
-  border-radius: 16px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06), 0 4px 10px rgba(0, 0, 0, 0.04);
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   border: 1px solid #e2e8f0;
   height: 100%; /* 명시적 높이 */
@@ -1652,12 +1619,9 @@ onUnmounted(() => {
 /* 섹션 공통 스타일 */
 .textbook-section,
 .filter-section {
-  padding: 1.5rem;
-  background: linear-gradient(135deg, #fafbfc 0%, #f8fafc 100%);
-  border-radius: 12px;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-  border: 1px solid #e2e8f0;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e1e4e8;
 }
 
 .textbook-section:last-child,
@@ -1688,25 +1652,22 @@ onUnmounted(() => {
 .btn-reset {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #475569;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #64748b;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
 }
 
 .btn-reset:hover {
-  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-  border-color: #fca5a5;
-  color: #dc2626;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(220, 38, 38, 0.15);
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
 }
 
 /* 단원 트리 구조 스타일 - 완전히 재디자인 */

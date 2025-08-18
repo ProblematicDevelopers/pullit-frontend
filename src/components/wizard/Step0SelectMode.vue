@@ -1047,6 +1047,8 @@ const createNewExam = () => {
 
 const selectExam = (exam) => {
   console.log('기존 시험지 선택:', exam)
+  console.log('exam.areaCode:', exam.areaCode, 'exam.areaName:', exam.areaName)
+  console.log('exam.gradeCode:', exam.gradeCode, 'exam.gradeName:', exam.gradeName)
   selectedExamId.value = exam.id
   selectedExamName.value = exam.title || exam.examName
   selectedExamObject.value = exam // exam 객체 전체 저장
