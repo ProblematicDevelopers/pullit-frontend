@@ -1,7 +1,4 @@
 import api from './api.js'
-import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
 /**
  * Item API Service for Wizard Step2 functionality
@@ -24,28 +21,37 @@ class ItemApiService {
    */
   async searchItems(searchParams) {
     try {
+      // 백엔드 ItemSearchRequest에 맞게 매핑
       const requestData = {
+        subjectId: searchParams.subjects && searchParams.subjects.length > 0 ? searchParams.subjects[0] : null,
+        largeChapterIds: searchParams.chapterIds || [],
+        mediumChapterIds: [],
+        smallChapterIds: [],
+        topicChapterIds: [],
+        questionFormCode: searchParams.categories || [],
+        difficultyCode: searchParams.difficulties ? searchParams.difficulties.map(d => parseInt(d)) : [],
         keyword: searchParams.keyword || '',
-        subjects: searchParams.subjects || [],
-        grades: searchParams.grades || [],
-        difficulties: searchParams.difficulties || [],
-        categories: searchParams.categories || [],
         page: searchParams.page || 0,
         size: searchParams.size || 20,
-        sortBy: searchParams.sortBy || 'createdAt',
-        sortDirection: searchParams.sortDirection || 'desc'
+        sortBy: searchParams.sortBy || 'itemId',
+        sortOrder: searchParams.sortDirection === 'desc' ? 'DESC' : 'ASC',
+        hasImage: null,
+        hasHtml: null,
+        passageId: null
       }
 
       const response = await api.post('/items/search', requestData)
       
       if (response.data.success) {
+        // Spring Page 객체 구조에 맞게 처리
+        const pageData = response.data.data
         return {
           success: true,
-          data: response.data.data,
-          totalElements: response.data.totalElements || 0,
-          totalPages: response.data.totalPages || 0,
-          currentPage: response.data.currentPage || 0,
-          size: response.data.size || 20
+          data: pageData.content || [],
+          totalElements: pageData.totalElements || 0,
+          totalPages: pageData.totalPages || 0,
+          currentPage: pageData.number || 0,
+          size: pageData.size || 20
         }
       }
       
@@ -160,14 +166,8 @@ class ItemApiService {
         minScore: similarityParams.minScore || 0.1
       }
 
-      // Create separate axios instance for Elasticsearch endpoint
-      const esResponse = await axios.post(`${API_BASE_URL}/es/items/similar`, requestData, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('accessToken') || ''}`
-        },
-        withCredentials: true
-      })
+      // Elasticsearch endpoint 호출
+      const esResponse = await api.post('/es/items/similar', requestData)
       
       if (esResponse.data.success) {
         return {
@@ -194,10 +194,37 @@ class ItemApiService {
    * @param {Object} options - Request options
    * @param {boolean} options.includeTextbooks - Include textbook information
    * @param {Array<string>} options.grades - Filter by specific grades
+   * @param {string} options.gradeCode - Filter by specific grade code
+   * @param {string} options.areaCode - Filter by specific area code
    * @returns {Promise<Object>} Subjects and textbooks data
    */
   async getSubjects(options = {}) {
     try {
+      console.log('getSubjects 호출 - options:', options)
+      
+      // gradeCode와 areaCode가 있으면 filter 엔드포인트 사용
+      if (options.gradeCode && options.areaCode) {
+        const params = {
+          gradeCode: options.gradeCode,
+          areaCode: options.areaCode
+        }
+        
+        console.log('필터링된 교과서 요청 - params:', params)
+        const response = await api.get('/subject/filter', { params })
+        console.log('필터링된 교과서 응답:', response.data)
+        
+        if (response.data.success) {
+          return {
+            success: true,
+            data: response.data.data
+          }
+        }
+        
+        throw new Error(response.data.message || 'Failed to fetch filtered subjects')
+      }
+      
+      // 기존 로직 (전체 조회)
+      console.warn('gradeCode 또는 areaCode가 없어서 전체 교과서를 조회합니다!')
       const params = {}
       
       if (options.includeTextbooks !== undefined) {
@@ -208,7 +235,9 @@ class ItemApiService {
         params.grades = options.grades.join(',')
       }
 
-      const response = await api.get('/subjects', { params })
+      console.log('전체 교과서 요청 - params:', params)
+      const response = await api.get('/subject', { params })
+      console.log('전체 교과서 응답 개수:', response.data?.data?.length || 0)
       
       if (response.data.success) {
         return {
@@ -248,7 +277,7 @@ class ItemApiService {
         params.grades = grades.join(',')
       }
 
-      const response = await api.get('/subjects', { params })
+      const response = await api.get('/subject', { params })
       
       if (response.data.success) {
         // Filter to return only textbook information

@@ -2,14 +2,16 @@ import axios from 'axios'
 import { tokenManager } from './auth'
 
 // API 기본 URL
-// 프로덕션: nginx가 /api를 프록시하므로 빈 문자열
-// 개발: http://localhost:8080
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
 
+// 프로덕션 환경인지 확인
+const isProduction = import.meta.env.PROD
 
 // Axios 인스턴스 생성
 const api = axios.create({
-  baseURL: API_BASE_URL ? `${API_BASE_URL}/api` : '/api',
+  // 프로덕션: nginx가 /api 프록시 처리하므로 baseURL 없음
+  // 로컬: 직접 /api 경로 추가
+  baseURL: isProduction ? '' : `${API_BASE_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
   },

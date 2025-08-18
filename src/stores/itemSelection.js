@@ -463,7 +463,9 @@ export const useItemSelectionStore = defineStore('itemSelection', {
       this.subjectsError = null
       
       try {
+        // gradeCode와 areaCode가 있으면 해당 파라미터 사용
         const params = {
+          ...options,
           includeTextbooks: options.includeTextbooks !== false, // 기본적으로 포함
           grades: options.grades || []
         }
