@@ -181,6 +181,55 @@ const authService = {
   },
   
   /**
+   * 소셜 로그인 시작
+   * @param {string} provider - 소셜 로그인 제공자 (google, kakao, naver)
+   */
+  async startSocialLogin(provider) {
+    try {
+      // 백엔드에서 OAuth2 URL 받아오기
+      const response = await authApi.get(`/oauth2/login/${provider}`)
+      const loginUrl = response.data.data
+      
+      // 상대 경로를 절대 경로로 변환하여 리디렉션
+      const fullUrl = `${API_BASE_URL}${loginUrl}`
+      window.location.href = fullUrl
+    } catch (error) {
+      console.error('Social login error:', error)
+      throw error
+    }
+  },
+
+  /**
+   * 소셜 로그인 콜백 처리
+   * @param {string} provider - 소셜 로그인 제공자
+   * @returns {Promise} 로그인 응답
+   */
+  async handleSocialLoginCallback(provider) {
+    try {
+      const response = await authApi.get(`/oauth2/callback/${provider}`)
+      
+      if (response.data.success) {
+        const { accessToken, refreshToken, user } = response.data.data
+        
+        // 토큰 저장
+        tokenManager.setTokens(accessToken, refreshToken)
+        
+        // 사용자 정보 저장
+        localStorage.setItem('userInfo', JSON.stringify(user))
+        localStorage.setItem('userType', user.role.toLowerCase())
+        localStorage.setItem('isLoggedIn', 'true')
+        
+        return response.data
+      }
+      
+      throw new Error(response.data.message || '소셜 로그인 실패')
+    } catch (error) {
+      console.error('Social login error:', error)
+      throw error
+    }
+  },
+
+  /**
    * 현재 로그인 사용자 정보 가져오기
    * @returns {Object|null} 사용자 정보
    */
