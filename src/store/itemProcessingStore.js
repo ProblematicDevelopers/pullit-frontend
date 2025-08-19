@@ -5,7 +5,7 @@
  */
 
 import { defineStore } from 'pinia'
-import { itemProcessingAPI } from '../services/api.js'
+import { itemProcessingAPI } from '../services/itemProcessApi.js'
 
 // 과목 정보 정의 (areaCode와 매칭)
 const SUBJECTS = {
@@ -18,7 +18,7 @@ const SUBJECTS = {
   'MO': { name: '도덕', color: '#06b6d4' },
 }
 
-export const useItemProcessingStore = defineStore('itemProcessing', {
+export const useItemProcessingStore = defineStore('itemProcessingStore', {
   /**
    * 상태 정의
    * 컴포넌트에서 사용할 반응형 데이터들을 정의
@@ -43,7 +43,10 @@ export const useItemProcessingStore = defineStore('itemProcessing', {
     pdfPages: [],
 
     // OCR 처리된 데이터
-    ocrData: []
+    ocrData: [],
+
+    // 생성된 Blob URL들 (메모리 관리용)
+    blobUrls: []
   }),
 
   /**
@@ -55,7 +58,6 @@ export const useItemProcessingStore = defineStore('itemProcessing', {
      * 과목별로 그룹화된 교과서 목록
      */
     groupedTextbooks: (state) => {
-      console.log('groupedTextbooks getter 호출됨')
       console.log('현재 textbooks:', state.textbooks)
 
       const grouped = {}
@@ -68,20 +70,45 @@ export const useItemProcessingStore = defineStore('itemProcessing', {
       // 교과서를 과목별로 분류 (areaCode 기준)
       state.textbooks.forEach(textbook => {
         const areaCode = textbook.areaCode
-        console.log('교과서 areaCode:', areaCode, 'textbook:', textbook)
         if (grouped[areaCode]) {
           grouped[areaCode].push(textbook)
         }
       })
 
-      console.log('그룹화된 결과:', grouped)
       return grouped
     },
 
     /**
      * 과목 정보
      */
-    subjects: () => SUBJECTS
+    subjects: () => SUBJECTS,
+
+    /**
+     * 현재 단계 확인
+     */
+    currentStep: (state) => {
+      if (!state.selectedTextbook) return 1
+      if (!state.pdfFile) return 2
+      return 3
+    },
+
+    /**
+     * 다음 단계로 이동 가능한지 확인
+     */
+    canProceedToNext: (state) => {
+      const step = state.currentStep
+
+      switch (step) {
+        case 1:
+          return state.selectedTextbook !== null
+        case 2:
+          return state.pdfFile !== null && state.pdfPages.length > 0
+        case 3:
+          return state.pdfPages.length > 0
+        default:
+          return false
+      }
+    }
   },
 
   /**
@@ -99,18 +126,16 @@ export const useItemProcessingStore = defineStore('itemProcessing', {
         this.loading = true
         this.error = null
 
-        console.log('API 호출 시작: 교과서 목록 조회')
+        console.log('교과서 목록 API 호출 시작')
 
-        // api.js의 itemProcessingAPI 사용
+        // API 호출
         const response = await itemProcessingAPI.getTextbooks()
 
-        console.log('API 응답:', response.data) // 디버깅용 로그
 
         // API 응답이 성공인 경우
         if (response.data.success && response.data.data) {
           // 받아온 데이터를 store의 textbooks에 저장
           this.textbooks = response.data.data
-          console.log('API에서 받은 교과서 저장됨:', this.textbooks) // 디버깅용 로그
         } else {
           // API에서 success: false를 반환한 경우
           throw new Error(response.data.message || '교과서 목록을 불러오는데 실패했습니다')
@@ -145,6 +170,61 @@ export const useItemProcessingStore = defineStore('itemProcessing', {
       // PDF 파일이 변경되면 페이지 정보 초기화
       this.pdfPages = []
       this.ocrData = []
+      // Blob URL들도 정리
+      this.cleanupBlobUrls()
+    },
+
+    /**
+     * PDF 페이지 설정
+     * @param {Array} pages - PDF 페이지 배열
+     */
+    setPdfPages(pages) {
+      this.pdfPages = pages
+    },
+
+    /**
+     * Blob URL 추가 (메모리 관리용)
+     * @param {string} url - 생성된 Blob URL
+     */
+    addBlobUrl(url) {
+      if (url && !this.blobUrls.includes(url)) {
+        this.blobUrls.push(url)
+        console.log('Store에 Blob URL 추가됨:', url)
+      }
+    },
+
+    /**
+     * 특정 Blob URL 정리
+     * @param {string} url - 정리할 Blob URL
+     */
+    removeBlobUrl(url) {
+      if (url && this.blobUrls.includes(url)) {
+        try {
+          URL.revokeObjectURL(url)
+          const index = this.blobUrls.indexOf(url)
+          this.blobUrls.splice(index, 1)
+          console.log('Store에서 Blob URL 정리됨:', url)
+        } catch (error) {
+          console.warn('Blob URL 정리 중 오류:', error)
+        }
+      }
+    },
+
+    /**
+     * 모든 Blob URL 정리
+     */
+    cleanupBlobUrls() {
+      console.log(`Store에서 ${this.blobUrls.length}개의 Blob URL 정리 시작`)
+      this.blobUrls.forEach(url => {
+        try {
+          URL.revokeObjectURL(url)
+          console.log('Blob URL 정리됨:', url)
+        } catch (error) {
+          console.warn('Blob URL 정리 중 오류:', error)
+        }
+      })
+      this.blobUrls = []
+      console.log('Store에서 모든 Blob URL 정리 완료')
     },
 
     /**
@@ -165,8 +245,42 @@ export const useItemProcessingStore = defineStore('itemProcessing', {
      */
     removePage(pageIndex) {
       if (pageIndex >= 0 && pageIndex < this.pdfPages.length) {
+        // Blob URL도 함께 정리
+        const page = this.pdfPages[pageIndex]
+        if (page && page.preview) {
+          this.removeBlobUrl(page.preview)
+        }
         this.pdfPages.splice(pageIndex, 1)
       }
+    },
+
+    /**
+     * 여러 PDF 페이지 일괄 삭제
+     * @param {Array<number>} pageIndexes - 삭제할 페이지 인덱스 배열
+     */
+    removeMultiplePages(pageIndexes) {
+      if (!Array.isArray(pageIndexes) || pageIndexes.length === 0) {
+        console.warn('유효하지 않은 페이지 인덱스 배열:', pageIndexes)
+        return
+      }
+
+      console.log('Store에서 일괄 삭제 시작:', pageIndexes)
+
+      // 인덱스를 내림차순으로 정렬하여 뒤에서부터 삭제 (인덱스 변화 방지)
+      const sortedIndexes = [...pageIndexes].sort((a, b) => b - a)
+
+      sortedIndexes.forEach(index => {
+        if (index >= 0 && index < this.pdfPages.length) {
+          // Blob URL도 함께 정리
+          const page = this.pdfPages[index]
+          if (page && page.preview) {
+            this.removeBlobUrl(page.preview)
+          }
+          this.pdfPages.splice(index, 1)
+        }
+      })
+
+      console.log('Store에서 일괄 삭제 완료, 남은 페이지 수:', this.pdfPages.length)
     },
 
     /**
@@ -181,6 +295,9 @@ export const useItemProcessingStore = defineStore('itemProcessing', {
      * 상태 초기화
      */
     reset() {
+      // Blob URL들 먼저 정리
+      this.cleanupBlobUrls()
+
       this.textbooks = []
       this.selectedTextbook = null
       this.pdfFile = null
