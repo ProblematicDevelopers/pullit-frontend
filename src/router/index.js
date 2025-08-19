@@ -13,6 +13,7 @@ import Login from '@/views/Login.vue'
 
 import CBTStep01 from '@/components/student/cbt/CBTStep01.vue'
 import ItemProcessing from '@/views/ItemProcessing.vue'
+import ItemProcessingTextbook from '@/views/ItemProcessingTextbook.vue'
 
 // 라우트 가드 import
 import { requireAuth, requireRole, preventAuthenticated } from './guards'
@@ -85,7 +86,7 @@ const routes = [
     {
       path: '/item-processing/textbook',
       name: "ItemProcessingTextbook",
-      component: ItemProcessing,
+      component: ItemProcessingTextbook,
       beforeEnter: requireAuth,
       meta: {
         requiresAuth: true,
