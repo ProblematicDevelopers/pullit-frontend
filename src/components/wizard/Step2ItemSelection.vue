@@ -435,31 +435,48 @@
           <p class="hint">문항을 선택해주세요.</p>
         </div>
 
-        <!-- 선택된 문항 목록 (드래그 가능) -->
+        <!-- 선택된 문항 목록 (Step3 스타일) -->
         <div v-else class="selected-items-list">
-          <transition-group name="list" tag="div">
-            <div
-              v-for="(item, index) in selectedItems"
-              :key="item.itemId"
-              class="selected-item"
-              draggable="true"
-              @dragstart="handleDragStart($event, index)"
-              @dragover.prevent
-              @drop="handleDrop($event, index)"
-            >
-              <span class="drag-handle">≡</span>
-              <span class="item-order">{{ index + 1 }}</span>
-              <div class="item-info">
-                <span class="item-title">문항 #{{ item.itemId }}</span>
-                <span class="item-meta">
-                  {{ item.difficulty?.name }} | {{ item.questionForm?.name }}
-                </span>
+          <div
+            v-for="(item, index) in selectedItems"
+            :key="`selected-${item.itemId}`"
+            class="preview-item-card"
+            draggable="true"
+            @dragstart="handleDragStart($event, index)"
+            @dragover.prevent
+            @drop="handleDrop($event, index)"
+          >
+            <div class="preview-item-header">
+              <div class="item-header-left">
+                <span class="drag-handle">≡</span>
+                <span class="preview-item-number">{{ index + 1 }}</span>
+                <div class="preview-item-badges">
+                  <span :class="['badge', `badge-${getDifficultyClass(item.difficulty)}`]">
+                    {{ item.difficulty?.name || '중' }}
+                  </span>
+                  <span class="badge badge-type">
+                    {{ item.questionForm?.name || '객관식' }}
+                  </span>
+                  <span v-if="item.chapterName" class="badge badge-chapter">
+                    {{ item.chapterName }}
+                  </span>
+                </div>
               </div>
-              <button class="btn-remove" @click="removeItem(item.itemId)">
+              <button class="btn-remove" @click="removeItem(item.itemId)" title="문항 제거">
                 ×
               </button>
             </div>
-          </transition-group>
+            
+            <div class="preview-item-content">
+              <div v-if="item.questionImageUrl" class="preview-item-image">
+                <img :src="item.questionImageUrl" :alt="`문항 ${index + 1}`" />
+              </div>
+              <div v-else-if="item.questionHtml" class="preview-item-text" v-html="item.questionHtml"></div>
+              <div v-else class="preview-item-placeholder">
+                문항 ID: {{ item.itemId }}
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- 선택된 문항 액션 -->
@@ -584,7 +601,7 @@
       <transition-group name="toast" tag="div">
         <div
           v-for="toast in toasts"
-          :key="toast.id"
+          :key="`toast-${toast.id}`"
           :class="['toast', `toast-${toast.type}`]"
         >
           <div class="toast-icon">
@@ -607,6 +624,7 @@ import { useToast } from '@/composables/useToast'
 import { useDebounce } from '@/composables/useDebounce'
 import { useVirtualScroll } from '@/composables/useVirtualScroll'
 import { storeToRefs } from 'pinia'
+import itemApiService from '@/services/itemApi'
 
 // Props
 const props = defineProps({
@@ -880,6 +898,19 @@ const performSearch = async () => {
 
     await itemStore.searchItems(searchParams)
 
+    // 편집 모드이고 기존 문항이 있으면 해당 문항들을 선택 상태로 표시
+    if (testBankStore.mode === 'edit' && testBankStore.existingItemIds.length > 0) {
+      items.value.forEach(item => {
+        const itemId = item.item_id || item.itemId
+        if (testBankStore.existingItemIds.includes(itemId)) {
+          // 이미 selectedItems에 없으면 추가
+          if (!selectedItems.value.includes(itemId)) {
+            console.log('기존 문항 자동 선택:', itemId)
+          }
+        }
+      })
+    }
+
     if (items.value.length === 0 && !isLoading.value) {
       warning('검색 결과가 없습니다. 다른 검색 조건을 시도해보세요.')
     }
@@ -948,6 +979,17 @@ const clearSelection = () => {
 const randomizeOrder = () => {
   itemStore.shuffleSelectedItems()
   info('선택된 문항 순서가 섬어졌습니다.')
+}
+
+// 난이도에 따른 클래스 반환
+const getDifficultyClass = (difficulty) => {
+  const code = difficulty?.code || 'M'
+  switch(code) {
+    case 'L': return 'easy'
+    case 'M': return 'medium'
+    case 'H': return 'hard'
+    default: return 'medium'
+  }
 }
 
 const loadPage = (page) => {
@@ -1166,6 +1208,52 @@ onMounted(async () => {
   try {
     // 과목 및 교과서 정보 로드
     await loadSubjectsAndTextbooks()
+
+    // 편집 모드이고 기존 문항이 있으면 선택 상태로 설정
+    if (testBankStore.mode === 'edit' && testBankStore.existingItemIds.length > 0) {
+      console.log('편집 모드 - 기존 문항 로드:', testBankStore.existingItemIds)
+      
+      // 기존 문항 ID들로 문항 정보 조회
+      const itemPromises = testBankStore.existingItemIds.map(async (itemId, index) => {
+        try {
+          // API를 통해 개별 문항 정보 조회
+          const response = await itemApiService.getItemDetail(itemId)
+          if (response.success && response.data) {
+            return response.data
+          }
+        } catch (err) {
+          console.warn(`문항 ${itemId} 정보 조회 실패:`, err)
+        }
+        
+        // 조회 실패 시 기본 객체 반환
+        return {
+          itemId: itemId,
+          itemNo: index + 1,
+          difficulty: { code: 'M', name: '중' },
+          questionForm: { code: 'MC', name: '객관식' },
+          chapterName: '기존 문항',
+          hasImageData: false,
+          hasHtmlData: false,
+          questionImageUrl: null,
+          questionHtml: `문항 #${itemId}`
+        }
+      })
+      
+      try {
+        const itemsData = await Promise.all(itemPromises)
+        
+        // 조회된 문항들을 selectedItems에 추가
+        itemsData.forEach(item => {
+          if (item) {
+            itemStore.selectItem(item)
+          }
+        })
+        
+        console.log('기존 문항 선택 완료:', itemStore.selectedItems.length, '개')
+      } catch (err) {
+        console.error('기존 문항 정보 조회 중 오류:', err)
+      }
+    }
 
     // 교과서를 선택하면 해당 교과서의 챕터를 로드하도록 변경
     // (subjectId는 교과서 선택 시 결정되므로 여기서는 로드하지 않음)
@@ -3590,7 +3678,7 @@ onUnmounted(() => {
   justify-content: center;
   font-size: 1.5rem;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 95; /* footer(100)보다 낮게 */
+  z-index: 1000; /* 높은 z-index로 변경 */
 }
 
 .selected-items-float-btn:hover {
@@ -3625,7 +3713,7 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 999;
+  z-index: 2000; /* 플로팅 버튼보다 높게 설정 */
   padding: 2rem;
 }
 
@@ -3669,5 +3757,190 @@ onUnmounted(() => {
   border-radius: 12px;
   font-size: 0.875rem;
   font-weight: 600;
+}
+
+/* 선택된 문항 리스트 */
+.selected-items-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Step3 스타일 문항 카드 */
+.preview-item-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 1rem;
+  transition: all 0.2s;
+  cursor: move;
+}
+
+.preview-item-card:hover {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  transform: translateX(4px);
+}
+
+.preview-item-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.item-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.drag-handle {
+  color: #9ca3af;
+  font-size: 1.125rem;
+  cursor: grab;
+}
+
+.preview-item-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  background: #6366f1;
+  color: white;
+  border-radius: 50%;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.preview-item-badges {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.badge-easy {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.badge-medium {
+  background: #fed7aa;
+  color: #92400e;
+}
+
+.badge-hard {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.badge-type {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.badge-chapter {
+  background: #f3f4f6;
+  color: #4b5563;
+}
+
+.btn-remove {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  border: none;
+  background: #fee2e2;
+  color: #991b1b;
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-remove:hover {
+  background: #fecaca;
+  transform: scale(1.1);
+}
+
+.preview-item-content {
+  padding-left: 2.5rem;
+}
+
+.preview-item-image img {
+  max-width: 100%;
+  max-height: 200px;
+  border-radius: 4px;
+  object-fit: contain;
+}
+
+.preview-item-text {
+  font-size: 0.875rem;
+  color: #374151;
+  line-height: 1.5;
+  max-height: 100px;
+  overflow: hidden;
+}
+
+.preview-item-placeholder {
+  color: #9ca3af;
+  font-style: italic;
+  font-size: 0.875rem;
+}
+
+/* 선택된 문항이 없을 때 */
+.no-selection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #6b7280;
+}
+
+.no-selection p {
+  margin: 0.5rem 0;
+}
+
+.no-selection .hint {
+  font-size: 0.875rem;
+  color: #9ca3af;
+}
+
+/* 하단 액션 영역 */
+.selected-actions {
+  padding: 1rem 1.5rem;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  gap: 0.75rem;
+  justify-content: center;
+}
+
+.modal-close {
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  border: none;
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  font-size: 1.25rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 </style>

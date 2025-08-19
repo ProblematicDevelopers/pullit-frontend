@@ -13,6 +13,8 @@ export const useTestBankStore = defineStore('testBank', {
 
     // ===== 선택된 기존 시험지 (편집 모드용) =====
     selectedExam: null, // 편집할 기존 시험지 정보
+    existingItemIds: [], // 기존 시험지의 문항 ID 목록
+    originalExamData: null, // 원본 시험지 데이터
     
     // ===== 시험지 기본 정보 =====
     examInfo: {
@@ -296,6 +298,8 @@ export const useTestBankStore = defineStore('testBank', {
       this.currentStep = 0
       this.mode = null
       this.selectedExam = null
+      this.existingItemIds = []
+      this.originalExamData = null
 
       // 모든 단원 접기 및 선택 해제
       this.chapters.forEach(chapter => {
@@ -580,6 +584,84 @@ export const useTestBankStore = defineStore('testBank', {
         console.error('시험지 통계 조회 실패:', error)
         throw error
       }
+    },
+
+    /**
+     * 기존 시험지의 문항 정보 로드
+     * @param {Number} examId - 시험지 ID
+     * @param {String} examType - 시험지 타입 (TESTWIZARD 또는 USER_CREATED)
+     */
+    async loadExistingExamItems(examId, examType = 'TESTWIZARD') {
+      try {
+        this.loading = true
+        console.log('기존 시험지 문항 로드 시작:', examId, '타입:', examType)
+        
+        let response
+        
+        // examType에 따라 다른 API 호출
+        if (examType === 'USER_CREATED') {
+          // UserExam인 경우 - 아직 백엔드 구현 필요
+          console.warn('UserExam 문항 조회는 아직 구현되지 않았습니다.')
+          // 임시로 빈 배열 반환
+          this.existingItemIds = []
+          this.originalExamData = null
+          return null
+        } else {
+          // 일반 Exam인 경우
+          response = await examApi.get(`/${examId}/items`)
+        }
+        
+        if (response && response.data.success) {
+          const data = response.data.data
+          this.existingItemIds = data.itemIds || []
+          this.originalExamData = data
+          
+          console.log('기존 문항 로드 성공:', {
+            examId: data.examId,
+            itemCount: data.itemCount,
+            itemIds: this.existingItemIds
+          })
+          
+          return data
+        } else {
+          console.error('기존 문항 로드 실패:', response?.data?.message)
+          this.existingItemIds = []
+          this.originalExamData = null
+        }
+      } catch (error) {
+        console.error('기존 문항 로드 중 오류:', error)
+        this.existingItemIds = []
+        this.originalExamData = null
+        // 에러를 throw하지 않고 gracefully 처리
+        return null
+      } finally {
+        this.loading = false
+      }
+    },
+    
+    /**
+     * 기존 문항 ID 목록 설정
+     * @param {Array} itemIds - 문항 ID 목록
+     */
+    setExistingItemIds(itemIds) {
+      this.existingItemIds = itemIds || []
+    },
+    
+    /**
+     * 기존 문항 ID 목록 초기화
+     */
+    clearExistingItemIds() {
+      this.existingItemIds = []
+      this.originalExamData = null
+    },
+    
+    /**
+     * 선택된 문항들 저장 (Step2에서 Step3로 전달)
+     * @param {Array} questions - 선택된 문항 배열
+     */
+    setSelectedQuestions(questions) {
+      this.selectedQuestions = questions || []
+      console.log('선택된 문항 저장:', this.selectedQuestions.length, '개')
     },
 
     /**

@@ -1,7 +1,8 @@
-import {createRouter, createWebHistory} from 'vue-router'
+import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../Home.vue'
 import MainDashboard from '../views/MainDashboard.vue'
-import Report from '../components/student/report/BasicReport.vue'
+import Report from '../components/student/report/ReportList.vue'
+import BasicReport from '../components/student/report/BasicReport.vue'
 import StudentMain from '../components/student/Main.vue'
 import StudentLayout from '@/components/student/StudentLayout.vue'
 
@@ -16,7 +17,8 @@ import ItemProcessing from '@/views/ItemProcessing.vue'
 import ItemProcessingTextbook from '@/views/ItemProcessingTextbook.vue'
 
 // 라우트 가드 import
-import { requireAuth, requireRole, preventAuthenticated } from './guards'
+import { requireAuth, preventAuthenticated } from './guards'
+import SignUp from '@/views/SignUp.vue'
 
 const routes = [
   { path: '/', name: 'Home', component: Home },
@@ -51,7 +53,8 @@ const routes = [
     children: [
       { path: 'main', name: 'student.main', component: StudentMain },
 
-      { path: 'report', name: 'student.report', component: Report},
+      { path: 'report', name: 'student.report', component: Report },
+      { path: 'report/:id/:attemptId?', name: 'student.basicReport', component: BasicReport },
       // { path: 'exam/:id', name: 'student.exam', component: StudentExam },
 
       { path: 'cbtstep01', name: 'student.cbt',component: CBTStep01 }
@@ -103,6 +106,12 @@ const routes = [
         role: 'teacher'
       }
     },
+  {
+    path:'/signup',
+    name: 'SignUp',
+    component: SignUp,
+    beforeEnter: preventAuthenticated,
+  }
 ]
 
 const router = createRouter({
