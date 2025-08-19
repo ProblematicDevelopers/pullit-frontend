@@ -428,12 +428,10 @@ export const useItemSelectionStore = defineStore('itemSelection', {
       
       try {
         const params = {
-          itemId,
-          subjects: options.subjects || this.filters.subjects,
-          grades: options.grades || this.filters.grades,
-          limit: options.limit || 10,
-          minScore: options.minScore || 0.1,
-          content: options.content || ''
+          topicChapterId: options.topicChapterId || 0,
+          difficultyCode: options.difficultyCode || 2,
+          excludeItemIds: options.excludeItemIds || [],
+          size: options.size || 20
         }
 
         const result = await itemApiService.getSimilarItems(params)

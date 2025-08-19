@@ -999,10 +999,10 @@ const showSimilarItems = async (item) => {
 
     // Elasticsearch를 통한 유사문항 검색
     const similarItems = await itemStore.searchSimilarItems(item.itemId, {
-      subjects: props.examInfo.subjectId ? [props.examInfo.subjectId] : [],
-      grades: props.examInfo.gradeCode ? [props.examInfo.gradeCode] : [],
-      limit: 10,
-      minScore: 0.2
+      topicChapterId: item.topicChapterId || item.topicChapter?.id,
+      difficultyCode: item.difficultyCode || item.difficulty?.code || 2,
+      excludeItemIds: [item.itemId, ...itemStore.selectedItems.map(i => i.itemId)],
+      size: 10
     })
 
     currentSimilarItems.value = similarItems
