@@ -28,7 +28,7 @@ onMounted(async () => {
   try {
     // URL에서 provider 정보 추출
     const provider = route.params.provider || route.query.provider
-    
+
     if (!provider) {
       statusMessage.value = '잘못된 접근입니다.'
       setTimeout(() => router.push('/login'), 2000)
@@ -36,21 +36,21 @@ onMounted(async () => {
     }
 
     statusMessage.value = `${provider} 로그인을 처리하고 있습니다...`
-    
+
     // 소셜 로그인 콜백 처리
     const response = await authService.handleSocialLoginCallback(provider)
-    
+
     if (response.success) {
       const user = response.data.user
-      
+
       statusMessage.value = '로그인 성공! 페이지를 이동합니다...'
-      
+
       // 사용자 타입 설정
-      const userType = user.role === 'TEACHER' ? 'teacher' : 'student'
-      
+      // const userType = user.role === 'TEACHER' ? 'teacher' : 'student'
+
       // Layout store 업데이트
       layoutStore.setUserName(user.fullName || user.username)
-      
+
       // 역할에 따라 기본 페이지로 리다이렉트
       setTimeout(() => {
         if (user.role === 'ADMIN') {
@@ -64,7 +64,7 @@ onMounted(async () => {
     }
   } catch (error) {
     console.error('OAuth2 callback error:', error)
-    
+
     if (error.message === 'NEW_USER') {
       statusMessage.value = '신규 사용자입니다. 회원가입을 진행해주세요.'
       // TODO: 회원가입 플로우로 이동
@@ -125,4 +125,4 @@ p {
   font-size: 14px;
   line-height: 1.5;
 }
-</style> 
+</style>
