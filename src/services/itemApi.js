@@ -41,7 +41,7 @@ class ItemApiService {
       }
 
       const response = await api.post('/items/search', requestData)
-      
+
       if (response.data.success) {
         // Spring Page 객체 구조에 맞게 처리
         const pageData = response.data.data
@@ -54,7 +54,7 @@ class ItemApiService {
           size: pageData.size || 20
         }
       }
-      
+
       throw new Error(response.data.message || 'Search failed')
     } catch (error) {
       console.error('Item search error:', error)
@@ -82,14 +82,14 @@ class ItemApiService {
       }
 
       const response = await api.get(`/items/${itemId}`)
-      
+
       if (response.data.success) {
         return {
           success: true,
           data: response.data.data
         }
       }
-      
+
       throw new Error(response.data.message || 'Failed to fetch item details')
     } catch (error) {
       console.error('Get item detail error:', error)
@@ -125,14 +125,14 @@ class ItemApiService {
       })
 
       const response = await api.get('/items/count/chapters', { params })
-      
+
       if (response.data.success) {
         return {
           success: true,
           data: response.data.data
         }
       }
-      
+
       throw new Error(response.data.message || 'Failed to fetch chapter counts')
     } catch (error) {
       console.error('Get chapter counts error:', error)
@@ -167,8 +167,8 @@ class ItemApiService {
       }
 
       // Elasticsearch endpoint 호출
-      const esResponse = await api.post('/es/items/similar', requestData)
-      
+      const esResponse = await api.post('/items/similar', requestData)
+
       if (esResponse.data.success) {
         return {
           success: true,
@@ -176,7 +176,7 @@ class ItemApiService {
           totalHits: esResponse.data.totalHits || 0
         }
       }
-      
+
       throw new Error(esResponse.data.message || 'Failed to fetch similar items')
     } catch (error) {
       console.error('Get similar items error:', error)
@@ -201,36 +201,36 @@ class ItemApiService {
   async getSubjects(options = {}) {
     try {
       console.log('getSubjects 호출 - options:', options)
-      
+
       // gradeCode와 areaCode가 있으면 filter 엔드포인트 사용
       if (options.gradeCode && options.areaCode) {
         const params = {
           gradeCode: options.gradeCode,
           areaCode: options.areaCode
         }
-        
+
         console.log('필터링된 교과서 요청 - params:', params)
         const response = await api.get('/subject/filter', { params })
         console.log('필터링된 교과서 응답:', response.data)
-        
+
         if (response.data.success) {
           return {
             success: true,
             data: response.data.data
           }
         }
-        
+
         throw new Error(response.data.message || 'Failed to fetch filtered subjects')
       }
-      
+
       // 기존 로직 (전체 조회)
       console.warn('gradeCode 또는 areaCode가 없어서 전체 교과서를 조회합니다!')
       const params = {}
-      
+
       if (options.includeTextbooks !== undefined) {
         params.includeTextbooks = options.includeTextbooks
       }
-      
+
       if (options.grades && options.grades.length > 0) {
         params.grades = options.grades.join(',')
       }
@@ -238,14 +238,14 @@ class ItemApiService {
       console.log('전체 교과서 요청 - params:', params)
       const response = await api.get('/subject', { params })
       console.log('전체 교과서 응답 개수:', response.data?.data?.length || 0)
-      
+
       if (response.data.success) {
         return {
           success: true,
           data: response.data.data
         }
       }
-      
+
       throw new Error(response.data.message || 'Failed to fetch subjects')
     } catch (error) {
       console.error('Get subjects error:', error)
@@ -268,17 +268,17 @@ class ItemApiService {
       const params = {
         includeTextbooks: true
       }
-      
+
       if (subjects && subjects.length > 0) {
         params.subjects = subjects.join(',')
       }
-      
+
       if (grades && grades.length > 0) {
         params.grades = grades.join(',')
       }
 
       const response = await api.get('/subject', { params })
-      
+
       if (response.data.success) {
         // Filter to return only textbook information
         const textbooks = response.data.data.reduce((acc, subject) => {
@@ -293,7 +293,7 @@ class ItemApiService {
           data: textbooks
         }
       }
-      
+
       throw new Error(response.data.message || 'Failed to fetch textbooks')
     } catch (error) {
       console.error('Get textbooks error:', error)
@@ -315,24 +315,24 @@ class ItemApiService {
   async getItemStats(filters = {}) {
     try {
       const params = {}
-      
+
       if (filters.dateRange) {
         params.dateRange = filters.dateRange
       }
-      
+
       if (filters.subjects && filters.subjects.length > 0) {
         params.subjects = filters.subjects.join(',')
       }
 
       const response = await api.get('/items/stats', { params })
-      
+
       if (response.data.success) {
         return {
           success: true,
           data: response.data.data
         }
       }
-      
+
       throw new Error(response.data.message || 'Failed to fetch item statistics')
     } catch (error) {
       console.error('Get item stats error:', error)
@@ -364,7 +364,7 @@ class ItemApiService {
       }
 
       const response = await api.post('/items/bulk', requestData)
-      
+
       if (response.data.success) {
         return {
           success: true,
@@ -374,7 +374,7 @@ class ItemApiService {
           errors: response.data.errors || []
         }
       }
-      
+
       throw new Error(response.data.message || 'Bulk operation failed')
     } catch (error) {
       console.error('Bulk item operation error:', error)
