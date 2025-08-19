@@ -218,11 +218,17 @@ const handleLogin = async () => {
 }
 
 // Social login
-const socialLogin = (provider) => {
-  console.log(`${provider} 로그인 시작`)
-  // TODO: 실제 OAuth 로그인 구현
-  // OAuth 로그인은 백엔드에서 별도 엔드포인트 구현 필요
-  alert(`${provider} 로그인은 준비중입니다`)
+const socialLogin = async (provider) => {
+  try {
+    console.log(`${provider} 로그인 시작`)
+    errorMessage.value = ''
+    
+    // 소셜 로그인 시작
+    await authService.startSocialLogin(provider)
+  } catch (error) {
+    console.error('Social login error:', error)
+    errorMessage.value = `${provider} 로그인 중 오류가 발생했습니다.`
+  }
 }
 </script>
 
