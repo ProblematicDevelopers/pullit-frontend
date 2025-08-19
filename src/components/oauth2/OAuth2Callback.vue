@@ -46,7 +46,7 @@ onMounted(async () => {
       statusMessage.value = '로그인 성공! 페이지를 이동합니다...'
 
       // 사용자 타입 설정
-      // const userType = user.role === 'TEACHER' ? 'teacher' : 'student'
+      const userType = user.role === 'TEACHER' ? 'teacher' : 'student'
 
       // Layout store 업데이트
       layoutStore.setUserName(user.fullName || user.username)
