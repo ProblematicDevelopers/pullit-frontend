@@ -539,35 +539,29 @@
             <div v-else class="similar-items-list">
               <div
                 v-for="similar in currentSimilarItems"
-                :key="similar.itemId"
-                :class="['similar-item-card', { 'selected': isSelected(similar.itemId) }]"
+                :key="similar.item_id"
+                :class="['similar-item-card', { 'selected': isSelected(similar.item_id) }]"
                 @click="toggleSelection(similar)"
               >
-                <div class="similarity-score">
-                  유사도: {{ Math.round(similar.score * 100) }}%
-                </div>
-
                 <div class="item-checkbox">
                   <input
                     type="checkbox"
-                    :checked="isSelected(similar.itemId)"
+                    :checked="isSelected(similar.item_id)"
                     @click.stop="toggleSelection(similar)"
                   />
                 </div>
 
-                <div class="item-number">문항 #{{ similar.itemId }}</div>
+                <div class="item-number">문항 #{{ similar.item_id }}</div>
 
                 <div class="item-content-small">
-                  <div v-if="similar.questionImageUrl" class="item-image-small">
-                    <img :src="similar.questionImageUrl" :alt="`문항 ${similar.itemId}`" loading="lazy" />
+                  <div v-if="similar.question_url" class="item-image-small">
+                    <img :src="similar.question_url" :alt="`문항 ${similar.item_id}`" loading="lazy" />
                   </div>
-                  <div v-else-if="similar.questionHtml" class="item-html-small" v-html="truncateHtml(similar.questionHtml, 100)"></div>
-                  <div v-else class="no-content">문항 내용 없음</div>
+                  <div v-else class="no-content">문항 이미지 없음</div>
                 </div>
 
                 <div class="similar-item-meta">
-                  <span class="difficulty-badge">{{ getDifficultyName(similar.difficulty?.code) }}</span>
-                  <span class="type-badge">{{ getQuestionFormName(similar.questionForm?.code) }}</span>
+                  <span class="difficulty-badge">난이도 {{ similar.difficulty_code || '-' }}</span>
                 </div>
               </div>
             </div>
@@ -579,7 +573,7 @@
             취소
           </button>
           <button class="btn btn-primary" @click="selectAllSimilarItems" :disabled="currentSimilarItems.length === 0">
-            모두 선택 ({{ currentSimilarItems.filter(item => !isSelected(item.itemId)).length }}개)
+            모두 선택 ({{ currentSimilarItems.filter(item => !isSelected(item.item_id || item.itemId)).length }}개)
           </button>
         </div>
       </div>
@@ -908,13 +902,27 @@ const performSearchWithDelay = () => {
 }
 
 const toggleSelection = (item) => {
-  const wasSelected = isSelected(item.itemId)
-  itemStore.toggleItemSelection(item)
+  // backend에서 item_id로 오는 경우와 itemId로 오는 경우 모두 처리
+  const itemId = item.item_id || item.itemId
+  const wasSelected = isSelected(itemId)
+  
+  // item 객체 정규화
+  const normalizedItem = {
+    itemId: itemId,
+    questionImageUrl: item.question_url || item.questionImageUrl,
+    answerImageUrl: item.answer_url || item.answerImageUrl,
+    explainImageUrl: item.explain_url || item.explainImageUrl,
+    difficultyCode: item.difficulty_code || item.difficultyCode,
+    subjectId: item.subject_id || item.subjectId,
+    topicChapterId: item.topic_chapter_id || item.topicChapterId
+  }
+  
+  itemStore.toggleItemSelection(normalizedItem)
 
   if (wasSelected) {
-    info(`문항 #${item.itemId}가 선택 해제되었습니다.`)
+    info(`문항 #${itemId}가 선택 해제되었습니다.`)
   } else {
-    success(`문항 #${item.itemId}가 선택되었습니다.`)
+    success(`문항 #${itemId}가 선택되었습니다.`)
   }
 }
 
@@ -1028,17 +1036,28 @@ const closeSimilarModal = () => {
 const selectAllSimilarItems = () => {
   let addedCount = 0
   currentSimilarItems.value.forEach(item => {
-    if (!isSelected(item.itemId)) {
-      itemStore.selectItem(item)
+    const itemId = item.item_id || item.itemId
+    if (!isSelected(itemId)) {
+      // item 객체 정규화
+      const normalizedItem = {
+        itemId: itemId,
+        questionImageUrl: item.question_url || item.questionImageUrl,
+        answerImageUrl: item.answer_url || item.answerImageUrl,
+        explainImageUrl: item.explain_url || item.explainImageUrl,
+        difficultyCode: item.difficulty_code || item.difficultyCode,
+        subjectId: item.subject_id || item.subjectId,
+        topicChapterId: item.topic_chapter_id || item.topicChapterId
+      }
+      itemStore.selectItem(normalizedItem)
       addedCount++
     }
   })
 
-  // if (addedCount > 0) {
-  //   success(`${addedCount}개의 유사 문항이 추가되었습니다.`)
-  // } else {
-  //   info('모든 유사 문항이 이미 선택되어 있습니다.')
-  // }
+  if (addedCount > 0) {
+    success(`${addedCount}개의 유사 문항이 추가되었습니다.`)
+  } else {
+    info('모든 유사 문항이 이미 선택되어 있습니다.')
+  }
 
   closeSimilarModal()
 }
@@ -3140,29 +3159,103 @@ onUnmounted(() => {
 
 .similar-items-list {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
   gap: 1rem;
+  padding: 0.5rem 0;
 }
 
 .similar-item-card {
   position: relative;
   background: white;
   border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 1rem;
+  border-radius: 12px;
+  overflow: hidden;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .similar-item-card:hover {
-  border-color: #3b82f6;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #8b5cf6;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
   transform: translateY(-2px);
 }
 
 .similar-item-card.selected {
-  border-color: #3b82f6;
-  background: #eff6ff;
+  border-color: #8b5cf6;
+  background: linear-gradient(135deg, #f3f0ff 0%, #ede9fe 100%);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+
+.similar-item-card .item-checkbox {
+  position: absolute;
+  top: 0.5rem;
+  left: 0.5rem;
+  z-index: 2;
+}
+
+.similar-item-card .item-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  cursor: pointer;
+  accent-color: #8b5cf6;
+}
+
+.similar-item-card .item-number {
+  padding: 0.5rem;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #4b5563;
+  text-align: center;
+}
+
+.similar-item-card .item-content-small {
+  height: 120px;
+  padding: 0.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fafafa;
+}
+
+.similar-item-card .item-image-small {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.similar-item-card .item-image-small img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 4px;
+}
+
+.similar-item-card .no-content {
+  color: #9ca3af;
+  font-size: 0.813rem;
+  text-align: center;
+}
+
+.similar-item-card .similar-item-meta {
+  padding: 0.5rem;
+  background: #f9fafb;
+  border-top: 1px solid #e5e7eb;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.similar-item-card .difficulty-badge {
+  padding: 0.25rem 0.625rem;
+  border-radius: 12px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: linear-gradient(135deg, #fbbf24, #f59e0b);
+  color: white;
 }
 
 .similarity-score {
