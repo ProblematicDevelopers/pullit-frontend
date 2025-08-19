@@ -158,12 +158,10 @@ class ItemApiService {
   async getSimilarItems(similarityParams) {
     try {
       const requestData = {
-        itemId: similarityParams.itemId,
-        content: similarityParams.content || '',
-        subjects: similarityParams.subjects || [],
-        grades: similarityParams.grades || [],
-        limit: similarityParams.limit || 10,
-        minScore: similarityParams.minScore || 0.1
+        topicChapterId: similarityParams.topicChapterId || 0,
+        difficultyCode: similarityParams.difficultyCode || 2,
+        excludeItemIds: similarityParams.excludeItemIds || [],
+        size: similarityParams.size || 20
       }
 
       // Elasticsearch endpoint 호출
