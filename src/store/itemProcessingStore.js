@@ -5,9 +5,7 @@
  */
 
 import { defineStore } from 'pinia'
-import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+import { itemProcessingAPI } from '../services/api.js'
 
 // 과목 정보 정의 (areaCode와 매칭)
 const SUBJECTS = {
@@ -101,10 +99,10 @@ export const useItemProcessingStore = defineStore('itemProcessing', {
         this.loading = true
         this.error = null
 
-        console.log('API 호출 시작:', `${API_BASE_URL}/api/file-history/textbook`)
+        console.log('API 호출 시작: 교과서 목록 조회')
 
-        // API 호출: 교과서 목록 가져오기
-        const response = await axios.get(`${API_BASE_URL}/api/file-history/textbook`)
+        // api.js의 itemProcessingAPI 사용
+        const response = await itemProcessingAPI.getTextbooks()
 
         console.log('API 응답:', response.data) // 디버깅용 로그
 
