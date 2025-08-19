@@ -9,9 +9,8 @@ const isProduction = import.meta.env.PROD
 
 // Axios 인스턴스 생성
 const api = axios.create({
-  // 프로덕션: nginx가 /api 프록시 처리하므로 baseURL 없음
-  // 로컬: 직접 /api 경로 추가
-  baseURL: isProduction ? '' : `${API_BASE_URL}/api`,
+  // 프로덕션: nginx가 /api 프록시 처리, 로컬: 직접 /api 경로 추가
+  baseURL: isProduction ? `${API_BASE_URL}` : `${API_BASE_URL}/api`,
   headers: {
     'Content-Type': 'application/json',
   },
