@@ -22,7 +22,7 @@
                   <span class="badge rounded-pill bg-success-subtle text-success fw-semibold">NEW</span>
                 </div>
 
-                <h4 class="mt-3 mb-2 text-dark fw-bold">AI 문제은행 시스템</h4>
+                <h4 class="mt-3 mb-2 text-dark fw-bold">문제은행 시스템</h4>
                 <p class="text-secondary mb-3">
                   15,000+ 검증된 문제를 AI가 스마트하게 분류하고 관리합니다. 과목별, 단원별, 난이도별 체계적인 분류로 원하는 문제를 쉽게 찾을 수 있습니다.
                 </p>
