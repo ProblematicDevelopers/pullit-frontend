@@ -1,6 +1,6 @@
 <!--
   시험지 마법사 Step 2: 문항 선택 (Enhanced)
-  
+
   이 컴포넌트는 시험지에 포함할 문항들을 선택하는 단계입니다.
   주요 기능:
   - 실제 Backend API 연동
@@ -30,32 +30,10 @@
       </div>
     </div>
 
-    <!-- 검색 바 -->
-    <div class="search-section">
-      <div class="search-container">
-        <div class="search-input-wrapper">
-          <input
-            v-model="searchKeyword"
-            type="text"
-            placeholder="문항 내용 검색... (예: 이차방정식, 삼각함수)"
-            class="search-input"
-            @keyup.enter="performSearch"
-          />
-          <button class="search-button" @click="performSearch" :disabled="isLoading">
-            <span v-if="isLoading" class="spinner-mini"></span>
-            <span v-else>🔍</span>
-          </button>
-        </div>
-        <div class="search-stats" v-if="totalItems > 0">
-          총 {{ totalItems }}개 문항 중 {{ selectedItems.length }}개 선택
-        </div>
-      </div>
-    </div>
-
     <!-- 메인 콘텐츠 영역 -->
-    <div class="content-wrapper">
-      <!-- 왼쪽 사이드바: 교과서 선택 및 필터 -->
-      <div class="left-sidebar">
+    <div class="main-content">
+      <!-- 왼쪽 패널: 교과서 선택 및 필터 (40%) -->
+      <div class="left-panel">
         <div class="sidebar-scroll">
           <!-- 교과서 선택 섹션 -->
           <div class="textbook-section" v-if="subjects.length > 0">
@@ -66,44 +44,44 @@
               </h3>
               <span class="section-desc">하나의 교과서를 선택하여 문제를 검색합니다</span>
             </div>
-          
+
             <!-- 로딩 상태 -->
             <div v-if="isSubjectsLoading" class="textbook-loading">
               <div class="spinner"></div>
               <p>교과서 정보를 불러오는 중...</p>
             </div>
-          
+
             <!-- 교과서 그리드 -->
             <div v-else class="textbook-grid">
-              <div 
-                v-for="subject in subjects" 
+              <div
+                v-for="subject in subjects"
                 :key="subject.subjectId"
                 :class="['textbook-card', { 'selected': selectedTextbook === subject.subjectId }]"
                 @click="selectTextbook(subject.subjectId)"
               >
                 <!-- 교과서 표지 이미지 -->
                 <div class="textbook-icon">
-                  <img 
-                    v-if="subject.subjectThumbnail" 
-                    :src="subject.subjectThumbnail" 
+                  <img
+                    v-if="subject.subjectThumbnail"
+                    :src="subject.subjectThumbnail"
                     :alt="subject.subjectName"
                     class="textbook-cover"
                     @error="handleCoverImageError($event)"
                   />
                   <span v-else>📖</span>
                 </div>
-                
+
                 <div class="textbook-info">
                   <h5>{{ subject.subjectName }}</h5>
                   <p class="publisher">{{ subject.gradeName }} | {{ subject.areaName }}</p>
                   <span class="year-badge">{{ subject.termName || '전체' }}</span>
                 </div>
-                
+
                 <div class="item-count">
                   <span class="count-number">{{ subject.itemCount || 0 }}</span>
                   <span class="count-label">문항</span>
                 </div>
-                
+
                 <div class="textbook-radio">
                   <span v-if="selectedTextbook === subject.subjectId">●</span>
                   <span v-else>○</span>
@@ -116,14 +94,14 @@
           <div class="filter-section">
             <div class="section-header">
               <h3>
-                <span class="section-icon">🔍</span>
+                <span class="section-icon">⚙️</span>
                 상세 필터
               </h3>
               <button class="btn-reset" @click="resetFilters">
                 <span>↻</span> 초기화
               </button>
             </div>
-          
+
             <div class="filter-content">
               <!-- 단원 선택 (트리 구조) -->
               <div class="filter-group" v-if="selectedTextbook && chapterTree.length > 0">
@@ -135,8 +113,8 @@
                 <div class="chapter-tree-container">
                   <div class="chapter-tree">
                     <div v-for="largeChapter in chapterTree" :key="largeChapter.id" class="large-chapter">
-                      <div 
-                        class="large-chapter-header" 
+                      <div
+                        class="large-chapter-header"
                         @click="toggleLargeChapter(largeChapter.id)"
                         :class="{ 'expanded': expandedChapters.includes(largeChapter.id) }"
                       >
@@ -161,18 +139,18 @@
                           </span>
                         </div>
                       </div>
-                      
+
                       <transition name="slide">
                         <div v-if="expandedChapters.includes(largeChapter.id)" class="medium-chapters">
                           <div v-if="largeChapter.mediumChapters && largeChapter.mediumChapters.length > 0">
-                            <label 
-                              v-for="mediumChapter in largeChapter.mediumChapters" 
+                            <label
+                              v-for="mediumChapter in largeChapter.mediumChapters"
                               :key="mediumChapter.id"
                               class="medium-chapter-item"
                               :class="{ 'selected': selectedMediumChapters.includes(mediumChapter.id) }"
                             >
                               <div class="checkbox-wrapper">ㄴ
-                                <input 
+                                <input
                                   type="checkbox"
                                   :id="`medium-${mediumChapter.id}`"
                                   :value="mediumChapter.id"
@@ -219,21 +197,21 @@
                   난이도
                 </label>
                 <div class="difficulty-buttons">
-                  <button 
+                  <button
                     :class="['difficulty-btn', 'diff-high', { 'active': filters.difficulties.includes('4') }]"
                     @click="toggleDifficulty('4')"
                   >
                     <span class="diff-icon">🔴</span>
                     <span>상</span>
                   </button>
-                  <button 
+                  <button
                     :class="['difficulty-btn', 'diff-medium', { 'active': filters.difficulties.includes('3') }]"
                     @click="toggleDifficulty('3')"
                   >
                     <span class="diff-icon">🟡</span>
                     <span>중</span>
                   </button>
-                  <button 
+                  <button
                     :class="['difficulty-btn', 'diff-low', { 'active': filters.difficulties.includes('2') }]"
                     @click="toggleDifficulty('2')"
                   >
@@ -250,21 +228,21 @@
                   문제 유형
                 </label>
                 <div class="type-buttons">
-                  <button 
+                  <button
                     :class="['type-btn', { 'active': questionFormFilters.includes('50') }]"
                     @click="toggleQuestionForm('50')"
                   >
                     <span class="type-icon">🔘</span>
                     <span>5지선택</span>
                   </button>
-                  <button 
+                  <button
                     :class="['type-btn', { 'active': questionFormFilters.includes('60') }]"
                     @click="toggleQuestionForm('60')"
                   >
                     <span class="type-icon">✏️</span>
                     <span>단답유순</span>
                   </button>
-                  <button 
+                  <button
                     :class="['type-btn', { 'active': questionFormFilters.includes('70') }]"
                     @click="toggleQuestionForm('70')"
                   >
@@ -280,10 +258,10 @@
             </div>
           </div> <!-- filter-section 닫기 -->
         </div> <!-- sidebar-scroll 닫기 -->
-      </div> <!-- left-sidebar 닫기 -->
+      </div> <!-- left-panel 닫기 -->
 
-      <!-- 중앙: 문항 목록 -->
-      <div class="center-panel">
+      <!-- 오른쪽 패널: 문항 목록 (60%) -->
+      <div class="right-panel">
         <div class="items-header">
           <span>검색 결과 ({{ totalItems }}개)</span>
           <label class="select-all">
@@ -300,8 +278,8 @@
 
         <!-- 문항 그리드 (가상 스크롤링 적용) -->
         <div v-else class="items-grid" ref="itemsContainer">
-          <div 
-            v-for="item in visibleItems" 
+          <div
+            v-for="item in visibleItems"
             :key="item.itemId"
             :class="['item-card', { selected: isSelected(item.itemId) }]"
             :style="{ transform: `translateY(${offsetY}px)` }"
@@ -309,13 +287,13 @@
           >
             <!-- 가상 스크롤 스페이서 -->
             <div class="virtual-spacer" :style="{ height: totalHeight + 'px' }"></div>
-            
+
             <!-- 카드 헤더 -->
             <div class="item-card-header">
               <div class="item-header-left">
                 <label class="custom-item-checkbox">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     :checked="isSelected(item.itemId)"
                     @click.stop="toggleSelection(item)"
                   />
@@ -325,7 +303,7 @@
                     </svg>
                   </span>
                 </label>
-                <span class="item-number">No. {{ item.itemId }}</span>
+                <span class="item-number">{{ item.topicChapterName || item.chapterName || `No. ${item.itemId}` }}</span>
               </div>
               <div class="item-header-right">
                 <span :class="['difficulty-badge', `difficulty-${item.difficulty?.code}`]">
@@ -341,8 +319,8 @@
             <div class="item-content">
               <!-- 이미지가 있는 경우 -->
               <div v-if="item.hasImageData && item.questionImageUrl" class="item-image-container">
-                <img 
-                  :src="item.questionImageUrl" 
+                <img
+                  :src="item.questionImageUrl"
                   :alt="`문항 ${item.itemId}`"
                   loading="lazy"
                   @error="handleImageError($event, item)"
@@ -373,20 +351,20 @@
             <!-- 카드 푸터 -->
             <div class="item-card-footer">
               <div class="chapter-info">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
                   <path d="M12 6V12L16 14M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
                 <span>{{ item.chapterName || item.chapter?.name || '단원 미지정' }}</span>
               </div>
-              <button 
+              <button
                 class="btn-similar"
                 @click.stop="showSimilarItems(item)"
                 :disabled="isSimilarItemsLoading"
               >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                   <path d="M9 9L3 3M9 3L3 9M15 9L21 3M21 9L15 3M15 15L21 21M15 21L21 15M9 15L3 21M3 15L9 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
-                유사
+                <span>유사</span>
               </button>
             </div>
           </div>
@@ -400,16 +378,16 @@
 
         <!-- 페이지네이션 -->
         <div v-if="totalPages > 1" class="pagination">
-          <button 
+          <button
             class="page-btn prev"
             :disabled="currentPage === 1"
             @click="loadPage(currentPage - 1)"
           >
             ‹
           </button>
-          
-          <button 
-            v-for="page in displayPages" 
+
+          <button
+            v-for="page in displayPages"
             :key="page"
             :class="['page-btn', { active: page === currentPage }]"
             @click="loadPage(page)"
@@ -417,8 +395,8 @@
           >
             {{ page }}
           </button>
-          
-          <button 
+
+          <button
             class="page-btn next"
             :disabled="currentPage === totalPages"
             @click="loadPage(currentPage + 1)"
@@ -426,26 +404,42 @@
             ›
           </button>
         </div>
-      </div> <!-- center-panel 닫기 -->
+      </div> <!-- right-panel 닫기 -->
+    </div> <!-- main-content 닫기 -->
 
-      <!-- 오른쪽: 선택된 문항 -->
-      <div class="right-sidebar">
-        <div class="selected-header">
+    <!-- 선택된 문항 플로팅 버튼 및 패널 -->
+    <button
+      class="selected-items-float-btn"
+      @click="showSelectedPanel = !showSelectedPanel"
+    >
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      <span class="badge" v-if="selectedItems.length > 0">{{ selectedItems.length }}</span>
+    </button>
+
+    <!-- 선택된 문항 모달 -->
+    <div v-if="showSelectedPanel" class="selected-modal" @click="showSelectedPanel = false">
+      <div class="selected-modal-content" @click.stop>
+        <div class="selected-modal-header">
           <h3>선택된 문항</h3>
-          <span class="selected-count">{{ selectedItems.length }}개</span>
+          <div class="header-right">
+            <span class="selected-count">{{ selectedItems.length }}개</span>
+            <button class="modal-close" @click="showSelectedPanel = false">×</button>
+          </div>
         </div>
 
         <!-- 선택된 문항이 없을 때 -->
         <div v-if="selectedItems.length === 0" class="no-selection">
           <p>선택된 문항이 없습니다.</p>
-          <p class="hint">왼쪽에서 문항을 선택해주세요.</p>
+          <p class="hint">문항을 선택해주세요.</p>
         </div>
 
         <!-- 선택된 문항 목록 (드래그 가능) -->
         <div v-else class="selected-items-list">
           <transition-group name="list" tag="div">
-            <div 
-              v-for="(item, index) in selectedItems" 
+            <div
+              v-for="(item, index) in selectedItems"
               :key="item.itemId"
               class="selected-item"
               draggable="true"
@@ -477,8 +471,8 @@
             순서 섞기
           </button>
         </div>
-      </div> <!-- right-sidebar 닫기 -->
-    </div> <!-- content-wrapper 닫기 -->
+      </div>
+    </div>
 
     <!-- 하단 액션 버튼 -->
     <div class="footer-actions">
@@ -488,7 +482,7 @@
       <div class="footer-info">
         <span>선택된 문항: {{ selectedItems.length }}개</span>
       </div>
-      <button 
+      <button
         class="btn btn-primary"
         :disabled="selectedItems.length === 0"
         @click="proceedToNext"
@@ -512,7 +506,7 @@
           <h3>유사 문항 검색 결과</h3>
           <button class="modal-close" @click="closeSimilarModal">×</button>
         </div>
-        
+
         <div class="similar-modal-body">
           <!-- 기준 문항 -->
           <div class="base-item-section">
@@ -532,19 +526,19 @@
           <!-- 유사 문항 목록 -->
           <div class="similar-items-section">
             <h4>유사 문항 ({{ currentSimilarItems.length }}개)</h4>
-            
+
             <div v-if="isSimilarItemsLoading" class="similar-loading">
               <div class="spinner"></div>
               <p>유사 문항을 검색하는 중...</p>
             </div>
-            
+
             <div v-else-if="currentSimilarItems.length === 0" class="no-similar-items">
               <p>유사한 문항을 찾을 수 없습니다.</p>
             </div>
-            
+
             <div v-else class="similar-items-list">
-              <div 
-                v-for="similar in currentSimilarItems" 
+              <div
+                v-for="similar in currentSimilarItems"
                 :key="similar.itemId"
                 :class="['similar-item-card', { 'selected': isSelected(similar.itemId) }]"
                 @click="toggleSelection(similar)"
@@ -552,17 +546,17 @@
                 <div class="similarity-score">
                   유사도: {{ Math.round(similar.score * 100) }}%
                 </div>
-                
+
                 <div class="item-checkbox">
-                  <input 
+                  <input
                     type="checkbox"
                     :checked="isSelected(similar.itemId)"
                     @click.stop="toggleSelection(similar)"
                   />
                 </div>
-                
+
                 <div class="item-number">문항 #{{ similar.itemId }}</div>
-                
+
                 <div class="item-content-small">
                   <div v-if="similar.questionImageUrl" class="item-image-small">
                     <img :src="similar.questionImageUrl" :alt="`문항 ${similar.itemId}`" loading="lazy" />
@@ -570,7 +564,7 @@
                   <div v-else-if="similar.questionHtml" class="item-html-small" v-html="truncateHtml(similar.questionHtml, 100)"></div>
                   <div v-else class="no-content">문항 내용 없음</div>
                 </div>
-                
+
                 <div class="similar-item-meta">
                   <span class="difficulty-badge">{{ getDifficultyName(similar.difficulty?.code) }}</span>
                   <span class="type-badge">{{ getQuestionFormName(similar.questionForm?.code) }}</span>
@@ -579,7 +573,7 @@
             </div>
           </div>
         </div>
-        
+
         <div class="similar-modal-footer">
           <button class="btn btn-secondary" @click="closeSimilarModal">
             취소
@@ -594,8 +588,8 @@
     <!-- Toast 알림 컨테이너 -->
     <div class="toast-container">
       <transition-group name="toast" tag="div">
-        <div 
-          v-for="toast in toasts" 
+        <div
+          v-for="toast in toasts"
           :key="toast.id"
           :class="['toast', `toast-${toast.type}`]"
         >
@@ -611,9 +605,7 @@
       </transition-group>
     </div>
   </div> <!-- step2-container 닫기 -->
-</template>
-
-<script setup>
+</template><script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useItemSelectionStore } from '@/stores/itemSelection'
 import { useTestBankStore } from '@/stores/testBank'
@@ -680,6 +672,9 @@ const chapterTree = ref([]) // 대단원-중단원 트리 구조
 const expandedChapters = ref([]) // 확장된 대단원 ID 목록
 const selectedMediumChapters = ref([]) // 선택된 중단원 ID 목록
 
+// UI 상태
+const showSelectedPanel = ref(false) // 선택된 문항 패널 표시 여부
+
 // 문제 유형 필터 (실제 DB 코드 반영)
 const questionFormFilters = ref([])
 
@@ -731,11 +726,11 @@ const selectTextbook = async (textbookId) => {
     selectedMediumChapters.value = []
     filters.value.chapterIds = []
     itemStore.setChapters([])
-    info('교과서 선택이 해제되었습니다.')
+    // info('교과서 선택이 해제되었습니다.')
   } else {
     // 새 교과서 선택
     selectedTextbook.value = textbookId
-    success('교과서가 선택되었습니다.')
+    // success('교과서가 선택되었습니다.')
 
     // 이전 선택 초기화
     expandedChapters.value = []
@@ -783,15 +778,15 @@ const loadChapterTree = async (subjectId) => {
       console.log(`교과서 ${subjectId}의 챕터 트리 로드 완료:`, chapterTree.value)
 
       if (chapterTree.value.length > 0) {
-        info(`${chapterTree.value.length}개의 대단원을 불러왔습니다.`)
+        // info(`${chapterTree.value.length}개의 대단원을 불러왔습니다.`)
         // 첫 번째 대단원 자동 확장
         expandedChapters.value = [chapterTree.value[0].id]
       } else {
-        warning('해당 교과서에 단원 정보가 없습니다.')
+        // warning('해당 교과서에 단원 정보가 없습니다.')
       }
     } else {
       console.warn('챕터 트리 데이터가 비어있습니다:', response.data)
-      warning('단원 정보를 찾을 수 없습니다.')
+      // warning('단원 정보를 찾을 수 없습니다.')
     }
   } catch (err) {
     console.error('챕터 트리 로드 실패:', err)
@@ -863,7 +858,7 @@ const resetFilters = () => {
   chapterTree.value = []
   searchKeyword.value = ''
   performSearchWithDelay()
-  info('필터가 초기화되었습니다.')
+  // info('필터가 초기화되었습니다.')
 }
 
 // 검색 수행
@@ -956,7 +951,7 @@ const loadPage = (page) => {
 // 검색 버튼 클릭 시 호출되는 함수
 const searchItems = () => {
   if (!selectedTextbook.value) {
-    warning('먼저 교과서를 선택해주세요.')
+    // warning('먼저 교과서를 선택해주세요.')
     return
   }
   performSearch()
@@ -1039,11 +1034,11 @@ const selectAllSimilarItems = () => {
     }
   })
 
-  if (addedCount > 0) {
-    success(`${addedCount}개의 유사 문항이 추가되었습니다.`)
-  } else {
-    info('모든 유사 문항이 이미 선택되어 있습니다.')
-  }
+  // if (addedCount > 0) {
+  //   success(`${addedCount}개의 유사 문항이 추가되었습니다.`)
+  // } else {
+  //   info('모든 유사 문항이 이미 선택되어 있습니다.')
+  // }
 
   closeSimilarModal()
 }
@@ -1098,13 +1093,14 @@ const handleBack = () => {
 
 const proceedToNext = () => {
   if (selectedItems.value.length === 0) {
-    warning('문항을 선택해주세요.')
+    // warning('문항을 선택해주세요.')
+    alert('문항을 선택해주세요.') // 경고는 alert로 대체
     return
   }
 
   // testBankStore에도 선택된 문항 저장 (다음 단계에서 사용)
   testBankStore.setSelectedQuestions(selectedItems.value)
-  success(`${selectedItems.value.length}개 문항이 선택되어 다음 단계로 이동합니다.`)
+  // success(`${selectedItems.value.length}개 문항이 선택되어 다음 단계로 이동합니다.`)
   emit('next')
 }
 
@@ -1180,8 +1176,8 @@ onUnmounted(() => {
 .step2-container {
   display: flex;
   flex-direction: column;
-  height: 100vh; /* viewport height로 변경 */
-  background: #f5f7fa;
+  height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
   position: relative;
   overflow: hidden;
 }
@@ -1199,15 +1195,15 @@ onUnmounted(() => {
   margin: 0 auto;
 }
 
-.search-input-wrapper {
+.filter-section .search-input-wrapper {
   position: relative;
   display: flex;
   align-items: center;
-  background: #f8fafc;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   overflow: hidden;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .search-input-wrapper:focus-within {
@@ -1280,11 +1276,8 @@ onUnmounted(() => {
 
 /* 교과서 선택 섹션 */
 .textbook-section {
-  padding: 1.5rem;
-  background: linear-gradient(135deg, #ffffff 0%, #f0f4ff 100%);
-  border-radius: 12px;
-  margin-bottom: 1.5rem;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.02);
+  padding: 1rem;
+  background: linear-gradient(135deg, #f8faff 0%, #f3f7ff 100%);
 }
 
 .textbook-loading {
@@ -1335,29 +1328,22 @@ onUnmounted(() => {
 .section-header h3 {
   display: flex;
   align-items: center;
-  gap: 0.75rem;
-  font-size: 1.25rem;
-  font-weight: 800;
-  color: #0f172a;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a202c;
   margin: 0;
-  letter-spacing: -0.02em;
 }
 
 .section-icon {
-  font-size: 1.5rem;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  font-size: 1.25rem;
 }
 
 .section-desc {
-  font-size: 0.875rem;
+  font-size: 0.8125rem;
   color: #64748b;
   margin-left: auto;
   margin-right: 1rem;
-  font-weight: 500;
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  padding: 0.25rem 0.75rem;
-  border-radius: 6px;
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.03);
 }
 
 .textbook-grid {
@@ -1370,30 +1356,26 @@ onUnmounted(() => {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 1rem;
-  padding: 1.25rem;
-  min-height: 100px;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
+  gap: 0.875rem;
+  padding: 1rem;
+  background: white;
+  border: 1.5px solid #e2e8f0;
+  border-radius: 8px;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+  min-height: 80px; /* 최소 높이 보장 */
 }
 
 .textbook-card:hover {
-  background: linear-gradient(135deg, #f8fafc 0%, #e7f2ff 100%);
-  border-color: #60a5fa;
-  transform: translateY(-2px);
-  box-shadow: 0 8px 20px rgba(59, 130, 246, 0.12), 0 4px 10px rgba(0, 0, 0, 0.06);
+  background: #f8fafc;
+  border-color: #cbd5e1;
+  border-color: #3b82f6;
 }
 
 .textbook-card.selected {
-  background: linear-gradient(135deg, #e7f2ff 0%, #c7dbff 100%);
+  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
   border-color: #3b82f6;
-  border-width: 2.5px;
-  box-shadow: 0 10px 25px rgba(59, 130, 246, 0.18), 0 4px 10px rgba(59, 130, 246, 0.12);
-  transform: scale(1.02);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
 }
 
 .textbook-check {
@@ -1421,31 +1403,23 @@ onUnmounted(() => {
 }
 
 .textbook-icon {
-  width: 60px;
-  height: 75px;
+  width: 40px;
+  height: 50px;
   display: flex;
   align-items: center;
   justify-content: center;
   position: relative;
   overflow: hidden;
-  border-radius: 8px;
-  background: linear-gradient(135deg, #f1f5f9 0%, #e2e8f0 100%);
+  border-radius: 4px;
+  background: #f8fafc;
   flex-shrink: 0;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-  border: 1px solid rgba(0, 0, 0, 0.05);
-  font-size: 2rem;
 }
 
 .textbook-cover {
   width: 100%;
   height: 100%;
   object-fit: cover;
-  border-radius: 6px;
-  transition: transform 0.3s ease;
-}
-
-.textbook-card:hover .textbook-cover {
-  transform: scale(1.05);
+  border-radius: 4px;
 }
 
 .textbook-info {
@@ -1458,59 +1432,50 @@ onUnmounted(() => {
 
 .textbook-info h4,
 .textbook-info h5 {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #0f172a;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1a202c;
   margin: 0;
-  line-height: 1.4;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  letter-spacing: -0.01em;
+  white-space: normal; /* nowrap → normal로 변경하여 줄바꿈 허용 */
+  word-break: keep-all; /* 한글 단어 단위로 줄바꿈 */
+  line-height: 1.3;
 }
 
 .textbook-info .publisher {
-  font-size: 0.875rem;
+  font-size: 0.6875rem;
   color: #64748b;
   margin: 0;
-  line-height: 1.4;
-  font-weight: 500;
 }
 
 .year-badge {
   display: inline-block;
-  padding: 0.25rem 0.5rem;
-  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
-  color: #4338ca;
-  border-radius: 6px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  padding: 0.125rem 0.25rem;
+  background: #f1f5f9;
+  color: #475569;
+  border-radius: 3px;
+  font-size: 0.625rem;
+  font-weight: 600;
 }
 
 .item-count {
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
-  border-radius: 8px;
+  gap: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  background: #f0f4f8;
+  border-radius: 6px;
   flex-shrink: 0;
-  box-shadow: 0 2px 4px rgba(251, 191, 36, 0.15);
-  border: 1px solid rgba(251, 191, 36, 0.2);
 }
 
 .count-number {
-  font-size: 1rem;
-  font-weight: 800;
-  color: #92400e;
-  letter-spacing: -0.02em;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #3b82f6;
 }
 
 .count-label {
-  font-size: 0.75rem;
-  color: #b45309;
-  font-weight: 600;
+  font-size: 0.6875rem;
+  color: #64748b;
 }
 
 .header-left {
@@ -1576,13 +1541,13 @@ onUnmounted(() => {
 
 /* 왼쪽 사이드바 - 교과서 및 필터 (개선) */
 .left-sidebar {
-  width: 340px;
+  width: 320px; /* 240px → 320px로 증가하여 텍스트 잘림 방지 */
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
-  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
-  border-radius: 16px;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.06), 0 4px 10px rgba(0, 0, 0, 0.04);
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
   overflow: hidden;
   border: 1px solid #e2e8f0;
   height: 100%; /* 명시적 높이 */
@@ -1608,18 +1573,108 @@ onUnmounted(() => {
   height: 100%; /* 명시적 높이 */
 }
 
-/* 오른쪽 사이드바 - 선택된 문항 (개선) */
-.right-sidebar {
-  width: 280px;
-  flex-shrink: 0;
+/* 플로팅 토글 버튼 */
+.floating-toggle-btn {
+  position: fixed;
+  right: 2rem;
+  bottom: 2rem;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+  border: none;
+  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.3s ease;
+  z-index: 1000;
+}
+
+.floating-toggle-btn:hover {
+  transform: scale(1.1);
+  box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
+}
+
+.floating-toggle-btn.active {
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+}
+
+.floating-toggle-btn .badge {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  background: #ff4757;
+  color: white;
+  border-radius: 12px;
+  padding: 2px 8px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  min-width: 24px;
+  text-align: center;
+}
+
+/* 슬라이드 패널 */
+.slide-panel {
+  position: fixed;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 400px;
+  background: white;
+  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.1);
+  z-index: 999;
   display: flex;
   flex-direction: column;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
   overflow: hidden;
-  border: 1px solid #e2e8f0;
-  height: 100%; /* 명시적 높이 */
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.panel-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.btn-close {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  border-radius: 8px;
+  padding: 0.5rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: white;
+}
+
+.btn-close:hover {
+  background: rgba(255, 255, 255, 0.3);
+  transform: scale(1.1);
+}
+
+/* 슬라이드 애니메이션 */
+.slide-enter-active,
+.slide-leave-active {
+  transition: transform 0.3s ease, opacity 0.3s ease;
+}
+
+.slide-enter-from {
+  transform: translateX(100%);
+  opacity: 0;
+}
+
+.slide-leave-to {
+  transform: translateX(100%);
+  opacity: 0;
 }
 
 /* 스크롤바 공통 스타일 */
@@ -1652,12 +1707,9 @@ onUnmounted(() => {
 /* 섹션 공통 스타일 */
 .textbook-section,
 .filter-section {
-  padding: 1.5rem;
-  background: linear-gradient(135deg, #fafbfc 0%, #f8fafc 100%);
-  border-radius: 12px;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
-  border: 1px solid #e2e8f0;
+  margin-bottom: 1rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e1e4e8;
 }
 
 .textbook-section:last-child,
@@ -1688,25 +1740,22 @@ onUnmounted(() => {
 .btn-reset {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
-  border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #475569;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: #64748b;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
 }
 
 .btn-reset:hover {
-  background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
-  border-color: #fca5a5;
-  color: #dc2626;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 8px rgba(220, 38, 38, 0.15);
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
 }
 
 /* 단원 트리 구조 스타일 - 완전히 재디자인 */
@@ -2241,9 +2290,9 @@ onUnmounted(() => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0.75rem 1rem;
-  border-bottom: 1px solid #e1e4e8;
-  background: white;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
   flex-shrink: 0;
 }
 
@@ -2262,65 +2311,59 @@ onUnmounted(() => {
   color: #24292e;
 }
 
-/* 문항 그리드 - UI/UX 개선 */
+/* 문항 그리드 - 큰 카드 */
 .items-grid {
   flex: 1;
   padding: 1.5rem;
   overflow-y: auto;
-  overflow-x: hidden; /* 가로 스크롤 방지 */
+  overflow-x: hidden;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 400px), 1fr)); /* 반응형 그리드 */
+  grid-template-columns: repeat(2, 1fr);
   gap: 1.5rem;
   align-content: start;
   background: linear-gradient(to bottom, #fafbfc, #f8fafc);
-  min-height: 0; /* flexbox 오버플로 방지 */
+  min-height: 0;
 }
 
 /* 반응형 그리드 조정 */
-@media (min-width: 1800px) {
+@media (min-width: 1200px) {
   .items-grid {
-    grid-template-columns: repeat(3, 1fr); /* 큰 화면에서 3열 */
+    grid-template-columns: repeat(2, 1fr);
   }
 }
 
-@media (min-width: 1400px) and (max-width: 1799px) {
+@media (max-width: 1199px) {
   .items-grid {
-    grid-template-columns: repeat(2, 1fr); /* 중간 화면에서 2열 */
-  }
-}
-
-@media (max-width: 1399px) {
-  .items-grid {
-    grid-template-columns: 1fr; /* 작은 화면에서 1열 */
+    grid-template-columns: 1fr;
   }
 }
 
 .item-card {
   position: relative;
   background: white;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
   overflow: hidden;
   cursor: pointer;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.04), 0 1px 2px rgba(0, 0, 0, 0.06);
-  min-height: 300px; /* 높이 약간 축소 */
-  height: 100%;
+  transition: all 0.2s ease;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  min-height: 360px;
+  height: 360px;
   display: flex;
   flex-direction: column;
 }
 
 .item-card:hover {
-  border-color: #60a5fa;
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08), 0 4px 10px rgba(0, 0, 0, 0.06);
-  transform: translateY(-4px) scale(1.01); /* 살짝 확대 효과 추가 */
+  border-color: #93c5fd;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
 }
 
 .item-card.selected {
   border-color: #3b82f6;
-  border-width: 3px; /* 선택 시 더 두꺼운 테두리 */
-  background: linear-gradient(135deg, #ffffff 0%, #eff6ff 100%);
-  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.18), 0 2px 8px rgba(59, 130, 246, 0.12);
+  border-width: 2px;
+  background: #f0f9ff;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.15);
 }
 
 /* 카드 헤더 - 개선된 스타일 */
@@ -2400,9 +2443,9 @@ onUnmounted(() => {
 
 /* 문항 내용 영역 - 크기 최적화 */
 .item-content {
-  padding: 1.25rem;
-  min-height: 180px;
-  flex: 1; /* 남은 공간 차지 */
+  padding: 0.75rem;
+  min-height: 160px;
+  flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2414,23 +2457,29 @@ onUnmounted(() => {
 .item-image-container {
   position: relative;
   width: 100%;
-  height: 200px; /* 적절한 높이 */
+  max-height: 200px;
+  height: 200px;
   border-radius: 8px;
   overflow: hidden;
   background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
   border: 1px solid #e2e8f0;
   box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03);
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .item-image {
-  width: 100%;
-  height: 100%;
+  width: auto;
+  height: auto;
+  max-width: 100%;
+  max-height: 100%;
   object-fit: contain;
   transition: transform 0.3s ease;
 }
 
 .item-card:hover .item-image {
-  transform: scale(1.05);
+  transform: scale(1.02);
 }
 
 .btn-zoom {
@@ -2462,7 +2511,10 @@ onUnmounted(() => {
   width: 100%;
   padding: 0.5rem;
   background: #fafbfc;
-  border-radius: 8px;
+  border-radius: 6px;
+  max-height: 120px;
+  overflow-y: auto;
+  font-size: 0.85rem;
 }
 
 .question-text {
@@ -2920,13 +2972,19 @@ onUnmounted(() => {
 
 /* 하단 액션 */
 .footer-actions {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
   display: flex;
   justify-content: space-between;
   align-items: center;
   padding: 1rem 1.5rem;
   background: white;
   border-top: 1px solid #e1e4e8;
-  box-shadow: 0 -1px 2px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
+  z-index: 100;
+  height: 60px;
 }
 
 .footer-info {
@@ -3038,11 +3096,13 @@ onUnmounted(() => {
 }
 
 .item-image-small {
-  width: 60px;
-  height: 40px;
+  width: 100%;
+  max-width: 150px;
+  height: 100px;
   overflow: hidden;
   border-radius: 4px;
   background: #f3f4f6;
+  margin: 0.5rem auto;
 }
 
 .item-image-small img {
@@ -3080,7 +3140,7 @@ onUnmounted(() => {
 
 .similar-items-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  grid-template-columns: repeat(2, 1fr);
   gap: 1rem;
 }
 
@@ -3380,5 +3440,141 @@ onUnmounted(() => {
   .similar-modal-footer {
     padding: 1rem;
   }
+}
+
+/* 2컬럼 레이아웃 스타일 */
+.main-content {
+  flex: 1;
+  display: flex;
+  gap: 1.5rem;
+  padding: 1rem;
+  overflow: hidden;
+  background: transparent;
+  min-height: 0;
+  height: calc(100vh - 120px - 100px); /* 헤더(120px) + footer(60px) + margin(40px) */
+  margin-bottom: 50px; /* Increased margin to prevent footer overlap */
+}
+
+.left-panel {
+  width: 40%;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  height: 100%;
+}
+
+.right-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+  min-width: 0;
+  height: 100%;
+}
+
+/* 선택된 문항 플로팅 버튼 */
+.selected-items-float-btn {
+  position: fixed;
+  right: 2rem;
+  bottom: calc(60px + 1.5rem); /* footer 높이(60px) + 여백 */
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #3b82f6; /* Solid blue color - no gradient */
+  color: white;
+  border: none;
+  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 95; /* footer(100)보다 낮게 */
+}
+
+.selected-items-float-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
+}
+
+.selected-items-float-btn .badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #ef4444; /* Solid red color - no gradient */
+  color: white;
+  border-radius: 12px;
+  padding: 4px 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  min-width: 24px;
+  text-align: center;
+  border: 2px solid white;
+  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
+}
+
+/* 선택된 문항 모달 */
+.selected-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 999;
+  padding: 2rem;
+}
+
+.selected-modal-content {
+  background: white;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
+}
+
+.selected-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1.5rem;
+  background: #3b82f6; /* Solid blue */
+  color: white;
+}
+
+.selected-modal-header h3 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.selected-modal-header .header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.selected-modal-header .selected-count {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
+  padding: 0.25rem 0.75rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+  font-weight: 600;
 }
 </style>
