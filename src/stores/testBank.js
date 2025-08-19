@@ -654,6 +654,15 @@ export const useTestBankStore = defineStore('testBank', {
       this.existingItemIds = []
       this.originalExamData = null
     },
+    
+    /**
+     * 선택된 문항들 저장 (Step2에서 Step3로 전달)
+     * @param {Array} questions - 선택된 문항 배열
+     */
+    setSelectedQuestions(questions) {
+      this.selectedQuestions = questions || []
+      console.log('선택된 문항 저장:', this.selectedQuestions.length, '개')
+    },
 
     /**
      * 시험지 생성
