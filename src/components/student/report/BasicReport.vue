@@ -17,7 +17,7 @@
 
       <button
         class="tab-btn"
-        :class="{ inactive: currentTab !== 'detail' }"
+        :class="{ active: currentTab === 'detail' }"
         role="tab"
         aria-selected="false"
         @click="currentTab = 'detail'"
@@ -37,36 +37,36 @@
             <span class="bar"></span>
             <span class="label">이름</span>
             <span class="sep">|</span>
-            <span class="value">{{ user.username }}</span>
+            <span class="value">{{ displayName }}</span>
           </li>
           <li class="row">
             <span class="bar"></span>
             <span class="label">학년</span>
             <span class="sep">|</span>
-            <span class="value">{{ user.grade }}</span>
+            <span class="value">{{ studentGrade }}</span>
           </li>
         </ul>
       </div>
       <div id="score-box">
-          <span class="score"> {{exams.answer}} </span>
-          <span class="sep"> | </span>
-          <span class="value"> {{exams.count}} </span>
+        <span class="score"> {{ exams.answer }} </span>
+        <span class="sep"> | </span>
+        <span class="value"> {{ exams.count }} </span>
       </div>
       <div>
         <table class="errata table table-bordered">
           <thead>
-          <tr>
-            <th>번호</th>
-            <th>채점 결과</th>
-            <th>문제 및 해설 보기</th>
-          </tr>
+            <tr>
+              <th>번호</th>
+              <th>채점 결과</th>
+              <th>문제 및 해설 보기</th>
+            </tr>
           </thead>
           <tbody>
-          <tr>
-            <td>1</td>
-            <td>2</td>
-            <td>3</td>
-          </tr>
+            <tr>
+              <td>1</td>
+              <td>2</td>
+              <td>3</td>
+            </tr>
           </tbody>
         </table>
       </div>
@@ -75,7 +75,7 @@
     <section v-else class="panel">
       <h3 class="panel-title">📊 평가결과 요약</h3>
       <div class="card empty">
-        <DetailReport/>
+        <DetailReport />
       </div>
     </section>
   </div>
@@ -83,72 +83,121 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { storeToRefs } from 'pinia'
 import DetailReport from '@/components/student/report/DetailReport.vue'
-import { useUserStore } from '@/store/userStore.js'
+import studentApi from '@/services/studentApi.js'
+const studentGrade = ref('-')
 
-const userStore = useUserStore()
-const { list } = storeToRefs(userStore)
+onMounted(async () => {
+  try {
+    // localStorage에서 userInfo 가져오기
+    const userInfoStr = localStorage.getItem('userInfo')
+    const userInfo = userInfoStr ? JSON.parse(userInfoStr) : null
 
-onMounted(() => {
-  userStore.fetchUsers().catch(() => {})
+    // 토큰에서 userId 가져오기 (라우터 파라미터 대신)
+    const userId = userInfo?.id
+
+    if (userId) {
+      try {
+        const { data } = await studentApi.getByUserId(userId)
+
+        // data.data.grade에서 학년 가져오기
+        const grade = data?.data?.grade
+
+        studentGrade.value = grade ?? '-'
+
+        // grade를 localStorage에 저장
+        if (grade) {
+          const updatedUserInfo = { ...userInfo, grade: grade }
+          localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo))
+        }
+      } catch {
+        studentGrade.value = '-'
+      }
+    }
+  } catch {
+    studentGrade.value = '-'
+  }
 })
 
-// 첫 번째 사용자만 보여주는 예 (원하는 로직에 맞게 고치세요)
-const user = computed(() => list.value[0] ?? { name: '-', grade: '-' })
+const user = computed(() => {
+  const userInfoStr = localStorage.getItem('userInfo')
+  const userInfo = userInfoStr ? JSON.parse(userInfoStr) : {}
+  return {
+    fullName: userInfo.fullName || userInfo.name || '사용자',
+    username: userInfo.username || '사용자',
+  }
+})
 
-// exams는 그대로 props로 받되, 기본값 보장
+const displayName = computed(
+  () => user.value.fullName || user.value.name || user.value.username || '-',
+)
+
+// 시험 데이터 (실제로는 API에서 가져와야 함)
+const exams = computed(() => ({
+  answer: '85점',
+  count: '20문제',
+}))
+
+// props는 그대로 유지하되, 기본값 보장
 const props = defineProps({
   defaultTab: { type: String, default: 'basic' },
-  exams: { type: Object, default: () => ({ answer: '-', count: '-' }) },
 })
 const currentTab = ref(props.defaultTab)
 </script>
 
 <style scoped>
 .report-wrap {
-  max-width: 960px;
-  margin: 0 auto;
-  padding: 24px 16px;
+  max-width: 1000px;
+  margin: 80px auto 80px;
+  padding: 0 20px;
 }
 
 /* Tabs */
 .tabs {
   display: flex;
-  gap: 48px;
+  gap: 10px;
   justify-content: center;
-  align-items: flex-end;
+  align-items: center;
   margin: 40px 0 28px;
+  flex-wrap: wrap;
 }
 
 .tab-btn {
   position: relative;
-  background: transparent;
-  border: 0;
-  padding: 8px 4px 12px;
-  font-size: 24px;
-  font-weight: 700;
-  color: #2b2f36;
+  background: white;
+  border: 1px solid #d3d3d3;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
   cursor: pointer;
+  border-radius: 20px;
+  transition: all 0.2s ease;
 }
 
 .tab-btn.inactive {
-  color: #c7c9cf; /* 스크린샷처럼 비활성 흐리게 */
+  color: #333;
+  background: white;
 }
 
 .tab-btn.active {
-  color: #2b2f36;
+  background: #3b6cff;
+  color: white;
+  border-color: #3b6cff;
+}
+
+.tab-btn:hover {
+  border-color: #3b6cff;
+  background: #f8f9ff;
+}
+
+.tab-btn.active:hover {
+  background: #3b6cff;
+  color: white;
 }
 
 .underline {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 2px;
-  height: 4px;
-  width: 100%;
-  background: #193a6a; /* 남색 */
-  border-radius: 2px;
+  display: none;
 }
 
 /* Panel & Card */
@@ -166,10 +215,18 @@ const currentTab = ref(props.defaultTab)
 
 .cardCustom {
   background: #fff;
-  border-radius: 12px;
-  padding: 28px 24px;
-  box-shadow: 0 2px 12px rgba(0,0,0,.08);
+  border: 1px solid #d3d3d3;
+  border-radius: 6px;
+  padding: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   width: 100%;
+  transition: all 0.3s ease;
+}
+
+.cardCustom:hover {
+  border-color: #2d5af5;
+  box-shadow: 0 4px 12px rgba(59, 108, 255, 0.15);
+  transform: translateY(-2px);
 }
 
 .card.empty {
@@ -193,10 +250,8 @@ const currentTab = ref(props.defaultTab)
   min-height: 32px;
 }
 
-
-
 .label {
-  color: #3a4760;
+  color: #3b6cff;
   font-weight: 700;
 }
 
@@ -212,14 +267,40 @@ const currentTab = ref(props.defaultTab)
 #score-box {
   margin-top: 60px;
   height: 100px;
-  background-color: #f1f1f1;
+  background: #fff;
+  border: 1px solid #d3d3d3;
+  border-radius: 6px;
   text-align: center;
   align-content: center;
   font-size: 20px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
 }
+
+/* hover 효과 제거 */
 
 .errata {
   margin-top: 60px;
+  border: 1px solid #d3d3d3;
+  border-radius: 6px;
+  overflow: hidden;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
+.errata th {
+  background: #f8f9ff;
+  color: #3b6cff;
+  font-weight: bold;
+  padding: 12px;
+  border: 1px solid #d3d3d3;
+}
+
+.errata td {
+  padding: 12px;
+  border: 1px solid #d3d3d3;
+}
+
+.errata tr:hover {
+  background: #f8f9ff;
+}
 </style>

@@ -1045,21 +1045,43 @@ const createNewExam = () => {
   emit('next', { mode: 'create' })
 }
 
-const selectExam = (exam) => {
+const selectExam = async (exam) => {
   console.log('기존 시험지 선택:', exam)
   console.log('exam.areaCode:', exam.areaCode, 'exam.areaName:', exam.areaName)
   console.log('exam.gradeCode:', exam.gradeCode, 'exam.gradeName:', exam.gradeName)
+  console.log('exam.examType:', exam.examType)
+  
   selectedExamId.value = exam.id
   selectedExamName.value = exam.title || exam.examName
   selectedExamObject.value = exam // exam 객체 전체 저장
   store.setMode('edit')
   store.setSelectedExam(exam)
+  
+  // 해당 시험지의 문항 정보 로드
+  try {
+    // examType 확인 (없으면 기본값 TESTWIZARD)
+    const examType = exam.examType || 'TESTWIZARD'
+    
+    // USER_CREATED 타입은 아직 지원하지 않음
+    if (examType === 'USER_CREATED') {
+      alert('사용자가 생성한 시험지는 현재 편집 기능을 지원하지 않습니다.')
+      store.existingItemIds = []
+      store.originalExamData = null
+    } else {
+      await store.loadExistingExamItems(exam.id, examType)
+      console.log('기존 문항 로드 완료:', store.existingItemIds)
+    }
+  } catch (error) {
+    console.error('기존 문항 로드 실패:', error)
+    // 로드 실패해도 계속 진행 (빈 문항으로 시작)
+  }
+  
   // 하단 패널 표시 (바로 이동하지 않고 사용자가 선택)
   showSelectedExamPanel.value = true
 }
 
-const editExam = (exam) => {
-  selectExam(exam)
+const editExam = async (exam) => {
+  await selectExam(exam)
   proceedToNext()
 }
 
