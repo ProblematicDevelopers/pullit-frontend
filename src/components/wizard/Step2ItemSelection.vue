@@ -440,7 +440,7 @@
           <transition-group name="list" tag="div">
             <div
               v-for="(item, index) in selectedItems"
-              :key="item.itemId"
+              :key="`selected-${item.itemId}`"
               class="selected-item"
               draggable="true"
               @dragstart="handleDragStart($event, index)"
@@ -584,7 +584,7 @@
       <transition-group name="toast" tag="div">
         <div
           v-for="toast in toasts"
-          :key="toast.id"
+          :key="`toast-${toast.id}`"
           :class="['toast', `toast-${toast.type}`]"
         >
           <div class="toast-icon">
@@ -607,6 +607,7 @@ import { useToast } from '@/composables/useToast'
 import { useDebounce } from '@/composables/useDebounce'
 import { useVirtualScroll } from '@/composables/useVirtualScroll'
 import { storeToRefs } from 'pinia'
+import itemApiService from '@/services/itemApi'
 
 // Props
 const props = defineProps({
@@ -879,6 +880,19 @@ const performSearch = async () => {
     console.log('문항 검색 파라미터:', searchParams)
 
     await itemStore.searchItems(searchParams)
+
+    // 편집 모드이고 기존 문항이 있으면 해당 문항들을 선택 상태로 표시
+    if (testBankStore.mode === 'edit' && testBankStore.existingItemIds.length > 0) {
+      items.value.forEach(item => {
+        const itemId = item.item_id || item.itemId
+        if (testBankStore.existingItemIds.includes(itemId)) {
+          // 이미 selectedItems에 없으면 추가
+          if (!selectedItems.value.includes(itemId)) {
+            console.log('기존 문항 자동 선택:', itemId)
+          }
+        }
+      })
+    }
 
     if (items.value.length === 0 && !isLoading.value) {
       warning('검색 결과가 없습니다. 다른 검색 조건을 시도해보세요.')
@@ -1166,6 +1180,52 @@ onMounted(async () => {
   try {
     // 과목 및 교과서 정보 로드
     await loadSubjectsAndTextbooks()
+
+    // 편집 모드이고 기존 문항이 있으면 선택 상태로 설정
+    if (testBankStore.mode === 'edit' && testBankStore.existingItemIds.length > 0) {
+      console.log('편집 모드 - 기존 문항 로드:', testBankStore.existingItemIds)
+      
+      // 기존 문항 ID들로 문항 정보 조회
+      const itemPromises = testBankStore.existingItemIds.map(async (itemId, index) => {
+        try {
+          // API를 통해 개별 문항 정보 조회
+          const response = await itemApiService.getItemDetail(itemId)
+          if (response.success && response.data) {
+            return response.data
+          }
+        } catch (err) {
+          console.warn(`문항 ${itemId} 정보 조회 실패:`, err)
+        }
+        
+        // 조회 실패 시 기본 객체 반환
+        return {
+          itemId: itemId,
+          itemNo: index + 1,
+          difficulty: { code: 'M', name: '중' },
+          questionForm: { code: 'MC', name: '객관식' },
+          chapterName: '기존 문항',
+          hasImageData: false,
+          hasHtmlData: false,
+          questionImageUrl: null,
+          questionHtml: `문항 #${itemId}`
+        }
+      })
+      
+      try {
+        const itemsData = await Promise.all(itemPromises)
+        
+        // 조회된 문항들을 selectedItems에 추가
+        itemsData.forEach(item => {
+          if (item) {
+            itemStore.selectItem(item)
+          }
+        })
+        
+        console.log('기존 문항 선택 완료:', itemStore.selectedItems.length, '개')
+      } catch (err) {
+        console.error('기존 문항 정보 조회 중 오류:', err)
+      }
+    }
 
     // 교과서를 선택하면 해당 교과서의 챕터를 로드하도록 변경
     // (subjectId는 교과서 선택 시 결정되므로 여기서는 로드하지 않음)
