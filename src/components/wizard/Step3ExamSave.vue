@@ -112,6 +112,16 @@
                 />
                 <span class="checkbox-label">배점 표시</span>
               </label>
+              
+              <div class="form-group" style="margin-top: 15px;">
+                <label class="form-label">페이지 레이아웃</label>
+                <select v-model="examData.layoutType" class="form-select">
+                  <option value="STANDARD">표준 (페이지당 4문제)</option>
+                  <option value="HALF_PAGE">반페이지 (페이지당 2문제)</option>
+                  <option value="SINGLE">한 페이지 한 문제</option>
+                  <option value="COMPACT">압축 (페이지당 6문제)</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -167,8 +177,8 @@
             <button class="btn-action" @click="reorderItems">
               <span class="icon">↕️</span> 순서 변경
             </button>
-            <button class="btn-action" @click="previewPDF" disabled>
-              <span class="icon">👁️</span> PDF 미리보기 (준비중)
+            <button class="btn-action" @click="previewPDF">
+              <span class="icon">👁️</span> PDF 미리보기
             </button>
           </div>
         </div>
@@ -250,6 +260,12 @@
       </div>
       <div class="footer-right">
         <button 
+          class="btn-action" 
+          @click="openPdfDesigner"
+        >
+          <span class="icon">✏️</span> PDF 편집기 열기
+        </button>
+        <button 
           class="btn-primary" 
           @click="saveAndGenerate"
           :disabled="!canSave"
@@ -299,6 +315,17 @@
         <p>{{ loadingMessage }}</p>
       </div>
     </div>
+
+    <!-- PDF Designer 모달 -->
+    <div v-if="showPdfDesigner" class="pdf-designer-modal">
+      <PdfDesigner
+        :questions="transformedQuestions"
+        :exam-data="pdfExamData"
+        @close="closePdfDesigner"
+        @save="handlePdfSave"
+        @generate="handlePdfGenerate"
+      />
+    </div>
   </div>
 </template>
 
@@ -307,6 +334,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useTestBankStore } from '@/stores/testBank'
 import { useItemSelectionStore } from '@/stores/itemSelection'
 import { storeToRefs } from 'pinia'
+import * as pdfGenerator from '@/services/pdfGenerator'
+import PdfDesigner from '@/components/pdf/PdfDesigner.vue'
 
 // Props
 const props = defineProps({
@@ -333,7 +362,8 @@ const examData = ref({
   includeAnswerSheet: true,
   shuffleQuestions: false,
   showPoints: true,
-  visibility: 'PRIVATE'
+  visibility: 'PRIVATE',
+  layoutType: 'HALF_PAGE'  // 기본값을 반페이지(2문제)로 설정
 })
 
 const showAllItems = ref(false)
@@ -342,6 +372,9 @@ const reorderedItems = ref([])
 const draggedIndex = ref(null)
 const isLoading = ref(false)
 const loadingMessage = ref('')
+const showPdfDesigner = ref(false)
+const transformedQuestions = ref([])
+const pdfExamData = ref({})
 
 // Computed
 const displayItems = computed(() => {
@@ -398,30 +431,104 @@ const saveAndGenerate = async () => {
   }
 
   isLoading.value = true
-  loadingMessage.value = '시험지를 저장하는 중...'
+  loadingMessage.value = 'PDF를 생성하는 중...'
 
   try {
-    console.log('시험지 저장:', {
-      examData: examData.value,
-      items: selectedItems.value,
-      examInfo: props.examInfo
-    })
+    // 시험 데이터 준비
+    const examInfo = {
+      title: examData.value.title,
+      subtitle: props.examInfo?.examName || '',
+      schoolName: '○○중학교', // 실제 데이터로 변경 필요
+      grade: props.examInfo?.gradeName || '',
+      subject: props.examInfo?.subjectName || props.examInfo?.areaName || '',
+      date: examData.value.examDate,
+      teacherName: '', // 실제 사용자 정보로 변경 필요
+      timeLimit: examData.value.timeLimit,
+      includeAnswer: examData.value.includeAnswerSheet,
+      includeExplanation: false, // 해설 포함 옵션 추가 필요
+      shuffleQuestions: examData.value.shuffleQuestions,
+      showPoints: examData.value.showPoints
+    }
 
-    // 2초 후 완료 시뮬레이션
-    setTimeout(() => {
-      isLoading.value = false
-      alert('시험지가 성공적으로 저장되었습니다!')
-      emit('complete')
-    }, 2000)
+    // 문항 데이터 변환
+    const questions = pdfGenerator.transformQuestions(selectedItems.value)
+    
+    // 문제 순서 섞기 (옵션)
+    const finalQuestions = examData.value.shuffleQuestions 
+      ? pdfGenerator.shuffleQuestions(questions)
+      : questions
+
+    // PDF 생성 (레이아웃 옵션 포함)
+    const pdfBlob = await pdfGenerator.generateExamPDF(
+      examInfo,
+      finalQuestions,
+      examData.value.includeAnswerSheet ? 'withAnswer' : 'basic',
+      examData.value.layoutType
+    )
+
+    // PDF 다운로드
+    const filename = `${examData.value.title}_${new Date().toISOString().split('T')[0]}.pdf`
+    pdfGenerator.downloadPDF(pdfBlob, filename)
+
+    isLoading.value = false
+    alert('PDF가 성공적으로 생성되었습니다!')
+    
+    // 서버에 저장 (선택적)
+    // await uploadToServer(pdfBlob, examInfo)
+    
+    emit('complete')
   } catch (error) {
-    console.error('저장 실패:', error)
-    alert('시험지 저장에 실패했습니다.')
+    console.error('PDF 생성 실패:', error)
+    alert('PDF 생성에 실패했습니다: ' + error.message)
     isLoading.value = false
   }
 }
 
-const previewPDF = () => {
-  alert('PDF 미리보기 기능은 준비 중입니다.')
+const previewPDF = async () => {
+  if (selectedItems.value.length === 0) {
+    alert('미리보기할 문항이 없습니다.')
+    return
+  }
+
+  isLoading.value = true
+  loadingMessage.value = 'PDF 미리보기를 준비하는 중...'
+
+  try {
+    // 시험 데이터 준비
+    const examInfo = {
+      title: examData.value.title || '시험지 미리보기',
+      subtitle: props.examInfo?.examName || '',
+      schoolName: '○○중학교',
+      grade: props.examInfo?.gradeName || '',
+      subject: props.examInfo?.subjectName || props.examInfo?.areaName || '',
+      date: examData.value.examDate,
+      teacherName: '',
+      timeLimit: examData.value.timeLimit,
+      includeAnswer: examData.value.includeAnswerSheet,
+      includeExplanation: false,
+      shuffleQuestions: examData.value.shuffleQuestions,
+      showPoints: examData.value.showPoints
+    }
+
+    // 문항 데이터 변환
+    const questions = pdfGenerator.transformQuestions(selectedItems.value)
+    
+    // PDF 생성
+    const pdfBlob = await pdfGenerator.generateExamPDF(
+      examInfo,
+      questions,
+      examData.value.includeAnswerSheet ? 'withAnswer' : 'basic'
+    )
+
+    // 미리보기 창 열기
+    pdfGenerator.previewPDF(pdfBlob)
+
+    isLoading.value = false
+  } catch (error) {
+    console.error('PDF 미리보기 실패:', error)
+    alert('PDF 미리보기에 실패했습니다: ' + error.message)
+    isLoading.value = false
+  }
 }
 
 const reorderItems = () => {
@@ -450,6 +557,51 @@ const handleDrop = (event, dropIndex) => {
 const applyReorder = () => {
   itemStore.selectedItems = [...reorderedItems.value]
   closeReorderModal()
+}
+
+// PDF Designer 관련 함수들
+const openPdfDesigner = () => {
+  console.log('openPdfDesigner 함수 호출됨')
+  console.log('selectedItems:', selectedItems.value)
+  
+  // 문항 데이터 변환
+  transformedQuestions.value = pdfGenerator.transformQuestions(selectedItems.value)
+  console.log('transformedQuestions:', transformedQuestions.value)
+  
+  // 시험 데이터 준비
+  pdfExamData.value = {
+    title: examData.value.title || '새 시험지',
+    subtitle: props.examInfo?.examName || '',
+    schoolName: '○○중학교',
+    grade: props.examInfo?.gradeName || '',
+    subject: props.examInfo?.subjectName || props.examInfo?.areaName || '',
+    date: examData.value.examDate,
+    teacherName: '',
+    timeLimit: examData.value.timeLimit,
+    includeAnswer: examData.value.includeAnswerSheet,
+    includeExplanation: false,
+    shuffleQuestions: examData.value.shuffleQuestions,
+    showPoints: examData.value.showPoints
+  }
+  console.log('pdfExamData:', pdfExamData.value)
+  
+  showPdfDesigner.value = true
+  console.log('showPdfDesigner 설정됨:', showPdfDesigner.value)
+}
+
+const closePdfDesigner = () => {
+  showPdfDesigner.value = false
+}
+
+const handlePdfSave = (template) => {
+  console.log('PDF 템플릿 저장됨:', template)
+  // 템플릿을 localStorage나 서버에 저장할 수 있습니다
+}
+
+const handlePdfGenerate = (pdfBlob) => {
+  console.log('PDF 생성 완료:', pdfBlob)
+  // PDF가 생성되면 추가 처리를 할 수 있습니다
+  closePdfDesigner()
 }
 
 // Lifecycle
@@ -1129,5 +1281,39 @@ input[type="radio"] {
     flex-direction: column;
     gap: 0.5rem;
   }
+}
+
+/* PDF Designer 모달 */
+.pdf-designer-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 3000;
+  background: white;
+}
+
+/* 액션 버튼 스타일 */
+.btn-action {
+  padding: 0.5rem 1rem;
+  background: white;
+  color: #4CAF50;
+  border: 1px solid #4CAF50;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.btn-action:hover {
+  background: #4CAF50;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
 }
 </style>
