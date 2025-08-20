@@ -20,6 +20,7 @@ import ItemProcessingTextbook from '@/views/ItemProcessingTextbook.vue'
 
 // 라우트 가드 import
 import { requireAuth, preventAuthenticated } from './guards'
+import SignUp from '@/views/SignUp.vue'
 
 const routes = [
   { path: '/', name: 'Home', component: Home },
@@ -117,6 +118,12 @@ const routes = [
         role: 'teacher'
       }
     },
+  {
+    path:'/signup',
+    name: 'SignUp',
+    component: SignUp,
+    beforeEnter: preventAuthenticated,
+  }
 ]
 
 const router = createRouter({
