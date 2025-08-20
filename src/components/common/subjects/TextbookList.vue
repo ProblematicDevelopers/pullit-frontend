@@ -5,7 +5,6 @@
     - 본문에는 카드 형태로 교과서들이 표시됩니다.
     - 카드의 "선택하기" 버튼을 클릭하면 선택된 교과서의 subjectId를 부모에게 알립니다(@view).
     데이터 소스:
-    - `textbookStore.fetchTextbooks()`가 axios로 `{BASE}/file-history/textbook` 호출
     - 응답 스키마: { success, code, message, data: Array<...>, timestamp }
   -->
   <div class="subject-list-container">

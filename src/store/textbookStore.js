@@ -1,8 +1,6 @@
 import { defineStore } from 'pinia'
-import axios from 'axios'
 
-// 교과서 목록 API의 베이스 경로
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL
+import { itemProcessingAPI } from '../services/itemProcessApi.js'
 
 export const useTextbookStore = defineStore('textbook', {
   state: () => ({
@@ -27,7 +25,6 @@ export const useTextbookStore = defineStore('textbook', {
 
     /**
      * 교과서 목록을 서버에서 조회합니다.
-     * - 엔드포인트: {BASE}/file-history/textbook
      */
     async fetchTextbooks({ force = false } = {}) {
       // 간단한 캐시: 이미 데이터가 있으면 재요청 스킵(옵션으로 강제 갱신 가능)
@@ -36,8 +33,7 @@ export const useTextbookStore = defineStore('textbook', {
       this.clearState()
       this.loading = true
       try {
-        // axios를 사용해 교과서 목록 API 호출
-        const response = await axios.get(`${API_BASE_URL}/file-history/textbook`)
+        const response = await itemProcessingAPI.getTextbooks()
 
         // 백엔드 표준 응답 스키마: { success, code, message, data, timestamp }
         if (response.data?.success) {
