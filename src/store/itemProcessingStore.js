@@ -6,7 +6,6 @@
 
 import { defineStore } from 'pinia'
 import { itemProcessingAPI } from '../services/itemProcessApi.js'
-
 // 과목 정보 정의 (areaCode와 매칭)
 const SUBJECTS = {
   'KO': { name: '국어', color: '#ef4444' },
@@ -46,7 +45,19 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
     ocrData: [],
 
     // 생성된 Blob URL들 (메모리 관리용)
-    blobUrls: []
+    blobUrls: [],
+
+    // 최종 생성된 PDF Blob (uploadProcessedPdf에서 설정)
+    finalPdf: null,
+
+    // 최종 PDF 생성 시간 (추가)
+    finalPdfGeneratedAt: null,
+
+    // 업로드된 PDF 정보 (추가)
+    uploadedPdfInfo: null,
+
+    // 원본 페이지 수 (추가)
+    originalPageCount: 0
   }),
 
   /**
@@ -58,7 +69,6 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
      * 과목별로 그룹화된 교과서 목록
      */
     groupedTextbooks: (state) => {
-      console.log('현재 textbooks:', state.textbooks)
 
       const grouped = {}
 
@@ -292,6 +302,91 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
     },
 
     /**
+     * 편집된 PDF를 최종 PDF로 생성
+     * @returns {Promise<Blob>} 생성된 최종 PDF Blob
+     */
+    async generateFinalPdf() {
+      try {
+        if (!this.pdfPages || this.pdfPages.length === 0) {
+          throw new Error('편집할 PDF 페이지가 없습니다.')
+        }
+
+        console.log('최종 PDF 생성 시작, 페이지 수:', this.pdfPages.length)
+
+        // PDFDocument 생성
+        const { PDFDocument } = await import('pdf-lib')
+        const pdfDoc = await PDFDocument.create()
+
+        // 편집된 순서대로 페이지 추가
+        for (let i = 0; i < this.pdfPages.length; i++) {
+          const page = this.pdfPages[i]
+          if (page.blob) {
+            try {
+              const pagePdf = await PDFDocument.load(await page.blob.arrayBuffer())
+              const [copiedPage] = await pdfDoc.copyPages(pagePdf, [0])
+              pdfDoc.addPage(copiedPage)
+              console.log(`페이지 ${i + 1} 추가 완료`)
+            } catch (pageError) {
+              console.warn(`페이지 ${i + 1} 처리 중 오류:`, pageError)
+            }
+          }
+        }
+
+        // 최종 PDF를 Blob으로 변환
+        const pdfBytes = await pdfDoc.save()
+        const finalPdfBlob = new Blob([pdfBytes], { type: 'application/pdf' })
+
+        // Store에 최종 PDF 저장
+        this.finalPdf = finalPdfBlob
+        this.finalPdfGeneratedAt = new Date().toISOString()
+
+        console.log('최종 PDF 생성 완료, 크기:', finalPdfBlob.size, 'bytes')
+        return finalPdfBlob
+
+      } catch (error) {
+        console.error('최종 PDF 생성 실패:', error)
+        throw error
+      }
+    },
+
+    /**
+     * 편집된 PDF를 서버에 업로드
+     * @returns {Promise<Object>} 업로드 결과
+     */
+    async uploadProcessedPdf() {
+      try {
+        console.log('PDF 업로드 시작:')
+
+        // 최종 PDF가 없으면 생성
+        if (!this.finalPdf) {
+          console.log('최종 PDF가 없어서 생성 시작')
+          await this.generateFinalPdf()
+        }
+
+        const response = await itemProcessingAPI.uploadProcessedPdf(
+          this.finalPdf,          // file
+          this.pdfFile.name,
+          "DOCUMENT",             // category
+          "file_history",         // entityType
+          0,                      // entityId
+          "user uploaded pdf"     // description
+        )
+        console.log(response)
+        if (response.data.success) {
+          this.uploadedPdfInfo = response.data.data
+          console.log('PDF 업로드 성공:', response.data.data)
+          return response.data.data
+        } else {
+          throw new Error(response.data.message || 'PDF 업로드에 실패했습니다.')
+        }
+
+      } catch (error) {
+        console.error('PDF 업로드 실패:', error)
+        throw error
+      }
+    },
+
+    /**
      * 상태 초기화
      */
     reset() {
@@ -304,6 +399,9 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
       this.pdfPages = []
       this.ocrData = []
       this.error = null
+      this.finalPdf = null
+      this.finalPdfGeneratedAt = null
+      this.uploadedPdfInfo = null
     }
   }
 })

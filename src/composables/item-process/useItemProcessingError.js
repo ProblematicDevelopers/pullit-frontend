@@ -62,11 +62,6 @@ export function useItemProcessingError() {
         console.error('상태 초기화 중 오류:', resetError)
       }
     }
-
-    // 사용자에게 에러 메시지 표시 (Toast 또는 alert)
-    if (typeof window !== 'undefined') {
-      alert(userMessage)
-    }
   }
 
   /**
@@ -83,10 +78,6 @@ export function useItemProcessingError() {
     }
 
     setError(userMessage, '교과서 처리')
-
-    if (typeof window !== 'undefined') {
-      alert(userMessage)
-    }
   }
 
   /**
@@ -96,11 +87,6 @@ export function useItemProcessingError() {
    */
   const handleGeneralError = (error, context = '일반') => {
     setError(error, context)
-
-    const message = currentError.value
-    if (typeof window !== 'undefined') {
-      alert(message)
-    }
   }
 
   /**
