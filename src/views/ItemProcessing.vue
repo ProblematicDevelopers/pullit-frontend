@@ -67,7 +67,7 @@
 </template>
 
 <script>
-import { onMounted, ref, computed, watch } from 'vue'
+import { onMounted, ref, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useItemProcessingStore } from '@/store/itemProcessingStore.js'
 import { PDFDocument } from 'pdf-lib'
@@ -120,6 +120,14 @@ export default {
       }
     })
 
+    // 컴포넌트 언마운트 시 Blob URL 정리
+    onUnmounted(() => {
+      console.log('ItemProcessing 컴포넌트 언마운트됨')
+      // Store에 등록된 모든 Blob URL을 정리
+      itemProcessingStore.cleanupBlobUrls()
+      console.log('Blob URL 정리 완료')
+    })
+
     // ===== 교과서 선택 관련 메서드 =====
 
     /**
@@ -146,6 +154,9 @@ export default {
      * @param {File} file - 업로드된 PDF 파일
      */
     const handlePdfFile = async (file) => {
+      // pages 배열을 try 블록 밖에서 선언
+      const pages = []
+
       try {
         pdfFile.value = file
         itemProcessingStore.setPdfFile(file)
@@ -161,7 +172,6 @@ export default {
         console.log(`PDF 페이지 수: ${pageCount}`)
 
         // 각 페이지를 개별 PDF로 만들어서 썸네일 생성
-        const pages = []
         for (let i = 0; i < pageCount; i++) {
           // 페이지별 PDF 생성
           const singlePagePdf = await PDFDocument.create()
@@ -174,6 +184,9 @@ export default {
 
           // Blob URL 생성 (썸네일 표시용)
           const blobUrl = URL.createObjectURL(blob)
+
+          // Store에 Blob URL 등록 (메모리 관리용)
+          itemProcessingStore.addBlobUrl(blobUrl)
 
           pages.push({
             index: i,
@@ -192,6 +205,16 @@ export default {
 
       } catch (error) {
         console.error('PDF 파싱 중 오류 발생:', error)
+
+        // 에러 발생 시 생성된 Blob URL들 정리
+        if (pages.length > 0) {
+          pages.forEach(page => {
+            if (page.preview) {
+              URL.revokeObjectURL(page.preview)
+            }
+          })
+        }
+
         errorHandler.handlePdfError(error, () => {
           pdfFile.value = null
           pdfPages.value = []
@@ -292,9 +315,29 @@ export default {
     /**
      * 다음 단계로 이동
      */
-    const nextStep = () => {
-      // PDF 편집 완료 후 다음 단계로 이동
-      router.push('/item-processing/area-selection')
+    const nextStep = async () => {
+      try {
+        // 로딩 상태 시작
+        itemProcessingStore.loading = true
+
+
+        // 편집된 PDF를 서버에 업로드
+        const uploadResult = await itemProcessingStore.uploadProcessedPdf()
+
+        console.log('PDF 업로드 완료:', uploadResult)
+
+        // 성공 메시지 표시 (Toast 등)
+        // showSuccessMessage('PDF가 성공적으로 저장되었습니다.')
+
+        // 다음 단계로 이동
+        router.push('/item-processing/area-selection')
+
+      } catch (error) {
+        console.error('PDF 저장 실패:', error)
+        errorHandler.handleGeneralError(error, 'PDF 서버 저장')
+      } finally {
+        itemProcessingStore.loading = false
+      }
     }
 
     /**
