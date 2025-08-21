@@ -22,6 +22,9 @@ import ItemProcessingTextbook from '@/views/ItemProcessingTextbook.vue'
 import { requireAuth, preventAuthenticated } from './guards'
 import SignUp from '@/views/SignUp.vue'
 
+// OAuth2 관련 컴포넌트 import
+import OAuth2Callback from '@/components/oauth2/OAuth2Callback.vue'
+
 const routes = [
   { path: '/', name: 'Home', component: Home },
 
@@ -34,6 +37,17 @@ const routes = [
     meta: {
       hideHeader: true,  // 헤더 숨김
       hideFooter: true   // 푸터 숨김
+    }
+  },
+
+  // OAuth2 콜백 처리
+  {
+    path: '/oauth2/callback/:provider',
+    name: 'OAuth2Callback',
+    component: OAuth2Callback,
+    meta: {
+      hideHeader: true,
+      hideFooter: true
     }
   },
 
@@ -124,10 +138,14 @@ const routes = [
     component: () => import('@/views/PdfTest.vue')
   },
   {
-    path:'/signup',
+    path: '/signup',
     name: 'SignUp',
     component: SignUp,
     beforeEnter: preventAuthenticated,
+    meta: {
+      hideHeader: true,  // 헤더 숨김
+      hideFooter: true   // 푸터 숨김
+    }
   }
 ]
 

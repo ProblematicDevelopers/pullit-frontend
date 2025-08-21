@@ -36,13 +36,23 @@
 
         <!-- 3단계: PDF 편집 -->
         <PdfEditor
-          v-else
+          v-else-if="!showOcrEditor"
           :pdf-pages="pdfPages"
           @page-removed="removePage"
           @page-moved="movePage"
           @pages-removed="removeMultiplePages"
           @go-back="goBack"
-          @next-step="nextStep"
+          @next-step="goToOcrEditor"
+        />
+
+        <!-- 4단계: OCR 편집 -->
+        <PdfOcrEditor
+          v-else
+          :pdf-pages="pdfPages"
+          :presigned-url="presignedUrl"
+          :file-id="fileId"
+          :subject-code="selectedSubject"
+          @go-back="goBackFromOcr"
         />
       </div>
     </div>
@@ -76,16 +86,19 @@ import { PDFDocument } from 'pdf-lib'
 import TextbookSelection from '@/components/item-process/TextbookSelection.vue'
 import PdfUpload from '@/components/item-process/PdfUpload.vue'
 import PdfEditor from '@/components/item-process/PdfEditor.vue'
+import PdfOcrEditor from '@/components/item-process/PdfOcrEditor.vue'
 
 // 새로 생성한 composable들 import
 import { useItemProcessingError } from '@/composables/item-process/useItemProcessingError'
+import { useToast } from '@/composables/useToast'
 
 export default {
   name: 'ItemProcessing',
   components: {
     TextbookSelection,
     PdfUpload,
-    PdfEditor
+    PdfEditor,
+    PdfOcrEditor
   },
   setup() {
     // Store 및 Router 초기화
@@ -97,6 +110,9 @@ export default {
     const pdfFile = ref(null)
     const pdfPages = ref([])
     const selectedSubject = ref(null)
+    const showOcrEditor = ref(false)
+    const presignedUrl = ref('')
+    const fileId = ref(null)
 
     // Store에서 데이터 가져오기 (computed로 반응성 보장)
     const loading = computed(() => itemProcessingStore.loading)
@@ -107,6 +123,7 @@ export default {
 
     // Composable 초기화
     const errorHandler = useItemProcessingError()
+    const toast = useToast()
 
     // 컴포넌트 마운트 시 교과서 목록 로드
     onMounted(() => {
@@ -160,6 +177,12 @@ export default {
       try {
         pdfFile.value = file
         itemProcessingStore.setPdfFile(file)
+
+        // presigned URL 설정 (실제 구현에서는 서버에서 받아와야 함)
+        presignedUrl.value = 'https://example.com/temp-pdf-url'
+
+        // fileId 설정 (실제 구현에서는 서버 응답에서 받아와야 함)
+        fileId.value = Date.now() // 임시 ID
 
         console.log('PDF 파일 처리 시작:', file.name)
 
@@ -292,6 +315,19 @@ export default {
           pageNumber: p.pageNumber
         })))
       }
+    }, { deep: true, immediate: true })
+
+    // 로컬 pdfPages 변경을 Store에 반영 (양방향 동기화)
+    watch(pdfPages, (newPages) => {
+      if (newPages && Array.isArray(newPages)) {
+        console.log('로컬 pdfPages 변경 감지:', newPages.length)
+
+        // Store와 길이가 다른 경우에만 업데이트 (무한 루프 방지)
+        if (newPages.length !== itemProcessingStore.pdfPages.length) {
+          console.log('Store pdfPages를 로컬 상태로 업데이트')
+          itemProcessingStore.setPdfPages(newPages)
+        }
+      }
     }, { deep: true })
 
     // ===== 네비게이션 관련 메서드 =====
@@ -350,6 +386,48 @@ export default {
       }
     }
 
+    /**
+     * OCR 편집 화면으로 이동
+     */
+    const goToOcrEditor = () => {
+      // 과목이 선택되어 있는지 확인
+      if (!selectedSubject.value) {
+        toast.show('과목을 먼저 선택해주세요.', 'error')
+        return
+      }
+
+      // 현재 pdfPages 상태 확인 및 디버깅
+      console.log('=== OCR 편집으로 이동 전 상태 확인 ===')
+      console.log('로컬 pdfPages:', pdfPages.value)
+      console.log('Store pdfPages:', itemProcessingStore.pdfPages)
+      console.log('로컬 pdfPages 길이:', pdfPages.value.length)
+      console.log('Store pdfPages 길이:', itemProcessingStore.pdfPages.length)
+
+      // Store와 로컬 상태가 동기화되어 있는지 확인
+      if (pdfPages.value.length !== itemProcessingStore.pdfPages.length) {
+        console.warn('⚠️ Store와 로컬 상태가 동기화되지 않음!')
+        console.warn('로컬 상태를 Store 상태로 강제 동기화')
+        pdfPages.value = [...itemProcessingStore.pdfPages]
+      }
+
+      // 최종 상태 확인
+      console.log('최종 pdfPages 길이:', pdfPages.value.length)
+      console.log('최종 pdfPages:', pdfPages.value.map(p => ({ index: p.index, pageNumber: p.pageNumber })))
+
+      showOcrEditor.value = true
+      console.log('OCR 편집 화면으로 이동 - 과목:', selectedSubject.value)
+    }
+
+    /**
+     * OCR 편집에서 뒤로가기
+     */
+    const goBackFromOcr = () => {
+      showOcrEditor.value = false
+      console.log('PDF 편집 화면으로 돌아가기')
+    }
+
+
+
     return {
       // 상태
       loading,
@@ -361,6 +439,9 @@ export default {
       selectedTextbook,
       pdfFile,
       pdfPages,
+      showOcrEditor,
+      presignedUrl,
+      fileId,
       errorHandler,
 
       // 메서드
@@ -373,6 +454,8 @@ export default {
       goBack,
       nextStep,
       goToPdfEdit,
+      goToOcrEditor,
+      goBackFromOcr,
     }
   },
 }
