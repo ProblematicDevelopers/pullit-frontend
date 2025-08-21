@@ -1,7 +1,6 @@
 // src/stores/subject.js
 import { defineStore } from 'pinia'
-import axios from 'axios'
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL // 환경변수 권장
+import chapterApi from '@/services/chapterApi'
 
 export const useChapterStore = defineStore('chapter', {
   state: () => ({
@@ -26,8 +25,8 @@ export const useChapterStore = defineStore('chapter', {
       this.clearState()
       this.loading = true
       try {
-        const { data } = await axios.get(`${API_BASE_URL}/chapter/${subjectId}/tree`)
-        this.list = data.data
+        const response = await chapterApi.getChapterTree(subjectId)
+        this.list = response.data.data
         this.currentSubjectId = subjectId
         this.lastFetchedAt = Date.now()
       } catch (e) {
