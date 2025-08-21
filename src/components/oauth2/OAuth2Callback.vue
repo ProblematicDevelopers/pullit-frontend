@@ -37,16 +37,24 @@ onMounted(async () => {
 
     statusMessage.value = `${provider} 로그인을 처리하고 있습니다...`
 
-    // 소셜 로그인 콜백 처리
-    const response = await authService.handleSocialLoginCallback(provider)
+    // 백엔드 OAuth2 성공 엔드포인트 호출
+    const response = await authService.handleOAuth2Callback(provider)
 
-    if (response.success) {
+    console.log('OAuth2 response:', response)
+
+    if (response.success && response.code === 'LOGIN_SUCCESS') {
+      // 기존 사용자 로그인 성공
       const user = response.data.user
 
       statusMessage.value = '로그인 성공! 페이지를 이동합니다...'
 
-      // 사용자 타입 설정
-      const userType = user.role === 'TEACHER' ? 'teacher' : 'student'
+      // 토큰 저장
+      authService.setTokens(response.data.accessToken, response.data.refreshToken)
+
+      // 사용자 정보 저장
+      localStorage.setItem('userInfo', JSON.stringify(user))
+      localStorage.setItem('userType', user.role === 'TEACHER' ? 'teacher' : 'student')
+      localStorage.setItem('isLoggedIn', 'true')
 
       // Layout store 업데이트
       layoutStore.setUserName(user.fullName || user.username)
@@ -61,20 +69,39 @@ onMounted(async () => {
           router.push('/student/main')
         }
       }, 1000)
-    }
-  } catch (error) {
-    console.error('OAuth2 callback error:', error)
-
-    if (error.message === 'NEW_USER') {
+    } else if (response.success && (response.code === 'NEW_USER' || response.message === 'NEW_USER')) {
+      // 신규 사용자 - 회원가입 페이지로 이동
       statusMessage.value = '신규 사용자입니다. 회원가입을 진행해주세요.'
-      // TODO: 회원가입 플로우로 이동
-      setTimeout(() => router.push('/oauth2/registration-choice'), 2000)
+
+      const socialInfo = response.data
+      sessionStorage.setItem('oauth2_social_info', JSON.stringify(socialInfo))
+
+      setTimeout(() => {
+        const query = {
+          oauth2: 'true',
+          provider: provider,
+          email: socialInfo.email,
+          name: socialInfo.name,
+          providerId: socialInfo.providerId,
+          username: socialInfo.username
+        }
+        console.log('Query params:', query)
+        router.push({ path: '/signup', query })
+      }, 2000)
     } else {
+      // 기타 응답 처리
       statusMessage.value = '로그인 처리 중 오류가 발생했습니다.'
       setTimeout(() => router.push('/login'), 2000)
     }
+  } catch (error) {
+    console.error('OAuth2 callback error:', error)
+    statusMessage.value = '로그인 처리 중 오류가 발생했습니다.'
+    console.error('Error details:', error.response?.data)
+    setTimeout(() => router.push('/login'), 2000)
   }
 })
+
+
 </script>
 
 <style scoped>

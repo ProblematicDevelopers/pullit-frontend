@@ -6,7 +6,6 @@
         <div class="spinner-border text-primary mb-3" role="status">
           <span class="visually-hidden">Loading...</span>
         </div>
-        <h5 class="text-white mb-2">시험지를 준비 중입니다...</h5>
         <p class="text-white-50 mb-0">잠시만 기다려주세요.</p>
       </div>
     </div>
@@ -33,7 +32,7 @@
     <!-- 메인 콘텐츠 영역 -->
     <div class="main-content flex-grow-1 d-flex justify-content-between gap-4 p-4">
       <!-- 시험 콘텐츠 -->
-      <div class="exam-content flex-grow-1 col-10">
+      <div class="exam-content flex-grow-1 col-10 overflow-auto" style="max-height: 730px">
         <div class="question-container bg-white rounded shadow-sm p-4">
           <div class="question-header d-flex align-items-center gap-3 mb-3 pb-3 border-bottom">
             <span class="question-number h5 mb-0 fw-bold text-primary"
@@ -126,11 +125,10 @@
       <!-- 우측 사이드바 - 문제 네비게이션 -->
       <div
         class="question-sidebar bg-white rounded shadow-sm p-3 d-flex flex-column col-2"
-        style="max-height: 90%"
+        style="max-height: 730px"
       >
         <div
           class="sidebar-header d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom"
-          style="max-height: 670px"
         >
           <h5 class="sidebar-title h6 mb-0 fw-bold text-dark">
             <i class="bi bi-list-ul me-2"></i>
@@ -223,7 +221,6 @@ const currentQuestionText = ref('여기에 문제 내용이 표시됩니다.')
 const examData = ref(null)
 const examItems = ref([]) // 문제 목록
 const currentQuestionData = ref(null) // 현재 문제 데이터
-const originalTimeLimit = ref(30 * 60) // 원본 시험 시간 (초)
 const savedAnswers = ref([]) // 저장된 답안 데이터
 
 // Redis 관련 데이터
@@ -266,8 +263,7 @@ onMounted(async () => {
       examItems.value = examDataResponse.data.data.examItems || []
       examTitle.value = examDataResponse.data.data.examName || 'CBT 시험'
       totalQuestions.value = examDataResponse.data.data.totalItems || examItems.value.length
-      remainingTime.value = (examDataResponse.data.data.timeLimit || 30) * 60
-      originalTimeLimit.value = remainingTime.value // 원본 시험 시간 저장
+      remainingTime.value = attemptResponse.data.data.remainTime
 
       // 첫 번째 문제 설정
       if (examItems.value.length > 0) {
@@ -345,8 +341,9 @@ onMounted(async () => {
   // 타이머 시작
   startTimer()
 
-  // 페이지 새로고침 방지
-  window.addEventListener('beforeunload', preventRefresh)
+  // 페이지 새로고침 방지 및 임시 저장
+  window.addEventListener('beforeunload', handleBeforeUnload)
+  window.addEventListener('pagehide', handlePageHide)
 })
 
 onUnmounted(() => {
@@ -356,7 +353,8 @@ onUnmounted(() => {
   }
 
   // 이벤트 리스너 제거
-  window.removeEventListener('beforeunload', preventRefresh)
+  window.removeEventListener('beforeunload', handleBeforeUnload)
+  window.removeEventListener('pagehide', handlePageHide)
 })
 
 // 타이머 시작
@@ -596,8 +594,17 @@ function renderMath(text) {
   if (!text) return ''
 
   try {
+    console.log(text)
+    // HTML 엔티티를 실제 문자로 변환
+    let processedText = text
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&amp;/g, '&')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+
     // LaTeX 수식 패턴 찾기 (예: \( ... \), \[ ... \], $ ... $)
-    return text.replace(
+    return processedText.replace(
       /\\\(([\s\S]*?)\\\)|\\\[([\s\S]*?)\\\]|\$([\s\S]*?)\$/g,
       (match, inline, display, dollar) => {
         const tex = inline || display || dollar
@@ -695,6 +702,7 @@ async function saveQuestionTime() {
 async function saveExamToDatabase(status = 'DONE') {
   try {
     // 마지막 문제 시간 저장
+    isLoading.value = true
     await saveQuestionTime()
 
     // Redis 데이터를 DB로 마이그레이션
@@ -702,12 +710,14 @@ async function saveExamToDatabase(status = 'DONE') {
       questionTimes: questionTimes.value,
       questionVisits: questionVisits.value,
       questionAnswers: questionAnswers.value,
-      totalTime: originalTimeLimit.value - remainingTime.value, // 총 시험 시간
+      remainingTime: remainingTime.value, // 남은 시간 저장
       status: status, // DONE 또는 IN_PROGRESS
     })
   } catch (error) {
     console.error('DB 저장 실패:', error)
     throw error
+  } finally {
+    isLoading.value = false
   }
 }
 
@@ -729,8 +739,14 @@ async function submitExam() {
     // Redis 데이터를 DB로 저장 (DONE 상태)
     await saveExamToDatabase('DONE')
 
-    // 결과 페이지로 이동
-    router.push('/student/cbt/result')
+    // 팝업창 닫고 부모 창에서 결과 페이지로 이동
+    if (window.opener) {
+      window.opener.location.href = `/student/report/${attemptId.value}`
+      window.close()
+    } else {
+      // 팝업이 아닌 경우 직접 이동
+      router.push(`/student/report/${attemptId.value}`)
+    }
   } catch (error) {
     console.error('시험 제출 실패:', error)
     alert('시험 제출에 실패했습니다. 다시 시도해주세요.')
@@ -742,17 +758,34 @@ async function temporarySave() {
   try {
     await saveExamToDatabase('IN_PROGRESS')
     alert('임시 저장되었습니다.')
+    // 팝업창 닫고 부모 창에서 결과 페이지로 이동
+    if (window.opener) {
+      window.opener.location.href = `/student/report/${attemptId.value}`
+      window.close()
+    } else {
+      // 팝업이 아닌 경우 직접 이동
+      router.push(`/student/report`)
+    }
   } catch (error) {
     console.error('임시 저장 실패:', error)
     alert('임시 저장에 실패했습니다. 다시 시도해주세요.')
   }
 }
 
-// 새로고침 방지
-function preventRefresh(e) {
-  e.preventDefault()
-  e.returnValue = '시험 중에는 페이지를 새로고침할 수 없습니다.'
-  return '시험 중에는 페이지를 새로고침할 수 없습니다.'
+// 페이지 새로고침 또는 닫을 때 임시 저장
+function handleBeforeUnload(e) {
+  if (remainingTime.value > 0) {
+    e.preventDefault()
+    e.returnValue = '시험 중에는 페이지를 새로고침하거나 닫을 수 없습니다.'
+    return '시험 중에는 페이지를 새로고침하거나 닫을 수 없습니다.'
+  }
+}
+
+function handlePageHide() {
+  if (remainingTime.value > 0) {
+    // 페이지가 숨겨지기 전에 임시 저장
+    temporarySave()
+  }
 }
 </script>
 
@@ -812,5 +845,18 @@ function preventRefresh(e) {
     flex-direction: column !important;
     gap: 1rem !important;
   }
+}
+
+/* 체크박스 원형 스타일 */
+.form-check-input[type='checkbox'] {
+  border-radius: 50% !important;
+  width: 1.2rem !important;
+  height: 1.2rem !important;
+}
+
+.form-check-input[type='radio'] {
+  border-radius: 50% !important;
+  width: 1.2rem !important;
+  height: 1.2rem !important;
 }
 </style>

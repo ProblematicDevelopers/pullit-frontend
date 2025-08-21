@@ -20,12 +20,12 @@ const authApi = axios.create({
 const tokenManager = {
   getAccessToken: () => localStorage.getItem('accessToken'),
   getRefreshToken: () => localStorage.getItem('refreshToken'),
-  
+
   setTokens: (accessToken, refreshToken) => {
     localStorage.setItem('accessToken', accessToken)
     localStorage.setItem('refreshToken', refreshToken)
   },
-  
+
   clearTokens: () => {
     localStorage.removeItem('accessToken')
     localStorage.removeItem('refreshToken')
@@ -54,10 +54,10 @@ authApi.interceptors.response.use(
   (response) => response,
   async (error) => {
     const originalRequest = error.config
-    
+
     if (error.response?.status === 401 && !originalRequest._retry) {
       originalRequest._retry = true
-      
+
       try {
         const refreshToken = tokenManager.getRefreshToken()
         if (refreshToken) {
@@ -71,7 +71,7 @@ authApi.interceptors.response.use(
         window.location.href = '/login'
       }
     }
-    
+
     return Promise.reject(error)
   }
 )
@@ -90,28 +90,28 @@ const authService = {
         username,
         password
       })
-      
+
       if (response.data.success) {
         const { accessToken, refreshToken, user } = response.data.data
-        
+
         // 토큰 저장
         tokenManager.setTokens(accessToken, refreshToken)
-        
+
         // 사용자 정보 저장
         localStorage.setItem('userInfo', JSON.stringify(user))
         localStorage.setItem('userType', user.role === 'TEACHER' ? 'teacher' : 'student')
         localStorage.setItem('isLoggedIn', 'true')
-        
+
         return response.data
       }
-      
+
       throw new Error(response.data.message || '로그인 실패')
     } catch (error) {
       console.error('Login error:', error)
       throw error
     }
   },
-  
+
   /**
    * 회원가입
    * @param {Object} userData - 회원가입 정보
@@ -126,7 +126,7 @@ const authService = {
       throw error
     }
   },
-  
+
   /**
    * 토큰 재발급
    * @param {string} refreshToken - 리프레시 토큰
@@ -137,19 +137,19 @@ const authService = {
       const response = await authApi.post('/refresh', {
         refreshToken
       })
-      
+
       if (response.data.success) {
         const { accessToken, refreshToken: newRefreshToken } = response.data.data
         tokenManager.setTokens(accessToken, newRefreshToken)
       }
-      
+
       return response.data
     } catch (error) {
       console.error('Token refresh error:', error)
       throw error
     }
   },
-  
+
   /**
    * 로그아웃
    * @returns {Promise} 로그아웃 응답
@@ -165,7 +165,7 @@ const authService = {
       throw error
     }
   },
-  
+
   /**
    * 토큰 검증
    * @returns {Promise} 토큰 유효성
@@ -179,20 +179,19 @@ const authService = {
       throw error
     }
   },
-  
+
   /**
    * 소셜 로그인 시작
    * @param {string} provider - 소셜 로그인 제공자 (google, kakao, naver)
    */
   async startSocialLogin(provider) {
     try {
-      // 백엔드에서 OAuth2 URL 받아오기
-      const response = await authApi.get(`/oauth2/login/${provider}`)
-      const loginUrl = response.data.data
-      
-      // 상대 경로를 절대 경로로 변환하여 리디렉션
-      const fullUrl = `${API_BASE_URL}${loginUrl}`
-      window.location.href = fullUrl
+      // Spring Security OAuth2 표준 경로로 직접 리디렉션
+      const baseUrl = isProduction ? API_BASE_URL : 'http://localhost:8080'
+      const oauthUrl = `${baseUrl}/oauth2/authorization/${provider}`
+
+      console.log(`Starting OAuth2 login for ${provider}: ${oauthUrl}`)
+      window.location.href = oauthUrl
     } catch (error) {
       console.error('Social login error:', error)
       throw error
@@ -200,33 +199,72 @@ const authService = {
   },
 
   /**
-   * 소셜 로그인 콜백 처리
+   * OAuth2 콜백 처리 (세션 기반)
+   * @param {string} provider - 소셜 로그인 제공자
+   * @returns {Promise} 로그인 응답
+   */
+  async handleOAuth2Callback(provider) {
+    try {
+      console.log(`Processing OAuth2 callback for ${provider}`)
+
+      // OAuth2 성공 엔드포인트 호출 (세션 기반)
+      const response = await authApi.get('/oauth2/success')
+
+      console.log('OAuth2 callback response:', response.data)
+
+      if (response.data.success) {
+        return response.data
+      }
+
+      throw new Error(response.data.message || '소셜 로그인 실패')
+    } catch (error) {
+      console.error('OAuth2 callback error:', error)
+
+      // NEW_USER 응답도 에러로 처리될 수 있으므로 응답 데이터 확인
+      if (error.response?.data?.code === 'NEW_USER') {
+        return error.response.data
+      }
+
+      throw error
+    }
+  },
+
+  /**
+   * 소셜 로그인 콜백 처리 (기존 방식 - 호환성 유지)
    * @param {string} provider - 소셜 로그인 제공자
    * @returns {Promise} 로그인 응답
    */
   async handleSocialLoginCallback(provider) {
     try {
-      const response = await authApi.get(`/oauth2/callback/${provider}`)
-      
+      // OAuth2 성공 엔드포인트 호출
+      const response = await authApi.get('/oauth2/success')
+
       if (response.data.success) {
         const { accessToken, refreshToken, user } = response.data.data
-        
+
         // 토큰 저장
         tokenManager.setTokens(accessToken, refreshToken)
-        
+
         // 사용자 정보 저장
         localStorage.setItem('userInfo', JSON.stringify(user))
         localStorage.setItem('userType', user.role.toLowerCase())
         localStorage.setItem('isLoggedIn', 'true')
-        
+
         return response.data
       }
-      
+
       throw new Error(response.data.message || '소셜 로그인 실패')
     } catch (error) {
       console.error('Social login error:', error)
       throw error
     }
+  },
+
+  /**
+   * 토큰 설정 (외부에서 호출 가능하도록)
+   */
+  setTokens(accessToken, refreshToken) {
+    tokenManager.setTokens(accessToken, refreshToken)
   },
 
   /**
@@ -237,7 +275,7 @@ const authService = {
     const userInfo = localStorage.getItem('userInfo')
     return userInfo ? JSON.parse(userInfo) : null
   },
-  
+
   /**
    * 로그인 여부 확인
    * @returns {boolean} 로그인 상태
