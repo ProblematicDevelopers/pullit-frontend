@@ -4,9 +4,9 @@
  */
 
 import { generate } from '@pdfme/generator';
-import { createExamTemplate, generateInputData } from '@/utils/pdfTemplates/examTemplate';
+import { createExamTemplate, generateInputData } from '@/utils/pdftemplates/examTemplate';
 import { getPDFMeFont } from '@/utils/pdfmeFonts';
-import { applyFontToTemplate } from '@/utils/pdfTemplates/addFont';
+import { applyFontToTemplate } from '@/utils/pdftemplates/addFont';
 
 /**
  * 시험지 PDF 생성 메인 함수
