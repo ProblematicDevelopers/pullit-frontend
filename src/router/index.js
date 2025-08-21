@@ -13,6 +13,8 @@ import TestWizardView from '@/views/TestWizardView.vue'
 import Login from '@/views/Login.vue'
 
 import CBTStep01 from '@/components/student/cbt/CBTStep01.vue'
+import CBTStep02 from '@/components/student/cbt/CBTStep02.vue'
+import CBTExam from '@/components/student/cbt/CBTExam.vue'
 import ItemProcessing from '@/views/ItemProcessing.vue'
 import ItemProcessingTextbook from '@/views/ItemProcessingTextbook.vue'
 
@@ -57,7 +59,17 @@ const routes = [
       { path: 'report/:id/:attemptId?', name: 'student.basicReport', component: BasicReport },
       // { path: 'exam/:id', name: 'student.exam', component: StudentExam },
 
-      { path: 'cbtstep01', name: 'student.cbt',component: CBTStep01 }
+      { path: 'cbtstep01', name: 'student.cbt.step1',component: CBTStep01 },
+      { path: 'cbtstep02', name: 'student.cbt.step2',component: CBTStep02 },
+      {
+        path: 'cbt/exam/:examId',
+        name: 'student.cbt.exam',
+        component: CBTExam,
+        meta: {
+          hideHeader: true,  // 헤더 숨김
+          hideFooter: true   // 푸터 숨김
+        }
+      }
 
       // { path: 'result/:id', name: 'student.result', component: StudentResult },
     ],
