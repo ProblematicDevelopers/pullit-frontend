@@ -165,7 +165,7 @@ const teacherName = computed(() => {
       const userData = JSON.parse(userInfo)
       console.log('Parsed userData:', userData)  // 파싱된 데이터 로그
       console.log('Available fields:', Object.keys(userData))  // 사용 가능한 필드들
-      
+
       // 다양한 필드 체크
       const name = userData.fullName || userData.userName || userData.name || userData.teacherName || ''
       console.log('Selected teacher name:', name)  // 선택된 이름
@@ -849,7 +849,6 @@ onUnmounted(() => {
   padding: 5mm;
   border: 1px solid #d1d5db;
   border-radius: 2mm;
-  //background: #fafafa;
   overflow: visible; /* 이미지가 잘리지 않도록 */
   height: auto; /* 내용에 맞춰 높이 자동 조정 */
   min-height: 40mm; /* 최소 높이 보장 */
@@ -899,8 +898,6 @@ onUnmounted(() => {
   width: auto;
   height: auto;
   max-width: 100%;
-  //border: 1px solid #d1d5db;
-  //border-radius: 1mm;
   display: inline-block;
   object-fit: contain;
 }
