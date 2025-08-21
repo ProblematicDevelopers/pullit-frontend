@@ -7,6 +7,8 @@ const reportApi = {
   getAttemptIdBasic: (attemptId) => api.get(`/report/attempt/${attemptId}/basic`),
   // 문제 HTML 데이터 조회
   getQuestionHtml: (questionId) => api.get(`/report/questions/${questionId}`),
+  // 상세 정오표 조회
+  getDetailErrata: (examId) => api.get(`/report/detailerrata/${examId}`)
 }
 
 export default reportApi
