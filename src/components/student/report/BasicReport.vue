@@ -190,7 +190,7 @@ const fetchExamData = async () => {
     const data = response.data?.data || response.data || {}
 
     // detail report
-    examId.value = data.examId    
+    examId.value = data.examId
 
     // API 응답 데이터를 컴포넌트에서 사용할 수 있는 형태로 변환
     examData.value = {
