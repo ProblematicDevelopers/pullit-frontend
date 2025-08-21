@@ -36,13 +36,23 @@
 
         <!-- 3단계: PDF 편집 -->
         <PdfEditor
-          v-else
+          v-else-if="!showOcrEditor"
           :pdf-pages="pdfPages"
           @page-removed="removePage"
           @page-moved="movePage"
           @pages-removed="removeMultiplePages"
           @go-back="goBack"
-          @next-step="nextStep"
+          @next-step="goToOcrEditor"
+        />
+
+        <!-- 4단계: OCR 편집 -->
+        <PdfOcrEditor
+          v-else
+          :pdf-pages="pdfPages"
+          :presigned-url="presignedUrl"
+          :file-id="fileId"
+          :subject-code="selectedSubject"
+          @go-back="goBackFromOcr"
         />
       </div>
     </div>
@@ -76,16 +86,19 @@ import { PDFDocument } from 'pdf-lib'
 import TextbookSelection from '@/components/item-process/TextbookSelection.vue'
 import PdfUpload from '@/components/item-process/PdfUpload.vue'
 import PdfEditor from '@/components/item-process/PdfEditor.vue'
+import PdfOcrEditor from '@/components/item-process/PdfOcrEditor.vue'
 
 // 새로 생성한 composable들 import
 import { useItemProcessingError } from '@/composables/item-process/useItemProcessingError'
+import { useToast } from '@/composables/useToast'
 
 export default {
   name: 'ItemProcessing',
   components: {
     TextbookSelection,
     PdfUpload,
-    PdfEditor
+    PdfEditor,
+    PdfOcrEditor
   },
   setup() {
     // Store 및 Router 초기화
@@ -97,6 +110,9 @@ export default {
     const pdfFile = ref(null)
     const pdfPages = ref([])
     const selectedSubject = ref(null)
+    const showOcrEditor = ref(false)
+    const presignedUrl = ref('')
+    const fileId = ref(null)
 
     // Store에서 데이터 가져오기 (computed로 반응성 보장)
     const loading = computed(() => itemProcessingStore.loading)
@@ -107,6 +123,7 @@ export default {
 
     // Composable 초기화
     const errorHandler = useItemProcessingError()
+    const toast = useToast()
 
     // 컴포넌트 마운트 시 교과서 목록 로드
     onMounted(() => {
@@ -160,6 +177,12 @@ export default {
       try {
         pdfFile.value = file
         itemProcessingStore.setPdfFile(file)
+
+        // presigned URL 설정 (실제 구현에서는 서버에서 받아와야 함)
+        presignedUrl.value = 'https://example.com/temp-pdf-url'
+
+        // fileId 설정 (실제 구현에서는 서버 응답에서 받아와야 함)
+        fileId.value = Date.now() // 임시 ID
 
         console.log('PDF 파일 처리 시작:', file.name)
 
@@ -350,6 +373,30 @@ export default {
       }
     }
 
+    /**
+     * OCR 편집 화면으로 이동
+     */
+    const goToOcrEditor = () => {
+      // 과목이 선택되어 있는지 확인
+      if (!selectedSubject.value) {
+        toast.show('과목을 먼저 선택해주세요.', 'error')
+        return
+      }
+
+      showOcrEditor.value = true
+      console.log('OCR 편집 화면으로 이동 - 과목:', selectedSubject.value)
+    }
+
+    /**
+     * OCR 편집에서 뒤로가기
+     */
+    const goBackFromOcr = () => {
+      showOcrEditor.value = false
+      console.log('PDF 편집 화면으로 돌아가기')
+    }
+
+
+
     return {
       // 상태
       loading,
@@ -361,6 +408,9 @@ export default {
       selectedTextbook,
       pdfFile,
       pdfPages,
+      showOcrEditor,
+      presignedUrl,
+      fileId,
       errorHandler,
 
       // 메서드
@@ -373,6 +423,8 @@ export default {
       goBack,
       nextStep,
       goToPdfEdit,
+      goToOcrEditor,
+      goBackFromOcr,
     }
   },
 }
