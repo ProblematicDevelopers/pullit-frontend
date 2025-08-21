@@ -2,7 +2,7 @@
   <div class="user-signup-container">
     <div class="signup-card">
       <h2 class="text-center mb-4">회원가입</h2>
-      
+
       <!-- 단계 표시 -->
       <div class="step-indicator">
                     <div class="step" :class="{active: signupStep === 1, completed: signupStep > 1}">
@@ -23,9 +23,9 @@
         <div class="mb-4">
           <h5 class="section-title">이용약관 동의</h5>
           <div class="form-check mb-2">
-            <input 
-              class="form-check-input" 
-              type="checkbox" 
+            <input
+              class="form-check-input"
+              type="checkbox"
               id="agreeAll"
               @change="toggleAllAgreements"
               v-model="agreements.all"
@@ -36,33 +36,33 @@
           </div>
           <hr>
           <div class="form-check mb-2">
-            <input 
-              class="form-check-input" 
-              type="checkbox" 
+            <input
+              class="form-check-input"
+              type="checkbox"
               id="agreeTerms"
               v-model="agreements.terms"
             >
             <label class="form-check-label" for="agreeTerms">
-              [필수] 이용약관 동의 
+              [필수] 이용약관 동의
               <a href="#" class="agreement-link">보기</a>
             </label>
           </div>
           <div class="form-check mb-2">
-            <input 
-              class="form-check-input" 
-              type="checkbox" 
+            <input
+              class="form-check-input"
+              type="checkbox"
               id="agreePrivacy"
               v-model="agreements.privacy"
             >
             <label class="form-check-label" for="agreePrivacy">
-              [필수] 개인정보 수집 및 이용 동의 
+              [필수] 개인정보 수집 및 이용 동의
               <a href="#" class="agreement-link">보기</a>
             </label>
           </div>
           <div class="form-check mb-4">
-            <input 
-              class="form-check-input" 
-              type="checkbox" 
+            <input
+              class="form-check-input"
+              type="checkbox"
               id="agreeMarketing"
               v-model="agreements.marketing"
             >
@@ -76,8 +76,8 @@
           <h5 class="section-title">가입 유형 선택</h5>
           <div class="row">
             <div class="col-6">
-              <div 
-                class="card text-center p-3" 
+              <div
+                class="card text-center p-3"
                 :class="{'border-primary': signupForm.userType === 'teacher'}"
                 @click="signupForm.userType = 'teacher'"
                 style="cursor: pointer;"
@@ -89,8 +89,8 @@
               </div>
             </div>
             <div class="col-6">
-              <div 
-                class="card text-center p-3 student-card" 
+              <div
+                class="card text-center p-3 student-card"
                 :class="{'border-primary': signupForm.userType === 'student'}"
                 @click="signupForm.userType = 'student'"
                 style="cursor: pointer;"
@@ -104,8 +104,8 @@
           </div>
         </div>
 
-        <button 
-          @click="nextStep" 
+        <button
+          @click="nextStep"
           class="btn btn-primary w-100"
           :disabled="!agreements.terms || !agreements.privacy || !signupForm.userType"
         >
@@ -119,17 +119,17 @@
         <div class="mb-3">
           <label for="phone" class="form-label">휴대폰 번호</label>
           <div class="phone-input-wrapper">
-            <input 
-              type="tel" 
-              class="form-control phone-input" 
+            <input
+              type="tel"
+              class="form-control phone-input"
               id="phone"
               v-model="signupForm.phone"
               placeholder="010-0000-0000"
               maxlength="13"
               :disabled="phoneVerified"
             >
-            <button 
-              class="btn btn-outline-primary send-btn" 
+            <button
+              class="btn btn-outline-primary send-btn"
               type="button"
               @click="sendVerificationCode"
               :disabled="!isValidPhone || phoneVerified"
@@ -142,17 +142,17 @@
         <div v-if="verificationSent" class="mb-3">
           <label for="verificationCode" class="form-label">인증번호</label>
           <div class="verification-input-wrapper">
-            <input 
-              type="text" 
-              class="form-control verification-input" 
+            <input
+              type="text"
+              class="form-control verification-input"
               id="verificationCode"
               v-model="verificationCode"
               placeholder="인증번호 6자리"
               maxlength="6"
               :disabled="phoneVerified"
             >
-            <button 
-              class="btn verify-btn" 
+            <button
+              class="btn verify-btn"
               :class="phoneVerified ? 'btn-success' : 'btn-outline-success'"
               type="button"
               @click="verifyPhone"
@@ -167,8 +167,8 @@
 
         <div class="d-flex gap-2">
           <button @click="prevStep" class="btn btn-secondary flex-fill">이전</button>
-          <button 
-            @click="nextStep" 
+          <button
+            @click="nextStep"
             class="btn btn-primary flex-fill"
             :disabled="!phoneVerified"
           >
@@ -184,15 +184,15 @@
           <div class="mb-3">
             <label for="username" class="form-label">아이디</label>
             <div class="username-input-wrapper">
-              <input 
-                type="text" 
-                class="form-control username-input" 
+              <input
+                type="text"
+                class="form-control username-input"
                 id="username"
                 v-model="signupForm.username"
                 placeholder="영문, 숫자 조합 4-20자"
                 required
               >
-              <button 
+              <button
                 class="btn username-check-btn"
                 :class="usernameAvailable ? 'btn-success' : 'btn-outline-primary'"
                 type="button"
@@ -210,16 +210,16 @@
           <div class="mb-3">
             <label for="password" class="form-label">비밀번호</label>
             <div class="password-input-wrapper">
-              <input 
-                :type="showPassword ? 'text' : 'password'" 
-                class="form-control password-input" 
+              <input
+                :type="showPassword ? 'text' : 'password'"
+                class="form-control password-input"
                 id="password"
                 v-model="signupForm.password"
                 @input="checkPasswordStrength"
                 placeholder="영문(대+소), 숫자, 특수문자 조합 9-20자"
                 required
               >
-              <button 
+              <button
                 type="button"
                 class="btn password-toggle-btn"
                 @click="togglePasswordVisibility"
@@ -237,14 +237,14 @@
           <div class="mb-3">
             <label for="passwordConfirm" class="form-label">비밀번호 확인</label>
             <div class="password-input-wrapper">
-              <input 
-                :type="showPasswordConfirm ? 'text' : 'password'" 
-                class="form-control password-input" 
+              <input
+                :type="showPasswordConfirm ? 'text' : 'password'"
+                class="form-control password-input"
                 id="passwordConfirm"
                 v-model="signupForm.passwordConfirm"
                 required
               >
-              <button 
+              <button
                 type="button"
                 class="btn password-toggle-btn"
                 @click="togglePasswordConfirmVisibility"
@@ -260,9 +260,9 @@
 
           <div class="mb-3">
             <label for="email" class="form-label">이메일</label>
-            <input 
-              type="email" 
-              class="form-control" 
+            <input
+              type="email"
+              class="form-control"
               :class="{'is-invalid': !emailValid && emailErrorMessage, 'is-valid': emailValid}"
               id="email"
               v-model="signupForm.email"
@@ -277,9 +277,9 @@
 
           <div class="mb-3">
             <label for="birthDate" class="form-label">생년월일</label>
-            <input 
-              type="date" 
-              class="form-control" 
+            <input
+              type="date"
+              class="form-control"
               id="birthDate"
               v-model="signupForm.birthDate"
               required
@@ -289,17 +289,17 @@
           <div class="mb-3">
             <label for="school" class="form-label">학교 정보</label>
             <div class="school-input-wrapper">
-              <input 
-                type="text" 
-                class="form-control school-input" 
+              <input
+                type="text"
+                class="form-control school-input"
                 id="school"
                 v-model="signupForm.school"
                 @input="onSchoolInput"
                 placeholder="학교명을 입력하세요"
                 required
               >
-              <button 
-                class="btn btn-outline-primary search-btn" 
+              <button
+                class="btn btn-outline-primary search-btn"
                 type="button"
                 @click="openSchoolSearchModal"
               >
@@ -329,31 +329,31 @@
           </div>
           <div class="school-modal-body">
             <div class="search-input-group mb-3">
-              <input 
-                type="text" 
-                class="form-control" 
+              <input
+                type="text"
+                class="form-control"
                 v-model="schoolSearchKeyword"
                 @input="searchSchools"
                 placeholder="학교명을 입력하세요"
               >
-              <button 
-                class="btn btn-primary" 
+              <button
+                class="btn btn-primary"
                 @click="searchSchools"
                 :disabled="!schoolSearchKeyword.trim()"
               >
                 검색
               </button>
             </div>
-            
+
             <div v-if="isSchoolSearching" class="text-center">
               <div class="spinner-border text-primary" role="status">
                 <span class="visually-hidden">검색 중...</span>
               </div>
             </div>
-            
+
             <div v-else-if="schoolSearchResults.length > 0" class="school-results">
-              <div 
-                v-for="school in schoolSearchResults" 
+              <div
+                v-for="school in schoolSearchResults"
                 :key="school.schoolCode"
                 class="school-item"
                 @click="selectSchool(school)"
@@ -363,11 +363,11 @@
                 <div class="school-region">{{ school.region }} {{ school.district }}</div>
               </div>
             </div>
-            
+
             <div v-else-if="schoolSearchKeyword && !isSchoolSearching" class="text-center text-muted">
               검색 결과가 없습니다.
             </div>
-            
+
             <div v-else class="text-center text-muted">
               학교명을 입력하고 검색해주세요.
             </div>
@@ -490,12 +490,12 @@ const sendVerificationCode = async () => {
     alert('(테스트) 인증번호가 전송되었습니다. 인증번호: 000000')
     return
   }
-  
+
   try {
     const response = await axios.post(`${apiBaseUrl}/auth/phone/send`, {
       phone: signupForm.value.phone
     })
-    
+
     if (response.data.success) {
       verificationSent.value = true
       startTimer()
@@ -525,13 +525,13 @@ const verifyPhone = async () => {
     alert('(테스트) 휴대폰 인증이 완료되었습니다.')
     return
   }
-  
+
   try {
     const response = await axios.post(`${apiBaseUrl}/auth/phone/verify`, {
       phone: signupForm.value.phone,
       code: verificationCode.value
     })
-    
+
     if (response.data.success) {
       phoneVerified.value = true
       clearInterval(timerInterval)
@@ -547,13 +547,11 @@ const checkUsername = async () => {
     usernameCheckResult.value = '아이디를 입력해주세요.'
     return
   }
-  
+
   try {
-    const response = await axios.get(`${apiBaseUrl}/auth/check-username`, {
-      params: { username: signupForm.value.username }
-    })
-    
-    if (response.data.available) {
+    const response = await axios.get(`${apiBaseUrl}/users/check/username/${signupForm.value.username}`)
+
+    if (response.data.success) {
       usernameCheckResult.value = '사용 가능한 아이디입니다.'
       usernameAvailable.value = true
     } else {
@@ -581,13 +579,13 @@ const validateEmail = (email) => {
 
 const checkEmailFormat = () => {
   const email = signupForm.value.email
-  
+
   if (!email) {
     emailValid.value = false
     emailErrorMessage.value = ''
     return
   }
-  
+
   if (!validateEmail(email)) {
     emailValid.value = false
     emailErrorMessage.value = '올바른 이메일 형식을 입력해주세요.'
@@ -599,25 +597,25 @@ const checkEmailFormat = () => {
 
 const checkPasswordStrength = () => {
   const password = signupForm.value.password
-  
+
   if (!password) {
     passwordStrength.value = ''
     return
   }
-  
+
   const hasLower = /[a-z]/.test(password)
   const hasUpper = /[A-Z]/.test(password)
   const hasNumber = /[0-9]/.test(password)
   const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password)
   const isLongEnough = password.length >= 9 && password.length <= 20
-  
+
   let strength = 0
   if (hasLower) strength++
   if (hasUpper) strength++
   if (hasNumber) strength++
   if (hasSpecial) strength++
   if (isLongEnough) strength++
-  
+
   if (strength >= 5) {
     passwordStrengthClass.value = 'strength-strong'
     passwordStrengthText.value = '보안 우수'
@@ -628,7 +626,7 @@ const checkPasswordStrength = () => {
     passwordStrengthClass.value = 'strength-weak'
     passwordStrengthText.value = '보안 취약'
   }
-  
+
   passwordStrength.value = true
 }
 
@@ -653,12 +651,12 @@ const searchSchools = async () => {
   if (!schoolSearchKeyword.value.trim()) {
     return
   }
-  
+
   isSchoolSearching.value = true
-  
+
   try {
     console.log('학교 검색 시작 (모의 데이터):', schoolSearchKeyword.value.trim())
-    
+
     // 모의 데이터로 학교 검색 (나중에 디비 연동 예정)
     const result = getMockSchools(schoolSearchKeyword.value.trim())
     console.log('검색 결과:', result)
@@ -695,12 +693,12 @@ const getMockSchools = (keyword) => {
     { schoolCode: '14', schoolName: '안양중학교', address: '경기도 안양시 만안구 안양로 753', region: '경기도', district: '안양시' },
     { schoolCode: '15', schoolName: '평택중학교', address: '경기도 평택시 평택로 951', region: '경기도', district: '평택시' }
   ]
-  
+
   if (!keyword) return mockSchools
-  
+
   const lowerKeyword = keyword.toLowerCase()
-  return mockSchools.filter(school => 
-    school.schoolName.toLowerCase().includes(lowerKeyword) || 
+  return mockSchools.filter(school =>
+    school.schoolName.toLowerCase().includes(lowerKeyword) ||
     school.region.toLowerCase().includes(lowerKeyword) ||
     school.district.toLowerCase().includes(lowerKeyword) ||
     school.address.toLowerCase().includes(lowerKeyword)
@@ -712,36 +710,58 @@ const handleSignup = async () => {
     alert('비밀번호가 일치하지 않습니다.')
     return
   }
-  
+
   if (!usernameAvailable.value) {
     alert('아이디 중복 확인을 해주세요.')
     return
   }
-  
+
   if (!emailValid.value) {
     alert('올바른 이메일 형식을 입력해주세요.')
     return
   }
-  
+
   if (!signupForm.value.school.trim()) {
     alert('학교 정보를 입력해주세요.')
     return
   }
-  
+
   try {
-    const response = await axios.post(`${apiBaseUrl}/auth/signup`, {
-      userType: signupForm.value.userType,
+    // OAuth2 소셜 정보 확인
+    const urlParams = new URLSearchParams(window.location.search)
+    const isOAuth2Signup = urlParams.get('oauth2') === 'true'
+    const socialInfo = isOAuth2Signup ? JSON.parse(sessionStorage.getItem('oauth2_social_info') || '{}') : null
+
+    const signupData = {
       username: signupForm.value.username,
       password: signupForm.value.password,
       email: signupForm.value.email,
       phone: signupForm.value.phone,
-      birthDate: signupForm.value.birthDate,
-      school: signupForm.value.school,
+      fullName: signupForm.value.username, // 임시로 username을 fullName으로 사용
+      role: signupForm.value.userType.toUpperCase(),
       marketingAgree: agreements.value.marketing
-    })
-    
+    }
+
+    // OAuth2 소셜 정보가 있으면 추가
+    if (socialInfo && socialInfo.provider) {
+      signupData.socialProvider = socialInfo.provider
+      signupData.socialProviderId = socialInfo.providerId
+      // 소셜 로그인에서 받은 이름이 있으면 사용
+      if (socialInfo.name) {
+        signupData.fullName = socialInfo.name
+      }
+    }
+
+    const response = await axios.post(`${apiBaseUrl}/auth/register`, signupData)
+
     if (response.data.success) {
       alert('회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.')
+
+      // OAuth2 소셜 정보 정리
+      if (isOAuth2Signup) {
+        sessionStorage.removeItem('oauth2_social_info')
+      }
+
       router.push('/login')
       resetSignupForm()
     }
@@ -816,7 +836,92 @@ onMounted(() => {
   if (token) {
     axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
   }
+
+  // OAuth2 소셜 정보 확인 및 폼 자동 입력
+  checkOAuth2SocialInfo()
 })
+
+// OAuth2 소셜 정보 확인 및 폼 자동 입력
+const checkOAuth2SocialInfo = () => {
+  // URL 쿼리에서 소셜 정보 확인
+  const urlParams = new URLSearchParams(window.location.search)
+  const isOAuth2Signup = urlParams.get('oauth2') === 'true'
+
+  if (isOAuth2Signup) {
+    // 세션 스토리지에서 소셜 정보 가져오기
+    const sessionSocialInfo = sessionStorage.getItem('oauth2_social_info')
+    if (sessionSocialInfo) {
+      try {
+        const socialInfo = JSON.parse(sessionSocialInfo)
+        console.log('OAuth2 소셜 정보 발견:', socialInfo)
+
+        // 폼에 소셜 정보 자동 입력
+        if (socialInfo.email) {
+          signupForm.value.email = socialInfo.email
+          checkEmailFormat() // 이메일 유효성 검사 실행
+        }
+
+        if (socialInfo.name) {
+          // 이름을 사용자명으로 자동 생성 (중복 확인 필요)
+          const suggestedUsername = generateUsernameFromName(socialInfo.name)
+          signupForm.value.username = suggestedUsername
+        }
+
+        // OAuth2 사용자임을 표시
+        showOAuth2Info(socialInfo)
+
+      } catch (e) {
+        console.error('OAuth2 소셜 정보 파싱 실패:', e)
+      }
+    }
+  }
+}
+
+// 이름으로부터 사용자명 생성
+const generateUsernameFromName = (name) => {
+  // 한글 이름을 영문으로 변환 (간단한 매핑)
+  const nameMapping = {
+    '김': 'kim', '이': 'lee', '박': 'park', '최': 'choi', '정': 'jung',
+    '강': 'kang', '조': 'cho', '윤': 'yoon', '장': 'jang', '임': 'lim'
+  }
+
+  let username = name
+  // 한글을 영문으로 변환
+  Object.entries(nameMapping).forEach(([korean, english]) => {
+    username = username.replace(new RegExp(korean, 'g'), english)
+  })
+
+  // 특수문자 제거 및 영문/숫자만 허용
+  username = username.replace(/[^a-zA-Z0-9]/g, '')
+
+  // 길이 조정 (4-20자)
+  if (username.length > 20) {
+    username = username.substring(0, 20)
+  } else if (username.length < 4) {
+    username = username + '123'
+  }
+
+  return username.toLowerCase()
+}
+
+// OAuth2 정보 표시
+const showOAuth2Info = (socialInfo) => {
+  // OAuth2 사용자임을 알리는 UI 표시
+  const oauth2Info = document.createElement('div')
+  oauth2Info.className = 'alert alert-info oauth2-info'
+  oauth2Info.innerHTML = `
+    <i class="fas fa-info-circle"></i>
+    <strong>소셜 계정 연동</strong><br>
+    ${socialInfo.provider} 계정으로 가입 중입니다.
+    이메일과 사용자명이 자동으로 입력되었습니다.
+  `
+
+  // 회원가입 카드 상단에 삽입
+  const signupCard = document.querySelector('.signup-card')
+  if (signupCard) {
+    signupCard.insertBefore(oauth2Info, signupCard.firstChild)
+  }
+}
 
 onUnmounted(() => {
   if (timerInterval) {
@@ -903,19 +1008,19 @@ onUnmounted(() => {
   transition: all 0.3s;
 }
 
-.strength-weak { 
-  background: #dc3545; 
-  width: 33%; 
+.strength-weak {
+  background: #dc3545;
+  width: 33%;
 }
 
-.strength-medium { 
-  background: #ffc107; 
-  width: 66%; 
+.strength-medium {
+  background: #ffc107;
+  width: 66%;
 }
 
-.strength-strong { 
-  background: #198754; 
-  width: 100%; 
+.strength-strong {
+  background: #198754;
+  width: 100%;
 }
 
 .card {
@@ -1375,7 +1480,35 @@ onUnmounted(() => {
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='currentColor'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0 8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.878 9.878L3 3m6.878 6.878L21 21' /%3E%3C/svg%3E");
 }
 
+/* OAuth2 소셜 계정 연동 정보 스타일 */
+.oauth2-info {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  border: none;
+  color: white;
+  border-radius: 12px;
+  margin-bottom: 24px;
+  padding: 16px 20px;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.2);
+}
 
+.oauth2-info i {
+  margin-right: 8px;
+  font-size: 18px;
+}
 
+.oauth2-info strong {
+  font-weight: 600;
+}
 
-</style> 
+/* OAuth2 사용자용 추가 스타일 */
+.oauth2-signup .form-control[readonly] {
+  background-color: #f8fafc;
+  border-color: #cbd5e0;
+  color: #4a5568;
+}
+
+.oauth2-signup .form-control[readonly]:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+</style>
