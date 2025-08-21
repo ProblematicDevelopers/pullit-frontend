@@ -1,6 +1,6 @@
 <!--
   시험지 마법사 Step 1: 모드 선택 및 시험지 설정
-  
+
   이 컴포넌트는 시험지 생성 마법사의 첫 번째 단계를 담당합니다.
   주요 기능:
   - 모드 선택: 새로 만들기 vs 기존 수정
@@ -32,8 +32,8 @@
             <h3>학년 선택</h3>
           </div>
           <div class="grade-grid">
-            <div 
-              v-for="grade in grades" 
+            <div
+              v-for="grade in grades"
               :key="grade.code"
               :class="['grade-card', { 'selected': examInfo.gradeCode === grade.code }]"
               @click="selectGrade(grade)"
@@ -64,16 +64,21 @@
             <h3>과목 선택</h3>
           </div>
           <div class="subject-grid">
-            <div 
-              v-for="subject in subjects" 
+            <div
+              v-for="subject in subjects"
               :key="subject.id"
-              :class="['subject-card', { 'selected': examInfo.subjectId === subject.id }]"
+              :class="['subject-card', { 'selected': examInfo.areaCode === subject.id }]"
               @click="selectSubject(subject)"
               :style="{ '--subject-color': subject.color }"
             >
               <div class="subject-icon-wrapper">
-                <div class="subject-icon" :style="{ backgroundColor: examInfo.subjectId === subject.id ? subject.color : '#F3F4F6' }">
-                  <span>{{ subject.name.charAt(0) }}</span>
+                <div class="subject-icon" :style="{ backgroundColor: examInfo.areaCode === subject.id ? subject.color : '#F3F4F6' }">
+                  <span v-if="examInfo.areaCode === subject.id" class="check-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+                      <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                  </span>
+                  <span v-else>{{ subject.name.charAt(0) }}</span>
                 </div>
               </div>
               <div class="subject-name">{{ subject.name }}</div>
@@ -85,8 +90,8 @@
       <!-- 하단 액션 버튼들 -->
       <div class="footer-actions">
         <div class="footer-left">
-          <button 
-            class="btn btn-secondary" 
+          <button
+            class="btn btn-secondary"
             @click="handleCancel"
           >
             취소
@@ -103,7 +108,7 @@
           </span>
         </div>
         <div class="footer-right">
-          <button 
+          <button
             class="btn btn-primary"
             :disabled="!canProceedToItemSelection"
             @click="proceedToItemSelection"
@@ -159,7 +164,7 @@ const examInfo = ref({
 // 학년 옵션
 const grades = ref([
   { code: '07', name: '중학교 1학년', grade: '1', desc: '중등 1학년 과정' },
-  { code: '08', name: '중학교 2학년', grade: '2', desc: '중등 2학년 과정' },  
+  { code: '08', name: '중학교 2학년', grade: '2', desc: '중등 2학년 과정' },
   { code: '09', name: '중학교 3학년', grade: '3', desc: '중등 3학년 과정' }
 ])
 
@@ -227,11 +232,11 @@ const formatDate = (dateString) => {
  */
 const handleCancel = () => {
   const confirmCancel = confirm('시험지 작성을 취소하시겠습니까? 입력한 내용이 삭제됩니다.')
-  
+
   if (confirmCancel) {
     // 팝업인 경우 닫기
     closePopup({ action: 'cancelled' })
-    
+
     // 일반 모달인 경우 부모에 취소 이벤트 전달
     emit('cancel')
   }
@@ -243,7 +248,7 @@ const handleCancel = () => {
 const proceedToItemSelection = () => {
   // Store에 시험지 정보 저장
   store.setExamInfo(examInfo.value)
-  
+
   // 다음 단계로 진행
   emit('next')
   sendToParent('PROCEED_TO_ITEM_SELECTION', examInfo.value)
@@ -263,7 +268,7 @@ const loadUserExams = async () => {
       size: 20,
       keyword: examSearchKeyword.value
     }
-    
+
     const response = await axios.get('/api/user-exams/my', { params })
     userExams.value = response.data.content || []
   } catch (error) {
@@ -312,7 +317,7 @@ function debounce(func, wait) {
 // Lifecycle - 컴포넌트 마운트 시 초기화
 onMounted(async () => {
   console.log('Step1 컴포넌트 마운트됨', { mode: props.mode, examId: props.examId })
-  
+
   if (props.mode === 'edit' && props.examId) {
     // 수정 모드: 기존 시험지 정보 로드
     await loadExamData(props.examId)
@@ -325,7 +330,7 @@ const loadExamData = async (examId) => {
   try {
     const response = await axios.get(`/api/user-exams/${examId}`)
     const exam = response.data.data
-    
+
     examInfo.value = {
       examName: exam.examName,
       gradeCode: exam.gradeCode,
@@ -336,7 +341,7 @@ const loadExamData = async (examId) => {
       visibility: exam.visibility || 'PRIVATE',
       description: exam.description || ''
     }
-    
+
     // 문제 목록도 로드
     await loadExamItems(examId)
   } catch (error) {
@@ -478,7 +483,9 @@ const loadExamData = async (examId) => {
 .grade-card.selected {
   background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
   border-color: #3b82f6;
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
+  border-width: 2px;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25);
+  transform: scale(1.02);
 }
 
 .grade-number {
@@ -514,6 +521,8 @@ const loadExamData = async (examId) => {
   display: flex;
   align-items: center;
   justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 .grade-name {
@@ -554,7 +563,9 @@ const loadExamData = async (examId) => {
 .subject-card.selected {
   background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
   border-color: #3b82f6;
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
+  border-width: 2px;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.25);
+  transform: scale(1.02);
 }
 
 .subject-icon-wrapper {
@@ -580,6 +591,14 @@ const loadExamData = async (examId) => {
 
 .subject-card.selected .subject-icon span {
   color: white;
+}
+
+.subject-icon .check-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
 }
 
 .subject-name {
@@ -1118,16 +1137,16 @@ textarea.form-control {
     flex-direction: column;
     align-items: center;
   }
-  
+
   .exam-form {
     flex-direction: column;
   }
-  
+
   .footer-actions {
     flex-direction: column;
     gap: 1rem;
   }
-  
+
   .footer-actions .btn {
     width: 100%;
   }
