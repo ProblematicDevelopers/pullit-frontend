@@ -51,10 +51,11 @@
           </div>
 
           <!-- 문제 HTML 내용 -->
-          <div v-if="questionHtml" class="question-content">
+          <div v-if="questionHtml || passageHtml" class="question-content">
             <h4>문제 내용</h4>
             <div class="content-box">
-              <div v-html="questionHtml"></div>
+              <div v-if="passageHtml" v-html="passageHtml"></div>
+              <div v-if="questionHtml" v-html="questionHtml"></div>
             </div>
           </div>
 
@@ -95,7 +96,11 @@
           <!-- 데이터 없음 -->
           <div
             v-if="
-              !questionHtml && !explainHtml && !answerHtml && !choiceHtmls.some((choice) => choice)
+              !questionHtml &&
+              !passageHtml &&
+              !explainHtml &&
+              !answerHtml &&
+              !choiceHtmls.some((choice) => choice)
             "
             class="no-data"
           >
@@ -135,6 +140,7 @@ const questionHtml = ref('')
 const explainHtml = ref('')
 const choiceHtmls = ref([])
 const answerHtml = ref('')
+const passageHtml = ref('')
 
 // 필터링된 선택지 (빈 값 제외)
 const filteredChoices = computed(() => {
@@ -257,6 +263,7 @@ const loadQuestionHtml = async () => {
   error.value = null
   questionHtml.value = ''
   explainHtml.value = ''
+  passageHtml.value = ''
 
   try {
     const response = await reportApi.getQuestionHtml(props.question.questionId)
@@ -264,6 +271,7 @@ const loadQuestionHtml = async () => {
 
     // HTML 데이터 가져오기
     const rawQuestionHtml = data.item_html || data.questionHtml || data.html || ''
+    const rawPassageHtml = data.passage_html || data.passageHtml || data.passage || ''
     const rawExplanationHtml =
       data.explain_html ||
       data.explainHtml ||
@@ -284,6 +292,7 @@ const loadQuestionHtml = async () => {
 
     // 수식 렌더링 적용
     questionHtml.value = renderMathInHtml(rawQuestionHtml)
+    passageHtml.value = renderMathInHtml(rawPassageHtml)
     explainHtml.value = renderMathInHtml(rawExplanationHtml)
     answerHtml.value = renderMathInHtml(rawAnswerHtml)
     choiceHtmls.value = rawChoiceHtmls.map((choiceHtml) => renderMathInHtml(choiceHtml))
@@ -414,11 +423,21 @@ watch(
   font-weight: bold;
 }
 
+.passage-content,
 .question-content,
 .explain,
 .choices,
 .answer {
   margin-bottom: 24px;
+}
+
+.passage-content h4 {
+  margin: 0 0 12px 0;
+  color: #1f2937;
+  font-size: 16px;
+  font-weight: 600;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #10b981;
 }
 
 .question-content h4,
