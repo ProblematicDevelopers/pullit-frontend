@@ -6,7 +6,7 @@
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="시험 제목을 검색하세요..."
+          placeholder="시험 제목을 검색하세요a..."
           class="search-input"
         />
         <button @click="clearSearch" class="clear-btn" v-if="searchQuery">✕</button>
@@ -100,119 +100,14 @@
 </template>
 
 <script>
-import examApi from '@/services/examApi.js'
+import reportApi from '@/services/reportApi.js'
 
 export default {
   name: 'ReportList',
   components: 'BasicReport',
   data() {
     return {
-      items: [
-        {
-          id: 1,
-          attemptId: 101,
-          userId: 1,
-          subject: '수학',
-          title: '2024년 1학기 중간고사',
-          grade: '고등학교 1학년',
-          usage: 1,
-          status: 'completed',
-          score: 17,
-          totalQuestions: 20,
-          type: 'exam',
-        },
-        {
-          id: 2,
-          attemptId: 102,
-          userId: 1,
-          subject: '영어',
-          title: '2024년 1학기 중간고사',
-          grade: '고등학교 1학년',
-          usage: 2,
-          status: 'completed',
-          score: 23,
-          totalQuestions: 25,
-          type: 'exam',
-        },
-        {
-          id: 3,
-          attemptId: null,
-          userId: 1,
-          subject: '과학',
-          title: '2024년 1학기 중간고사',
-          grade: '고등학교 1학년',
-          usage: 0,
-          status: 'not_started',
-          score: null,
-          totalQuestions: 30,
-          type: 'cbt',
-        },
-        {
-          id: 4,
-          attemptId: 104,
-          userId: 1,
-          subject: '국어',
-          title: '2024년 1학기 중간고사',
-          grade: '고등학교 1학년',
-          usage: 1,
-          status: 'completed',
-          score: 17,
-          totalQuestions: 22,
-          type: 'exam',
-        },
-        {
-          id: 5,
-          attemptId: null,
-          userId: 1,
-          subject: '사회',
-          title: '2024년 1학기 중간고사',
-          grade: '고등학교 1학년',
-          usage: 0,
-          status: 'not_started',
-          score: null,
-          totalQuestions: 28,
-          type: 'cbt',
-        },
-        {
-          id: 6,
-          attemptId: 106,
-          userId: 1,
-          subject: '수학',
-          title: '2024년 1학기 기말고사',
-          grade: '고등학교 1학년',
-          usage: 1,
-          status: 'completed',
-          score: 22,
-          totalQuestions: 25,
-          type: 'exam',
-        },
-        {
-          id: 7,
-          attemptId: 104,
-          userId: 1,
-          subject: '영어',
-          title: '2024년 1학기 기말고사',
-          grade: '고등학교 1학년',
-          usage: 1,
-          status: 'completed',
-          score: 28,
-          totalQuestions: 30,
-          type: 'exam',
-        },
-        {
-          id: 8,
-          attemptId: null,
-          userId: 1,
-          subject: '과학',
-          title: '2024년 1학기 기말고사',
-          grade: '고등학교 1학년',
-          usage: 0,
-          status: 'not_started',
-          score: null,
-          totalQuestions: 35,
-          type: 'cbt',
-        },
-      ],
+      items: [],
       loading: false,
       error: null,
       currentPage: 1,
@@ -221,8 +116,8 @@ export default {
       currentFilter: 'all',
     }
   },
-  mounted() {
-    // 더미데이터 사용으로 API 호출 제거
+  async mounted() {
+    await this.fetchStudentExams()
   },
   computed: {
     filteredItems() {
@@ -291,71 +186,50 @@ export default {
     async fetchStudentExams() {
       this.loading = true
       try {
-        // localStorage에서 userInfo 가져오기
-        const userInfoStr = localStorage.getItem('userInfo')
-        const userInfo = userInfoStr ? JSON.parse(userInfoStr) : null
+        // 모든 과목별로 시험 목록 가져오기 (다양한 형태 시도)
+        const subjects = ['MA', 'EN', 'KO', 'SC', 'SO']
+        // 만약 위가 안 되면 아래 중 하나를 시도해보세요:
+        // const subjects = ['math', 'english', 'korean', 'science', 'social']
+        // const subjects = ['MATH', 'ENGLISH', 'KOREAN', 'SCIENCE', 'SOCIAL']
+        // const subjects = ['1', '2', '3', '4', '5'] // 숫자 코드
+        let allExams = []
 
-        if (userInfo?.id) {
-          let allExams = []
-
-          // 1. 해당 학생의 시험 목록 가져오기 (exams)
+        for (const subject of subjects) {
           try {
-            const examResponse = await examApi.get(`/student/${userInfo.id}/exams`)
-            const examData = examResponse.data?.data || examResponse.data || []
+            const response = await reportApi.getAttemptList(subject)
+            const examData = response.data?.data || response.data || []
+
             allExams = allExams.concat(
               examData.map((exam) => ({
-                id: exam.id,
-                attemptId: exam.attemptId || exam.attempt_id,
-                userId: exam.userId || userInfo.id,
-                subject: exam.subject,
-                title: exam.title,
+                id: exam.examId || exam.id, // examId를 우선 사용
+                attemptId: exam.attemptId || exam.attempt_id || exam.id,
+                userId: exam.userId,
+                subject: this.getSubjectName(subject),
+                title: exam.examName || exam.title || exam.examTitle || exam.exam_name,
                 grade: exam.grade,
-                usage: exam.attemptCount || 0,
-                status: exam.status, // 'completed', 'in_progress', 'not_started'
-                score: exam.score,
-                totalQuestions: exam.totalQuestions,
+                usage: exam.attemptCount || 1,
+                status: exam.status || 'completed',
+                score: exam.score || exam.correctAnswers,
+                totalQuestions: exam.totalQuestions || exam.questionCount,
                 type: 'exam',
               })),
             )
-          } catch (examError) {
-            console.error('시험 목록 조회 실패:', examError)
+          } catch (error) {
+            console.error(`${subject} 과목 조회 실패:`, error)
           }
-
-          // 2. CBT 시험지 목록도 가져오기
-          try {
-            const cbtResponse = await examApi.getCBTList()
-            const cbtData = cbtResponse.data?.data || cbtResponse.data || []
-            allExams = allExams.concat(
-              cbtData.map((cbt) => ({
-                id: cbt.id,
-                attemptId: null, // CBT는 아직 시도하지 않았을 수 있음
-                userId: userInfo.id,
-                subject: cbt.subject,
-                title: cbt.title,
-                grade: cbt.grade,
-                usage: 0, // 아직 시도하지 않음
-                status: 'not_started',
-                score: null,
-                totalQuestions: cbt.totalQuestions,
-                type: 'cbt',
-              })),
-            )
-          } catch (cbtError) {
-            console.error('CBT 목록 조회 실패:', cbtError)
-          }
-
-          // 3. 중복 제거 및 정렬 (최신순)
-          const uniqueExams = allExams.filter(
-            (exam, index, self) => index === self.findIndex((e) => e.id === exam.id),
-          )
-
-          this.items = uniqueExams.sort((a, b) => {
-            // 완료된 시험을 먼저, 그 다음 최신순
-            if (a.status === 'completed' && b.status !== 'completed') return -1
-            if (a.status !== 'completed' && b.status === 'completed') return 1
-            return b.id - a.id
-          })
         }
+
+        // 중복 제거 및 정렬 (최신순)
+        const uniqueExams = allExams.filter(
+          (exam, index, self) => index === self.findIndex((e) => e.id === exam.id),
+        )
+
+        this.items = uniqueExams.sort((a, b) => {
+          // 완료된 시험을 먼저, 그 다음 최신순
+          if (a.status === 'completed' && b.status !== 'completed') return -1
+          if (a.status !== 'completed' && b.status === 'completed') return 1
+          return b.id - a.id
+        })
       } catch (error) {
         console.error('시험 목록을 가져오는데 실패했습니다:', error)
         this.error = '시험 목록을 불러올 수 없습니다.'
@@ -364,10 +238,37 @@ export default {
         this.loading = false
       }
     },
+
+    // 과목 코드를 한글 이름으로 변환
+    getSubjectName(areaCode) {
+      const subjectMap = {
+        MATH: '수학',
+        ENGLISH: '영어',
+        KOREAN: '국어',
+        SCIENCE: '과학',
+        SOCIAL: '사회',
+        math: '수학',
+        english: '영어',
+        korean: '국어',
+        science: '과학',
+        social: '사회',
+        MA: '수학',
+        EN: '영어',
+        KO: '국어',
+        SC: '과학',
+        SO: '사회',
+        1: '수학',
+        2: '영어',
+        3: '국어',
+        4: '과학',
+        5: '사회',
+      }
+      return subjectMap[areaCode] || areaCode
+    },
     goToReport(id, attemptId) {
       this.$router.push({
         name: 'student.basicReport',
-        params: { id: id, attemptId: attemptId },
+        params: { id: attemptId || id }, // attemptId가 있으면 사용, 없으면 id 사용
       })
     },
     goToPage(page) {
