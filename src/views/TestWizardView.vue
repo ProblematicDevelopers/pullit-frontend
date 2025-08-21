@@ -53,33 +53,13 @@
         @next="handleStep2Next"
       />
 
-      <!-- Step 3: 시험지저장 (향후 구현) -->
-      <div
+      <!-- Step 3: 시험지저장 -->
+      <Step3ExamSave
         v-else-if="currentStep === 3"
-        class="step-placeholder"
-      >
-        <div class="placeholder-content">
-          <h3>Step 3: 시험지저장</h3>
-          <p>완성된 시험지를 저장하고 다운로드하는 단계입니다.</p>
-          <p>현재 개발 중입니다.</p>
-
-          <!-- 임시 네비게이션 버튼 -->
-          <div class="temp-navigation">
-            <button
-              class="btn btn-secondary"
-              @click="goToStep(2)"
-            >
-              ← Step 2로 돌아가기
-            </button>
-            <button
-              class="btn btn-success"
-              @click="handleComplete"
-            >
-              마법사 완료
-            </button>
-          </div>
-        </div>
-      </div>
+        :examInfo="store.examInfo"
+        @back="handleStep3Back"
+        @complete="handleWizardComplete"
+      />
     </div>
   </div>
 </template>
@@ -102,6 +82,7 @@ import WizardHeader from '@/components/wizard/WizardHeader.vue'
 import Step0SelectMode from '@/components/wizard/Step0SelectMode.vue'
 import Step1UnitSelection from '@/components/wizard/Step1UnitSelection.vue'
 import Step2ItemSelection from '@/components/wizard/Step2ItemSelection.vue'
+import Step3ExamSave from '@/components/wizard/Step3ExamSave.vue'
 
 // Props 정의
 const props = defineProps({
@@ -240,6 +221,23 @@ const handleStep2Back = () => {
 const handleStep2Next = () => {
   console.log('Step 2 완료, Step 3로 진행')
   setCurrentStep(3)
+}
+
+/**
+ * Step 3에서 Step 2로 돌아가기 핸들러
+ */
+const handleStep3Back = () => {
+  console.log('Step 3에서 Step 2로 돌아가기')
+  setCurrentStep(2)
+}
+
+/**
+ * 마법사 완료 핸들러
+ */
+const handleWizardComplete = () => {
+  console.log('시험지 마법사 완료!')
+  alert('시험지가 성공적으로 생성되었습니다!')
+  handleClose()
 }
 
 /**
