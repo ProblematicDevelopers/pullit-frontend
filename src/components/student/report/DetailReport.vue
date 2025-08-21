@@ -12,7 +12,8 @@ const selectedQuestion = ref(null)
 
 // common data
 const props = defineProps({
-  examId: { type: Number, default: -1 }
+  examId: { type: Number, default: -1 },
+  questionId: { type: Number, default: -1 },
 })
 
 
@@ -41,7 +42,7 @@ async function getDetailErrata() {
   try{
     const response = await reportApi.getDetailErrata(props.examId);
     const data = await response.data;
-    errataData.value = data.data;
+    errataData.value = data.data;    
   } catch(err) {
     console.error('상세 정오표 조회에 실패했습니다.:', err)
     error.value = '상세 정오표 조회에 실패했습니다.'
@@ -190,7 +191,7 @@ watch(
         </tr>
       </thead>
       <tbody>
-        <tr v-for="(question, index) in errataData" :key="`${question}`">
+        <tr v-for="(question, index) in errataData" :key="`${question}_${index}`">
           <td>{{ question.itemOrder }}</td>
           <td>{{ question.domainName }}</td>
           <td>{{ question.points }}</td>

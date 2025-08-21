@@ -261,7 +261,7 @@ const loadQuestionHtml = async () => {
   try {
     const response = await reportApi.getQuestionHtml(props.question.questionId)
     const data = response.data?.data || response.data || {}
-
+    
     // HTML 데이터 가져오기
     const rawQuestionHtml = data.item_html || data.questionHtml || data.html || ''
     const rawExplanationHtml =
