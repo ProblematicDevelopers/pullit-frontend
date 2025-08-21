@@ -24,12 +24,16 @@ class ItemApiService {
       // 백엔드 ItemSearchRequest에 맞게 매핑
       const requestData = {
         subjectId: searchParams.subjects && searchParams.subjects.length > 0 ? searchParams.subjects[0] : null,
-        largeChapterIds: searchParams.chapterIds || [],
-        mediumChapterIds: [],
+        largeChapterIds: [],
+        mediumChapterIds: searchParams.chapterIds || [], // 중단원 필터 적용
         smallChapterIds: [],
         topicChapterIds: [],
         questionFormCode: searchParams.categories || [],
-        difficultyCode: searchParams.difficulties ? searchParams.difficulties.map(d => parseInt(d)) : [],
+        difficultyCode: searchParams.difficulties ? searchParams.difficulties.map(d => {
+          // 문자열을 정수로 변환
+          const val = parseInt(d)
+          return isNaN(val) ? d : val
+        }) : [],
         keyword: searchParams.keyword || '',
         page: searchParams.page || 0,
         size: searchParams.size || 20,
@@ -97,6 +101,69 @@ class ItemApiService {
         success: false,
         error: error.response?.data?.message || error.message || 'Failed to load item details',
         data: null
+      }
+    }
+  }
+
+  /**
+   * Get item counts by subject IDs
+   * @param {Array<number>} subjectIds - List of subject IDs
+   * @returns {Promise<Object>} Item counts mapped by subject ID
+   */
+  async getItemCountsBySubjects(subjectIds) {
+    try {
+      const response = await api.post('/items/count/subjects', subjectIds)
+
+      if (response.data.success) {
+        return {
+          success: true,
+          data: response.data.data
+        }
+      }
+
+      throw new Error(response.data.message || 'Failed to fetch subject item counts')
+    } catch (error) {
+      console.error('Get subject item counts error:', error)
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to load subject item counts',
+        data: {}
+      }
+    }
+  }
+
+  /**
+   * Get item counts by chapters
+   * @param {number} subjectId - Subject ID
+   * @param {Array<number>} chapterIds - List of chapter IDs
+   * @returns {Promise<Object>} Item counts mapped by chapter ID
+   */
+  async getItemCountsByChapters(subjectId, chapterIds) {
+    try {
+      const response = await api.get('/items/count/chapters', {
+        params: {
+          subjectId,
+          chapterIds: chapterIds
+        },
+        paramsSerializer: {
+          indexes: null // 배열 파라미터를 chapterIds=1&chapterIds=2 형식으로 직렬화
+        }
+      })
+
+      if (response.data.success) {
+        return {
+          success: true,
+          data: response.data.data
+        }
+      }
+
+      throw new Error(response.data.message || 'Failed to fetch chapter item counts')
+    } catch (error) {
+      console.error('Get chapter item counts error:', error)
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Failed to load chapter item counts',
+        data: {}
       }
     }
   }
@@ -398,6 +465,8 @@ export const {
   searchItems,
   getItemDetail,
   getChapterCounts,
+  getItemCountsBySubjects,
+  getItemCountsByChapters,
   getSimilarItems,
   getSubjects,
   getTextbooks,

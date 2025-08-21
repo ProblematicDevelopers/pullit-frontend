@@ -1,5 +1,28 @@
 <template>
   <div class="report-list-container">
+    <!-- 탭 헤더 -->
+    <nav class="tabs" role="tablist" aria-label="시험 상태 탭">
+      <button
+        class="tab-btn"
+        :class="{ active: currentTab === 'completed' }"
+        role="tab"
+        aria-selected="currentTab === 'completed'"
+        @click="currentTab = 'completed'"
+      >
+        완료한 시험
+      </button>
+
+      <button
+        class="tab-btn"
+        :class="{ active: currentTab === 'in-progress' }"
+        role="tab"
+        aria-selected="currentTab === 'in-progress'"
+        @click="currentTab = 'in-progress'"
+      >
+        진행중인 시험
+      </button>
+    </nav>
+
     <!-- 검색 및 필터 영역 -->
     <div class="search-filter-section">
       <div class="search-box">
@@ -49,12 +72,27 @@
         >
           사회
         </button>
+        <button
+          @click="setFilter('역사')"
+          :class="['filter-btn', { active: currentFilter === '역사' }]"
+        >
+          역사
+        </button>
+        <button
+          @click="setFilter('도덕')"
+          :class="['filter-btn', { active: currentFilter === '도덕' }]"
+        >
+          도덕
+        </button>
       </div>
     </div>
 
     <!-- 결과 개수 표시 -->
     <div class="result-info">
-      <span>총 {{ filteredItems.length }}개의 시험</span>
+      <span
+        >{{ currentTab === 'completed' ? '완료한' : '진행중인' }} 시험
+        {{ filteredItems.length }}개</span
+      >
     </div>
 
     <div
@@ -71,7 +109,11 @@
           <span class="sub">{{ item.grade }} 사용 {{ item.usage }}회</span>
         </div>
       </div>
-      <div class="right"><a @click.stop="goToReport(item.id, item.attemptId)">자세히 보기</a></div>
+      <div class="right">
+        <a @click.stop="goToReport(item.id, item.attemptId)">
+          {{ currentTab === 'in-progress' ? '이어서 보기' : '자세히 보기' }}
+        </a>
+      </div>
     </div>
 
     <!-- 페이지네이션 -->
@@ -100,133 +142,43 @@
 </template>
 
 <script>
-import examApi from '@/services/examApi.js'
+import reportApi from '@/services/reportApi.js'
 
 export default {
   name: 'ReportList',
   components: 'BasicReport',
   data() {
     return {
-      items: [
-        {
-          id: 1,
-          attemptId: 101,
-          userId: 1,
-          subject: '수학',
-          title: '2024년 1학기 중간고사',
-          grade: '고등학교 1학년',
-          usage: 1,
-          status: 'completed',
-          score: 17,
-          totalQuestions: 20,
-          type: 'exam',
-        },
-        {
-          id: 2,
-          attemptId: 102,
-          userId: 1,
-          subject: '영어',
-          title: '2024년 1학기 중간고사',
-          grade: '고등학교 1학년',
-          usage: 2,
-          status: 'completed',
-          score: 23,
-          totalQuestions: 25,
-          type: 'exam',
-        },
-        {
-          id: 3,
-          attemptId: null,
-          userId: 1,
-          subject: '과학',
-          title: '2024년 1학기 중간고사',
-          grade: '고등학교 1학년',
-          usage: 0,
-          status: 'not_started',
-          score: null,
-          totalQuestions: 30,
-          type: 'cbt',
-        },
-        {
-          id: 4,
-          attemptId: 104,
-          userId: 1,
-          subject: '국어',
-          title: '2024년 1학기 중간고사',
-          grade: '고등학교 1학년',
-          usage: 1,
-          status: 'completed',
-          score: 17,
-          totalQuestions: 22,
-          type: 'exam',
-        },
-        {
-          id: 5,
-          attemptId: null,
-          userId: 1,
-          subject: '사회',
-          title: '2024년 1학기 중간고사',
-          grade: '고등학교 1학년',
-          usage: 0,
-          status: 'not_started',
-          score: null,
-          totalQuestions: 28,
-          type: 'cbt',
-        },
-        {
-          id: 6,
-          attemptId: 106,
-          userId: 1,
-          subject: '수학',
-          title: '2024년 1학기 기말고사',
-          grade: '고등학교 1학년',
-          usage: 1,
-          status: 'completed',
-          score: 22,
-          totalQuestions: 25,
-          type: 'exam',
-        },
-        {
-          id: 7,
-          attemptId: 104,
-          userId: 1,
-          subject: '영어',
-          title: '2024년 1학기 기말고사',
-          grade: '고등학교 1학년',
-          usage: 1,
-          status: 'completed',
-          score: 28,
-          totalQuestions: 30,
-          type: 'exam',
-        },
-        {
-          id: 8,
-          attemptId: null,
-          userId: 1,
-          subject: '과학',
-          title: '2024년 1학기 기말고사',
-          grade: '고등학교 1학년',
-          usage: 0,
-          status: 'not_started',
-          score: null,
-          totalQuestions: 35,
-          type: 'cbt',
-        },
-      ],
+      items: [],
       loading: false,
       error: null,
       currentPage: 1,
       itemsPerPage: 5,
       searchQuery: '',
       currentFilter: 'all',
+      currentTab: 'completed', // 기본값은 완료한 시험
     }
   },
-  mounted() {
-    // 더미데이터 사용으로 API 호출 제거
+  async mounted() {
+    await this.fetchStudentExams()
   },
   computed: {
     filteredItems() {
       let filtered = this.items
+
+      // 탭에 따른 상태 필터링
+      if (this.currentTab === 'completed') {
+        filtered = filtered.filter((item) => item.status === 'completed' || item.status === 'DONE')
+      } else if (this.currentTab === 'in-progress') {
+        filtered = filtered.filter(
+          (item) =>
+            item.status === 'in-progress' ||
+            item.status === 'IN_PROGRESS' ||
+            item.status === 'PROGRESS' ||
+            item.status === 'started' ||
+            item.status === 'STARTED',
+        )
+      }
 
       // 과목 필터링
       if (this.currentFilter !== 'all') {
@@ -291,71 +243,50 @@ export default {
     async fetchStudentExams() {
       this.loading = true
       try {
-        // localStorage에서 userInfo 가져오기
-        const userInfoStr = localStorage.getItem('userInfo')
-        const userInfo = userInfoStr ? JSON.parse(userInfoStr) : null
+        // 모든 과목별로 시험 목록 가져오기 (다양한 형태 시도)
+        const subjects = ['MA', 'EN', 'KO', 'SC', 'SO', 'HS', 'MO']
+        // 만약 위가 안 되면 아래 중 하나를 시도해보세요:
+        // const subjects = ['math', 'english', 'korean', 'science', 'social', 'history', 'moral']
+        // const subjects = ['MATH', 'ENGLISH', 'KOREAN', 'SCIENCE', 'SOCIAL', 'HISTORY', 'MORAL']
+        // const subjects = ['1', '2', '3', '4', '5', '6', '7'] // 숫자 코드
+        let allExams = []
 
-        if (userInfo?.id) {
-          let allExams = []
-
-          // 1. 해당 학생의 시험 목록 가져오기 (exams)
+        for (const subject of subjects) {
           try {
-            const examResponse = await examApi.get(`/student/${userInfo.id}/exams`)
-            const examData = examResponse.data?.data || examResponse.data || []
+            const response = await reportApi.getAttemptList(subject)
+            const examData = response.data?.data || response.data || []
+
             allExams = allExams.concat(
               examData.map((exam) => ({
-                id: exam.id,
-                attemptId: exam.attemptId || exam.attempt_id,
-                userId: exam.userId || userInfo.id,
-                subject: exam.subject,
-                title: exam.title,
+                id: exam.examId || exam.id, // examId를 우선 사용
+                attemptId: exam.attemptId || exam.attempt_id || exam.id,
+                userId: exam.userId,
+                subject: this.getSubjectName(subject),
+                title: exam.examName || exam.title || exam.examTitle || exam.exam_name,
                 grade: exam.grade,
-                usage: exam.attemptCount || 0,
-                status: exam.status, // 'completed', 'in_progress', 'not_started'
-                score: exam.score,
-                totalQuestions: exam.totalQuestions,
+                usage: exam.attemptCount || 1,
+                status: exam.status || 'completed',
+                score: exam.score || exam.correctAnswers,
+                totalQuestions: exam.totalQuestions || exam.questionCount,
                 type: 'exam',
               })),
             )
-          } catch (examError) {
-            console.error('시험 목록 조회 실패:', examError)
+          } catch (error) {
+            console.error(`${subject} 과목 조회 실패:`, error)
           }
-
-          // 2. CBT 시험지 목록도 가져오기
-          try {
-            const cbtResponse = await examApi.getCBTList()
-            const cbtData = cbtResponse.data?.data || cbtResponse.data || []
-            allExams = allExams.concat(
-              cbtData.map((cbt) => ({
-                id: cbt.id,
-                attemptId: null, // CBT는 아직 시도하지 않았을 수 있음
-                userId: userInfo.id,
-                subject: cbt.subject,
-                title: cbt.title,
-                grade: cbt.grade,
-                usage: 0, // 아직 시도하지 않음
-                status: 'not_started',
-                score: null,
-                totalQuestions: cbt.totalQuestions,
-                type: 'cbt',
-              })),
-            )
-          } catch (cbtError) {
-            console.error('CBT 목록 조회 실패:', cbtError)
-          }
-
-          // 3. 중복 제거 및 정렬 (최신순)
-          const uniqueExams = allExams.filter(
-            (exam, index, self) => index === self.findIndex((e) => e.id === exam.id),
-          )
-
-          this.items = uniqueExams.sort((a, b) => {
-            // 완료된 시험을 먼저, 그 다음 최신순
-            if (a.status === 'completed' && b.status !== 'completed') return -1
-            if (a.status !== 'completed' && b.status === 'completed') return 1
-            return b.id - a.id
-          })
         }
+
+        // 중복 제거 및 정렬 (최신순)
+        const uniqueExams = allExams.filter(
+          (exam, index, self) => index === self.findIndex((e) => e.id === exam.id),
+        )
+
+        this.items = uniqueExams.sort((a, b) => {
+          // 완료된 시험을 먼저, 그 다음 최신순
+          if (a.status === 'completed' && b.status !== 'completed') return -1
+          if (a.status !== 'completed' && b.status === 'completed') return 1
+          return b.id - a.id
+        })
       } catch (error) {
         console.error('시험 목록을 가져오는데 실패했습니다:', error)
         this.error = '시험 목록을 불러올 수 없습니다.'
@@ -364,11 +295,93 @@ export default {
         this.loading = false
       }
     },
+
+    // 과목 코드를 한글 이름으로 변환
+    getSubjectName(areaCode) {
+      const subjectMap = {
+        MATH: '수학',
+        ENGLISH: '영어',
+        KOREAN: '국어',
+        SCIENCE: '과학',
+        SOCIAL: '사회',
+        HISTORY: '역사',
+        MORAL: '도덕',
+        math: '수학',
+        english: '영어',
+        korean: '국어',
+        science: '과학',
+        social: '사회',
+        history: '역사',
+        moral: '도덕',
+        MA: '수학',
+        EN: '영어',
+        KO: '국어',
+        SC: '과학',
+        SO: '사회',
+        HS: '역사',
+        MO: '도덕',
+        1: '수학',
+        2: '영어',
+        3: '국어',
+        4: '과학',
+        5: '사회',
+        6: '역사',
+        7: '도덕',
+      }
+      return subjectMap[areaCode] || areaCode
+    },
     goToReport(id, attemptId) {
-      this.$router.push({
-        name: 'student.basicReport',
-        params: { id: id, attemptId: attemptId },
-      })
+      if (this.currentTab === 'in-progress') {
+        // 진행중인 시험은 팝업창으로 시험지 열기
+        const examUrl = `/student/cbt/exam/${id}` // CBT 시험지 URL
+
+        // 전체화면 팝업창 설정
+        const popupFeatures = [
+          'width=' + screen.width,
+          'height=' + screen.height,
+          'left=0',
+          'top=0',
+          'scrollbars=yes',
+          'resizable=yes',
+          'toolbar=no',
+          'menubar=no',
+          'location=no',
+          'status=no',
+          'directories=no',
+          'fullscreen=yes',
+          'channelmode=yes',
+        ].join(',')
+
+        const popup = window.open(examUrl, '_blank', popupFeatures)
+
+        // 팝업창이 열린 후 전체화면 모드로 전환 시도
+        if (popup) {
+          popup.onload = function () {
+            try {
+              // 전체화면 모드로 전환 시도
+              if (popup.document.documentElement.requestFullscreen) {
+                popup.document.documentElement.requestFullscreen()
+              } else if (popup.document.documentElement.webkitRequestFullscreen) {
+                popup.document.documentElement.webkitRequestFullscreen()
+              } else if (popup.document.documentElement.msRequestFullscreen) {
+                popup.document.documentElement.msRequestFullscreen()
+              }
+            } catch (e) {
+              console.log('전체화면 모드 전환 실패:', e)
+            }
+          }
+        }
+
+        if (!popup) {
+          alert('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.')
+        }
+      } else {
+        // 완료한 시험은 기존 방식대로 리포트 페이지로 이동
+        this.$router.push({
+          name: 'student.basicReport',
+          params: { id: attemptId || id },
+        })
+      }
     },
     goToPage(page) {
       if (page !== '...' && page >= 1 && page <= this.totalPages) {
@@ -392,6 +405,11 @@ export default {
     clearSearch() {
       this.searchQuery = ''
       this.currentPage = 1
+    },
+  },
+  watch: {
+    currentTab() {
+      this.currentPage = 1 // 탭 변경 시 첫 페이지로 이동
     },
   },
 }
@@ -596,5 +614,53 @@ export default {
   margin-bottom: 20px;
   color: #666;
   font-size: 14px;
+}
+
+/* 탭 스타일 */
+.tabs {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  margin: 40px 0 28px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  position: relative;
+  background: white;
+  border: 1px solid #d3d3d3;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  border-radius: 20px;
+  transition: all 0.2s ease;
+}
+
+.tab-btn.inactive {
+  color: #333;
+  background: white;
+}
+
+.tab-btn.active {
+  background: #3b6cff;
+  color: white;
+  border-color: #3b6cff;
+}
+
+.tab-btn:hover {
+  border-color: #3b6cff;
+  background: #f8f9ff;
+}
+
+.tab-btn.active:hover {
+  background: #3b6cff;
+  color: white;
+}
+
+.underline {
+  display: none;
 }
 </style>
