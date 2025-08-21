@@ -1,8 +1,6 @@
 // src/stores/subject.js
 import { defineStore } from 'pinia'
-import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL // 환경변수 권장
+import api from '@/services/api.js'
 
 export const useSubjectStore = defineStore
 ('subject', {
@@ -25,7 +23,7 @@ export const useSubjectStore = defineStore
       this.clearState()
       this.loading = true
       try {
-        const { data } = await axios.get(`${API_BASE_URL}/subject`)
+        const { data } = await api.get('/subject')
         this.list = data.data;
         this.lastFetchedAt = Date.now()
       } catch (e) {
