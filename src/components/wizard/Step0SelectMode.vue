@@ -1,8 +1,8 @@
 <!--
   Step 0: 시험지 모드 선택 컴포넌트 (대용량 데이터 최적화 버전)
-  
+
   1100개의 시험지 데이터를 효과적으로 탐색할 수 있도록 설계된 UI
-  
+
   주요 기능:
   - 검색 중심 인터페이스
   - 계층적 필터링 시스템
@@ -27,7 +27,7 @@
           </button>
         </div>
       </div>
-      
+
       <!-- 검색 및 필터 영역 -->
       <div class="search-row">
         <!-- 메인 검색창 -->
@@ -35,7 +35,7 @@
           <svg class="search-icon" width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
-          <input 
+          <input
             type="text"
             v-model="searchQuery"
             placeholder="시험지명, 과목, 단원 검색"
@@ -43,13 +43,13 @@
             @input="handleSearchWithDebounce"
             @focus="showSuggestions = true"
           >
-          
+
           <!-- 자동완성 드롭다운 -->
-          <div v-if="showSuggestions && (searchSuggestions.length > 0 || recentSearches.length > 0)" 
+          <div v-if="showSuggestions && (searchSuggestions.length > 0 || recentSearches.length > 0)"
                class="search-suggestions">
             <div v-if="searchQuery && searchSuggestions.length > 0">
               <div class="suggestion-label">검색 제안</div>
-              <div v-for="suggestion in searchSuggestions" 
+              <div v-for="suggestion in searchSuggestions"
                    :key="suggestion"
                    class="suggestion-item"
                    @click="selectSuggestion(suggestion)">
@@ -61,7 +61,7 @@
             </div>
             <div v-else-if="!searchQuery && recentSearches.length > 0">
               <div class="suggestion-label">최근 검색</div>
-              <div v-for="recent in recentSearches" 
+              <div v-for="recent in recentSearches"
                    :key="recent"
                    class="suggestion-item"
                    @click="selectSuggestion(recent)">
@@ -76,7 +76,7 @@
 
         <!-- 빠른 필터 칩들 -->
         <div class="quick-filters">
-          <button 
+          <button
             v-for="filter in quickFilters"
             :key="filter.id"
             class="filter-chip"
@@ -144,10 +144,10 @@
           </h4>
           <div class="filter-options">
             <label class="checkbox-item" v-for="textbook in availableTextbooks" :key="`textbook-${textbook.id}`">
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 :id="`textbook-checkbox-${textbook.id}`"
-                v-model="filters.textbooks" 
+                v-model="filters.textbooks"
                 :value="textbook.id">
               <span>{{ textbook.name }}</span>
               <span class="count">{{ textbook.count || 0 }}</span>
@@ -165,8 +165,8 @@
           </h4>
           <div class="filter-options">
             <label v-for="(chapter, index) in availableChapters" :key="`chapter-${index}-${chapter.id}`" class="checkbox-item">
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 :id="`chapter-checkbox-${index}-${chapter.id}`"
                 :name="`chapter-checkbox-${index}`"
                 :checked="filters.chapters.includes(String(chapter.code || chapter.id))"
@@ -257,7 +257,9 @@
               <button class="view-all">전체보기 →</button>
             </div>
             <div class="exam-cards">
-              <div v-for="exam in recentExams" :key="exam.id" class="exam-card" @click="selectExam(exam)">
+              <div v-for="exam in recentExams" :key="exam.id"
+                   :class="['exam-card', { 'selected': selectedExamId === exam.id }]"
+                   @click="selectExam(exam)">
                 <div class="exam-badge">{{ getSubjectName(exam.subject) }}</div>
                 <h4 class="exam-title">{{ exam.title }}</h4>
                 <div class="exam-meta">
@@ -363,15 +365,17 @@
           </div>
 
           <!-- 검색 결과 목록 (가상 스크롤) -->
-          <div v-else 
+          <div v-else
                ref="scrollContainer"
                class="results-container"
                :class="{ 'card-view': viewMode === 'card', 'list-view': viewMode === 'list' }"
                @scroll="handleScroll">
-            
+
             <!-- 카드 뷰 -->
             <div v-if="viewMode === 'card'" class="results-grid">
-              <div v-for="exam in visibleExams" :key="exam.id" class="result-card" @click="selectExam(exam)">
+              <div v-for="exam in visibleExams" :key="exam.id"
+                   :class="['result-card', { 'selected': selectedExamId === exam.id }]"
+                   @click="selectExam(exam)">
                 <div class="card-header">
                   <span class="subject-badge" :class="`subject-${exam.subject}`">
                     {{ getSubjectName(exam.subject) }}
@@ -487,26 +491,7 @@
         </button>
       </div>
     </div>
-    
-    <!-- 선택한 시험지 하단 패널 -->
-    <transition name="slide-up">
-      <div v-if="showSelectedExamPanel" class="selected-exam-panel">
-        <div class="panel-content">
-          <div class="panel-info">
-            <h3>선택한 시험지</h3>
-            <p class="exam-name">{{ selectedExamName }}</p>
-          </div>
-          <div class="panel-actions">
-            <button class="btn btn-secondary" @click="showSelectedExamPanel = false">
-              취소
-            </button>
-            <button class="btn btn-primary" @click="proceedWithSelectedExam">
-              이 시험지로 하기
-            </button>
-          </div>
-        </div>
-      </div>
-    </transition>
+
   </div>
 </template>
 
@@ -585,7 +570,6 @@ const selectedExamId = ref(null)
 const selectedExamName = ref('')
 const selectedExamObject = ref(null) // 선택한 exam 객체 전체 저장
 const isCreatingNew = ref(false)
-const showSelectedExamPanel = ref(false)
 const popularFilter = ref('week')
 
 // 추천 시험지 데이터 (임시)
@@ -692,22 +676,22 @@ const handleSearchWithDebounce = (() => {
 const performSearch = async () => {
   console.log('===== performSearch 시작 =====')
   console.log('현재 filters.grades:', filters.grades)
-  
+
   // 검색어와 필터가 모두 없을 때는 전체 검색
   const isEmptySearch = !searchQuery.value && !hasActiveFilters.value
-  
+
   // 초기화
   searchResults.value = []
   visibleExams.value = []
 
   isLoading.value = true
   currentPage.value = 0  // 0부터 시작
-  
+
   try {
     // 검색 파라미터 준비 - 여러 과목 선택 지원
     const gradeCodeValue = filters.grades.length > 0 ? filters.grades.join(',') : null
     console.log('gradeCode 계산 결과:', gradeCodeValue)
-    
+
     const searchParams = {
       keyword: searchQuery.value,
       gradeCode: gradeCodeValue,
@@ -720,7 +704,7 @@ const performSearch = async () => {
       size: pageSize,
       examType: 'ALL'
     }
-    
+
     // 디버깅용 로그
     console.log('=== 시험지 검색 시작 ===')
     console.log('검색 파라미터:', searchParams)
@@ -731,21 +715,21 @@ const performSearch = async () => {
       gradeCode: searchParams.gradeCode,
       전체필터: JSON.stringify(filters)
     })
-    
+
     // API 호출
     const result = await store.searchExams(searchParams)
-    
+
     console.log('API 응답 결과:', result)
     console.log('응답 content 개수:', result?.content?.length || 0)
     console.log('총 개수:', result?.totalElements || 0)
-    
+
     if (result && result.content && Array.isArray(result.content)) {
       searchResults.value = transformSearchResults(result.content)
       visibleExams.value = [...searchResults.value]  // 첫 페이지 전체 표시
       totalCount.value = result.totalElements || 0
       hasMore.value = result.totalPages > 1  // 다음 페이지 존재 여부
       currentPage.value = 1  // 다음 로드를 위해 1로 설정
-      
+
       console.log('변환된 검색 결과:', searchResults.value.slice(0, 3)) // 처음 3개만 로그
     } else {
       console.warn('검색 결과가 없거나 형식이 잘못됨:', result)
@@ -753,7 +737,7 @@ const performSearch = async () => {
       visibleExams.value = []
       totalCount.value = 0
     }
-    
+
     // 검색 제안 업데이트
     if (searchQuery.value) {
       searchSuggestions.value = [
@@ -775,7 +759,7 @@ const performSearch = async () => {
 const handleScroll = (event) => {
   const container = event.target
   const scrollPercentage = (container.scrollTop + container.clientHeight) / container.scrollHeight
-  
+
   if (scrollPercentage > 0.9 && !isLoadingMore.value && hasMore.value) {
     loadMoreExams()
   }
@@ -783,9 +767,9 @@ const handleScroll = (event) => {
 
 const loadMoreExams = async () => {
   if (isLoadingMore.value || !hasMore.value) return
-  
+
   isLoadingMore.value = true
-  
+
   try {
     // 다음 페이지 데이터를 서버에서 가져오기
     const searchParams = {
@@ -799,20 +783,20 @@ const loadMoreExams = async () => {
       includeSystemExams: true,
       includeUserExams: true
     }
-    
+
     console.log('더 많은 시험지 로드 중... 페이지:', currentPage.value + 1)
-    
+
     const result = await store.searchExams(searchParams)
-    
+
     if (result && result.content) {
       const newExams = transformSearchResults(result.content)
       visibleExams.value.push(...newExams)
       searchResults.value.push(...newExams)
-      
+
       // 다음 페이지 여부 확인
       hasMore.value = currentPage.value < result.totalPages - 1
       currentPage.value++
-      
+
       console.log(`추가 로드 완료: ${newExams.length}개, 전체: ${visibleExams.value.length}개`)
     }
   } catch (error) {
@@ -844,10 +828,10 @@ const toggleChapter = (chapterId) => {
 // 과목 필터 변경 이벤트 핸들러
 const onSubjectFilterChange = async () => {
   console.log('과목 필터 변경됨:', filters.subjects)
-  
+
   // 교과서 목록 로드
   await loadTextbooksForSubject()
-  
+
   // 검색 수행
   console.log('과목 변경으로 검색 시작')
   performSearch()
@@ -860,16 +844,16 @@ const loadTextbooksForSubject = async () => {
       availableTextbooks.value = []
       return
     }
-    
+
     console.log('선택된 과목의 교과서 목록 로드 중...', filters.subjects)
-    
+
     // 선택된 학년과 과목 코드
     const gradeCode = filters.grades.length > 0 ? filters.grades[0] : null
     const areaCode = filters.subjects[0] // 첫 번째 과목 코드
-    
+
     // store의 fetchTextbooks 함수 사용
     const textbooks = await store.fetchTextbooks(gradeCode, areaCode)
-    
+
     // 각 교과서별 시험지 개수 조회
     const textbooksWithCount = await Promise.all(textbooks.map(async t => {
       try {
@@ -881,7 +865,7 @@ const loadTextbooksForSubject = async () => {
           }
         })
         const count = countResponse.data.totalCount || 0
-        
+
         return {
           id: t.subjectId,
           code: t.subjectId,
@@ -902,7 +886,7 @@ const loadTextbooksForSubject = async () => {
         }
       }
     }))
-    
+
     availableTextbooks.value = textbooksWithCount
     console.log('교과서 목록 로드 완료 (카운트 포함):', availableTextbooks.value)
   } catch (error) {
@@ -923,24 +907,24 @@ const loadChaptersForFilters = async () => {
   try {
     // 선택된 첫 번째 교과서 ID
     const subjectId = filters.textbooks[0]
-    
+
     console.log(`대단원 로드 중... 교과서 ID: ${subjectId}`)
-    
+
     // store의 fetchChapters 함수 사용
     const chapters = await store.fetchChapters(subjectId)
-    
+
     if (chapters && chapters.length > 0) {
       console.log(`대단원 로드 성공:`, chapters)
-      
+
       // API 응답이 LargeNode 형식 (id, name, children)
       // 각 대단원별로 시험지 개수 조회
       const chaptersWithCount = []
-      
+
       for (const largeChapter of chapters) {
         // LargeNode 구조: { id: Long, name: String, children: [] }
         const chapterCode = String(largeChapter.id)
         const chapterName = largeChapter.name
-        
+
         // 각 대단원별 시험지 개수를 개별 조회
         try {
           const countResponse = await axios.get(`${API_BASE_URL}/api/exams/count`, {
@@ -951,10 +935,10 @@ const loadChaptersForFilters = async () => {
               areaCode: filters.subjects.length > 0 ? filters.subjects[0] : null
             }
           })
-          
+
           const count = countResponse.data.totalCount || 0
           console.log(`대단원 "${chapterName}" (코드: ${chapterCode}): ${count}개 시험지`)
-          
+
           chaptersWithCount.push({
             id: chapterCode,
             code: chapterCode,
@@ -971,7 +955,7 @@ const loadChaptersForFilters = async () => {
           })
         }
       }
-      
+
       availableChapters.value = chaptersWithCount
       console.log('대단원 로드 완료 (카운트 포함):', availableChapters.value)
     } else {
@@ -1001,9 +985,9 @@ const onTextbookChange = () => {
 const toggleChapterSelection = (chapterCode) => {
   console.log('토글 전 chapters 배열:', [...filters.chapters])
   console.log('토글할 chapterCode:', chapterCode)
-  
+
   const index = filters.chapters.findIndex(code => code === chapterCode)
-  
+
   if (index > -1) {
     // 이미 선택되어 있으면 제거
     filters.chapters.splice(index, 1)
@@ -1013,9 +997,9 @@ const toggleChapterSelection = (chapterCode) => {
     filters.chapters.push(chapterCode)
     console.log(`대단원 ${chapterCode} 추가됨`)
   }
-  
+
   console.log('토글 후 chapters 배열:', [...filters.chapters])
-  
+
   // 강제로 Vue의 반응성 트리거
   filters.chapters = [...filters.chapters]
 }
@@ -1050,18 +1034,18 @@ const selectExam = async (exam) => {
   console.log('exam.areaCode:', exam.areaCode, 'exam.areaName:', exam.areaName)
   console.log('exam.gradeCode:', exam.gradeCode, 'exam.gradeName:', exam.gradeName)
   console.log('exam.examType:', exam.examType)
-  
+
   selectedExamId.value = exam.id
   selectedExamName.value = exam.title || exam.examName
   selectedExamObject.value = exam // exam 객체 전체 저장
   store.setMode('edit')
   store.setSelectedExam(exam)
-  
+
   // 해당 시험지의 문항 정보 로드
   try {
     // examType 확인 (없으면 기본값 TESTWIZARD)
     const examType = exam.examType || 'TESTWIZARD'
-    
+
     // USER_CREATED 타입은 아직 지원하지 않음
     if (examType === 'USER_CREATED') {
       alert('사용자가 생성한 시험지는 현재 편집 기능을 지원하지 않습니다.')
@@ -1075,16 +1059,15 @@ const selectExam = async (exam) => {
     console.error('기존 문항 로드 실패:', error)
     // 로드 실패해도 계속 진행 (빈 문항으로 시작)
   }
-  
-  // 하단 패널 표시 (바로 이동하지 않고 사용자가 선택)
-  showSelectedExamPanel.value = true
+
+  // 선택만 하고 다음 단계로 진행하지 않음
 }
 
 const editExam = async (exam) => {
   await selectExam(exam)
-  proceedToNext()
 }
 
+// 선택된 시험지로 진행하는 함수
 const proceedWithSelectedExam = () => {
   if (selectedExamId.value && selectedExamObject.value) {
     // exam 객체 전체를 emit - TestWizardView에서 examInfo를 설정하기 위해
@@ -1141,12 +1124,12 @@ const formatDate = (date) => {
   const d = new Date(date)
   const now = new Date()
   const diff = Math.floor((now - d) / (1000 * 60 * 60 * 24))
-  
+
   if (diff === 0) return '오늘'
   if (diff === 1) return '어제'
   if (diff < 7) return `${diff}일 전`
   if (diff < 30) return `${Math.floor(diff / 7)}주 전`
-  
+
   return `${d.getFullYear()}.${String(d.getMonth() + 1).padStart(2, '0')}.${String(d.getDate()).padStart(2, '0')}`
 }
 
@@ -1160,10 +1143,10 @@ const loadAccessibleExams = async () => {
       examType: 'ALL',
       sort: 'createdDate,desc'
     }
-    
+
     console.log('초기 시험지 목록 로드 중...')
     const result = await store.searchExams(searchParams)
-    
+
     if (result && result.content) {
       // 검색 결과를 searchResults와 visibleExams에 설정
       searchResults.value = transformSearchResults(result.content)
@@ -1171,12 +1154,12 @@ const loadAccessibleExams = async () => {
       totalCount.value = result.totalElements || 0
       hasMore.value = result.totalPages > 1
       currentPage.value = 1  // 다음 페이지 로드를 위해 1로 설정
-      
+
       // 최근 시험지도 동일한 데이터로 설정
       recentExams.value = searchResults.value.slice(0, 10)
-      
+
       console.log(`초기 시험지 ${result.content.length}개 로드 완료, 전체: ${result.totalElements}개`)
-      
+
       // 빠른 필터 업데이트
       const myExamFilter = quickFilters.value.find(f => f.id === 2)
       if (myExamFilter) {
@@ -1201,28 +1184,28 @@ const loadStatistics = async () => {
       includeSystemExams: true,
       includeUserExams: true
     })
-    
+
     if (allExamsResult) {
       totalExamCount.value = allExamsResult.totalElements || 0
     }
-    
+
     // 공개 시험지 수 조회
     const publicExamsResult = await store.searchExams({
       page: 0,
       size: 1,
       visibility: 'public'
     })
-    
+
     if (publicExamsResult) {
       publicExamCount.value = publicExamsResult.totalElements || 0
-      
+
       // 빠른 필터 업데이트
       const publicFilter = quickFilters.value.find(f => f.id === 4)
       if (publicFilter) {
         publicFilter.count = publicExamsResult.totalElements || 0
       }
     }
-    
+
     // 각 과목별 시험지 수 조회 - count API 사용
     console.log('=== 과목별 통계 로드 시작 ===')
     for (const subject of subjects.value) {
@@ -1230,7 +1213,7 @@ const loadStatistics = async () => {
         const response = await examApi.getExamCounts({
           areaCode: subject.code  // subject.id가 아니라 subject.code 사용
         })
-        
+
         if (response.data) {
           // API 응답에서 직접 카운트 추출
           subject.count = response.data.totalCount || 0
@@ -1246,7 +1229,7 @@ const loadStatistics = async () => {
             size: 1,
             examType: 'ALL'
           })
-          
+
           if (result) {
             subject.count = result.totalElements || 0
             console.log(`${subject.name} (${subject.code}): ${subject.count}개 (폴백)`)
@@ -1256,16 +1239,16 @@ const loadStatistics = async () => {
         }
       }
     }
-    
+
     // 필터 옵션에서 학교급별 통계 업데이트 (schoolLevels 제거)
     console.log('통계 로드 완료 - 중학교 과목별 통계 집계 완료')
-    
+
     // 최근 업데이트 시험지 수 (임시로 전체의 일부로 설정)
     const recentFilter = quickFilters.value.find(f => f.id === 1)
     if (recentFilter) {
       recentFilter.count = Math.floor(totalExamCount.value * 0.15) // 임시로 15%
     }
-    
+
     // 우리 학교 시험지 수 (임시로 설정)
     const schoolFilter = quickFilters.value.find(f => f.id === 3)
     if (schoolFilter) {
@@ -1298,7 +1281,7 @@ const transformSearchResults = (exams) => {
 const getGradeCode = (gradeName) => {
   const gradeMap = {
     '중1': '07',
-    '중2': '08', 
+    '중2': '08',
     '중3': '09'
   }
   return gradeMap[gradeName] || ''
@@ -1319,15 +1302,15 @@ const loadPopularExams = async () => {
 // Lifecycle
 onMounted(async () => {
   document.addEventListener('click', handleClickOutside)
-  
+
   // 필터 옵션 로드
   try {
     await store.fetchFilterOptions()
     console.log('필터 옵션 로드 완료')
-    
+
     // store에서 가져온 데이터로 업데이트
     const filterOptions = store.filterOptions
-    
+
     if (filterOptions) {
       // 학년 데이터 업데이트
       if (filterOptions.grades && filterOptions.grades.length > 0) {
@@ -1337,8 +1320,8 @@ onMounted(async () => {
           count: grade.count || 0
         }))
       }
-      
-      // 과목 데이터 업데이트  
+
+      // 과목 데이터 업데이트
       if (filterOptions.subjects && filterOptions.subjects.length > 0) {
         subjects.value = filterOptions.subjects.map(subj => ({
           code: subj.code,
@@ -1346,7 +1329,7 @@ onMounted(async () => {
           count: subj.count || 0
         }))
       }
-      
+
       // 학기 데이터 업데이트
       if (filterOptions.terms && filterOptions.terms.length > 0) {
         terms.value = filterOptions.terms.map(term => ({
@@ -1355,20 +1338,20 @@ onMounted(async () => {
           count: term.count || 0
         }))
       }
-      
+
       console.log('필터 옵션 업데이트 완료:', {
         grades: grades.value.length,
         subjects: subjects.value.length,
         terms: terms.value.length
       })
     }
-    
+
     // 초기 시험지 목록 로드 (접근 가능한 시험지)
     await loadAccessibleExams()
-    
+
     // 인기 시험지 로드
     await loadPopularExams()
-    
+
     // 통계 데이터 로드
     await loadStatistics()
   } catch (error) {
@@ -1402,7 +1385,7 @@ watch(() => filters.grades, (newVal) => {
 // 2. 과목 변경 시 - 교과서 목록 로드
 watch(() => filters.subjects, async (newVal, oldVal) => {
   console.log('과목 필터 변경됨:', { 이전: oldVal, 현재: newVal })
-  
+
   if (newVal.length === 0) {
     // 과목 해제 시 하위 필터 초기화
     filters.textbooks = []
@@ -1415,7 +1398,7 @@ watch(() => filters.subjects, async (newVal, oldVal) => {
     console.log('과목 선택됨 - 교과서 로드 시작:', newVal)
     await loadTextbooksForSubject()
   }
-  
+
   console.log('과목 변경으로 인한 검색 시작')
   performSearch()
 }, { deep: true })
@@ -1964,6 +1947,7 @@ watch([() => filters.itemCount, () => filters.visibility], () => {
 }
 
 .exam-card {
+  position: relative;
   background: white;
   border: 1px solid #e1e4e8;
   border-radius: 6px;
@@ -1975,6 +1959,30 @@ watch([() => filters.itemCount, () => filters.visibility], () => {
 .exam-card:hover {
   border-color: #0366d6;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.exam-card.selected {
+  border-color: #0366d6;
+  border-width: 2px;
+  background-color: #f0f7ff;
+  box-shadow: 0 4px 12px rgba(3, 102, 214, 0.15);
+}
+
+.exam-card.selected::before {
+  content: '✓';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 24px;
+  height: 24px;
+  background: #0366d6;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
 }
 
 .exam-badge {
@@ -2263,6 +2271,7 @@ watch([() => filters.itemCount, () => filters.visibility], () => {
 }
 
 .result-card {
+  position: relative;
   background: white;
   border: 1px solid #e1e4e8;
   border-radius: 6px;
@@ -2274,6 +2283,30 @@ watch([() => filters.itemCount, () => filters.visibility], () => {
 .result-card:hover {
   border-color: #0366d6;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.result-card.selected {
+  border-color: #0366d6;
+  border-width: 2px;
+  background-color: #f0f7ff;
+  box-shadow: 0 4px 12px rgba(3, 102, 214, 0.15);
+}
+
+.result-card.selected::before {
+  content: '✓';
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 24px;
+  height: 24px;
+  background: #0366d6;
+  color: white;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 14px;
 }
 
 .card-header {
@@ -2532,98 +2565,18 @@ watch([() => filters.itemCount, () => filters.visibility], () => {
   .main-layout {
     flex-direction: column;
   }
-  
+
   .filter-sidebar {
     width: 100%;
     border-right: none;
     border-bottom: 1px solid #e1e4e8;
     max-height: 40vh;
   }
-  
+
   .exam-cards,
   .results-grid {
     grid-template-columns: 1fr;
   }
 }
 
-/* 선택한 시험지 하단 패널 */
-.selected-exam-panel {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  background: white;
-  border-top: 2px solid #3b82f6;
-  box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.1);
-  z-index: 1000;
-  padding: 1.5rem 2rem;
-}
-
-.panel-content {
-  max-width: 1200px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.panel-info h3 {
-  font-size: 0.875rem;
-  color: #6b7280;
-  margin-bottom: 0.25rem;
-  font-weight: 500;
-}
-
-.panel-info .exam-name {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #111827;
-  margin: 0;
-}
-
-.panel-actions {
-  display: flex;
-  gap: 1rem;
-}
-
-.panel-actions .btn {
-  padding: 0.75rem 1.5rem;
-  border-radius: 8px;
-  font-weight: 600;
-  font-size: 0.9375rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
-}
-
-.panel-actions .btn-secondary {
-  background: #f3f4f6;
-  color: #374151;
-}
-
-.panel-actions .btn-secondary:hover {
-  background: #e5e7eb;
-}
-
-.panel-actions .btn-primary {
-  background: #3b82f6;
-  color: white;
-}
-
-.panel-actions .btn-primary:hover {
-  background: #2563eb;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
-}
-
-/* 슬라이드 업 애니메이션 */
-.slide-up-enter-active,
-.slide-up-leave-active {
-  transition: transform 0.3s ease;
-}
-
-.slide-up-enter-from,
-.slide-up-leave-to {
-  transform: translateY(100%);
-}
 </style>

@@ -30,7 +30,7 @@
                 시험지 정보
               </h3>
             </div>
-            
+
             <div class="form-content">
               <div class="form-group">
                 <label class="form-label required">시험지 제목</label>
@@ -84,7 +84,7 @@
                 출력 설정
               </h3>
             </div>
-            
+
             <div class="setting-content">
               <label class="checkbox-item">
                 <input
@@ -94,7 +94,7 @@
                 />
                 <span class="checkbox-label">정답지 포함</span>
               </label>
-              
+
               <label class="checkbox-item">
                 <input
                   v-model="examData.shuffleQuestions"
@@ -112,6 +112,16 @@
                 />
                 <span class="checkbox-label">배점 표시</span>
               </label>
+
+              <div class="form-group" style="margin-top: 15px;">
+                <label class="form-label">페이지 레이아웃</label>
+                <select v-model="examData.layoutType" class="form-select">
+                  <option value="STANDARD">표준 (페이지당 4문제)</option>
+                  <option value="HALF_PAGE">반페이지 (페이지당 2문제)</option>
+                  <option value="SINGLE">한 페이지 한 문제</option>
+                  <option value="COMPACT">압축 (페이지당 6문제)</option>
+                </select>
+              </div>
             </div>
           </div>
 
@@ -123,7 +133,7 @@
                 공개 설정
               </h3>
             </div>
-            
+
             <div class="visibility-content">
               <label class="radio-item">
                 <input
@@ -134,7 +144,7 @@
                 />
                 <span class="radio-label">비공개</span>
               </label>
-              
+
               <label class="radio-item">
                 <input
                   v-model="examData.visibility"
@@ -159,85 +169,23 @@
         </div>
       </div>
 
-      <!-- 오른쪽 패널: 문항 미리보기 (60%) -->
+      <!-- 오른쪽 패널: PDF 미리보기/편집 (60%) -->
       <div class="right-panel">
-        <div class="preview-header">
-          <h3>선택된 문항 미리보기</h3>
-          <div class="preview-actions">
-            <button class="btn-action" @click="reorderItems">
-              <span class="icon">↕️</span> 순서 변경
-            </button>
-            <button class="btn-action" @click="previewPDF" disabled>
-              <span class="icon">👁️</span> PDF 미리보기 (준비중)
-            </button>
-          </div>
+        <div v-if="selectedItems.length === 0" class="empty-state">
+          <div class="empty-icon">📄</div>
+          <p>선택된 문항이 없습니다.</p>
+          <button class="btn-secondary" @click="goBackToStep2">
+            문항 선택하러 가기
+          </button>
         </div>
 
-        <div class="preview-content">
-          <div v-if="selectedItems.length === 0" class="empty-state">
-            <div class="empty-icon">📄</div>
-            <p>선택된 문항이 없습니다.</p>
-            <button class="btn-secondary" @click="goBackToStep2">
-              문항 선택하러 가기
-            </button>
-          </div>
-
-          <div v-else class="item-list">
-            <div
-              v-for="(item, index) in displayItems"
-              :key="item.itemId"
-              class="item-card"
-            >
-              <div class="item-header">
-                <span class="item-number">{{ index + 1 }}</span>
-                <div class="item-badges">
-                  <span :class="['badge', `badge-${getDifficultyClass(item.difficulty)}`]">
-                    {{ item.difficulty?.name || '중' }}
-                  </span>
-                  <span class="badge badge-type">
-                    {{ item.questionForm?.name || '객관식' }}
-                  </span>
-                  <span v-if="examData.showPoints" class="badge badge-points">
-                    {{ item.points || 5 }}점
-                  </span>
-                </div>
-              </div>
-              
-              <div class="item-content">
-                <div v-if="item.questionImageUrl" class="item-image">
-                  <img :src="item.questionImageUrl" :alt="`문항 ${index + 1}`" />
-                </div>
-                <div v-else-if="item.questionHtml" class="item-text" v-html="item.questionHtml"></div>
-                <div v-else class="item-placeholder">
-                  문항 ID: {{ item.itemId }}
-                </div>
-              </div>
-            </div>
-
-            <!-- 더보기 버튼 -->
-            <div v-if="selectedItems.length > 5 && !showAllItems" class="show-more">
-              <button class="btn-secondary" @click="showAllItems = true">
-                나머지 {{ selectedItems.length - 5 }}개 문항 더보기
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 하단 요약 정보 -->
-        <div class="preview-summary">
-          <div class="summary-item">
-            <span class="label">총 문항수:</span>
-            <span class="value">{{ selectedItems.length }}개</span>
-          </div>
-          <div class="summary-item">
-            <span class="label">예상 시간:</span>
-            <span class="value">{{ estimatedTime }}분</span>
-          </div>
-          <div class="summary-item">
-            <span class="label">총 배점:</span>
-            <span class="value">{{ totalPoints }}점</span>
-          </div>
-        </div>
+        <SimplePdfViewer
+          v-else
+          :questions="transformedQuestions"
+          :exam-data="pdfExamData"
+          @generate="handlePdfGenerate"
+          @save="handlePdfSave"
+        />
       </div>
     </div>
 
@@ -249,12 +197,12 @@
         </button>
       </div>
       <div class="footer-right">
-        <button 
-          class="btn-primary" 
-          @click="saveAndGenerate"
+        <button
+          class="btn-primary"
+          @click="saveExam"
           :disabled="!canSave"
         >
-          <span class="icon">✓</span> 저장하고 PDF 생성
+          <span class="icon">✓</span> 시험지 저장
         </button>
       </div>
     </div>
@@ -299,6 +247,7 @@
         <p>{{ loadingMessage }}</p>
       </div>
     </div>
+
   </div>
 </template>
 
@@ -307,6 +256,8 @@ import { ref, computed, onMounted } from 'vue'
 import { useTestBankStore } from '@/stores/testBank'
 import { useItemSelectionStore } from '@/stores/itemSelection'
 import { storeToRefs } from 'pinia'
+import * as pdfGenerator from '@/services/pdfGenerator'
+import SimplePdfViewer from '@/components/pdf/SimplePdfViewer.vue'
 
 // Props
 const props = defineProps({
@@ -333,10 +284,10 @@ const examData = ref({
   includeAnswerSheet: true,
   shuffleQuestions: false,
   showPoints: true,
-  visibility: 'PRIVATE'
+  visibility: 'PRIVATE',
+  layoutType: 'HALF_PAGE'  // 기본값을 반페이지(2문제)로 설정
 })
 
-const showAllItems = ref(false)
 const showReorderModal = ref(false)
 const reorderedItems = ref([])
 const draggedIndex = ref(null)
@@ -344,19 +295,25 @@ const isLoading = ref(false)
 const loadingMessage = ref('')
 
 // Computed
-const displayItems = computed(() => {
-  if (showAllItems.value) {
-    return selectedItems.value
+const transformedQuestions = computed(() => {
+  return selectedItems.value ? pdfGenerator.transformQuestions(selectedItems.value) : []
+})
+
+const pdfExamData = computed(() => {
+  return {
+    title: examData.value.title || '새 시험지',
+    subtitle: props.examInfo?.examName || '',
+    schoolName: '○○중학교',
+    grade: props.examInfo?.gradeName || '',
+    subject: props.examInfo?.subjectName || props.examInfo?.areaName || '',
+    date: examData.value.examDate,
+    teacherName: '',
+    timeLimit: examData.value.timeLimit,
+    includeAnswer: examData.value.includeAnswerSheet,
+    includeExplanation: false,
+    shuffleQuestions: examData.value.shuffleQuestions,
+    showPoints: examData.value.showPoints
   }
-  return selectedItems.value.slice(0, 5)
-})
-
-const estimatedTime = computed(() => {
-  return selectedItems.value.length * 3
-})
-
-const totalPoints = computed(() => {
-  return selectedItems.value.reduce((sum, item) => sum + (item.points || 5), 0)
 })
 
 const canSave = computed(() => {
@@ -391,38 +348,22 @@ const saveDraft = () => {
   alert('임시 저장 기능은 준비 중입니다.')
 }
 
-const saveAndGenerate = async () => {
+const saveExam = async () => {
   if (!canSave.value) {
     alert('시험지 제목을 입력해주세요.')
     return
   }
 
-  isLoading.value = true
-  loadingMessage.value = '시험지를 저장하는 중...'
+  // 시험지 데이터를 저장
+  console.log('시험지 저장:', {
+    examData: examData.value,
+    questions: selectedItems.value
+  })
 
-  try {
-    console.log('시험지 저장:', {
-      examData: examData.value,
-      items: selectedItems.value,
-      examInfo: props.examInfo
-    })
-
-    // 2초 후 완료 시뮬레이션
-    setTimeout(() => {
-      isLoading.value = false
-      alert('시험지가 성공적으로 저장되었습니다!')
-      emit('complete')
-    }, 2000)
-  } catch (error) {
-    console.error('저장 실패:', error)
-    alert('시험지 저장에 실패했습니다.')
-    isLoading.value = false
-  }
+  alert('시험지가 저장되었습니다.')
+  emit('complete')
 }
 
-const previewPDF = () => {
-  alert('PDF 미리보기 기능은 준비 중입니다.')
-}
 
 const reorderItems = () => {
   reorderedItems.value = [...selectedItems.value]
@@ -439,11 +380,11 @@ const handleDragStart = (event, index) => {
 
 const handleDrop = (event, dropIndex) => {
   if (draggedIndex.value === null) return
-  
+
   const draggedItem = reorderedItems.value[draggedIndex.value]
   reorderedItems.value.splice(draggedIndex.value, 1)
   reorderedItems.value.splice(dropIndex, 0, draggedItem)
-  
+
   draggedIndex.value = null
 }
 
@@ -452,11 +393,22 @@ const applyReorder = () => {
   closeReorderModal()
 }
 
+// PDF 관련 핸들러
+const handlePdfSave = (template) => {
+  console.log('PDF 템플릿 저장됨:', template)
+  // 템플릿을 localStorage나 서버에 저장할 수 있습니다
+}
+
+const handlePdfGenerate = (pdfBlob) => {
+  console.log('PDF 생성 완료:', pdfBlob)
+  // PDF가 생성되면 추가 처리를 할 수 있습니다
+}
+
 // Lifecycle
 onMounted(() => {
   const today = new Date().toISOString().split('T')[0]
   examData.value.examDate = today
-  
+
   if (testBankStore.wizardData.examTitle) {
     examData.value.title = testBankStore.wizardData.examTitle
   }
@@ -1108,7 +1060,7 @@ input[type="radio"] {
   .main-content {
     flex-direction: column;
   }
-  
+
   .left-panel {
     width: 100%;
     border-right: none;
@@ -1120,14 +1072,38 @@ input[type="radio"] {
   .form-row {
     grid-template-columns: 1fr;
   }
-  
+
   .preview-actions {
     flex-direction: column;
   }
-  
+
   .preview-summary {
     flex-direction: column;
     gap: 0.5rem;
   }
+}
+
+
+/* 액션 버튼 스타일 */
+.btn-action {
+  padding: 0.5rem 1rem;
+  background: white;
+  color: #4CAF50;
+  border: 1px solid #4CAF50;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  transition: all 0.2s;
+}
+
+.btn-action:hover {
+  background: #4CAF50;
+  color: white;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(76, 175, 80, 0.2);
 }
 </style>

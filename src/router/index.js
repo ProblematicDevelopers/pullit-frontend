@@ -119,6 +119,11 @@ const routes = [
       }
     },
   {
+    path: '/pdf-test',
+    name: 'PdfTest',
+    component: () => import('@/views/PdfTest.vue')
+  },
+  {
     path:'/signup',
     name: 'SignUp',
     component: SignUp,

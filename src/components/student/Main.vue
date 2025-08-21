@@ -22,20 +22,21 @@
                   <span class="badge rounded-pill bg-success-subtle text-success fw-semibold">NEW</span>
                 </div>
 
-                <h4 class="mt-3 mb-2 text-dark fw-bold">문제은행 시스템</h4>
+                <h4 class="mt-3 mb-2 text-dark fw-bold">문제은행 CBT</h4>
                 <p class="text-secondary mb-3">
-                  15,000+ 검증된 문제를 AI가 스마트하게 분류하고 관리합니다. 과목별, 단원별, 난이도별 체계적인 분류로 원하는 문제를 쉽게 찾을 수 있습니다.
+                  문제은행에서 15,000+ 검증된 문제를 스마트하게 분석하여 실시간으로 CBT를 출제합니다.
+                  과목별, 단원별 체계적인 분류로 다양한 문제를 쉽게 찾고 바로 풀 수 있습니다.
                 </p>
 
                 <ul class="list-unstyled m-0 text-secondary small">
                   <li class="d-flex align-items-start gap-2 mb-2">
-                    <span class="check text-success">✓</span> AI 기반 문제 분류
+                    <span class="check text-success">✓</span> 방대한 문제 은행 데이터
                   </li>
                   <li class="d-flex align-items-start gap-2 mb-2">
-                    <span class="check text-success">✓</span> 23개 과목 지원
+                    <span class="check text-success">✓</span> 다양한 검증 교과서 기반 문제 지원
                   </li>
                   <li class="d-flex align-items-start gap-2">
-                    <span class="check text-success">✓</span> 실시간 검색 & 필터링
+                    <span class="check text-success">✓</span> 실시간 생성 & 원하는 단원 필터링
                   </li>
                 </ul>
               </div>
@@ -58,17 +59,21 @@
                   <span class="badge rounded-pill bg-warning-subtle text-warning fw-semibold">HOT</span>
                 </div>
 
-                <h4 class="mt-3 mb-2 text-dark fw-bold">스마트 시험지 생성</h4>
+                <h4 class="mt-3 mb-2 text-dark fw-bold">똑똑한 우리반</h4>
                 <p class="text-secondary mb-3">
-                  원클릭으로 완벽한 시험지를 생성하세요. AI가 난이도를 자동 조절하고 문항 유형을 균형 있게 배치해 최적의 시험지를 만들어 드립니다.
+                  똑똑한 우리반과 함께라면, 온라인 시험도 교실처럼 실시간으로! 체계적으로 공정한 시험 경험을 제공합니다.
+                  모두가 동시에 풀고 즉시 결과를 확인해보세요!
                 </p>
 
                 <ul class="list-unstyled m-0 text-secondary small">
                   <li class="d-flex align-items-start gap-2 mb-2">
-                    <span class="check text-success">✓</span> 자동 난이도 조정
+                    <span class="check text-success">✓</span> 교실처럼 모두가 동시에 시작하는 실시간 시험
+                  </li>
+                  <li class="d-flex align-items-start gap-2 mb-2">
+                    <span class="check text-success">✓</span> 문제 풀이 후 즉시 확인되는 결과
                   </li>
                   <li class="d-flex align-items-start gap-2">
-                    <span class="check text-success">✓</span> 다양한 출제 템플릿
+                    <span class="check text-success">✓</span> 공정하고 투명한 온라인 시험 환경
                   </li>
                 </ul>
               </div>
@@ -90,17 +95,20 @@
                   </div>
                 </div>
 
-                <h4 class="mt-3 mb-2 text-dark fw-bold">심화 성적 분석</h4>
+                <h4 class="mt-3 mb-2 text-dark fw-bold">시험 성적 분석</h4>
                 <p class="text-secondary mb-3">
-                  학생별, 문항별, 단원별 세밀한 분석 데이터를 제공합니다. 개별 맞춤 지도와 효과적인 교육 전략을 수립하세요.
+                  점수만 확인하는 시대는 끝! 평가 결과 요약으로 큰 그림을 보고, 문항 분석 리포트로 세부 데이터를 파악하며, 성적 분석으로 학습 성장을 이끌어갑니다.
                 </p>
 
                 <ul class="list-unstyled m-0 text-secondary small">
                   <li class="d-flex align-items-start gap-2 mb-2">
-                    <span class="check text-success">✓</span> 실시간 성적 분석
+                    <span class="check text-success">✓</span> 성적 분석
+                  </li>
+                  <li class="d-flex align-items-start gap-2 mb-2">
+                    <span class="check text-success">✓</span> 문항 분석 리포트
                   </li>
                   <li class="d-flex align-items-start gap-2">
-                    <span class="check text-success">✓</span> 개별 리포트 생성
+                    <span class="check text-success">✓</span> 평가 결과 요약
                   </li>
                 </ul>
               </div>
