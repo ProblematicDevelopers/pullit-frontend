@@ -1,12 +1,35 @@
 <template>
   <div class="report-list-container">
+    <!-- 탭 헤더 -->
+    <nav class="tabs" role="tablist" aria-label="시험 상태 탭">
+      <button
+        class="tab-btn"
+        :class="{ active: currentTab === 'completed' }"
+        role="tab"
+        aria-selected="currentTab === 'completed'"
+        @click="currentTab = 'completed'"
+      >
+        완료한 시험
+      </button>
+
+      <button
+        class="tab-btn"
+        :class="{ active: currentTab === 'in-progress' }"
+        role="tab"
+        aria-selected="currentTab === 'in-progress'"
+        @click="currentTab = 'in-progress'"
+      >
+        진행중인 시험
+      </button>
+    </nav>
+
     <!-- 검색 및 필터 영역 -->
     <div class="search-filter-section">
       <div class="search-box">
         <input
           v-model="searchQuery"
           type="text"
-          placeholder="시험 제목을 검색하세요a..."
+          placeholder="시험 제목을 검색하세요..."
           class="search-input"
         />
         <button @click="clearSearch" class="clear-btn" v-if="searchQuery">✕</button>
@@ -49,12 +72,27 @@
         >
           사회
         </button>
+        <button
+          @click="setFilter('역사')"
+          :class="['filter-btn', { active: currentFilter === '역사' }]"
+        >
+          역사
+        </button>
+        <button
+          @click="setFilter('도덕')"
+          :class="['filter-btn', { active: currentFilter === '도덕' }]"
+        >
+          도덕
+        </button>
       </div>
     </div>
 
     <!-- 결과 개수 표시 -->
     <div class="result-info">
-      <span>총 {{ filteredItems.length }}개의 시험</span>
+      <span
+        >{{ currentTab === 'completed' ? '완료한' : '진행중인' }} 시험
+        {{ filteredItems.length }}개</span
+      >
     </div>
 
     <div
@@ -71,7 +109,11 @@
           <span class="sub">{{ item.grade }} 사용 {{ item.usage }}회</span>
         </div>
       </div>
-      <div class="right"><a @click.stop="goToReport(item.id, item.attemptId)">자세히 보기</a></div>
+      <div class="right">
+        <a @click.stop="goToReport(item.id, item.attemptId)">
+          {{ currentTab === 'in-progress' ? '이어서 보기' : '자세히 보기' }}
+        </a>
+      </div>
     </div>
 
     <!-- 페이지네이션 -->
@@ -114,6 +156,7 @@ export default {
       itemsPerPage: 5,
       searchQuery: '',
       currentFilter: 'all',
+      currentTab: 'completed', // 기본값은 완료한 시험
     }
   },
   async mounted() {
@@ -122,6 +165,20 @@ export default {
   computed: {
     filteredItems() {
       let filtered = this.items
+
+      // 탭에 따른 상태 필터링
+      if (this.currentTab === 'completed') {
+        filtered = filtered.filter((item) => item.status === 'completed' || item.status === 'DONE')
+      } else if (this.currentTab === 'in-progress') {
+        filtered = filtered.filter(
+          (item) =>
+            item.status === 'in-progress' ||
+            item.status === 'IN_PROGRESS' ||
+            item.status === 'PROGRESS' ||
+            item.status === 'started' ||
+            item.status === 'STARTED',
+        )
+      }
 
       // 과목 필터링
       if (this.currentFilter !== 'all') {
@@ -187,11 +244,11 @@ export default {
       this.loading = true
       try {
         // 모든 과목별로 시험 목록 가져오기 (다양한 형태 시도)
-        const subjects = ['MA', 'EN', 'KO', 'SC', 'SO']
+        const subjects = ['MA', 'EN', 'KO', 'SC', 'SO', 'HS', 'MO']
         // 만약 위가 안 되면 아래 중 하나를 시도해보세요:
-        // const subjects = ['math', 'english', 'korean', 'science', 'social']
-        // const subjects = ['MATH', 'ENGLISH', 'KOREAN', 'SCIENCE', 'SOCIAL']
-        // const subjects = ['1', '2', '3', '4', '5'] // 숫자 코드
+        // const subjects = ['math', 'english', 'korean', 'science', 'social', 'history', 'moral']
+        // const subjects = ['MATH', 'ENGLISH', 'KOREAN', 'SCIENCE', 'SOCIAL', 'HISTORY', 'MORAL']
+        // const subjects = ['1', '2', '3', '4', '5', '6', '7'] // 숫자 코드
         let allExams = []
 
         for (const subject of subjects) {
@@ -247,29 +304,84 @@ export default {
         KOREAN: '국어',
         SCIENCE: '과학',
         SOCIAL: '사회',
+        HISTORY: '역사',
+        MORAL: '도덕',
         math: '수학',
         english: '영어',
         korean: '국어',
         science: '과학',
         social: '사회',
+        history: '역사',
+        moral: '도덕',
         MA: '수학',
         EN: '영어',
         KO: '국어',
         SC: '과학',
         SO: '사회',
+        HS: '역사',
+        MO: '도덕',
         1: '수학',
         2: '영어',
         3: '국어',
         4: '과학',
         5: '사회',
+        6: '역사',
+        7: '도덕',
       }
       return subjectMap[areaCode] || areaCode
     },
     goToReport(id, attemptId) {
-      this.$router.push({
-        name: 'student.basicReport',
-        params: { id: attemptId || id }, // attemptId가 있으면 사용, 없으면 id 사용
-      })
+      if (this.currentTab === 'in-progress') {
+        // 진행중인 시험은 팝업창으로 시험지 열기
+        const examUrl = `/student/cbt/exam/${id}` // CBT 시험지 URL
+
+        // 전체화면 팝업창 설정
+        const popupFeatures = [
+          'width=' + screen.width,
+          'height=' + screen.height,
+          'left=0',
+          'top=0',
+          'scrollbars=yes',
+          'resizable=yes',
+          'toolbar=no',
+          'menubar=no',
+          'location=no',
+          'status=no',
+          'directories=no',
+          'fullscreen=yes',
+          'channelmode=yes',
+        ].join(',')
+
+        const popup = window.open(examUrl, '_blank', popupFeatures)
+
+        // 팝업창이 열린 후 전체화면 모드로 전환 시도
+        if (popup) {
+          popup.onload = function () {
+            try {
+              // 전체화면 모드로 전환 시도
+              if (popup.document.documentElement.requestFullscreen) {
+                popup.document.documentElement.requestFullscreen()
+              } else if (popup.document.documentElement.webkitRequestFullscreen) {
+                popup.document.documentElement.webkitRequestFullscreen()
+              } else if (popup.document.documentElement.msRequestFullscreen) {
+                popup.document.documentElement.msRequestFullscreen()
+              }
+            } catch (e) {
+              console.log('전체화면 모드 전환 실패:', e)
+            }
+          }
+        }
+
+        if (!popup) {
+          alert('팝업이 차단되었습니다. 팝업 차단을 해제해주세요.')
+        }
+      } else {
+        // 완료한 시험은 기존 방식대로 리포트 페이지로 이동
+        this.$router.push({
+          name: 'student.basicReport',
+          params: { id: attemptId || id },
+        })
+      }
     },
     goToPage(page) {
       if (page !== '...' && page >= 1 && page <= this.totalPages) {
@@ -293,6 +405,11 @@ export default {
     clearSearch() {
       this.searchQuery = ''
       this.currentPage = 1
+    },
+  },
+  watch: {
+    currentTab() {
+      this.currentPage = 1 // 탭 변경 시 첫 페이지로 이동
     },
   },
 }
@@ -497,5 +614,53 @@ export default {
   margin-bottom: 20px;
   color: #666;
   font-size: 14px;
+}
+
+/* 탭 스타일 */
+.tabs {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  align-items: center;
+  margin: 40px 0 28px;
+  flex-wrap: wrap;
+}
+
+.tab-btn {
+  position: relative;
+  background: white;
+  border: 1px solid #d3d3d3;
+  padding: 12px 24px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  border-radius: 20px;
+  transition: all 0.2s ease;
+}
+
+.tab-btn.inactive {
+  color: #333;
+  background: white;
+}
+
+.tab-btn.active {
+  background: #3b6cff;
+  color: white;
+  border-color: #3b6cff;
+}
+
+.tab-btn:hover {
+  border-color: #3b6cff;
+  background: #f8f9ff;
+}
+
+.tab-btn.active:hover {
+  background: #3b6cff;
+  color: white;
+}
+
+.underline {
+  display: none;
 }
 </style>
