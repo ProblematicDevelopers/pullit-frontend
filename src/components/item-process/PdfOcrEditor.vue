@@ -11,21 +11,16 @@
       <!-- PDF 뷰어 -->
       <div class="pdf-viewer">
         <div class="pdf-container" ref="pdfContainer">
-          <!-- PDF iframe -->
-          <iframe
-            ref="pdfIframe"
-            :src="currentPdfUrl"
-            class="pdf-iframe"
-            @load="onIframeLoad"
-          ></iframe>
+          <!-- PDF Canvas -->
+          <canvas
+            ref="pdfCanvas"
+            class="pdf-canvas"
+          ></canvas>
 
           <!-- 영역 선택을 위한 Canvas 오버레이 -->
           <canvas
             ref="selectionCanvas"
             class="selection-canvas"
-            @mousedown="startSelection"
-            @mousemove="updateSelection"
-            @mouseup="endSelection"
             @click="handleCanvasClick"
           ></canvas>
 
@@ -35,11 +30,7 @@
             class="selection-area"
             :style="selectionStyle"
           >
-            <!-- 크기 조정 핸들 -->
-            <div class="resize-handle resize-handle-nw" @mousedown="startResize('nw')"></div>
-            <div class="resize-handle resize-handle-ne" @mousedown="startResize('ne')"></div>
-            <div class="resize-handle resize-handle-sw" @mousedown="startResize('sw')"></div>
-            <div class="resize-handle resize-handle-se" @mousedown="startResize('se')"></div>
+            <!-- 두 번 클릭 방식에서는 크기 조정 핸들 불필요 -->
           </div>
         </div>
 
@@ -49,7 +40,7 @@
             이전
           </button>
           <span class="page-info">{{ currentPage + 1 }} / {{ totalPages }}</span>
-          <button @click="nextPage" :disabled="currentPage === totalPages.value - 1" class="btn btn-secondary">
+          <button @click="nextPage" :disabled="currentPage >= totalPages - 1" class="btn btn-secondary">
             다음
           </button>
         </div>
@@ -88,7 +79,13 @@
                 <span class="result-page">페이지 {{ result.page + 1 }}</span>
                 <button @click="removeResult(index)" class="btn btn-small btn-danger">삭제</button>
               </div>
-              <div class="result-text">{{ result.text }}</div>
+              <div class="result-image" v-if="result.image">
+                <img :src="result.image" :alt="`페이지 ${result.page + 1} 선택 영역`" class="captured-image" />
+              </div>
+              <div class="result-text">
+                <strong>OCR 추출 결과:</strong>
+                <div class="text-content">{{ result.text }}</div>
+              </div>
               <div class="result-coordinates">
                 좌표: ({{ Math.round(result.x) }}, {{ Math.round(result.y) }})
                 {{ Math.round(result.width) }} × {{ Math.round(result.height) }}
@@ -105,6 +102,7 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useToast } from '@/composables/useToast'
 import { ocrApi } from '@/services/ocrApi'
+import * as pdfjsLib from 'pdfjs-dist'
 
 export default {
   name: 'PdfOcrEditor',
@@ -131,9 +129,25 @@ export default {
   setup(props) {
     const { success, error: showError } = useToast()
 
+    // props로 받은 pdfPages 상태 확인 및 디버깅
+    console.log('=== PdfOcrEditor 컴포넌트 마운트 ===')
+    console.log('받은 pdfPages:', props.pdfPages)
+    console.log('받은 pdfPages 길이:', props.pdfPages.length)
+    console.log('받은 pdfPages 상세:', props.pdfPages.map(p => ({
+      index: p.index,
+      pageNumber: p.pageNumber,
+      hasPreview: !!p.preview,
+      hasBlob: !!p.blob
+    })))
+
+
+
+    // PDF.js 워커 설정
+    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.js'
+
     // PDF 렌더링 관련
     const pdfContainer = ref(null)
-    const pdfIframe = ref(null)
+    const pdfCanvas = ref(null)
     const selectionCanvas = ref(null)
     const currentPage = ref(0)
     const totalPages = ref(props.pdfPages.length)
@@ -147,62 +161,154 @@ export default {
       y: 0,
       width: 0,
       height: 0,
-      isResizing: false,
-      resizeHandle: null
+      waitingForSecondClick: false
     })
 
     // OCR 관련
     const ocrLoading = ref(false)
     const ocrResults = ref([])
 
-    // 현재 PDF URL 계산
-    const currentPdfUrl = computed(() => {
-      if (props.pdfPages[currentPage.value]) {
-        return props.pdfPages[currentPage.value].preview
-      }
-      return ''
-    })
+
+
+
 
     // OCR 실행 버튼 활성화 여부
     const canExecuteOcr = computed(() => {
       return selection.value.active && selection.value.width > 10 && selection.value.height > 10
     })
 
-    // iframe 로드 완료 시 Canvas 오버레이 설정
-    const onIframeLoad = () => {
-      nextTick(() => {
-        setupCanvasOverlay()
-      })
-    }
+    // props.pdfPages 변경 감지하여 totalPages 업데이트
+    watch(() => props.pdfPages, (newPdfPages) => {
+      console.log('=== PdfOcrEditor에서 pdfPages 변경 감지 ===')
+      console.log('새로운 pdfPages:', newPdfPages)
+      console.log('새로운 길이:', newPdfPages.length)
+
+      totalPages.value = newPdfPages.length
+      console.log('totalPages 업데이트됨:', totalPages.value)
+
+      // 현재 페이지가 새로운 페이지 수를 초과하는 경우 조정
+      if (currentPage.value >= newPdfPages.length) {
+        currentPage.value = Math.max(0, newPdfPages.length - 1)
+        console.log('현재 페이지 조정됨:', currentPage.value)
+      }
+    }, { immediate: true, deep: true })
+
+                // PDF 페이지 렌더링
+        const renderPdfPage = async (pageIndex) => {
+          if (!pdfCanvas.value || !props.pdfPages[pageIndex]) {
+            console.log('PDF Canvas 또는 페이지 데이터가 준비되지 않음')
+            return
+          }
+
+          try {
+            console.log('=== PDF 페이지 렌더링 시작 ===')
+            console.log('페이지 인덱스:', pageIndex)
+
+            const pageData = props.pdfPages[pageIndex]
+            if (!pageData.blob) {
+              console.error('페이지에 blob 데이터가 없음:', pageData)
+              return
+            }
+
+            // Blob을 ArrayBuffer로 변환
+            const arrayBuffer = await pageData.blob.arrayBuffer()
+            console.log('ArrayBuffer 생성 완료, 크기:', arrayBuffer.byteLength)
+
+            // PDF 문서 로드
+            const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+            console.log('PDF 문서 로드 완료, 페이지 수:', pdfDoc.numPages)
+
+            // 첫 번째 페이지 가져오기 (이미 분리된 페이지)
+            const page = await pdfDoc.getPage(1)
+            console.log('PDF 페이지 가져오기 완료')
+
+            // Canvas 크기 설정
+            const viewport = page.getViewport({ scale: 1.5 })
+            const canvas = pdfCanvas.value
+            const context = canvas.getContext('2d')
+
+            canvas.height = viewport.height
+            canvas.width = viewport.width
+
+            console.log('Canvas 크기 설정:', canvas.width, 'x', canvas.height)
+
+            // PDF 페이지 렌더링
+            const renderContext = {
+              canvasContext: context,
+              viewport: viewport
+            }
+
+            await page.render(renderContext).promise
+            console.log('PDF 페이지 렌더링 완료')
+
+            // Canvas 오버레이 설정 - 렌더링 완료 후
+            nextTick(() => {
+              if (pdfCanvas.value && selectionCanvas.value) {
+                setupCanvasOverlay()
+              } else {
+                console.log('Canvas 요소들이 아직 준비되지 않음, 오버레이 설정 건너뜀')
+              }
+            })
+
+          } catch (error) {
+            console.error('PDF 페이지 렌더링 오류:', error)
+          }
+        }
+
+        // PDF 페이지 변경 시 렌더링
+        watch(currentPage, (newPage) => {
+          renderPdfPage(newPage)
+        })
+
+        // 컴포넌트 마운트 시 첫 번째 페이지 렌더링
+        onMounted(() => {
+          nextTick(() => {
+            if (props.pdfPages && props.pdfPages.length > 0) {
+              console.log('컴포넌트 마운트 완료, 첫 번째 페이지 렌더링 시작')
+              // Canvas 요소들이 준비될 때까지 잠시 대기
+              setTimeout(() => {
+                if (pdfCanvas.value && selectionCanvas.value) {
+                  renderPdfPage(0)
+                } else {
+                  console.log('Canvas 요소들이 아직 준비되지 않음, 100ms 후 재시도')
+                  setTimeout(() => renderPdfPage(0), 100)
+                }
+              }, 50)
+            }
+          })
+        })
 
     // Canvas 오버레이 설정
     const setupCanvasOverlay = () => {
-      if (!pdfIframe.value || !selectionCanvas.value) return
+      if (!pdfCanvas.value || !selectionCanvas.value) {
+        console.log('Canvas 요소들이 준비되지 않음')
+        return
+      }
 
       try {
-        const iframe = pdfIframe.value
-        const canvas = selectionCanvas.value
+        const pdfCanvasEl = pdfCanvas.value
+        const selectionCanvasEl = selectionCanvas.value
 
-        // iframe 크기에 맞춰 Canvas 크기 설정
-        const iframeRect = iframe.getBoundingClientRect()
-        canvas.width = iframeRect.width
-        canvas.height = iframeRect.height
+        // PDF Canvas 크기에 맞춰 Canvas 크기 설정
+        const pdfCanvasRect = pdfCanvasEl.getBoundingClientRect()
+        selectionCanvasEl.width = pdfCanvasRect.width
+        selectionCanvasEl.height = pdfCanvasRect.height
 
-        // Canvas를 iframe 위에 정확히 겹치도록 위치 조정
-        canvas.style.width = iframeRect.width + 'px'
-        canvas.style.height = iframeRect.height + 'px'
-        canvas.style.position = 'absolute'
-        canvas.style.top = '0px'
-        canvas.style.left = '0px'
+        // Canvas를 PDF Canvas 위에 정확히 겹치도록 위치 조정
+        selectionCanvasEl.style.width = pdfCanvasRect.width + 'px'
+        selectionCanvasEl.style.height = pdfCanvasRect.height + 'px'
+        selectionCanvasEl.style.position = 'absolute'
+        selectionCanvasEl.style.top = '0px'
+        selectionCanvasEl.style.left = '0px'
 
-        console.log('Canvas 오버레이 설정 완료:', canvas.width, 'x', canvas.height)
+        console.log('Canvas 오버레이 설정 완료:', selectionCanvasEl.width, 'x', selectionCanvasEl.height)
       } catch (error) {
         console.error('Canvas 오버레이 설정 오류:', error)
       }
     }
 
-    // 영역 선택 시작
-    const startSelection = (event) => {
+    // 첫 번째 클릭 - 시작 지점
+    const firstClick = (event) => {
       event.preventDefault()
       event.stopPropagation()
 
@@ -211,126 +317,94 @@ export default {
       const x = event.clientX - rect.left
       const y = event.clientY - rect.top
 
-      // 새로운 드래그 시작
+      // 첫 번째 클릭으로 시작 지점 설정
       selection.value = {
-        active: true,
+        active: false, // 아직 영역이 완성되지 않음
         startX: x,
         startY: y,
         x: x,
         y: y,
         width: 0,
         height: 0,
-        isResizing: false,
-        resizeHandle: null
+        waitingForSecondClick: true // 두 번째 클릭 대기 중
       }
 
-      console.log('드래그 시작:', x, y)
+      console.log('첫 번째 클릭 - 시작 지점:', x, y)
     }
 
-    // 영역 선택 업데이트
-    const updateSelection = (event) => {
-      if (!selection.value.active) return
-
+    // 두 번째 클릭 - 종료 지점 및 영역 완성
+    const secondClick = (event) => {
       event.preventDefault()
       event.stopPropagation()
+
+      // 첫 번째 클릭이 없으면 무시
+      if (!selection.value.waitingForSecondClick) {
+        console.log('첫 번째 클릭이 없음, 무시됨')
+        return
+      }
 
       const canvas = selectionCanvas.value
       const rect = canvas.getBoundingClientRect()
-      const x = event.clientX - rect.left
-      const y = event.clientY - rect.top
+      const endX = event.clientX - rect.left
+      const endY = event.clientY - rect.top
 
-      if (selection.value.isResizing) {
-        // 크기 조정 중
-        handleResize(event, x, y)
-      } else if (selection.value.startX > 0 && selection.value.startY > 0) {
-        // 드래그 중일 때만 좌표 업데이트
-        selection.value.x = Math.min(selection.value.startX, x)
-        selection.value.y = Math.min(selection.value.startY, y)
-        selection.value.width = Math.abs(x - selection.value.startX)
-        selection.value.height = Math.abs(y - selection.value.startY)
-        console.log('드래그 중 좌표 업데이트:', selection.value)
+      // 시작점과 종료점으로 사각형 영역 생성
+      const startX = selection.value.startX
+      const startY = selection.value.startY
+
+      // 좌표 정규화 (시작점이 항상 왼쪽 위, 종료점이 오른쪽 아래)
+      const x = Math.min(startX, endX)
+      const y = Math.min(startY, endY)
+      const width = Math.abs(endX - startX)
+      const height = Math.abs(endY - startY)
+
+      // 최소 크기 체크
+      if (width < 10 || height < 10) {
+        console.log('선택 영역이 너무 작음, 선택 취소')
+        clearSelection()
+        return
       }
+
+      // 영역 선택 완료
+      selection.value = {
+        active: true,
+        startX: startX,
+        startY: startY,
+        x: x,
+        y: y,
+        width: width,
+        height: height,
+        waitingForSecondClick: false
+      }
+
+      console.log('두 번째 클릭 - 영역 완성:', {
+        start: { x: startX, y: startY },
+        end: { x: endX, y: endY },
+        final: { x, y, width, height }
+      })
     }
 
-    // 영역 선택 완료
-    const endSelection = (event) => {
-      if (!selection.value.active) return
 
-      event.preventDefault()
-      event.stopPropagation()
 
-      if (selection.value.isResizing) {
-        // 크기 조정 완료
-        selection.value.isResizing = false
-        selection.value.resizeHandle = null
-        console.log('크기 조정 완료:', selection.value)
-      } else {
-        // 드래그 완료
-        // 최소 크기 체크 (너무 작은 영역은 무시)
-        if (selection.value.width < 10 || selection.value.height < 10) {
-          console.log('선택 영역이 너무 작음, 선택 취소')
-          clearSelection()
-        } else {
-          console.log('드래그 완료, 영역 선택 확정:', selection.value)
-          // 선택 완료 - active는 true로 유지
-        }
-      }
-    }
-
-    // Canvas 클릭 처리 (영역 정지/활성화)
+    // Canvas 클릭 처리 (두 번 클릭 방식)
     const handleCanvasClick = (event) => {
-      if (!selection.value.active) return
-
       event.preventDefault()
       event.stopPropagation()
 
-      // 이미 선택된 영역이 있으면 클릭으로 선택 유지
-      if (selection.value.width > 10 && selection.value.height > 10) {
+      // 첫 번째 클릭인지 두 번째 클릭인지 판단
+      if (!selection.value.waitingForSecondClick && !selection.value.active) {
+        // 첫 번째 클릭
+        firstClick(event)
+      } else if (selection.value.waitingForSecondClick) {
+        // 두 번째 클릭
+        secondClick(event)
+      } else if (selection.value.active) {
+        // 이미 영역이 선택된 상태에서 클릭하면 선택 유지
         console.log('영역 선택 유지됨')
-        // 선택 상태 유지
       }
     }
 
-    // 크기 조정 시작
-    const startResize = (handle) => {
-      selection.value.isResizing = true
-      selection.value.resizeHandle = handle
-      console.log('크기 조정 시작:', handle)
-    }
-
-    // 크기 조정 처리
-    const handleResize = (event, x, y) => {
-      const handle = selection.value.resizeHandle
-      const currentSelection = { ...selection.value }
-
-      switch (handle) {
-        case 'nw': // 북서쪽
-          currentSelection.width = currentSelection.x + currentSelection.width - x
-          currentSelection.height = currentSelection.y + currentSelection.height - y
-          currentSelection.x = x
-          currentSelection.y = y
-          break
-        case 'ne': // 북동쪽
-          currentSelection.width = x - currentSelection.x
-          currentSelection.height = currentSelection.y + currentSelection.height - y
-          currentSelection.y = y
-          break
-        case 'sw': // 남서쪽
-          currentSelection.width = currentSelection.x + currentSelection.width - x
-          currentSelection.height = y - currentSelection.y
-          currentSelection.x = x
-          break
-        case 'se': // 남동쪽
-          currentSelection.width = x - currentSelection.x
-          currentSelection.height = y - currentSelection.y
-          break
-      }
-
-      // 최소 크기 보장
-      if (currentSelection.width >= 10 && currentSelection.height >= 10) {
-        selection.value = { ...currentSelection, isResizing: true, resizeHandle: handle }
-      }
-    }
+    // 두 번 클릭 방식에서는 크기 조정 기능 불필요
 
     // 선택 영역 취소
     const clearSelection = () => {
@@ -342,8 +416,7 @@ export default {
         y: 0,
         width: 0,
         height: 0,
-        isResizing: false,
-        resizeHandle: null
+        waitingForSecondClick: false
       }
       console.log('선택 영역 초기화됨')
     }
@@ -355,15 +428,18 @@ export default {
       try {
         ocrLoading.value = true
 
-        // iframe을 이미지로 캡처
-        const iframe = pdfIframe.value
+        // PDF Canvas를 이미지로 캡처
+        const canvas = pdfCanvas.value
 
-        // html2canvas 또는 다른 방법으로 iframe 캡처
-        // 임시로 더미 이미지 생성 (실제 구현에서는 html2canvas 사용)
-        const tempImage = await captureIframeAsImage(iframe, selection.value)
+        // PDF Canvas에서 선택된 영역을 캡처
+        const tempImage = await capturePdfCanvas(canvas, selection.value)
 
         // Base64로 변환
         const imageBase64 = tempImage
+
+        // 캡처된 이미지 정보 로깅
+        console.log('캡처된 이미지 크기:', selection.value.width, 'x', selection.value.height, 'px')
+        console.log('이미지 데이터 길이:', tempImage.length, 'characters')
 
         // OCR API 호출
         const result = await callOcrApi(imageBase64, props.subjectCode)
@@ -371,12 +447,12 @@ export default {
         // 결과 저장
         ocrResults.value.push({
           page: currentPage.value,
-          text: result.text,
+          text: result.message, // message에 실제 추출된 텍스트가 들어있음
+          image: tempImage, // 캡처된 이미지 저장
           x: selection.value.x,
           y: selection.value.y,
           width: selection.value.width,
-          height: selection.value.height,
-          confidence: result.confidence
+          height: selection.value.height
         })
 
         success('OCR 처리가 완료되었습니다.')
@@ -390,18 +466,41 @@ export default {
       }
     }
 
-    // iframe을 이미지로 캡처 (임시로 더미 이미지 사용)
-    const captureIframeAsImage = async (iframe, selection) => {
-      try {
-        // html2canvas가 제대로 작동하지 않을 수 있으므로 더미 이미지로 대체
-        console.log('iframe 캡처 시도:', iframe.offsetWidth, 'x', iframe.offsetHeight)
-        return createDummyImage(selection)
-      } catch (error) {
-        console.error('iframe 캡처 오류:', error)
-        // 캡처 실패 시 더미 이미지 반환
-        return createDummyImage(selection)
-      }
-    }
+                        // PDF Canvas에서 영역을 이미지로 캡처 (PDF.js 직접 방식)
+        const capturePdfCanvas = async (pdfCanvas, selection) => {
+          try {
+            console.log('=== PDF Canvas 영역 캡처 시작 ===')
+            console.log('선택된 영역:', selection)
+            console.log('PDF Canvas 크기:', pdfCanvas.width, 'x', pdfCanvas.height)
+
+            // PDF Canvas에서 직접 선택된 영역 캡처
+            const tempCanvas = document.createElement('canvas')
+            tempCanvas.width = selection.width
+            tempCanvas.height = selection.height
+
+            const ctx = tempCanvas.getContext('2d')
+
+            // PDF Canvas에서 선택된 영역을 새 Canvas로 복사
+            // 이 방식이 훨씬 더 정확하고 간단함!
+            ctx.drawImage(
+              pdfCanvas,
+              selection.x, selection.y, selection.width, selection.height,
+              0, 0, selection.width, selection.height
+            )
+
+            console.log('PDF Canvas 영역 캡처 성공')
+            const imageDataUrl = tempCanvas.toDataURL('image/png')
+            console.log('생성된 이미지 데이터 길이:', imageDataUrl.length)
+            console.log('이미지 데이터 시작:', imageDataUrl.substring(0, 50))
+
+            return imageDataUrl
+
+          } catch (error) {
+            console.error('PDF Canvas 영역 캡처 오류:', error)
+            console.log('더미 이미지로 대체')
+            return createDummyImage(selection)
+          }
+        }
 
     // 더미 이미지 생성 (캡처 실패 시 사용)
     const createDummyImage = (selection) => {
@@ -439,21 +538,35 @@ export default {
 
     // 페이지 네비게이션
     const previousPage = () => {
-      if (currentPage.value > 0) {
+      console.log('이전 페이지 요청 - 현재:', currentPage.value, '총:', totalPages.value)
+      if (currentPage.value > 0 && currentPage.value < totalPages.value) {
         currentPage.value--
+        console.log('이전 페이지로 이동:', currentPage.value)
         clearSelection()
         nextTick(() => {
           setupCanvasOverlay()
+        })
+      } else {
+        console.warn('이전 페이지로 이동할 수 없음:', {
+          currentPage: currentPage.value,
+          totalPages: totalPages.value
         })
       }
     }
 
     const nextPage = () => {
-      if (currentPage.value < totalPages.value - 1) {
+      console.log('다음 페이지 요청 - 현재:', currentPage.value, '총:', totalPages.value)
+      if (currentPage.value >= 0 && currentPage.value < totalPages.value - 1) {
         currentPage.value++
+        console.log('다음 페이지로 이동:', currentPage.value)
         clearSelection()
         nextTick(() => {
           setupCanvasOverlay()
+        })
+      } else {
+        console.warn('다음 페이지로 이동할 수 없음:', {
+          currentPage: currentPage.value,
+          totalPages: totalPages.value
         })
       }
     }
@@ -480,7 +593,7 @@ export default {
       })
     })
 
-    // 컴포넌트 언마운트 시 정리
+        // 컴포넌트 언마운트 시 정리
     onUnmounted(() => {
       clearSelection()
     })
@@ -488,7 +601,7 @@ export default {
     return {
       // refs
       pdfContainer,
-      pdfIframe,
+      pdfCanvas,
       selectionCanvas,
 
       // 상태
@@ -499,25 +612,22 @@ export default {
       ocrResults,
 
       // 계산된 속성
-      currentPdfUrl,
       selectionStyle,
       canExecuteOcr,
 
       // 메서드
-      onIframeLoad,
+      renderPdfPage,
       setupCanvasOverlay,
-      startSelection,
-      updateSelection,
-      endSelection,
+      firstClick,
+      secondClick,
       clearSelection,
       performOcr,
       removeResult,
       previousPage,
       nextPage,
-      captureIframeAsImage,
+      capturePdfCanvas,
       createDummyImage,
-      handleCanvasClick,
-      startResize
+      handleCanvasClick
     }
   }
 }
@@ -577,7 +687,7 @@ export default {
   min-height: 600px; /* 최소 높이 설정 */
 }
 
-.pdf-iframe {
+.pdf-canvas {
   display: block;
   width: 100%;
   height: 100%;
@@ -747,13 +857,45 @@ export default {
   font-size: 0.875rem;
   line-height: 1.5;
   color: #374151;
+}
+
+.result-text strong {
+  display: block;
+  margin-bottom: 0.5rem;
+  color: #1e293b;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.text-content {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 4px;
+  padding: 0.5rem;
   white-space: pre-wrap;
-  min-height: 60px;
+  min-height: 40px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.8rem;
+  line-height: 1.4;
 }
 
 .result-coordinates {
   font-size: 0.75rem;
   color: #6b7280;
+}
+
+.result-image {
+  margin-bottom: 0.75rem;
+  text-align: center;
+}
+
+.captured-image {
+  max-width: 100%;
+  max-height: 200px;
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 .btn {

@@ -315,6 +315,19 @@ export default {
           pageNumber: p.pageNumber
         })))
       }
+    }, { deep: true, immediate: true })
+
+    // 로컬 pdfPages 변경을 Store에 반영 (양방향 동기화)
+    watch(pdfPages, (newPages) => {
+      if (newPages && Array.isArray(newPages)) {
+        console.log('로컬 pdfPages 변경 감지:', newPages.length)
+
+        // Store와 길이가 다른 경우에만 업데이트 (무한 루프 방지)
+        if (newPages.length !== itemProcessingStore.pdfPages.length) {
+          console.log('Store pdfPages를 로컬 상태로 업데이트')
+          itemProcessingStore.setPdfPages(newPages)
+        }
+      }
     }, { deep: true })
 
     // ===== 네비게이션 관련 메서드 =====
@@ -382,6 +395,24 @@ export default {
         toast.show('과목을 먼저 선택해주세요.', 'error')
         return
       }
+
+      // 현재 pdfPages 상태 확인 및 디버깅
+      console.log('=== OCR 편집으로 이동 전 상태 확인 ===')
+      console.log('로컬 pdfPages:', pdfPages.value)
+      console.log('Store pdfPages:', itemProcessingStore.pdfPages)
+      console.log('로컬 pdfPages 길이:', pdfPages.value.length)
+      console.log('Store pdfPages 길이:', itemProcessingStore.pdfPages.length)
+
+      // Store와 로컬 상태가 동기화되어 있는지 확인
+      if (pdfPages.value.length !== itemProcessingStore.pdfPages.length) {
+        console.warn('⚠️ Store와 로컬 상태가 동기화되지 않음!')
+        console.warn('로컬 상태를 Store 상태로 강제 동기화')
+        pdfPages.value = [...itemProcessingStore.pdfPages]
+      }
+
+      // 최종 상태 확인
+      console.log('최종 pdfPages 길이:', pdfPages.value.length)
+      console.log('최종 pdfPages:', pdfPages.value.map(p => ({ index: p.index, pageNumber: p.pageNumber })))
 
       showOcrEditor.value = true
       console.log('OCR 편집 화면으로 이동 - 과목:', selectedSubject.value)

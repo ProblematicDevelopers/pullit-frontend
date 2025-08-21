@@ -189,7 +189,14 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
      * @param {Array} pages - PDF 페이지 배열
      */
     setPdfPages(pages) {
+      console.log('=== Store setPdfPages 호출됨 ===')
+      console.log('이전 pdfPages 길이:', this.pdfPages.length)
+      console.log('새로운 pages 길이:', pages.length)
+      console.log('새로운 pages:', pages.map(p => ({ index: p.index, pageNumber: p.pageNumber })))
+
       this.pdfPages = pages
+
+      console.log('Store pdfPages 업데이트 완료:', this.pdfPages.length)
     },
 
     /**
@@ -243,9 +250,18 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
      * @param {number} toIndex - 이동할 페이지의 목표 인덱스
      */
     movePage(fromIndex, toIndex) {
+      console.log('=== Store movePage 호출됨 ===')
+      console.log('이동할 페이지 인덱스:', fromIndex, '->', toIndex)
+      console.log('이동 전 pdfPages 길이:', this.pdfPages.length)
+
       if (fromIndex >= 0 && toIndex >= 0 && fromIndex < this.pdfPages.length && toIndex < this.pdfPages.length) {
         const page = this.pdfPages.splice(fromIndex, 1)[0]
         this.pdfPages.splice(toIndex, 0, page)
+
+        console.log('페이지 이동 완료')
+        console.log('이동 후 페이지들:', this.pdfPages.map(p => ({ index: p.index, pageNumber: p.pageNumber })))
+      } else {
+        console.warn('유효하지 않은 인덱스:', { fromIndex, toIndex, pdfPagesLength: this.pdfPages.length })
       }
     },
 
@@ -254,6 +270,10 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
      * @param {number} pageIndex - 삭제할 페이지의 인덱스
      */
     removePage(pageIndex) {
+      console.log('=== Store removePage 호출됨 ===')
+      console.log('삭제할 페이지 인덱스:', pageIndex)
+      console.log('삭제 전 pdfPages 길이:', this.pdfPages.length)
+
       if (pageIndex >= 0 && pageIndex < this.pdfPages.length) {
         // Blob URL도 함께 정리
         const page = this.pdfPages[pageIndex]
@@ -261,6 +281,11 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
           this.removeBlobUrl(page.preview)
         }
         this.pdfPages.splice(pageIndex, 1)
+
+        console.log('페이지 삭제 완료, 남은 길이:', this.pdfPages.length)
+        console.log('남은 페이지들:', this.pdfPages.map(p => ({ index: p.index, pageNumber: p.pageNumber })))
+      } else {
+        console.warn('유효하지 않은 페이지 인덱스:', pageIndex)
       }
     },
 
@@ -269,6 +294,10 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
      * @param {Array<number>} pageIndexes - 삭제할 페이지 인덱스 배열
      */
     removeMultiplePages(pageIndexes) {
+      console.log('=== Store removeMultiplePages 호출됨 ===')
+      console.log('삭제할 페이지 인덱스들:', pageIndexes)
+      console.log('삭제 전 pdfPages 길이:', this.pdfPages.length)
+
       if (!Array.isArray(pageIndexes) || pageIndexes.length === 0) {
         console.warn('유효하지 않은 페이지 인덱스 배열:', pageIndexes)
         return
@@ -278,6 +307,7 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
 
       // 인덱스를 내림차순으로 정렬하여 뒤에서부터 삭제 (인덱스 변화 방지)
       const sortedIndexes = [...pageIndexes].sort((a, b) => b - a)
+      console.log('정렬된 인덱스 (내림차순):', sortedIndexes)
 
       sortedIndexes.forEach(index => {
         if (index >= 0 && index < this.pdfPages.length) {
@@ -287,10 +317,14 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
             this.removeBlobUrl(page.preview)
           }
           this.pdfPages.splice(index, 1)
+          console.log(`인덱스 ${index} 페이지 삭제 완료`)
+        } else {
+          console.warn(`유효하지 않은 인덱스 ${index} 건너뜀`)
         }
       })
 
       console.log('Store에서 일괄 삭제 완료, 남은 페이지 수:', this.pdfPages.length)
+      console.log('남은 페이지들:', this.pdfPages.map(p => ({ index: p.index, pageNumber: p.pageNumber })))
     },
 
     /**
