@@ -15,7 +15,7 @@ export const useTestBankStore = defineStore('testBank', {
     selectedExam: null, // 편집할 기존 시험지 정보
     existingItemIds: [], // 기존 시험지의 문항 ID 목록
     originalExamData: null, // 원본 시험지 데이터
-    
+
     // ===== 시험지 기본 정보 =====
     examInfo: {
       gradeCode: null,
@@ -23,7 +23,7 @@ export const useTestBankStore = defineStore('testBank', {
       subjectId: null,
       subjectName: ''
     },
-    
+
     // ===== 시험지 타입 =====
     examType: 'ALL', // 'TESTWIZARD', 'USER_CREATED', 'ALL'
 
@@ -45,7 +45,7 @@ export const useTestBankStore = defineStore('testBank', {
     totalPages: 0, // 전체 페이지 수
     totalElements: 0, // 전체 요소 수
     currentPage: 0, // 현재 페이지
-    
+
     // ===== 필터 옵션 =====
     filterOptions: {
       grades: [],    // { code: '08', name: '중학교 2학년', count: 100 }
@@ -373,7 +373,7 @@ export const useTestBankStore = defineStore('testBank', {
     },
 
     // ===== API 메서드 추가 =====
-    
+
     /**
      * 필터 옵션 가져오기 (학년, 과목, 학기)
      */
@@ -398,28 +398,28 @@ export const useTestBankStore = defineStore('testBank', {
             { code: '02', name: '2학기', count: 837 }
           ]
         }
-        
+
         // 기존 배열에도 할당
         this.grades = data.grades || []
         this.subjects = data.subjects || []
         this.terms = data.terms || []
-        
+
         // filterOptions 객체에도 할당
         this.filterOptions = {
           grades: data.grades || [],
           terms: data.terms || [],
           subjects: data.subjects || []
         }
-        
+
         console.log('필터 옵션 로드 성공 (임시 데이터):', data)
-        
+
         return data
       } catch (error) {
         console.error('필터 옵션 조회 실패:', error)
         throw error
       }
     },
-    
+
     /**
      * 교과서 목록 가져오기
      */
@@ -427,14 +427,14 @@ export const useTestBankStore = defineStore('testBank', {
       try {
         const response = await axios.get(`${API_BASE_URL}/api/subject`)
         const textbooks = response.data.data || []
-        
+
         // 학년과 과목에 맞는 교과서만 필터링
         const filtered = textbooks.filter(textbook => {
           const matchGrade = !gradeCode || textbook.gradeCode === gradeCode
           const matchArea = !areaCode || textbook.areaCode === areaCode
           return matchGrade && matchArea
         })
-        
+
         console.log('교과서 목록 로드:', filtered.length)
         return filtered
       } catch (error) {
@@ -442,7 +442,7 @@ export const useTestBankStore = defineStore('testBank', {
         return []
       }
     },
-    
+
     /**
      * 대단원 목록 가져오기
      */
@@ -450,7 +450,7 @@ export const useTestBankStore = defineStore('testBank', {
       try {
         const response = await axios.get(`${API_BASE_URL}/api/chapter/${subjectId}/tree`)
         const chapters = response.data.data || []
-        
+
         console.log('대단원 목록 로드:', chapters.length)
         return chapters
       } catch (error) {
@@ -466,7 +466,7 @@ export const useTestBankStore = defineStore('testBank', {
     async searchExams(searchParams) {
       try {
         this.loading = true
-        
+
         // API 파라미터 매핑
         const params = {
           keyword: searchParams.keyword || '',
@@ -481,7 +481,7 @@ export const useTestBankStore = defineStore('testBank', {
           size: searchParams.size || 20,
           sort: searchParams.sort || 'createdDate,desc'
         }
-        
+
         // null 값 제거 (빈 문자열은 유지)
         console.log('파라미터 정리 전:', params)
         Object.keys(params).forEach(key => {
@@ -489,23 +489,49 @@ export const useTestBankStore = defineStore('testBank', {
             delete params[key]
           }
         })
-        
+
         console.log('시험지 검색 요청 (최종):', params)
         const response = await examApi.get('/search', { params })
-        
+
         // 응답 데이터 처리
         const data = response.data
-        this.examSearchResults = data.content || []
+
+        // CBT 타입 시험 필터링 (wizard에서만 적용)
+        let filteredContent = data.content || []
+        if (params.examType === 'ALL' || !params.examType) {
+          // examType이 ALL이거나 지정되지 않은 경우 CBT 제외
+          const originalCount = filteredContent.length
+          filteredContent = filteredContent.filter(exam => {
+            // userExamType이 CBT인 경우 필터링 (USER_CREATED 타입의 경우)
+            const isCBT = exam.userExamType === 'CBT'
+            if (isCBT) {
+              console.log('CBT 시험 필터링됨:', exam.examName || exam.title, '(userExamType:', exam.userExamType, ')')
+            }
+            return !isCBT
+          })
+
+          if (originalCount !== filteredContent.length) {
+            console.log(`CBT 필터링: ${originalCount}개 중 ${filteredContent.length}개 표시 (${originalCount - filteredContent.length}개 CBT 제외)`)
+          }
+        }
+
+        this.examSearchResults = filteredContent
+        // 원본 페이지 정보 유지 (백엔드 페이징 정보 그대로 사용)
         this.totalPages = data.totalPages || 0
         this.totalElements = data.totalElements || 0
         this.currentPage = data.number || 0
-        
+
         console.log('시험지 검색 성공:', {
-          results: data.content?.length || 0,
-          total: data.totalElements || 0
+          results: filteredContent.length,
+          total: data.totalElements || 0,
+          filtered: data.content?.length !== filteredContent.length
         })
-        
-        return data
+
+        // 필터링된 데이터를 반환
+        return {
+          ...data,
+          content: filteredContent
+        }
       } catch (error) {
         console.error('시험지 검색 실패:', error)
         this.examSearchResults = []
@@ -524,15 +550,32 @@ export const useTestBankStore = defineStore('testBank', {
       try {
         this.loading = true
         const response = await examApi.get('/accessible', {
-          params: { 
+          params: {
             userId: userId || 1, // 임시 userId
-            page, 
-            size, 
-            sort: 'createdDate,desc' 
+            page,
+            size,
+            sort: 'createdDate,desc'
           }
         })
-        
-        return response.data
+
+        // CBT 타입 시험 필터링
+        const data = response.data
+        if (data && data.content) {
+          const originalCount = data.content.length
+          data.content = data.content.filter(exam => {
+            const isCBT = exam.userExamType === 'CBT'
+            if (isCBT) {
+              console.log('CBT 시험 필터링됨 (accessible):', exam.examName || exam.title, '(userExamType:', exam.userExamType, ')')
+            }
+            return !isCBT
+          })
+
+          if (originalCount !== data.content.length) {
+            console.log(`CBT 필터링 (accessible): ${originalCount}개 중 ${data.content.length}개 표시`)
+          }
+        }
+
+        return data
       } catch (error) {
         console.error('접근 가능한 시험지 조회 실패:', error)
         throw error
@@ -540,7 +583,7 @@ export const useTestBankStore = defineStore('testBank', {
         this.loading = false
       }
     },
-    
+
     /**
      * 최근 시험지 가져오기
      */
@@ -549,13 +592,39 @@ export const useTestBankStore = defineStore('testBank', {
         const response = await examApi.get('/recent', {
           params: { limit }
         })
-        return response.data
+
+        // CBT 타입 시험 필터링
+        const data = response.data
+        if (data && Array.isArray(data)) {
+          const originalCount = data.length
+          const filtered = data.filter(exam => {
+            const isCBT = exam.userExamType === 'CBT'
+            return !isCBT
+          })
+
+          if (originalCount !== filtered.length) {
+            console.log(`CBT 필터링 (recent): ${originalCount}개 중 ${filtered.length}개 표시`)
+          }
+          return filtered
+        } else if (data && data.content) {
+          const originalCount = data.content.length
+          data.content = data.content.filter(exam => {
+            const isCBT = exam.userExamType === 'CBT'
+            return !isCBT
+          })
+
+          if (originalCount !== data.content.length) {
+            console.log(`CBT 필터링 (recent): ${originalCount}개 중 ${data.content.length}개 표시`)
+          }
+        }
+
+        return data
       } catch (error) {
         console.error('최근 시험지 조회 실패:', error)
         throw error
       }
     },
-    
+
     /**
      * 인기 시험지 가져오기
      */
@@ -564,13 +633,39 @@ export const useTestBankStore = defineStore('testBank', {
         const response = await examApi.get('/popular', {
           params: { limit }
         })
-        return response.data
+
+        // CBT 타입 시험 필터링
+        const data = response.data
+        if (data && Array.isArray(data)) {
+          const originalCount = data.length
+          const filtered = data.filter(exam => {
+            const isCBT = exam.userExamType === 'CBT'
+            return !isCBT
+          })
+
+          if (originalCount !== filtered.length) {
+            console.log(`CBT 필터링 (popular): ${originalCount}개 중 ${filtered.length}개 표시`)
+          }
+          return filtered
+        } else if (data && data.content) {
+          const originalCount = data.content.length
+          data.content = data.content.filter(exam => {
+            const isCBT = exam.userExamType === 'CBT'
+            return !isCBT
+          })
+
+          if (originalCount !== data.content.length) {
+            console.log(`CBT 필터링 (popular): ${originalCount}개 중 ${data.content.length}개 표시`)
+          }
+        }
+
+        return data
       } catch (error) {
         console.error('인기 시험지 조회 실패:', error)
         throw error
       }
     },
-    
+
     /**
      * 과목별 시험지 통계
      */
@@ -595,9 +690,9 @@ export const useTestBankStore = defineStore('testBank', {
       try {
         this.loading = true
         console.log('기존 시험지 문항 로드 시작:', examId, '타입:', examType)
-        
+
         let response
-        
+
         // examType에 따라 다른 API 호출
         if (examType === 'USER_CREATED') {
           // UserExam인 경우 - 아직 백엔드 구현 필요
@@ -610,18 +705,18 @@ export const useTestBankStore = defineStore('testBank', {
           // 일반 Exam인 경우
           response = await examApi.get(`/${examId}/items`)
         }
-        
+
         if (response && response.data.success) {
           const data = response.data.data
           this.existingItemIds = data.itemIds || []
           this.originalExamData = data
-          
+
           console.log('기존 문항 로드 성공:', {
             examId: data.examId,
             itemCount: data.itemCount,
             itemIds: this.existingItemIds
           })
-          
+
           return data
         } else {
           console.error('기존 문항 로드 실패:', response?.data?.message)
@@ -638,7 +733,7 @@ export const useTestBankStore = defineStore('testBank', {
         this.loading = false
       }
     },
-    
+
     /**
      * 기존 문항 ID 목록 설정
      * @param {Array} itemIds - 문항 ID 목록
@@ -646,7 +741,7 @@ export const useTestBankStore = defineStore('testBank', {
     setExistingItemIds(itemIds) {
       this.existingItemIds = itemIds || []
     },
-    
+
     /**
      * 기존 문항 ID 목록 초기화
      */
@@ -654,7 +749,7 @@ export const useTestBankStore = defineStore('testBank', {
       this.existingItemIds = []
       this.originalExamData = null
     },
-    
+
     /**
      * 선택된 문항들 저장 (Step2에서 Step3로 전달)
      * @param {Array} questions - 선택된 문항 배열
@@ -672,7 +767,7 @@ export const useTestBankStore = defineStore('testBank', {
       try {
         this.loading = true
         const response = await examApi.post('', examData)
-        
+
         if (response.data.success) {
           console.log('시험지 생성 성공:', response.data.data)
           return response.data.data
@@ -695,7 +790,7 @@ export const useTestBankStore = defineStore('testBank', {
         const response = await examApi.get(`/${id}`, {
           params: { source }
         })
-        
+
         if (response.data.success) {
           return response.data.data
         }
