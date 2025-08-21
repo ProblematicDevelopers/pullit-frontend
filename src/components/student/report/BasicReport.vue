@@ -108,9 +108,7 @@
 
     <section v-else class="panel">
       <h3 class="panel-title">📊 평가결과 요약</h3>
-      <div class="card empty">
-        <DetailReport />
-      </div>
+        <DetailReport :examId="examId"/>
     </section>
 
     <!-- 문제 HTML 모달 -->
@@ -137,6 +135,9 @@ const loading = ref(false)
 const error = ref(null)
 const showModal = ref(false)
 const selectedQuestion = ref(null)
+
+// detail report
+const examId = ref(-1)
 
 onMounted(async () => {
   await Promise.all([fetchStudentInfo(), fetchExamData()])
@@ -187,6 +188,9 @@ const fetchExamData = async () => {
 
     const response = await reportApi.getAttemptIdBasic(attemptId)
     const data = response.data?.data || response.data || {}
+
+    // detail report
+    examId.value = data.examId    
 
     // API 응답 데이터를 컴포넌트에서 사용할 수 있는 형태로 변환
     examData.value = {
