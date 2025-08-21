@@ -42,11 +42,13 @@ import * as schemas from '@pdfme/schemas'
 const props = defineProps({
   questions: {
     type: Array,
-    required: true
+    required: true,
+    default: () => []
   },
   examData: {
     type: Object,
-    required: true
+    required: true,
+    default: () => ({})
   }
 })
 
@@ -62,7 +64,7 @@ const loadingMessage = ref('')
 // 문제를 이미지로 변환 (HTML to Canvas)
 const questionToImage = async (question) => {
   const html2canvas = (await import('html2canvas')).default
-  
+
   // 임시 div 생성
   const tempDiv = document.createElement('div')
   tempDiv.style.position = 'absolute'
@@ -71,7 +73,7 @@ const questionToImage = async (question) => {
   tempDiv.style.padding = '20px'
   tempDiv.style.backgroundColor = 'white'
   tempDiv.style.fontFamily = 'Noto Sans KR, sans-serif'
-  
+
   // 문제 HTML 생성
   tempDiv.innerHTML = `
     <div style="margin-bottom: 20px;">
@@ -90,19 +92,19 @@ const questionToImage = async (question) => {
       ` : ''}
     </div>
   `
-  
+
   document.body.appendChild(tempDiv)
-  
+
   try {
     // HTML을 Canvas로 변환
     const canvas = await html2canvas(tempDiv, {
       scale: 2,
       backgroundColor: '#ffffff'
     })
-    
+
     // Canvas를 Base64로 변환
     const base64 = canvas.toDataURL('image/png')
-    
+
     return base64
   } finally {
     // 임시 div 제거
@@ -114,7 +116,7 @@ const questionToImage = async (question) => {
 const createInitialTemplate = async () => {
   // PDFMe Designer는 단일 페이지 스키마 배열을 사용
   const schema = []
-  
+
   // 페이지 제목
   schema.push({
     name: 'title',
@@ -126,7 +128,7 @@ const createInitialTemplate = async () => {
     alignment: 'center',
     fontName: 'NotoSansKR'
   })
-  
+
   schema.push({
     name: 'subtitle',
     type: 'text',
@@ -137,11 +139,12 @@ const createInitialTemplate = async () => {
     alignment: 'center',
     fontName: 'NotoSansKR'
   })
-  
+
   // 문제 이미지 추가 (첫 2문제만 Designer에서 편집)
-  for (let i = 0; i < Math.min(2, props.questions.length); i++) {
+  const questionCount = props.questions ? Math.min(2, props.questions.length) : 0
+  for (let i = 0; i < questionCount; i++) {
     const yPosition = 50 + (i * 120)
-    
+
     schema.push({
       name: `question_${i}`,
       type: 'image',
@@ -150,10 +153,11 @@ const createInitialTemplate = async () => {
       height: 100
     })
   }
-  
+
   return {
     basePdf: BLANK_PDF,
-    schemas: [schema]  // 단일 스키마 배열
+    schemas: [schema],  // 단일 스키마 배열
+    sampleInput: [{}]   // 샘플 입력 추가
   }
 }
 
@@ -161,21 +165,28 @@ const createInitialTemplate = async () => {
 const createInputData = async () => {
   isLoading.value = true
   loadingMessage.value = '문제를 이미지로 변환 중...'
-  
+
   const input = {}
-  
+
   // 제목 정보
   input['title'] = props.examData.title || '시험지'
   input['subtitle'] = `${props.examData.grade || ''} ${props.examData.subject || ''}`
-  
+
   // 첫 2문제만 이미지로 변환 (Designer에서 편집)
-  for (let i = 0; i < Math.min(2, props.questions.length); i++) {
-    const imageData = await questionToImage(props.questions[i])
-    input[`question_${i}`] = imageData
+  const questionCount = props.questions ? Math.min(2, props.questions.length) : 0
+  for (let i = 0; i < questionCount; i++) {
+    try {
+      const imageData = await questionToImage(props.questions[i])
+      input[`question_${i}`] = imageData
+    } catch (imgError) {
+      console.error(`문제 ${i} 이미지 변환 실패:`, imgError)
+      // 기본 이미지나 텍스트로 대체
+      input[`question_${i}`] = ''
+    }
   }
-  
+
   isLoading.value = false
-  
+
   return [input]  // 배열로 반환하지만 단일 객체만 포함
 }
 
@@ -184,36 +195,54 @@ const initializeDesigner = async () => {
   try {
     isLoading.value = true
     loadingMessage.value = 'PDF 편집기 초기화 중...'
-    
+
     // 폰트 로드
     const font = await getPDFMeFont()
-    
+
     // 템플릿 생성
     const template = await createInitialTemplate()
-    
+
     // 입력 데이터 생성 (배열의 첫 번째 요소만 사용)
     const inputsArray = await createInputData()
     const inputs = inputsArray[0] || {}
-    
+
     console.log('Designer 초기화 - template:', template)
     console.log('Designer 초기화 - inputs:', inputs)
     console.log('Designer 초기화 - font:', font)
-    
+
     // Designer 생성
-    designer.value = new Designer({
-      domContainer: designerContainer.value,
-      template: template,
-      input: inputs,  // 'input'으로 변경 (단수형)
-      options: {
-        font: font,
-        lang: 'ko'
-      },
-      plugins: {
-        text: schemas.text,
-        image: schemas.image
-      }
-    })
-    
+    try {
+      designer.value = new Designer({
+        domContainer: designerContainer.value,
+        template: template,
+        inputs: [inputs],  // 배열로 감싸기
+        options: {
+          font: font,
+          lang: 'ko'
+        },
+        plugins: {
+          Text: schemas.text,    // 대문자로 변경
+          Image: schemas.image   // 대문자로 변경
+        }
+      })
+    } catch (designerError) {
+      console.error('Designer 생성 오류:', designerError)
+      // 대체 시도 - plugins 키 이름 변경
+      designer.value = new Designer({
+        domContainer: designerContainer.value,
+        template: template,
+        inputs: [inputs],
+        options: {
+          font: font,
+          lang: 'ko'
+        },
+        plugins: {
+          text: schemas.text,
+          image: schemas.image
+        }
+      })
+    }
+
     isLoading.value = false
   } catch (error) {
     console.error('Designer 초기화 실패:', error)
@@ -225,13 +254,13 @@ const initializeDesigner = async () => {
 // 템플릿 저장
 const saveTemplate = () => {
   if (!designer.value) return
-  
+
   const template = designer.value.getTemplate()
   console.log('저장된 템플릿:', template)
-  
+
   // localStorage에 저장
   localStorage.setItem('examPdfTemplate', JSON.stringify(template))
-  
+
   emit('save', template)
   alert('템플릿이 저장되었습니다.')
 }
@@ -239,15 +268,15 @@ const saveTemplate = () => {
 // PDF 생성
 const generatePDF = async () => {
   if (!designer.value) return
-  
+
   try {
     isLoading.value = true
     loadingMessage.value = 'PDF 생성 중...'
-    
+
     const template = designer.value.getTemplate()
     const inputsArray = await createInputData()
     const font = await getPDFMeFont()
-    
+
     const pdf = await generate({
       template: template,
       inputs: inputsArray,  // 배열로 전달
@@ -255,7 +284,7 @@ const generatePDF = async () => {
         font: font
       }
     })
-    
+
     // Blob 생성 및 다운로드
     const blob = new Blob([pdf.buffer || pdf], { type: 'application/pdf' })
     const url = URL.createObjectURL(blob)
@@ -266,7 +295,7 @@ const generatePDF = async () => {
     link.click()
     document.body.removeChild(link)
     URL.revokeObjectURL(url)
-    
+
     isLoading.value = false
     emit('generate', blob)
     alert('PDF가 생성되었습니다.')
@@ -282,7 +311,11 @@ onMounted(() => {
   console.log('PdfDesigner mounted')
   console.log('Props questions:', props.questions)
   console.log('Props examData:', props.examData)
-  initializeDesigner()
+
+  // DOM이 완전히 렌더링된 후 초기화
+  setTimeout(() => {
+    initializeDesigner()
+  }, 100)
 })
 
 onUnmounted(() => {

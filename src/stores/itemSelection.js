@@ -11,16 +11,16 @@ export const useItemSelectionStore = defineStore('itemSelection', {
   state: () => ({
     // 검색된 문항 목록
     items: [],
-    
+
     // 선택된 문항 목록
     selectedItems: [],
-    
+
     // 페이지네이션
     currentPage: 1,
     totalPages: 1,
     totalItems: 0,
     itemsPerPage: 20,
-    
+
     // 필터 설정
     filters: {
       subjects: [], // 과목 필터
@@ -30,44 +30,44 @@ export const useItemSelectionStore = defineStore('itemSelection', {
       keyword: '', // 검색 키워드
       chapterIds: [] // 단원 ID 필터 (기존 호환성)
     },
-    
+
     // 로딩 상태
     isLoading: false,
     isSimilarItemsLoading: false,
     isSubjectsLoading: false,
-    
+
     // 에러 상태
     error: null,
     similarItemsError: null,
     subjectsError: null,
-    
+
     // 교과서/과목 정보
     subjects: [],
     textbooks: {},
     chapters: [], // 기존 호환성 유지
-    
+
     // 정렬 설정
     sortBy: 'createdAt', // createdAt, difficulty, chapterCode
     sortOrder: 'desc', // asc, desc
-    
+
     // 문항 상세 정보 캐시
     itemDetailsCache: new Map(),
-    
+
     // 유사 문항 캐시 (Elasticsearch)
     similarItemsCache: new Map(),
-    
+
     // 검색 기록 (UX 개선용)
     searchHistory: [],
     maxSearchHistory: 10,
-    
+
     // 이미지 미리보기 설정
     previewItem: null,
     showPreview: false,
-    
+
     // 통계 정보
     chapterCounts: {},
     itemStats: null,
-    
+
     // 마지막 검색 파라미터 (캐싱용)
     lastSearchParams: null
   }),
@@ -93,8 +93,8 @@ export const useItemSelectionStore = defineStore('itemSelection', {
      * 전체 선택 상태
      */
     isAllSelected: (state) => {
-      return state.items.length > 0 && 
-             state.items.every(item => 
+      return state.items.length > 0 &&
+             state.items.every(item =>
                state.selectedItems.some(selected => selected.itemId === item.itemId)
              )
     },
@@ -103,7 +103,7 @@ export const useItemSelectionStore = defineStore('itemSelection', {
      * 일부 선택 상태 (전체 선택 체크박스용)
      */
     isSomeSelected: (state) => {
-      return state.items.some(item => 
+      return state.items.some(item =>
         state.selectedItems.some(selected => selected.itemId === item.itemId)
       ) && !state.isAllSelected
     },
@@ -323,16 +323,17 @@ export const useItemSelectionStore = defineStore('itemSelection', {
     async searchItems(searchParams = {}) {
       this.isLoading = true
       this.error = null
-      
+
       try {
         // 검색 파라미터 준비
         const params = {
-          keyword: this.filters.keyword || searchParams.keyword || '',
-          subjects: this.filters.subjects.length > 0 ? this.filters.subjects : (searchParams.subjects || []),
-          grades: this.filters.grades.length > 0 ? this.filters.grades : (searchParams.grades || []),
-          difficulties: this.filters.difficulties.length > 0 ? this.filters.difficulties : (searchParams.difficulties || []),
-          categories: this.filters.categories.length > 0 ? this.filters.categories : (searchParams.categories || []),
-          page: (searchParams.page || this.currentPage) - 1, // 0-based indexing
+          keyword: searchParams.keyword || this.filters.keyword || '',
+          subjects: searchParams.subjects || this.filters.subjects || [],
+          grades: searchParams.grades || this.filters.grades || [],
+          difficulties: searchParams.difficulties || this.filters.difficulties || [],
+          categories: searchParams.categories || this.filters.categories || [],
+          chapterIds: searchParams.chapterIds || this.filters.chapterIds || [],
+          page: searchParams.page !== undefined ? searchParams.page : (this.currentPage - 1), // 0-based indexing
           size: searchParams.size || this.itemsPerPage,
           sortBy: this.sortBy,
           sortDirection: this.sortOrder
@@ -349,8 +350,20 @@ export const useItemSelectionStore = defineStore('itemSelection', {
 
         // API 호출
         const result = await itemApiService.searchItems(params)
-        
+
         if (result.success) {
+          // 첫 번째 아이템의 구조 확인 (디버깅용)
+          if (result.data && result.data.length > 0) {
+            console.log('First item structure:', result.data[0])
+            console.log('Has choice fields?', {
+              choice1Html: result.data[0].choice1Html,
+              choice2Html: result.data[0].choice2Html,
+              choice3Html: result.data[0].choice3Html,
+              choice4Html: result.data[0].choice4Html,
+              choice5Html: result.data[0].choice5Html
+            })
+          }
+
           this.setItems(result.data)
           this.setPaginationInfo({
             currentPage: result.currentPage + 1, // 1-based for UI
@@ -369,7 +382,7 @@ export const useItemSelectionStore = defineStore('itemSelection', {
         } else {
           throw new Error(result.error || 'Search failed')
         }
-        
+
       } catch (error) {
         console.error('문항 검색 실패:', error)
         this.error = error.message || 'Failed to search items'
@@ -395,7 +408,7 @@ export const useItemSelectionStore = defineStore('itemSelection', {
 
       try {
         const result = await itemApiService.getItemDetail(itemId)
-        
+
         if (result.success) {
           // 캐시에 저장
           this.itemDetailsCache.set(itemId, result.data)
@@ -425,7 +438,7 @@ export const useItemSelectionStore = defineStore('itemSelection', {
 
       this.isSimilarItemsLoading = true
       this.similarItemsError = null
-      
+
       try {
         const params = {
           topicChapterId: options.topicChapterId || 0,
@@ -435,7 +448,7 @@ export const useItemSelectionStore = defineStore('itemSelection', {
         }
 
         const result = await itemApiService.getSimilarItems(params)
-        
+
         if (result.success) {
           // 캐시에 저장
           this.similarItemsCache.set(cacheKey, result.data)
@@ -443,7 +456,7 @@ export const useItemSelectionStore = defineStore('itemSelection', {
         } else {
           throw new Error(result.error || 'Failed to find similar items')
         }
-        
+
       } catch (error) {
         console.error('유사 문항 검색 실패:', error)
         this.similarItemsError = error.message || 'Failed to search similar items'
@@ -459,7 +472,7 @@ export const useItemSelectionStore = defineStore('itemSelection', {
     async loadSubjects(options = {}) {
       this.isSubjectsLoading = true
       this.subjectsError = null
-      
+
       try {
         // gradeCode와 areaCode가 있으면 해당 파라미터 사용
         const params = {
@@ -469,10 +482,10 @@ export const useItemSelectionStore = defineStore('itemSelection', {
         }
 
         const result = await itemApiService.getSubjects(params)
-        
+
         if (result.success) {
           this.subjects = result.data
-          
+
           // 텍스트북 정보 별도 저장
           if (params.includeTextbooks) {
             const textbooks = {}
@@ -483,12 +496,12 @@ export const useItemSelectionStore = defineStore('itemSelection', {
             })
             this.textbooks = textbooks
           }
-          
+
           return result.data
         } else {
           throw new Error(result.error || 'Failed to load subjects')
         }
-        
+
       } catch (error) {
         console.error('과목 정보 가져오기 실패:', error)
         this.subjectsError = error.message || 'Failed to load subjects'
@@ -510,14 +523,14 @@ export const useItemSelectionStore = defineStore('itemSelection', {
         }
 
         const result = await itemApiService.getChapterCounts(params)
-        
+
         if (result.success) {
           this.chapterCounts = result.data
           return result.data
         } else {
           throw new Error(result.error || 'Failed to load chapter counts')
         }
-        
+
       } catch (error) {
         console.error('단원별 통계 가져오기 실패:', error)
         throw error
@@ -530,14 +543,14 @@ export const useItemSelectionStore = defineStore('itemSelection', {
     async loadItemStats(filters = {}) {
       try {
         const result = await itemApiService.getItemStats(filters)
-        
+
         if (result.success) {
           this.itemStats = result.data
           return result.data
         } else {
           throw new Error(result.error || 'Failed to load item statistics')
         }
-        
+
       } catch (error) {
         console.error('문항 통계 가져오기 실패:', error)
         throw error
@@ -577,10 +590,10 @@ export const useItemSelectionStore = defineStore('itemSelection', {
       this.searchHistory = this.searchHistory.filter(
         item => item.keyword !== searchData.keyword
       )
-      
+
       // 새 항목을 맨 앞에 추가
       this.searchHistory.unshift(searchData)
-      
+
       // 최대 개수 제한
       if (this.searchHistory.length > this.maxSearchHistory) {
         this.searchHistory = this.searchHistory.slice(0, this.maxSearchHistory)
@@ -711,7 +724,7 @@ export const useItemSelectionStore = defineStore('itemSelection', {
       this.totalPages = 1
       this.totalItems = 0
       this.itemsPerPage = 20
-      
+
       this.filters = {
         subjects: [],
         grades: [],
@@ -720,26 +733,26 @@ export const useItemSelectionStore = defineStore('itemSelection', {
         keyword: '',
         chapterIds: []
       }
-      
+
       this.isLoading = false
       this.isSimilarItemsLoading = false
       this.isSubjectsLoading = false
-      
+
       this.error = null
       this.similarItemsError = null
       this.subjectsError = null
-      
+
       this.subjects = []
       this.textbooks = {}
       this.chapters = []
       this.chapterCounts = {}
       this.itemStats = null
-      
+
       this.searchHistory = []
       this.lastSearchParams = null
-      
+
       this.clearCaches()
-      
+
       this.previewItem = null
       this.showPreview = false
     },
@@ -761,13 +774,13 @@ export const useItemSelectionStore = defineStore('itemSelection', {
      * 선택된 문항들의 유사 문항 일괄 검색
      */
     async loadSimilarItemsForSelected(options = {}) {
-      const promises = this.selectedItems.map(item => 
+      const promises = this.selectedItems.map(item =>
         this.searchSimilarItems(item.itemId, options).catch(error => {
           console.warn(`유사 문항 검색 실패 (itemId: ${item.itemId}):`, error)
           return []
         })
       )
-      
+
       return await Promise.all(promises)
     },
 
@@ -777,7 +790,7 @@ export const useItemSelectionStore = defineStore('itemSelection', {
     async bulkItemOperation(operation, itemIds, operationData = {}) {
       try {
         const result = await itemApiService.bulkItemOperation(operation, itemIds, operationData)
-        
+
         if (result.success) {
           return result
         } else {

@@ -198,6 +198,13 @@
                 </label>
                 <div class="difficulty-buttons">
                   <button
+                    :class="['difficulty-btn', 'diff-very-high', { 'active': filters.difficulties.includes('5') }]"
+                    @click="toggleDifficulty('5')"
+                  >
+                    <span class="diff-icon">⚫</span>
+                    <span>최상</span>
+                  </button>
+                  <button
                     :class="['difficulty-btn', 'diff-high', { 'active': filters.difficulties.includes('4') }]"
                     @click="toggleDifficulty('4')"
                   >
@@ -217,6 +224,13 @@
                   >
                     <span class="diff-icon">🟢</span>
                     <span>하</span>
+                  </button>
+                  <button
+                    :class="['difficulty-btn', 'diff-very-low', { 'active': filters.difficulties.includes('1') }]"
+                    @click="toggleDifficulty('1')"
+                  >
+                    <span class="diff-icon">⚪</span>
+                    <span>최하</span>
                   </button>
                 </div>
               </div>
@@ -317,8 +331,40 @@
 
             <!-- 문항 내용 -->
             <div class="item-content">
-              <!-- 이미지가 있는 경우 -->
-              <div v-if="item.hasImageData && item.questionImageUrl" class="item-image-container">
+              <!-- HTML 콘텐츠가 있는 경우 (우선 표시) -->
+              <div v-if="item.hasHtmlData && item.questionHtml" class="item-html-content" ref="mathContent">
+                <div class="question-text mathjax-content" v-html="item.questionHtml"></div>
+
+                <!-- 선택지 HTML 표시 -->
+                <div v-if="hasChoices(item)" class="choices-container">
+                  <div class="choices-title">선택지:</div>
+                  <div class="choices-list">
+                    <div v-if="item.choice1Html" class="choice-item mathjax-content">
+                      <span class="choice-number">①</span>
+                      <span v-html="item.choice1Html"></span>
+                    </div>
+                    <div v-if="item.choice2Html" class="choice-item mathjax-content">
+                      <span class="choice-number">②</span>
+                      <span v-html="item.choice2Html"></span>
+                    </div>
+                    <div v-if="item.choice3Html" class="choice-item mathjax-content">
+                      <span class="choice-number">③</span>
+                      <span v-html="item.choice3Html"></span>
+                    </div>
+                    <div v-if="item.choice4Html" class="choice-item mathjax-content">
+                      <span class="choice-number">④</span>
+                      <span v-html="item.choice4Html"></span>
+                    </div>
+                    <div v-if="item.choice5Html" class="choice-item mathjax-content">
+                      <span class="choice-number">⑤</span>
+                      <span v-html="item.choice5Html"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- HTML이 없고 이미지가 있는 경우 -->
+              <div v-else-if="item.hasImageData && item.questionImageUrl" class="item-image-container">
                 <img
                   :src="item.questionImageUrl"
                   :alt="`문항 ${item.itemId}`"
@@ -332,11 +378,6 @@
                     <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                   </svg>
                 </button>
-              </div>
-
-              <!-- HTML 콘텐츠가 있는 경우 -->
-              <div v-else-if="item.hasHtmlData" class="item-html-content">
-                <div class="question-text" v-html="truncateHtml(item.questionHtml, 200)"></div>
               </div>
 
               <!-- 콘텐츠가 없는 경우 -->
@@ -466,14 +507,41 @@
                 ×
               </button>
             </div>
-            
+
             <div class="preview-item-content">
-              <div v-if="item.questionImageUrl" class="preview-item-image">
+              <!-- HTML 콘텐츠 우선 표시 -->
+              <div v-if="item.questionHtml" class="preview-item-text mathjax-content" v-html="item.questionHtml"></div>
+              <div v-else-if="item.questionImageUrl" class="preview-item-image">
                 <img :src="item.questionImageUrl" :alt="`문항 ${index + 1}`" />
               </div>
-              <div v-else-if="item.questionHtml" class="preview-item-text" v-html="item.questionHtml"></div>
               <div v-else class="preview-item-placeholder">
                 문항 ID: {{ item.itemId }}
+              </div>
+
+              <!-- 선택지 표시 -->
+              <div v-if="hasChoices(item)" class="preview-choices-container">
+                <div class="preview-choices-list">
+                  <div v-if="item.choice1Html" class="preview-choice-item mathjax-content">
+                    <span class="choice-number">①</span>
+                    <span v-html="item.choice1Html"></span>
+                  </div>
+                  <div v-if="item.choice2Html" class="preview-choice-item mathjax-content">
+                    <span class="choice-number">②</span>
+                    <span v-html="item.choice2Html"></span>
+                  </div>
+                  <div v-if="item.choice3Html" class="preview-choice-item mathjax-content">
+                    <span class="choice-number">③</span>
+                    <span v-html="item.choice3Html"></span>
+                  </div>
+                  <div v-if="item.choice4Html" class="preview-choice-item mathjax-content">
+                    <span class="choice-number">④</span>
+                    <span v-html="item.choice4Html"></span>
+                  </div>
+                  <div v-if="item.choice5Html" class="preview-choice-item mathjax-content">
+                    <span class="choice-number">⑤</span>
+                    <span v-html="item.choice5Html"></span>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
@@ -531,10 +599,10 @@
             <div class="base-item-card">
               <div class="item-number">문항 #{{ currentBaseItem?.itemId }}</div>
               <div class="item-preview">
-                <div v-if="currentBaseItem?.questionImageUrl" class="item-image-small">
+                <div v-if="currentBaseItem?.questionHtml" class="item-html-small mathjax-content" v-html="currentBaseItem.questionHtml"></div>
+                <div v-else-if="currentBaseItem?.questionImageUrl" class="item-image-small">
                   <img :src="currentBaseItem.questionImageUrl" :alt="`문항 ${currentBaseItem.itemId}`" />
                 </div>
-                <div v-else-if="currentBaseItem?.questionHtml" class="item-html-small" v-html="truncateHtml(currentBaseItem.questionHtml, 100)"></div>
                 <div v-else class="no-content">문항 내용 없음</div>
               </div>
             </div>
@@ -789,8 +857,35 @@ const loadChapterTree = async (subjectId) => {
 
       console.log(`교과서 ${subjectId}의 챕터 트리 로드 완료:`, chapterTree.value)
 
+      // 챕터별 문항 개수 가져오기
       if (chapterTree.value.length > 0) {
-        // info(`${chapterTree.value.length}개의 대단원을 불러왔습니다.`)
+        // 모든 챕터 ID 수집 (대단원 + 중단원)
+        const allChapterIds = []
+        chapterTree.value.forEach(large => {
+          allChapterIds.push(large.id)
+          if (large.mediumChapters) {
+            large.mediumChapters.forEach(medium => {
+              allChapterIds.push(medium.id)
+            })
+          }
+        })
+
+        // 챕터별 문항 개수 API 호출
+        const countsResult = await itemApiService.getItemCountsByChapters(subjectId, allChapterIds)
+
+        if (countsResult.success) {
+          // 챕터 트리에 문항 개수 업데이트
+          chapterTree.value.forEach(large => {
+            large.itemCount = countsResult.data[large.id] || 0
+            if (large.mediumChapters) {
+              large.mediumChapters.forEach(medium => {
+                medium.itemCount = countsResult.data[medium.id] || 0
+              })
+            }
+          })
+          console.log('챕터별 문항 개수 업데이트 완료:', chapterTree.value)
+        }
+
         // 첫 번째 대단원 자동 확장
         expandedChapters.value = [chapterTree.value[0].id]
       } else {
@@ -936,7 +1031,7 @@ const toggleSelection = (item) => {
   // backend에서 item_id로 오는 경우와 itemId로 오는 경우 모두 처리
   const itemId = item.item_id || item.itemId
   const wasSelected = isSelected(itemId)
-  
+
   // item 객체 정규화
   const normalizedItem = {
     itemId: itemId,
@@ -947,7 +1042,7 @@ const toggleSelection = (item) => {
     subjectId: item.subject_id || item.subjectId,
     topicChapterId: item.topic_chapter_id || item.topicChapterId
   }
-  
+
   itemStore.toggleItemSelection(normalizedItem)
 
   if (wasSelected) {
@@ -1027,6 +1122,11 @@ const showImageModal = (imageUrl) => {
 const closeModal = () => {
   showModal.value = false
   modalImageUrl.value = ''
+}
+
+const hasChoices = (item) => {
+  return item.choice1Html || item.choice2Html || item.choice3Html ||
+         item.choice4Html || item.choice5Html
 }
 
 const truncateHtml = (html, maxLength) => {
@@ -1196,6 +1296,20 @@ const loadSubjectsAndTextbooks = async () => {
 
     console.log('로드된 교과서 목록:', subjects.value)
     console.log('로드된 교과서 개수:', subjects.value?.length || 0)
+
+    // 교과서별 문항 개수 가져오기
+    if (subjects.value && subjects.value.length > 0) {
+      const subjectIds = subjects.value.map(s => s.subjectId)
+      const countsResult = await itemApiService.getItemCountsBySubjects(subjectIds)
+
+      if (countsResult.success) {
+        // 각 교과서에 itemCount 추가
+        subjects.value.forEach(subject => {
+          subject.itemCount = countsResult.data[subject.subjectId] || 0
+        })
+        console.log('문항 개수 업데이트 완료:', subjects.value)
+      }
+    }
   } catch (err) {
     error('과목 정보 로드에 실패했습니다.')
     console.error('Load subjects error:', err)
@@ -1203,16 +1317,90 @@ const loadSubjectsAndTextbooks = async () => {
 }
 
 
+// MathJax 렌더링 함수
+const renderMathJax = async () => {
+  await nextTick()
+
+  // MathJax가 아직 로드되지 않았으면 대기
+  if (!window.MathJax || !window.MathJax.typesetPromise) {
+    console.log('MathJax not loaded yet, retrying...')
+    setTimeout(() => renderMathJax(), 500)
+    return
+  }
+
+  try {
+    // MathJax 렌더링 전에 기존 렌더링 초기화
+    await window.MathJax.startup.document.clear()
+    await window.MathJax.startup.document.updateDocument()
+
+    // 모든 mathjax-content 클래스를 가진 요소들을 렌더링
+    const elements = document.querySelectorAll('.mathjax-content')
+
+    if (elements.length > 0) {
+      console.log(`Rendering MathJax for ${elements.length} elements`)
+      await window.MathJax.typesetPromise(Array.from(elements))
+    }
+  } catch (error) {
+    console.error('MathJax rendering error:', error)
+    // 에러 발생 시 재시도
+    setTimeout(() => renderMathJax(), 500)
+  }
+}
+
+// 문항 목록이 변경될 때 MathJax 렌더링
+watch(() => items.value, async () => {
+  // DOM 업데이트를 기다린 후 렌더링
+  await nextTick()
+  setTimeout(() => renderMathJax(), 100)
+}, { deep: true })
+
+// 선택된 문항이 변경될 때 MathJax 렌더링
+watch(() => selectedItems.value, async () => {
+  await nextTick()
+  setTimeout(() => renderMathJax(), 100)
+}, { deep: true })
+
+// 유사 문항이 표시될 때 MathJax 렌더링
+watch(() => showSimilarModal.value, async (newVal) => {
+  if (newVal) {
+    await nextTick()
+    setTimeout(() => renderMathJax(), 100)
+  }
+})
+
+// 선택된 문항 패널이 표시될 때 MathJax 렌더링
+watch(() => showSelectedPanel.value, async (newVal) => {
+  if (newVal) {
+    await nextTick()
+    setTimeout(() => renderMathJax(), 100)
+  }
+})
+
 // Lifecycle
 onMounted(async () => {
   try {
+    // MathJax 설정 초기화
+    if (!window.MathJax) {
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          displayMath: [['$$', '$$'], ['\\[', '\\]']],
+          processEscapes: true,
+          processEnvironments: true
+        },
+        options: {
+          skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+        }
+      }
+    }
+
     // 과목 및 교과서 정보 로드
     await loadSubjectsAndTextbooks()
 
     // 편집 모드이고 기존 문항이 있으면 선택 상태로 설정
     if (testBankStore.mode === 'edit' && testBankStore.existingItemIds.length > 0) {
       console.log('편집 모드 - 기존 문항 로드:', testBankStore.existingItemIds)
-      
+
       // 기존 문항 ID들로 문항 정보 조회
       const itemPromises = testBankStore.existingItemIds.map(async (itemId, index) => {
         try {
@@ -1224,7 +1412,7 @@ onMounted(async () => {
         } catch (err) {
           console.warn(`문항 ${itemId} 정보 조회 실패:`, err)
         }
-        
+
         // 조회 실패 시 기본 객체 반환
         return {
           itemId: itemId,
@@ -1238,17 +1426,17 @@ onMounted(async () => {
           questionHtml: `문항 #${itemId}`
         }
       })
-      
+
       try {
         const itemsData = await Promise.all(itemPromises)
-        
+
         // 조회된 문항들을 selectedItems에 추가
         itemsData.forEach(item => {
           if (item) {
             itemStore.selectItem(item)
           }
         })
-        
+
         console.log('기존 문항 선택 완료:', itemStore.selectedItems.length, '개')
       } catch (err) {
         console.error('기존 문항 정보 조회 중 오류:', err)
@@ -2237,15 +2425,18 @@ onUnmounted(() => {
 /* 난이도 버튼 */
 .difficulty-buttons {
   display: flex;
-  gap: 0.75rem;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .difficulty-btn {
-  flex: 1;
+  flex: 0 0 calc(20% - 0.4rem);
+  min-width: 60px;
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
+  flex-direction: column;
   padding: 0.75rem;
   background: white;
   border: 2px solid #e2e8f0;
@@ -2259,6 +2450,15 @@ onUnmounted(() => {
 .difficulty-btn:hover {
   transform: translateY(-2px);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.diff-very-high {
+  color: #1f2937;
+}
+
+.diff-very-high.active {
+  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
+  border-color: #1f2937;
 }
 
 .diff-high {
@@ -2288,8 +2488,22 @@ onUnmounted(() => {
   border-color: #059669;
 }
 
+.diff-very-low {
+  color: #6b7280;
+}
+
+.diff-very-low.active {
+  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
+  border-color: #6b7280;
+}
+
 .diff-icon {
-  font-size: 1rem;
+  font-size: 1.2rem;
+}
+
+.difficulty-btn span:not(.diff-icon) {
+  font-size: 0.75rem;
+  font-weight: 600;
 }
 
 /* 난이도 배지 - 모던 스타일 */
@@ -2454,8 +2668,8 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all 0.2s ease;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  min-height: 360px;
-  height: 360px;
+  min-height: 420px;
+  height: auto;
   display: flex;
   flex-direction: column;
 }
@@ -2616,25 +2830,106 @@ onUnmounted(() => {
 
 .item-html-content {
   width: 100%;
-  padding: 0.5rem;
+  padding: 1rem;
   background: #fafbfc;
   border-radius: 6px;
-  max-height: 120px;
+  max-height: 280px;
   overflow-y: auto;
-  font-size: 0.85rem;
+  font-size: 0.95rem;
 }
 
 .question-text {
-  font-size: 1.125rem; /* 텍스트 크기 증가 */
-  line-height: 1.75; /* 줄 간격 증가 */
-  color: #0f172a; /* 더 진한 색상 */
+  font-size: 0.95rem;
+  line-height: 1.6;
+  color: #1e293b;
   font-weight: 400;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  display: -webkit-box;
-  -webkit-line-clamp: 8; /* 더 많은 줄 표시 */
-  -webkit-box-orient: vertical;
-  letter-spacing: -0.01em;
+  word-break: break-word;
+}
+
+/* MathJax 스타일 */
+.mathjax-content {
+  overflow-x: auto;
+}
+
+.mathjax-content mjx-container {
+  margin: 0.5em 0 !important;
+  font-size: 1em !important;
+}
+
+.mathjax-content mjx-math {
+  font-size: 1.1em !important;
+}
+
+/* HTML 콘텐츠 내부 스타일 */
+.item-html-content p {
+  margin: 0.5rem 0;
+  line-height: 1.6;
+}
+
+.item-html-content ul,
+.item-html-content ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+
+.item-html-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+}
+
+.item-html-content table td,
+.item-html-content table th {
+  border: 1px solid #e2e8f0;
+  padding: 0.25rem 0.5rem;
+  text-align: left;
+}
+
+.item-html-content img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0.5rem 0;
+}
+
+/* 선택지 스타일 */
+.choices-container {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid #e2e8f0;
+}
+
+.choices-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.choices-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.choice-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.choice-number {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: #3b82f6;
+  margin-top: 0.125rem;
+}
+
+.choice-item span:not(.choice-number) {
+  flex: 1;
+  color: #475569;
 }
 
 .item-placeholder {
@@ -3895,6 +4190,39 @@ onUnmounted(() => {
 .preview-item-placeholder {
   color: #9ca3af;
   font-style: italic;
+}
+
+/* 선택된 문항의 선택지 스타일 */
+.preview-choices-container {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.preview-choices-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.preview-choice-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  font-size: 0.813rem;
+  line-height: 1.4;
+  color: #4b5563;
+}
+
+.preview-choice-item .choice-number {
+  flex-shrink: 0;
+  font-weight: 600;
+  color: #3b82f6;
+  margin-top: 0.125rem;
+}
+
+.preview-choice-item span:not(.choice-number) {
+  flex: 1;
   font-size: 0.875rem;
 }
 

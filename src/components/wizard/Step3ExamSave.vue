@@ -30,7 +30,7 @@
                 시험지 정보
               </h3>
             </div>
-            
+
             <div class="form-content">
               <div class="form-group">
                 <label class="form-label required">시험지 제목</label>
@@ -84,7 +84,7 @@
                 출력 설정
               </h3>
             </div>
-            
+
             <div class="setting-content">
               <label class="checkbox-item">
                 <input
@@ -94,7 +94,7 @@
                 />
                 <span class="checkbox-label">정답지 포함</span>
               </label>
-              
+
               <label class="checkbox-item">
                 <input
                   v-model="examData.shuffleQuestions"
@@ -112,7 +112,7 @@
                 />
                 <span class="checkbox-label">배점 표시</span>
               </label>
-              
+
               <div class="form-group" style="margin-top: 15px;">
                 <label class="form-label">페이지 레이아웃</label>
                 <select v-model="examData.layoutType" class="form-select">
@@ -133,7 +133,7 @@
                 공개 설정
               </h3>
             </div>
-            
+
             <div class="visibility-content">
               <label class="radio-item">
                 <input
@@ -144,7 +144,7 @@
                 />
                 <span class="radio-label">비공개</span>
               </label>
-              
+
               <label class="radio-item">
                 <input
                   v-model="examData.visibility"
@@ -169,85 +169,23 @@
         </div>
       </div>
 
-      <!-- 오른쪽 패널: 문항 미리보기 (60%) -->
+      <!-- 오른쪽 패널: PDF 미리보기/편집 (60%) -->
       <div class="right-panel">
-        <div class="preview-header">
-          <h3>선택된 문항 미리보기</h3>
-          <div class="preview-actions">
-            <button class="btn-action" @click="reorderItems">
-              <span class="icon">↕️</span> 순서 변경
-            </button>
-            <button class="btn-action" @click="previewPDF">
-              <span class="icon">👁️</span> PDF 미리보기
-            </button>
-          </div>
+        <div v-if="selectedItems.length === 0" class="empty-state">
+          <div class="empty-icon">📄</div>
+          <p>선택된 문항이 없습니다.</p>
+          <button class="btn-secondary" @click="goBackToStep2">
+            문항 선택하러 가기
+          </button>
         </div>
 
-        <div class="preview-content">
-          <div v-if="selectedItems.length === 0" class="empty-state">
-            <div class="empty-icon">📄</div>
-            <p>선택된 문항이 없습니다.</p>
-            <button class="btn-secondary" @click="goBackToStep2">
-              문항 선택하러 가기
-            </button>
-          </div>
-
-          <div v-else class="item-list">
-            <div
-              v-for="(item, index) in displayItems"
-              :key="item.itemId"
-              class="item-card"
-            >
-              <div class="item-header">
-                <span class="item-number">{{ index + 1 }}</span>
-                <div class="item-badges">
-                  <span :class="['badge', `badge-${getDifficultyClass(item.difficulty)}`]">
-                    {{ item.difficulty?.name || '중' }}
-                  </span>
-                  <span class="badge badge-type">
-                    {{ item.questionForm?.name || '객관식' }}
-                  </span>
-                  <span v-if="examData.showPoints" class="badge badge-points">
-                    {{ item.points || 5 }}점
-                  </span>
-                </div>
-              </div>
-              
-              <div class="item-content">
-                <div v-if="item.questionImageUrl" class="item-image">
-                  <img :src="item.questionImageUrl" :alt="`문항 ${index + 1}`" />
-                </div>
-                <div v-else-if="item.questionHtml" class="item-text" v-html="item.questionHtml"></div>
-                <div v-else class="item-placeholder">
-                  문항 ID: {{ item.itemId }}
-                </div>
-              </div>
-            </div>
-
-            <!-- 더보기 버튼 -->
-            <div v-if="selectedItems.length > 5 && !showAllItems" class="show-more">
-              <button class="btn-secondary" @click="showAllItems = true">
-                나머지 {{ selectedItems.length - 5 }}개 문항 더보기
-              </button>
-            </div>
-          </div>
-        </div>
-
-        <!-- 하단 요약 정보 -->
-        <div class="preview-summary">
-          <div class="summary-item">
-            <span class="label">총 문항수:</span>
-            <span class="value">{{ selectedItems.length }}개</span>
-          </div>
-          <div class="summary-item">
-            <span class="label">예상 시간:</span>
-            <span class="value">{{ estimatedTime }}분</span>
-          </div>
-          <div class="summary-item">
-            <span class="label">총 배점:</span>
-            <span class="value">{{ totalPoints }}점</span>
-          </div>
-        </div>
+        <SimplePdfViewer
+          v-else
+          :questions="transformedQuestions"
+          :exam-data="pdfExamData"
+          @generate="handlePdfGenerate"
+          @save="handlePdfSave"
+        />
       </div>
     </div>
 
@@ -259,18 +197,12 @@
         </button>
       </div>
       <div class="footer-right">
-        <button 
-          class="btn-action" 
-          @click="openPdfDesigner"
-        >
-          <span class="icon">✏️</span> PDF 편집기 열기
-        </button>
-        <button 
-          class="btn-primary" 
-          @click="saveAndGenerate"
+        <button
+          class="btn-primary"
+          @click="saveExam"
           :disabled="!canSave"
         >
-          <span class="icon">✓</span> 저장하고 PDF 생성
+          <span class="icon">✓</span> 시험지 저장
         </button>
       </div>
     </div>
@@ -316,16 +248,6 @@
       </div>
     </div>
 
-    <!-- PDF Designer 모달 -->
-    <div v-if="showPdfDesigner" class="pdf-designer-modal">
-      <PdfDesigner
-        :questions="transformedQuestions"
-        :exam-data="pdfExamData"
-        @close="closePdfDesigner"
-        @save="handlePdfSave"
-        @generate="handlePdfGenerate"
-      />
-    </div>
   </div>
 </template>
 
@@ -335,7 +257,7 @@ import { useTestBankStore } from '@/stores/testBank'
 import { useItemSelectionStore } from '@/stores/itemSelection'
 import { storeToRefs } from 'pinia'
 import * as pdfGenerator from '@/services/pdfGenerator'
-import PdfDesigner from '@/components/pdf/PdfDesigner.vue'
+import SimplePdfViewer from '@/components/pdf/SimplePdfViewer.vue'
 
 // Props
 const props = defineProps({
@@ -366,30 +288,32 @@ const examData = ref({
   layoutType: 'HALF_PAGE'  // 기본값을 반페이지(2문제)로 설정
 })
 
-const showAllItems = ref(false)
 const showReorderModal = ref(false)
 const reorderedItems = ref([])
 const draggedIndex = ref(null)
 const isLoading = ref(false)
 const loadingMessage = ref('')
-const showPdfDesigner = ref(false)
-const transformedQuestions = ref([])
-const pdfExamData = ref({})
 
 // Computed
-const displayItems = computed(() => {
-  if (showAllItems.value) {
-    return selectedItems.value
+const transformedQuestions = computed(() => {
+  return selectedItems.value ? pdfGenerator.transformQuestions(selectedItems.value) : []
+})
+
+const pdfExamData = computed(() => {
+  return {
+    title: examData.value.title || '새 시험지',
+    subtitle: props.examInfo?.examName || '',
+    schoolName: '○○중학교',
+    grade: props.examInfo?.gradeName || '',
+    subject: props.examInfo?.subjectName || props.examInfo?.areaName || '',
+    date: examData.value.examDate,
+    teacherName: '',
+    timeLimit: examData.value.timeLimit,
+    includeAnswer: examData.value.includeAnswerSheet,
+    includeExplanation: false,
+    shuffleQuestions: examData.value.shuffleQuestions,
+    showPoints: examData.value.showPoints
   }
-  return selectedItems.value.slice(0, 5)
-})
-
-const estimatedTime = computed(() => {
-  return selectedItems.value.length * 3
-})
-
-const totalPoints = computed(() => {
-  return selectedItems.value.reduce((sum, item) => sum + (item.points || 5), 0)
 })
 
 const canSave = computed(() => {
@@ -424,112 +348,22 @@ const saveDraft = () => {
   alert('임시 저장 기능은 준비 중입니다.')
 }
 
-const saveAndGenerate = async () => {
+const saveExam = async () => {
   if (!canSave.value) {
     alert('시험지 제목을 입력해주세요.')
     return
   }
 
-  isLoading.value = true
-  loadingMessage.value = 'PDF를 생성하는 중...'
+  // 시험지 데이터를 저장
+  console.log('시험지 저장:', {
+    examData: examData.value,
+    questions: selectedItems.value
+  })
 
-  try {
-    // 시험 데이터 준비
-    const examInfo = {
-      title: examData.value.title,
-      subtitle: props.examInfo?.examName || '',
-      schoolName: '○○중학교', // 실제 데이터로 변경 필요
-      grade: props.examInfo?.gradeName || '',
-      subject: props.examInfo?.subjectName || props.examInfo?.areaName || '',
-      date: examData.value.examDate,
-      teacherName: '', // 실제 사용자 정보로 변경 필요
-      timeLimit: examData.value.timeLimit,
-      includeAnswer: examData.value.includeAnswerSheet,
-      includeExplanation: false, // 해설 포함 옵션 추가 필요
-      shuffleQuestions: examData.value.shuffleQuestions,
-      showPoints: examData.value.showPoints
-    }
-
-    // 문항 데이터 변환
-    const questions = pdfGenerator.transformQuestions(selectedItems.value)
-    
-    // 문제 순서 섞기 (옵션)
-    const finalQuestions = examData.value.shuffleQuestions 
-      ? pdfGenerator.shuffleQuestions(questions)
-      : questions
-
-    // PDF 생성 (레이아웃 옵션 포함)
-    const pdfBlob = await pdfGenerator.generateExamPDF(
-      examInfo,
-      finalQuestions,
-      examData.value.includeAnswerSheet ? 'withAnswer' : 'basic',
-      examData.value.layoutType
-    )
-
-    // PDF 다운로드
-    const filename = `${examData.value.title}_${new Date().toISOString().split('T')[0]}.pdf`
-    pdfGenerator.downloadPDF(pdfBlob, filename)
-
-    isLoading.value = false
-    alert('PDF가 성공적으로 생성되었습니다!')
-    
-    // 서버에 저장 (선택적)
-    // await uploadToServer(pdfBlob, examInfo)
-    
-    emit('complete')
-  } catch (error) {
-    console.error('PDF 생성 실패:', error)
-    alert('PDF 생성에 실패했습니다: ' + error.message)
-    isLoading.value = false
-  }
+  alert('시험지가 저장되었습니다.')
+  emit('complete')
 }
 
-const previewPDF = async () => {
-  if (selectedItems.value.length === 0) {
-    alert('미리보기할 문항이 없습니다.')
-    return
-  }
-
-  isLoading.value = true
-  loadingMessage.value = 'PDF 미리보기를 준비하는 중...'
-
-  try {
-    // 시험 데이터 준비
-    const examInfo = {
-      title: examData.value.title || '시험지 미리보기',
-      subtitle: props.examInfo?.examName || '',
-      schoolName: '○○중학교',
-      grade: props.examInfo?.gradeName || '',
-      subject: props.examInfo?.subjectName || props.examInfo?.areaName || '',
-      date: examData.value.examDate,
-      teacherName: '',
-      timeLimit: examData.value.timeLimit,
-      includeAnswer: examData.value.includeAnswerSheet,
-      includeExplanation: false,
-      shuffleQuestions: examData.value.shuffleQuestions,
-      showPoints: examData.value.showPoints
-    }
-
-    // 문항 데이터 변환
-    const questions = pdfGenerator.transformQuestions(selectedItems.value)
-    
-    // PDF 생성
-    const pdfBlob = await pdfGenerator.generateExamPDF(
-      examInfo,
-      questions,
-      examData.value.includeAnswerSheet ? 'withAnswer' : 'basic'
-    )
-
-    // 미리보기 창 열기
-    pdfGenerator.previewPDF(pdfBlob)
-
-    isLoading.value = false
-  } catch (error) {
-    console.error('PDF 미리보기 실패:', error)
-    alert('PDF 미리보기에 실패했습니다: ' + error.message)
-    isLoading.value = false
-  }
-}
 
 const reorderItems = () => {
   reorderedItems.value = [...selectedItems.value]
@@ -546,11 +380,11 @@ const handleDragStart = (event, index) => {
 
 const handleDrop = (event, dropIndex) => {
   if (draggedIndex.value === null) return
-  
+
   const draggedItem = reorderedItems.value[draggedIndex.value]
   reorderedItems.value.splice(draggedIndex.value, 1)
   reorderedItems.value.splice(dropIndex, 0, draggedItem)
-  
+
   draggedIndex.value = null
 }
 
@@ -559,40 +393,7 @@ const applyReorder = () => {
   closeReorderModal()
 }
 
-// PDF Designer 관련 함수들
-const openPdfDesigner = () => {
-  console.log('openPdfDesigner 함수 호출됨')
-  console.log('selectedItems:', selectedItems.value)
-  
-  // 문항 데이터 변환
-  transformedQuestions.value = pdfGenerator.transformQuestions(selectedItems.value)
-  console.log('transformedQuestions:', transformedQuestions.value)
-  
-  // 시험 데이터 준비
-  pdfExamData.value = {
-    title: examData.value.title || '새 시험지',
-    subtitle: props.examInfo?.examName || '',
-    schoolName: '○○중학교',
-    grade: props.examInfo?.gradeName || '',
-    subject: props.examInfo?.subjectName || props.examInfo?.areaName || '',
-    date: examData.value.examDate,
-    teacherName: '',
-    timeLimit: examData.value.timeLimit,
-    includeAnswer: examData.value.includeAnswerSheet,
-    includeExplanation: false,
-    shuffleQuestions: examData.value.shuffleQuestions,
-    showPoints: examData.value.showPoints
-  }
-  console.log('pdfExamData:', pdfExamData.value)
-  
-  showPdfDesigner.value = true
-  console.log('showPdfDesigner 설정됨:', showPdfDesigner.value)
-}
-
-const closePdfDesigner = () => {
-  showPdfDesigner.value = false
-}
-
+// PDF 관련 핸들러
 const handlePdfSave = (template) => {
   console.log('PDF 템플릿 저장됨:', template)
   // 템플릿을 localStorage나 서버에 저장할 수 있습니다
@@ -601,14 +402,13 @@ const handlePdfSave = (template) => {
 const handlePdfGenerate = (pdfBlob) => {
   console.log('PDF 생성 완료:', pdfBlob)
   // PDF가 생성되면 추가 처리를 할 수 있습니다
-  closePdfDesigner()
 }
 
 // Lifecycle
 onMounted(() => {
   const today = new Date().toISOString().split('T')[0]
   examData.value.examDate = today
-  
+
   if (testBankStore.wizardData.examTitle) {
     examData.value.title = testBankStore.wizardData.examTitle
   }
@@ -1260,7 +1060,7 @@ input[type="radio"] {
   .main-content {
     flex-direction: column;
   }
-  
+
   .left-panel {
     width: 100%;
     border-right: none;
@@ -1272,27 +1072,17 @@ input[type="radio"] {
   .form-row {
     grid-template-columns: 1fr;
   }
-  
+
   .preview-actions {
     flex-direction: column;
   }
-  
+
   .preview-summary {
     flex-direction: column;
     gap: 0.5rem;
   }
 }
 
-/* PDF Designer 모달 */
-.pdf-designer-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 3000;
-  background: white;
-}
 
 /* 액션 버튼 스타일 */
 .btn-action {
