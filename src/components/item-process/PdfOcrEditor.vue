@@ -1,7 +1,7 @@
 <template>
   <div class="pdf-ocr-editor">
     <div class="editor-header">
-      <h3>PDF OCR 편집</h3>
+      <h3>문제 추출 & 편집 </h3>
       <div class="header-actions">
         <button @click="handleGoBack" class="btn btn-secondary">뒤로가기</button>
       </div>

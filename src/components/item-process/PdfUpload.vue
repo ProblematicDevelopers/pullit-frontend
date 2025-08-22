@@ -7,7 +7,7 @@
           <p v-if="props.selectedTextbook" class="selected-textbook">
             선택된 교과서: {{ props.selectedTextbook.subjectName }}
           </p>
-          <p>PDF 파일을 여기에 드래그하거나</p>
+          <p>PDF 파일 업로드</p>
           <button @click="triggerFileInput" class="upload-button">파일 선택</button>
         </div>
         <input
