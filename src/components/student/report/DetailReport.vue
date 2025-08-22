@@ -1,9 +1,12 @@
-<script setup >
-import {ref, watch} from 'vue'
-import MyChart from './ChartComponent.vue'
+<script setup>
+import { ref, watch, onMounted, nextTick } from 'vue'
 import QuestionHtmlModal from '@/components/student/report/QuestionHtmlModal.vue'
 import reportApi from '@/services/reportApi.js'
 import katex from 'katex'
+import { Chart, registerables } from 'chart.js'
+
+// Chart.js 등록
+Chart.register(...registerables)
 // rendering data
 const loading = ref(false)
 const error = ref(null)
@@ -16,9 +19,12 @@ const props = defineProps({
   questionId: { type: Number, default: -1 },
 })
 
-
 // detail errata
 const errataData = ref([])
+
+// 차트 관련 변수
+const chartCanvas = ref(null)
+let chart = null
 
 // 문제 상세 보기 모달 열기
 const viewQuestionDetail = (question, index) => {
@@ -38,18 +44,154 @@ const closeModal = () => {
 async function getDetailErrata() {
   loading.value = true
   error.value = null
-  
-  try{
-    const response = await reportApi.getDetailErrata(props.examId);
-    const data = await response.data;
-    errataData.value = data.data;    
-  } catch(err) {
+
+  try {
+    const response = await reportApi.getDetailErrata(props.examId)
+    const data = await response.data
+    errataData.value = data.data
+
+    // 차트 데이터 업데이트
+    updateChartData()
+  } catch (err) {
     console.error('상세 정오표 조회에 실패했습니다.:', err)
     error.value = '상세 정오표 조회에 실패했습니다.'
   } finally {
     loading.value = false
-  } 
+  }
+}
 
+// 차트 생성 함수
+function createChart() {
+  if (!chartCanvas.value || !errataData.value || errataData.value.length === 0) return
+
+  // 기존 차트가 있으면 제거
+  if (chart) {
+    chart.destroy()
+  }
+
+  // 문제 번호와 평균 정답률 데이터 추출
+  const labels = errataData.value.map((question) => `문제 ${question.itemOrder}`)
+  const accuracyData = errataData.value.map((question) => Math.round(question.accuracy * 100))
+  const isCorrectData = errataData.value.map((question) => question.isCorrect)
+
+  console.log('차트 데이터:', { labels, accuracyData, isCorrectData })
+
+  // 차트 생성
+  chart = new Chart(chartCanvas.value, {
+    type: 'bar',
+    data: {
+      labels: labels,
+      datasets: [
+        {
+          label: '평균 정답률 (%)',
+          data: accuracyData,
+          backgroundColor: isCorrectData.map((isCorrect) => {
+            return isCorrect ? '#10b981' : '#ef4444' // 정답: 녹색, 오답: 빨간색
+          }),
+          borderColor: isCorrectData.map((isCorrect) => {
+            return isCorrect ? '#059669' : '#dc2626' // 정답: 진한 녹색, 오답: 진한 빨간색
+          }),
+          borderWidth: 2,
+          borderRadius: 8,
+          borderSkipped: false,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: false,
+        },
+        title: {
+          display: true,
+          text: '평균 정답률 분석',
+          font: {
+            size: 18,
+            weight: 'bold',
+            family: 'Inter, sans-serif',
+          },
+          color: '#1f2937',
+          padding: {
+            top: 10,
+            bottom: 20,
+          },
+        },
+        tooltip: {
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          titleColor: '#ffffff',
+          bodyColor: '#ffffff',
+          borderColor: '#3b6cff',
+          borderWidth: 1,
+          cornerRadius: 8,
+          displayColors: false,
+          callbacks: {
+            label: function (context) {
+              const isCorrect = isCorrectData[context.dataIndex]
+              const status = isCorrect ? '정답' : '오답'
+              const domainName = errataData.value[context.dataIndex]?.domainName || 'N/A'
+              return [`정답률: ${context.parsed.y}%`, `상태: ${status}`, `평가 영역: ${domainName}`]
+            },
+          },
+        },
+      },
+      scales: {
+        x: {
+          grid: {
+            display: false,
+          },
+          ticks: {
+            font: {
+              size: 12,
+              weight: '500',
+            },
+            color: '#6b7280',
+          },
+          border: {
+            display: false,
+          },
+        },
+        y: {
+          beginAtZero: true,
+          max: 100,
+          grid: {
+            color: '#e5e7eb',
+            drawBorder: false,
+          },
+          ticks: {
+            font: {
+              size: 12,
+              weight: '500',
+            },
+            color: '#6b7280',
+            callback: function (value) {
+              return value + '%'
+            },
+            padding: 8,
+          },
+          border: {
+            display: false,
+          },
+        },
+      },
+      elements: {
+        bar: {
+          hoverBackgroundColor: function (context) {
+            const isCorrect = isCorrectData[context.dataIndex]
+            return isCorrect ? '#059669' : '#dc2626' // 정답: 진한 녹색, 오답: 진한 빨간색
+          },
+        },
+      },
+    },
+  })
+}
+
+// 차트 데이터 업데이트 함수
+function updateChartData() {
+  nextTick(() => {
+    createChart()
+  })
 }
 
 // 수식 렌더링 함수
@@ -156,8 +298,17 @@ watch(
       getDetailErrata()
     }
   },
-  { immediate: true }
+  { immediate: true },
 )
+
+// 컴포넌트 마운트 시 차트 초기화
+onMounted(() => {
+  if (props.examId && props.examId !== -1) {
+    nextTick(() => {
+      createChart()
+    })
+  }
+})
 </script>
 
 <template>
@@ -220,13 +371,12 @@ watch(
   <!-- 문항 모달 -->
   <QuestionHtmlModal :is-visible="showModal" :question="selectedQuestion" @close="closeModal" />
 
-  <!-- 난이도별 통계 -->
-  <div>
-    <MyChart/>
-  </div>
-  <!-- 평가영역별 통계 -->
-  <div>
-    <MyChart/>
+  <!-- 평균 정답률 차트 -->
+  <div class="chart-section">
+    <h3 class="panel-title">📊 평균 정답률 분석</h3>
+    <div class="chart-container">
+      <canvas ref="chartCanvas"></canvas>
+    </div>
   </div>
 </template>
 
@@ -352,5 +502,28 @@ watch(
 
 .retry-btn:hover {
   background: #2d5af5;
+}
+
+/* 차트 섹션 스타일 */
+.chart-section {
+  margin-top: 40px;
+  padding: 20px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.chart-title {
+  color: #1f2937;
+  font-size: 18px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.chart-container {
+  height: 400px;
+  position: relative;
 }
 </style>
