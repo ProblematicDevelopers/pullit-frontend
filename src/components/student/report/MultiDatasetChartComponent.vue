@@ -378,13 +378,13 @@ watch(
     
     isUpdating.value = true
     
-    // 300ms 후 차트 업데이트 (디바운싱)
+    // 1000ms 후 차트 업데이트 (디바운싱)
     updateTimeout = setTimeout(() => {
       nextTick(() => {
         createChart()
         isUpdating.value = false
       })
-    }, 300)
+    }, 1000)
   },
   { deep: true }
 )
