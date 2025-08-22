@@ -268,7 +268,7 @@ const loadQuestionHtml = async () => {
   try {
     const response = await reportApi.getQuestionHtml(props.question.questionId)
     const data = response.data?.data || response.data || {}
-    
+
     // HTML 데이터 가져오기
     const rawQuestionHtml = data.item_html || data.questionHtml || data.html || ''
     const rawPassageHtml = data.passage_html || data.passageHtml || data.passage || ''
@@ -430,7 +430,13 @@ watch(
 .answer {
   margin-bottom: 24px;
 }
+div.explain > div > div > div {
+  padding: 20px !important;
+}
 
+div.explain > div > div > div:nth-child(1) {
+  margin-top: 24px !important;
+}
 .passage-content h4 {
   margin: 0 0 12px 0;
   color: #1f2937;
