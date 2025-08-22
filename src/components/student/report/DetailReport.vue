@@ -562,7 +562,7 @@ onMounted(() => {
           <td>{{ question.domainName }}</td>
           <td>{{ question.points }}점</td>
           <td v-html="renderMathInHtml(question.answer)"></td>
-          <td>{{ question.userAnswer }}</td>
+          <td v-html="renderMathInHtml(question.userAnswer)"></td>
           <td>{{ question.userPoints }}점</td>
           <td>
             <span :class="question.isCorrect ? 'correct' : 'incorrect'">
