@@ -1,15 +1,6 @@
 <!-- src/components/student/report/ReportTabs.vue -->
 <template>
   <div class="report-wrap">
-    <!-- 뒤로가기 버튼과 시험 제목 -->
-    <div class="back-button-container">
-      <button class="back-btn" @click="goBack">
-        <span class="back-icon">←</span>
-        뒤로가기
-      </button>
-      <h2 class="exam-title">{{ examTitle }}</h2>
-    </div>
-
     <!-- 탭 헤더 -->
 
     <nav class="tabs" role="tablist" aria-label="리포트 탭">
@@ -132,14 +123,13 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import DetailReport from '@/components/student/report/DetailReport.vue'
 import QuestionHtmlModal from '@/components/student/report/QuestionHtmlModal.vue'
 import studentApi from '@/services/studentApi.js'
 import reportApi from '@/services/reportApi.js'
 
 const route = useRoute()
-const router = useRouter()
 const studentGrade = ref('-')
 const examData = ref({
   score: 0,
@@ -147,7 +137,6 @@ const examData = ref({
   totalDuration: 0,
   questions: [],
 })
-const examTitle = ref('')
 const loading = ref(false)
 const error = ref(null)
 const showModal = ref(false)
@@ -208,8 +197,6 @@ const fetchExamData = async () => {
 
     // detail report
     examId.value = data.examId
-    // 시험 제목 설정
-    examTitle.value = data.examName || data.title || '시험 리포트'
 
     // API 응답 데이터를 컴포넌트에서 사용할 수 있는 형태로 변환
     examData.value = {
@@ -223,7 +210,6 @@ const fetchExamData = async () => {
     error.value = '시험 데이터를 불러올 수 없습니다.'
 
     // 에러 시 기본 데이터 설정
-    examTitle.value = '시험 리포트'
     examData.value = {
       score: 0,
       totalQuestions: 0,
@@ -300,16 +286,6 @@ const closeModal = () => {
   selectedQuestion.value = null
 }
 
-const goBack = () => {
-  // 브라우저 히스토리에서 뒤로가기
-  if (window.history.length > 1) {
-    window.history.back()
-  } else {
-    // 히스토리가 없으면 리포트 목록으로 이동
-    router.push({ name: 'student.reportList' })
-  }
-}
-
 const user = computed(() => {
   const userInfoStr = localStorage.getItem('userInfo')
   const userInfo = userInfoStr ? JSON.parse(userInfoStr) : {}
@@ -335,54 +311,6 @@ const currentTab = ref(props.defaultTab)
   max-width: 1000px;
   margin: 80px auto 80px;
   padding: 0 20px;
-}
-
-/* 뒤로가기 버튼과 시험 제목 */
-.back-button-container {
-  margin-top: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  color: #374151;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-decoration: none;
-}
-
-.back-btn:hover {
-  background: #e5e7eb;
-  border-color: #9ca3af;
-  color: #1f2937;
-}
-
-.back-btn:active {
-  transform: translateY(1px);
-}
-
-.back-icon {
-  font-size: 16px;
-  font-weight: bold;
-}
-
-.exam-title {
-  margin: 0;
-  color: #1f2937;
-  font-size: 18px;
-  font-weight: 600;
-  flex: 1;
-  text-align: right;
 }
 
 /* Tabs */
