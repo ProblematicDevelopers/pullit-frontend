@@ -73,9 +73,14 @@
           </ul>
         </div>
         <div id="score-box">
-          <span class="score"> {{ examData.score || '0' }}개 </span>
-          <span class="sep"> | </span>
-          <span class="value"> {{ examData.totalQuestions || '0' }}문제 </span>
+          <div class="score-section">
+            <span class="score"> {{ examData.score || '0' }}개 </span>
+            <span class="sep"> | </span>
+            <span class="value"> {{ examData.totalQuestions || '0' }}문제 </span>
+          </div>
+          <div class="duration-section">
+            <span class="duration">{{ formatDuration(examData.totalDuration || 0) }}</span>
+          </div>
         </div>
         <div>
           <table class="errata table table-bordered">
@@ -139,6 +144,7 @@ const studentGrade = ref('-')
 const examData = ref({
   score: 0,
   totalQuestions: 0,
+  totalDuration: 0,
   questions: [],
 })
 const examTitle = ref('')
@@ -209,6 +215,7 @@ const fetchExamData = async () => {
     examData.value = {
       score: calculateCorrectCount(data.attemptQuestions || []),
       totalQuestions: data.attemptQuestions?.length || 0,
+      totalDuration: calculateTotalDuration(data.attemptQuestions || []),
       questions: normalizeQuestions(data.attemptQuestions || []),
     }
   } catch (err) {
@@ -220,6 +227,7 @@ const fetchExamData = async () => {
     examData.value = {
       score: 0,
       totalQuestions: 0,
+      totalDuration: 0,
       questions: [],
     }
   } finally {
@@ -234,6 +242,28 @@ const calculateCorrectCount = (attemptQuestions) => {
   }
 
   return attemptQuestions.filter((question) => question.isCorrect).length
+}
+
+// 총 소요시간 계산 함수
+const calculateTotalDuration = (attemptQuestions) => {
+  if (!Array.isArray(attemptQuestions)) {
+    return 0
+  }
+
+  return attemptQuestions.reduce((total, question) => {
+    return total + (question.duration || 0)
+  }, 0)
+}
+
+// 소요시간을 분:초 형식으로 변환하는 함수
+const formatDuration = (totalSeconds) => {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+
+  const formattedMinutes = minutes.toString().padStart(2, '0')
+  const formattedSeconds = seconds.toString().padStart(2, '0')
+
+  return `${formattedMinutes}분 ${formattedSeconds}초`
 }
 
 // 문제 데이터 정규화 함수
@@ -467,17 +497,35 @@ const currentTab = ref(props.defaultTab)
   font-weight: 500;
 }
 
+.duration {
+  color: #059669;
+  font-weight: 500;
+  white-space: pre-line;
+  line-height: 1.2;
+}
+
 #score-box {
   margin-top: 60px;
-  height: 100px;
+  height: 120px;
   background: #fff;
   border: 1px solid #d3d3d3;
   border-radius: 6px;
   text-align: center;
-  align-content: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
   font-size: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
+}
+
+.score-section {
+  margin-bottom: 8px;
+}
+
+.duration-section {
+  margin-top: 4px;
 }
 
 /* hover 효과 제거 */
