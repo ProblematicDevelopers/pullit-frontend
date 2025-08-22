@@ -4,43 +4,34 @@
     :class="{
       active: isActive,
       selected: isSelected,
-      'dragging': isDragging,
-      'drag-over': isDragOver,
-      'drag-placeholder': isDragPlaceholder
+      'selected-for-move': isSelectedForMove,
+      'move-target': isMoveTarget
     }"
-    :draggable="true"
-    @click="$emit('click', index)"
-    @dblclick="$emit('dblclick', index)"
-    @dragstart="handleDragStart"
-    @dragend="handleDragEnd"
-    @dragover="handleDragOver"
-    @dragleave="handleDragLeave"
-    @drop="handleDrop"
-    :title="`페이지 ${index + 1} 클릭하여 미리보기, 드래그하여 순서 변경`"
+    @click="handleClick"
+    @dblclick="handleDblClick"
+    :title="getTitle()"
   >
     <!-- 페이지 번호 -->
     <div class="thumbnail-number">{{ index + 1 }}</div>
 
     <!-- 페이지 미리보기 -->
-    <iframe
+    <img
       :src="page.preview"
-      :title="`페이지 ${index + 1} 썸네일`"
-      class="pdf-thumbnail-frame"
-      frameborder="0"
-    ></iframe>
+      :alt="`페이지 ${index + 1} 썸네일`"
+      class="pdf-thumbnail-image"
+    />
 
     <!-- 선택 체크박스 -->
     <div class="thumbnail-checkbox">
       <input
         type="checkbox"
         :checked="isSelected"
-        @change="$emit('selection-change', index)"
+        @change="handleSelectionChange"
         @click.stop
       />
     </div>
 
-    <!-- 드래그 핸들 아이콘 -->
-    <div class="drag-handle">⋮⋮</div>
+
   </div>
 </template>
 
@@ -64,99 +55,42 @@ export default {
       type: Boolean,
       default: false
     },
-    isDragging: {
+    isSelectedForMove: {
       type: Boolean,
       default: false
     },
-    isDragOver: {
-      type: Boolean,
-      default: false
-    },
-    isDragPlaceholder: {
+    isMoveTarget: {
       type: Boolean,
       default: false
     }
   },
-  emits: ['click', 'dblclick', 'selection-change', 'drag-start', 'drag-end', 'drag-over', 'drag-leave', 'drop'],
+  emits: ['click', 'dblclick', 'selection-change'],
   setup(props, { emit }) {
-    const handleDragStart = (event) => {
-      console.log('📱 드래그 시작:', props.index)
-
-      // 인덱스 유효성 검사
-      if (props.index === null || props.index === undefined || props.index < 0) {
-        console.error('유효하지 않은 드래그 인덱스:', props.index)
-        event.preventDefault()
-        return
+    const getTitle = () => {
+      if (props.isMoveTarget) {
+        return `페이지 ${props.index + 1} 클릭하여 순서 변경`;
       }
+      return `페이지 ${props.index + 1} 클릭하여 미리보기, 클릭하여 순서 변경`;
+    };
 
-      // 페이지 객체 유효성 검사
-      if (!props.page || typeof props.page !== 'object') {
-        console.error('유효하지 않은 페이지 객체:', props.page)
-        event.preventDefault()
-        return
-      }
+    const handleClick = () => {
+      emit('click', props.index);
+    };
 
-      // 이벤트 데이터 설정 (디버깅용)
-      if (event.dataTransfer) {
-        event.dataTransfer.setData('debug/index', props.index.toString())
-        event.dataTransfer.setData('debug/timestamp', Date.now().toString())
-        event.dataTransfer.setData('debug/pageInfo', JSON.stringify({
-          index: props.index,
-          pageNumber: props.page.pageNumber,
-          hasPreview: !!props.page.preview
-        }))
-      }
+    const handleDblClick = () => {
+      emit('dblclick', props.index);
+    };
 
-      emit('drag-start', event, props.index)
-    }
-
-    const handleDragEnd = (event) => {
-      console.log('📱 드래그 종료:', props.index)
-
-      // 드래그 종료 시 스타일 강제 초기화
-      const element = event.target
-      if (element) {
-        element.style.opacity = '1'
-        element.style.transform = 'none'
-        element.style.zIndex = 'auto'
-        // CSS 클래스도 제거
-        element.classList.remove('dragging', 'drag-over', 'drag-placeholder')
-      }
-
-      emit('drag-end', event)
-    }
-
-    const handleDragOver = (event) => {
-      // 인덱스 유효성 검사
-      if (props.index === null || props.index === undefined || props.index < 0) {
-        console.error('유효하지 않은 드래그 오버 인덱스:', props.index)
-        return
-      }
-
-      emit('drag-over', event, props.index)
-    }
-
-    const handleDragLeave = (event) => {
-      emit('drag-leave', event)
-    }
-
-    const handleDrop = (event) => {
-      // 인덱스 유효성 검사
-      if (props.index === null || props.index === undefined || props.index < 0) {
-        console.error('유효하지 않은 드롭 인덱스:', props.index)
-        return
-      }
-
-      emit('drop', event, props.index)
-    }
+    const handleSelectionChange = () => {
+      emit('selection-change', props.index);
+    };
 
     return {
-      handleDragStart,
-      handleDragEnd,
-      handleDragOver,
-      handleDragLeave,
-      handleDrop
-    }
+      getTitle,
+      handleClick,
+      handleDblClick,
+      handleSelectionChange
+    };
   }
 }
 </script>
@@ -171,10 +105,12 @@ export default {
   background: white;
   transition: all 0.15s ease;
   user-select: none;
-  height: 160px;
+  height: 180px;
+  width: 140px;
   display: flex;
   flex-direction: column;
   justify-content: center;
+  align-items: center;
 }
 
 .thumbnail-item:hover {
@@ -230,31 +166,31 @@ export default {
   animation: pulse-border 1.5s ease-in-out infinite;
 }
 
-/* 드래그 플레이스홀더 - 빈 공간 표시 */
-.thumbnail-item.drag-placeholder {
-  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
-  border: 2px dashed #0ea5e9;
-  border-radius: 8px;
-  opacity: 0.8;
-  transform: scale(0.98);
+/* 이동 선택 상태 */
+.thumbnail-item.selected-for-move {
+  border-color: #10b981;
+  background-color: #ecfdf5;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+  animation: pulse-border 1.5s infinite;
 }
 
-.thumbnail-item.drag-placeholder::before {
-  content: '📄';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  font-size: 2rem;
-  opacity: 0.6;
-  pointer-events: none;
+/* 이동 대상 페이지 상태 */
+.thumbnail-item.move-target {
+  border-color: #f59e0b;
+  background-color: #fffbeb;
+  cursor: pointer;
+  transition: all 0.2s ease;
 }
 
-.thumbnail-item.drag-placeholder .thumbnail-number,
-.thumbnail-item.drag-placeholder .pdf-thumbnail-frame,
-.thumbnail-item.drag-placeholder .thumbnail-checkbox,
-.thumbnail-item.drag-placeholder .drag-handle {
-  opacity: 0.3;
+.thumbnail-item.move-target:hover {
+  border-color: #d97706;
+  background-color: #fef3c7;
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
+}
+
+.thumbnail-item.move-target .thumbnail-number {
+  background: #f59e0b;
 }
 
 @keyframes pulse-border {
@@ -283,14 +219,17 @@ export default {
   pointer-events: none;
 }
 
-.pdf-thumbnail-frame {
+.pdf-thumbnail-image {
   width: 100%;
-  height: 120px;
+  height: 140px;
   border: none;
   border-radius: 4px;
   background: #f8fafc;
   pointer-events: none;
   flex-shrink: 0;
+  object-fit: contain;
+  max-width: 100%;
+  max-height: 100%;
 }
 
 .thumbnail-checkbox {
@@ -306,24 +245,5 @@ export default {
   cursor: pointer;
 }
 
-/* 드래그 핸들 */
-.drag-handle {
-  position: absolute;
-  bottom: 0.15rem;
-  right: 0.15rem;
-  color: #94a3b8;
-  font-size: 0.875rem;
-  cursor: grab;
-  z-index: 1;
-  user-select: none;
-  transition: color 0.15s ease;
-}
 
-.drag-handle:hover {
-  color: #64748b;
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
 </style>

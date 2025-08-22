@@ -1,305 +1,239 @@
 <template>
-  <div class="pdf-upload-section">
-    <h2 class="section-title">2. PDF 업로드</h2>
-    <p class="section-description">선택된 교과서: {{ selectedTextbook?.subjectName }}</p>
-
-    <!-- PDF 업로드 영역 -->
-    <div
-      class="upload-area"
-      @click="triggerFileInput"
-      @drop="handleFileDrop"
-      @dragover.prevent
-      @dragenter.prevent
-      @dragleave.prevent
-    >
-      <!-- 업로드 아이콘 -->
-      <div class="upload-icon">
-        <svg viewBox="0 0 24 24" class="icon">
-          <path
-            d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2M18 20H6V4H13V9H18V20Z"
-          />
-        </svg>
+  <div class="pdf-upload">
+    <div class="upload-area" @drop="handleDrop" @dragover.prevent @dragenter.prevent>
+      <div v-if="!pdfFile" class="upload-content">
+        <div class="upload-icon">📄</div>
+        <div class="upload-text">
+          <p v-if="props.selectedTextbook" class="selected-textbook">
+            선택된 교과서: {{ props.selectedTextbook.subjectName }}
+          </p>
+          <p>PDF 파일을 여기에 드래그하거나</p>
+          <button @click="triggerFileInput" class="upload-button">파일 선택</button>
+        </div>
+        <input
+          ref="fileInput"
+          type="file"
+          accept=".pdf"
+          @change="handleFileSelect"
+          style="display: none"
+        />
       </div>
 
-      <!-- 업로드 안내 텍스트 -->
-      <p class="upload-text">PDF 파일을 클릭하거나 드래그하여 업로드하세요</p>
-      <p class="upload-hint">지원 형식: PDF</p>
+      <div v-else class="file-info">
+        <div class="file-details">
+          <div class="file-icon">📄</div>
+          <div class="file-text">
+            <p class="file-name">{{ pdfFile.name }}</p>
+            <p class="file-size">{{ formatFileSize(pdfFile.size) }}</p>
+          </div>
+        </div>
 
-      <!-- 파일 크기 제한 안내 -->
-      <p class="upload-limit">최대 파일 크기: 50MB</p>
-    </div>
-
-    <!-- 숨겨진 파일 입력 요소 -->
-    <input
-      ref="fileInput"
-      type="file"
-      accept=".pdf"
-      @change="handleFileSelect"
-      style="display: none"
-    />
-
-    <!-- 네비게이션 버튼들 -->
-    <div class="navigation-buttons">
-      <button @click="goBack" class="btn btn-secondary">
-        뒤로가기
-      </button>
-      <button
-        @click="goToPdfEdit"
-        class="btn btn-primary"
-        :disabled="!pdfFile"
-      >
-        다음
-      </button>
-    </div>
-
-    <!-- 에러 메시지 표시 -->
-    <div v-if="errorMessage" class="error-message">
-      <div class="error-icon">⚠️</div>
-      <p>{{ errorMessage }}</p>
+        <div class="file-actions">
+          <button @click="removeFile" class="remove-button">제거</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
 
-<script>
-import { ref } from 'vue'
+<script setup>
+import { ref, watch } from 'vue'
+import { useItemProcessingStore } from '../../store/itemProcessingStore.js'
 
-export default {
-  name: 'PdfUpload',
-  props: {
-    // 선택된 교과서 정보
-    selectedTextbook: {
-      type: Object,
-      required: true
-    },
-    // 현재 PDF 파일
-    pdfFile: {
-      type: File,
-      default: null
-    }
-  },
-  emits: ['file-selected', 'go-back', 'go-to-pdf-edit'],
-  setup(props, { emit }) {
-    const fileInput = ref(null)
-    const errorMessage = ref('')
+// 파일 상태
+const pdfFile = ref(null)
 
-    // 파일 입력 트리거 (업로드 영역 클릭 시)
-    const triggerFileInput = () => {
-      fileInput.value.click()
-    }
+// 파일 입력 참조
+const fileInput = ref(null)
 
-    // 파일 선택 처리
-    const handleFileSelect = (event) => {
-      const file = event.target.files[0]
-      if (file) {
-        validateAndProcessFile(file)
-      }
-    }
-
-    // 파일 드롭 처리
-    const handleFileDrop = (event) => {
-      event.preventDefault()
-      const file = event.dataTransfer.files[0]
-      if (file) {
-        validateAndProcessFile(file)
-      }
-    }
-
-    // 파일 유효성 검사 및 처리
-    const validateAndProcessFile = (file) => {
-      // 에러 메시지 초기화
-      errorMessage.value = ''
-
-      // 파일 타입 검사
-      if (file.type !== 'application/pdf') {
-        errorMessage.value = 'PDF 파일만 업로드할 수 있습니다.'
-        return
-      }
-
-      // 파일 크기 검사 (50MB 제한)
-      const maxSize = 50 * 1024 * 1024 // 50MB in bytes
-      if (file.size > maxSize) {
-        errorMessage.value = '파일 크기가 50MB를 초과합니다.'
-        return
-      }
-
-      // 파일이 유효하면 부모 컴포넌트에 전달
-      emit('file-selected', file)
-    }
-
-    // 뒤로가기 처리
-    const goBack = () => {
-      emit('go-back')
-    }
-
-    // PDF 편집 화면으로 이동
-    const goToPdfEdit = () => {
-      if (props.pdfFile) {
-        emit('go-to-pdf-edit')
-      }
-    }
-
-    return {
-      fileInput,
-      errorMessage,
-      triggerFileInput,
-      handleFileSelect,
-      handleFileDrop,
-      goBack,
-      goToPdfEdit
-    }
+// Props 정의
+const props = defineProps({
+  selectedTextbook: {
+    type: Object,
+    required: true
   }
+})
+
+const emit = defineEmits(['file-selected'])
+const itemProcessingStore = useItemProcessingStore()
+
+// pdfFile 변경 감지하여 자동으로 다음 단계로 진행
+watch(pdfFile, (newFile) => {
+  if (newFile) {
+    console.log('PDF 파일이 설정됨, 다음 단계로 진행')
+    // 부모 컴포넌트에 파일 설정 완료 알림
+    emit('file-selected', {
+      file: newFile,
+      images: [] // 아직 변환되지 않음
+    })
+  }
+})
+
+// 파일 선택 처리
+const handleFileSelect = (event) => {
+  const file = event.target.files[0]
+  if (file && file.type === 'application/pdf') {
+    pdfFile.value = file
+    itemProcessingStore.setPdfFile(file)
+
+    // 파일 선택 즉시 다음 단계로 진행
+    emit('file-selected', {
+      file: file,
+      images: [] // 아직 변환되지 않음
+    })
+  }
+}
+
+// 파일 드래그 앤 드롭 처리
+const handleDrop = (event) => {
+  event.preventDefault()
+  const files = event.dataTransfer.files
+  if (files.length > 0 && files[0].type === 'application/pdf') {
+    const file = files[0]
+    pdfFile.value = file
+    itemProcessingStore.setPdfFile(file)
+
+    // 파일 드롭 즉시 다음 단계로 진행
+    emit('file-selected', {
+      file: file,
+      images: [] // 아직 변환되지 않음
+    })
+  }
+}
+
+// 파일 입력 트리거
+const triggerFileInput = () => {
+  fileInput.value?.click()
+}
+
+// 파일 제거
+const removeFile = () => {
+  pdfFile.value = null
+  itemProcessingStore.setPdfFile(null)
+}
+
+// 파일 크기 포맷팅
+const formatFileSize = (bytes) => {
+  if (bytes === 0) return '0 Bytes'
+  const k = 1024
+  const sizes = ['Bytes', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
 }
 </script>
 
 <style scoped>
-/* 섹션 제목 스타일 */
-.section-title {
-  font-size: 1.5rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0 0 0.5rem 0;
+.pdf-upload {
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
 }
 
-.section-description {
-  color: #64748b;
-  margin: 0 0 2rem 0;
-}
-
-/* PDF 업로드 영역 */
 .upload-area {
-  border: 2px dashed #cbd5e1;
-  border-radius: 16px;
-  padding: 3rem;
+  border: 2px dashed #ddd;
+  border-radius: 12px;
+  padding: 2rem;
   text-align: center;
+  background: #fafafa;
+  transition: all 0.3s ease;
   cursor: pointer;
-  transition: all 0.2s ease;
-  background: white;
-  margin-bottom: 2rem;
 }
 
 .upload-area:hover {
   border-color: #3b82f6;
-  background: #f8fafc;
+  background: #f0f9ff;
 }
 
-.upload-area:active {
-  transform: scale(0.98);
-}
-
-/* 업로드 아이콘 */
-.upload-icon {
-  width: 64px;
-  height: 64px;
-  background: #eff6ff;
-  border-radius: 16px;
+.upload-content {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  margin: 0 auto 1rem auto;
-}
-
-.upload-icon .icon {
-  width: 32px;
-  height: 32px;
-  color: #3b82f6;
-}
-
-/* 업로드 텍스트 */
-.upload-text {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #1e293b;
-  margin: 0 0 0.5rem 0;
-}
-
-.upload-hint {
-  color: #64748b;
-  margin: 0 0 0.5rem 0;
-  font-size: 0.875rem;
-}
-
-.upload-limit {
-  color: #94a3b8;
-  margin: 0;
-  font-size: 0.75rem;
-  font-weight: 500;
-}
-
-/* 네비게이션 버튼 */
-.navigation-buttons {
-  display: flex;
   gap: 1rem;
-  justify-content: center;
-  margin-top: 2rem;
 }
 
-.btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
+.upload-icon {
+  font-size: 3rem;
+  color: #6b7280;
+}
+
+.upload-text p {
+  margin: 0.5rem 0;
+  color: #374151;
+}
+
+.selected-textbook {
   font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  color: #3b82f6;
+  background: #eff6ff;
+  padding: 0.5rem;
+  border-radius: 6px;
+  border: 1px solid #dbeafe;
 }
 
-.btn-primary {
+.upload-button {
   background: #3b82f6;
   color: white;
+  border: none;
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.3s ease;
 }
 
-.btn-primary:hover:not(:disabled) {
+.upload-button:hover {
   background: #2563eb;
 }
 
-.btn-primary:disabled {
-  background: #94a3b8;
-  cursor: not-allowed;
+.file-info {
+  text-align: left;
 }
 
-.btn-secondary {
-  background: #64748b;
-  color: white;
-}
-
-.btn-secondary:hover {
-  background: #475569;
-}
-
-/* 에러 메시지 */
-.error-message {
+.file-details {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  background: #fef2f2;
-  border: 1px solid #fecaca;
-  border-radius: 8px;
-  padding: 1rem;
-  margin-top: 1rem;
-  color: #dc2626;
+  gap: 1rem;
+  margin-bottom: 1rem;
 }
 
-.error-icon {
-  font-size: 1.25rem;
+.file-icon {
+  font-size: 2rem;
+  color: #3b82f6;
 }
 
-.error-message p {
+.file-text {
+  flex: 1;
+}
+
+.file-name {
+  font-weight: 600;
+  margin: 0 0 0.25rem 0;
+  color: #111827;
+}
+
+.file-size {
   margin: 0;
-  font-weight: 500;
+  color: #6b7280;
+  font-size: 0.875rem;
 }
 
-/* 반응형 디자인 */
-@media (max-width: 768px) {
-  .upload-area {
-    padding: 2rem 1rem;
-  }
+.file-actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+}
 
-  .navigation-buttons {
-    flex-direction: column;
-  }
+.remove-button {
+  background: #ef4444;
+  color: white;
+  border: none;
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.3s ease;
+}
 
-  .btn {
-    width: 100%;
-  }
+.remove-button:hover {
+  background: #dc2626;
 }
 </style>
