@@ -14,8 +14,7 @@
     "format": "prettier --write src/"
   },
   "dependencies": {
-    "@ckeditor/ckeditor5-build-classic": "^41.4.2",
-    "@ckeditor/ckeditor5-markdown-gfm": "^46.0.2",
+    "@ckeditor/ckeditor5-build-decoupled-document": "^41.4.2",
     "@ckeditor/ckeditor5-vue": "^7.3.0",
     "@pdfme/common": "^5.4.2",
     "@pdfme/generator": "^5.4.2",

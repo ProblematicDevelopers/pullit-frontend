@@ -81,8 +81,7 @@
                 <span>{{ convertedPdfPages }}/{{ totalPdfPages }} 페이지</span>
               </div>
               <div class="progress-details d-flex justify-content-between text-muted small">
-                <span>현재 페이지: {{ currentPdfPage }}</span>
-                <span v-if="estimatedPdfTime">{{ estimatedPdfTime }}</span>
+                <span>현재 페이지: {{ currentPdfPage }}</span> <div>  </div>
               </div>
             </div>
           </div>
@@ -119,9 +118,7 @@
               <div class="progress-text d-flex justify-content-between text-muted small mb-3">
                 <span>진행률: {{ Math.min(pdfGenerationProgress, 100) }}%</span>
               </div>
-              <div class="progress-details d-flex justify-content-center text-muted small">
-                <span>{{ currentPdfStage }}</span>
-              </div>
+
             </div>
           </div>
         </div>
@@ -212,21 +209,6 @@ export default {
     const groupedTextbooks = computed(() => itemProcessingStore.groupedTextbooks)
     const subjects = computed(() => itemProcessingStore.subjects)
 
-    // PDF 변환 예상 시간 계산
-    const estimatedPdfTime = computed(() => {
-      if (!pdfConversionStartTime.value || convertedPdfPages.value === 0) return null
-
-      const elapsed = Date.now() - pdfConversionStartTime.value
-      const avgTimePerPage = elapsed / convertedPdfPages.value
-      const remainingPages = totalPdfPages.value - convertedPdfPages.value
-      const estimatedRemaining = avgTimePerPage * remainingPages
-
-      if (estimatedRemaining < 60000) { // 1분 미만
-        return `${Math.ceil(estimatedRemaining / 1000)}초 남음`
-      } else {
-        return `${Math.ceil(estimatedRemaining / 60000)}분 남음`
-      }
-    })
 
     // Composable 초기화
     const errorHandler = useItemProcessingError()
@@ -547,6 +529,12 @@ export default {
         }
       }
 
+      // PDF 페이지가 있는지 확인
+      if (!pdfPages.value || pdfPages.value.length === 0) {
+        errorHandler.handleError('편집할 PDF 페이지가 없습니다. PDF를 먼저 업로드하고 편집해주세요.', 'PDF 페이지 누락')
+        return
+      }
+
       try {
         // 로딩 상태 즉시 시작
         isGeneratingPdf.value = true
@@ -639,7 +627,6 @@ export default {
       presignedUrl,
       fileId,
       errorHandler,
-      estimatedPdfTime,
       isConvertingPdf,
       convertedPdfPages,
       totalPdfPages,
