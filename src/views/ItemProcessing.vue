@@ -272,12 +272,12 @@ export default {
           const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry')
           pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
-          // PDF 파일을 ArrayBuffer로 읽기
-          const arrayBuffer = await file.arrayBuffer()
+                  // PDF 파일을 ArrayBuffer로 읽기
+        const arrayBuffer = await file.arrayBuffer()
 
-          // PDF 문서 로드
-          const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-          totalPdfPages.value = pdfDoc.numPages
+        // PDF 문서 로드
+        const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+        totalPdfPages.value = pdfDoc.numPages
 
           // 각 페이지를 이미지로 변환
           for (let pageNum = 1; pageNum <= totalPdfPages.value; pageNum++) {
@@ -285,8 +285,8 @@ export default {
 
             const page = await pdfDoc.getPage(pageNum)
 
-            // 극한 고해상도로 뷰포트 설정 (600 DPI)
-            const scale = 8.33 // 600 DPI = 72 DPI * 8.33
+            // 고해상도로 뷰포트 설정 (300 DPI로 조정)
+            const scale = 4.17 // 300 DPI = 72 DPI * 4.17
             const viewport = page.getViewport({ scale: scale })
 
             const canvas = document.createElement('canvas')
@@ -294,6 +294,8 @@ export default {
 
             canvas.width = viewport.width
             canvas.height = viewport.height
+
+
 
             // Canvas 렌더링 품질을 극한으로 설정
             context.imageSmoothingEnabled = true
@@ -305,8 +307,12 @@ export default {
             }
             await page.render(renderContext).promise
 
-            // 극한 고품질 PNG로 변환 (무손실)
-            const imageDataUrl = canvas.toDataURL('image/png', 1.0)
+            // 고품질 PNG로 변환 (품질 조정)
+            // PNG: 무손실이지만 파일 크기가 큼, JPEG: 손실 압축이지만 파일 크기가 작음
+            const imageDataUrl = canvas.toDataURL('image/png', 0.9)
+            // JPEG 테스트용 (파일 크기 절약): const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9)
+
+
 
             pages.push({
               index: pageNum - 1,
@@ -319,6 +325,16 @@ export default {
 
             convertedPdfPages.value = pageNum
           }
+
+          // 변환 완료 후 총 크기 정보만 간단히 로깅
+          const totalImageSizeKB = pages.reduce((total, page) => {
+            if (page.preview) {
+              return total + ((page.preview.length * 0.75) / 1024)
+            }
+            return total
+          }, 0)
+
+          console.log(`📊 PDF 변환 완료: ${pages.length}페이지, 총 ${(totalImageSizeKB / 1024).toFixed(2)}MB`)
 
           // 로딩 상태 종료
           isConvertingPdf.value = false
