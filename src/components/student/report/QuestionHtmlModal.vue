@@ -36,7 +36,7 @@
 
             <div class="info-row">
               <span class="label">내 답안:</span>
-              <span class="answer">{{ question?.answer || '답안 없음' }}</span>
+              <span class="answer" v-html="question?.answer || '답안 없음'"></span>
             </div>
 
             <div class="info-row">
