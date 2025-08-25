@@ -1,10 +1,40 @@
 <template>
   <div class="item-processing-container bg-light min-vh-100">
     <!-- 페이지 헤더 -->
-    <div class="page-header bg-white border-bottom py-5 mb-4">
+    <div class="page-header bg-white border-bottom py-5 mb-0">
       <div class="container">
         <h1 class="page-title fw-bold text-dark mb-2">문제 등록</h1>
         <p class="page-subtitle text-muted mb-0">교과서를 선택하고 PDF를 업로드하여 문제를 가공하세요</p>
+      </div>
+    </div>
+
+    <!-- 단계별 진행 표시기 -->
+    <div class="progress-stepper-container bg-white border-bottom py-4 mb-4">
+      <div class="container">
+        <div class="progress-stepper d-flex justify-content-center align-items-center">
+          <div class="step-item d-flex align-items-center" :class="{ active: true, completed: selectedTextbook }">
+            <div class="step-number rounded-circle d-flex align-items-center justify-content-center fw-bold">1</div>
+            <span class="step-label ms-2 fw-medium">교과서 선택</span>
+            <div class="step-connector ms-3" v-if="selectedTextbook"></div>
+          </div>
+
+          <div class="step-item d-flex align-items-center" :class="{ active: selectedTextbook, completed: pdfFile }">
+            <div class="step-number rounded-circle d-flex align-items-center justify-content-center fw-bold">2</div>
+            <span class="step-label ms-2 fw-medium">PDF 업로드</span>
+            <div class="step-connector ms-3" v-if="pdfFile"></div>
+          </div>
+
+          <div class="step-item d-flex align-items-center" :class="{ active: pdfFile && !isConvertingPdf, completed: showOcrEditor }">
+            <div class="step-number rounded-circle d-flex align-items-center justify-content-center fw-bold">3</div>
+            <span class="step-label ms-2 fw-medium">PDF 편집</span>
+            <div class="step-connector ms-3" v-if="showOcrEditor"></div>
+          </div>
+
+          <div class="step-item d-flex align-items-center" :class="{ active: showOcrEditor }">
+            <div class="step-number rounded-circle d-flex align-items-center justify-content-center fw-bold">4</div>
+            <span class="step-label ms-2 fw-medium">OCR 편집</span>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -599,6 +629,91 @@ export default {
 </script>
 
 <style scoped>
+/* 단계별 진행 표시기 스타일 */
+.progress-stepper-container {
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.progress-stepper {
+  gap: 2rem;
+}
+
+.step-item {
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.step-number {
+  width: 40px;
+  height: 40px;
+  background-color: #e2e8f0;
+  color: #64748b;
+  border: 2px solid #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+.step-label {
+  color: #64748b;
+  font-size: 0.9rem;
+  transition: all 0.3s ease;
+}
+
+.step-connector {
+  width: 60px;
+  height: 2px;
+  background-color: #e2e8f0;
+  transition: all 0.3s ease;
+}
+
+/* 활성 상태 */
+.step-item.active .step-number {
+  background-color: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.step-item.active .step-label {
+  color: #1e293b;
+  font-weight: 600;
+}
+
+/* 완료 상태 */
+.step-item.completed .step-number {
+  background-color: #10b981;
+  color: white;
+  border-color: #10b981;
+}
+
+.step-item.completed .step-label {
+  color: #10b981;
+  font-weight: 600;
+}
+
+.step-item.completed .step-connector {
+  background-color: #10b981;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .progress-stepper {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .step-connector {
+    display: none;
+  }
+
+  .step-item {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .step-label {
+    margin-top: 0.5rem;
+  }
+}
+
 /* 부트스트랩으로 대체할 수 없는 일부 커스텀 스타일 */
 .page-title {
   font-size: 1.875rem;
@@ -609,8 +724,71 @@ export default {
   color: #64748b;
 }
 
+/* 로딩 상태 스타일 - TextbookSelection과 일관성 */
+.conversion-loading,
+.pdf-generation-loading {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.loading-content {
+  max-width: 500px;
+}
+
+.loading-icon {
+  color: #3b82f6;
+}
+
+.progress-info {
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+}
+
+.progress-stage {
+  color: #3b82f6;
+}
+
+.progress {
+  background-color: #e2e8f0;
+  border-radius: 6px;
+}
+
+.progress-bar {
+  background: linear-gradient(90deg, #3b82f6, #1d4ed8);
+  border-radius: 6px;
+}
+
+/* 에러 모달 스타일 - TextbookSelection과 일관성 */
+.error-overlay {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.error-modal {
+  border-radius: 16px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
+}
+
+.error-header h3 {
+  color: #dc2626;
+}
+
 /* 커스텀 그림자 효과 */
 .shadow-custom-lg {
   box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .main-content {
+    padding: 2rem 1rem;
+  }
+
+  .error-modal {
+    margin: 1rem;
+    padding: 1.5rem;
+  }
 }
 </style>
