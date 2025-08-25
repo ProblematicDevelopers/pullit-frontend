@@ -77,6 +77,7 @@ export const useTestBankStore = defineStore('testBank', {
 
     // ===== 선택된 문제들 =====
     selectedQuestions: [], // Step2에서 편집할 문제 목록
+    selectedItems: [], // Step2에서 선택한 문항들
 
     // ===== 최종 시험지 데이터 =====
     finalExam: null // Step3에서 생성된 최종 시험지 데이터
@@ -797,6 +798,35 @@ export const useTestBankStore = defineStore('testBank', {
       } catch (error) {
         console.error('시험지 상세 조회 실패:', error)
         throw error
+      }
+    },
+
+    /**
+     * selectedItems 관련 액션들
+     */
+    addItem(item) {
+      if (!this.selectedItems.find(i => i.itemId === item.itemId)) {
+        this.selectedItems.push(item)
+      }
+    },
+
+    removeItem(itemId) {
+      const index = this.selectedItems.findIndex(item => item.itemId === itemId)
+      if (index > -1) {
+        this.selectedItems.splice(index, 1)
+      }
+    },
+
+    clearSelection() {
+      this.selectedItems = []
+    },
+
+    toggleItemSelection(item) {
+      const index = this.selectedItems.findIndex(i => i.itemId === item.itemId)
+      if (index > -1) {
+        this.selectedItems.splice(index, 1)
+      } else {
+        this.selectedItems.push(item)
       }
     }
   }

@@ -34,20 +34,25 @@
         @selectExisting="handleSelectExisting"
       />
 
-      <!-- Step 1: 단원선택 -->
-      <Step1UnitSelection
+      <!-- Step 1: 생성 방식 선택 -->
+      <Step1ModeSelection
         v-else-if="currentStep === 1"
-        :mode="store.mode"
-        :examId="store.selectedExam?.id"
+        :examInfo="store.examInfo"
+        @back="handleStep1Back"
         @next="handleStep1Next"
-        @cancel="handleCancel"
-        @research="handleResearch"
-        @show-scope="handleShowScope"
       />
 
-      <!-- Step 2: 문항선택 -->
+      <!-- Step 2-1: 간편 생성 설정 -->
+      <Step2SimpleGeneration
+        v-else-if="currentStep === 2 && store.examInfo?.mode === 'simple'"
+        :examInfo="store.examInfo"
+        @back="handleStep2Back"
+        @next="handleStep2SimpleNext"
+      />
+
+      <!-- Step 2-2: 문항 직접 선택 -->
       <Step2ItemSelection
-        v-else-if="currentStep === 2"
+        v-else-if="currentStep === 2 && store.examInfo?.mode === 'manual'"
         :examInfo="store.examInfo"
         @back="handleStep2Back"
         @next="handleStep2Next"
@@ -72,15 +77,18 @@
  * Pinia store를 통해 상태를 관리하고, 각 단계 간의 전환을 처리합니다.
  */
 
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useTestBankStore } from '@/stores/testBank'
+import { useItemSelectionStore } from '@/stores/itemSelection'
 import { storeToRefs } from 'pinia'
 import { isPopupWindow, closePopup, sendToParent } from '@/utils/popup'
+import itemApiService from '@/services/itemApi'
 
 // 컴포넌트 import
 import WizardHeader from '@/components/wizard/WizardHeader.vue'
 import Step0SelectMode from '@/components/wizard/Step0SelectMode.vue'
-import Step1UnitSelection from '@/components/wizard/Step1UnitSelection.vue'
+import Step1ModeSelection from '@/components/wizard/Step1ModeSelection.vue'
+import Step2SimpleGeneration from '@/components/wizard/Step2SimpleGeneration.vue'
 import Step2ItemSelection from '@/components/wizard/Step2ItemSelection.vue'
 import Step3ExamSave from '@/components/wizard/Step3ExamSave.vue'
 
@@ -97,7 +105,11 @@ const emit = defineEmits(['close'])
 
 // Pinia store 사용
 const store = useTestBankStore()
+const itemStore = useItemSelectionStore()
 const { currentStep } = storeToRefs(store)
+
+// 로딩 상태
+const isGenerating = ref(false)
 const { setCurrentStep, resetWizard } = store
 
 /**
@@ -150,14 +162,8 @@ const handleStep0Next = () => {
   console.log('Step 0 완료, 다음 단계로 진행')
   // mode가 설정되어 있어야 진행 가능
   if (store.mode) {
-    // 기존 시험지 편집 모드면 Step2로 바로 이동
-    if (store.mode === 'edit' && store.selectedExam) {
-      console.log('기존 시험지 편집 모드 - Step2로 바로 이동')
-      setCurrentStep(2)
-    } else {
-      // 새 시험지 생성 모드면 Step1로 이동
-      setCurrentStep(1)
-    }
+    // 모든 모드에서 Step1(문항선택)로 이동
+    setCurrentStep(1)
   }
 }
 
@@ -168,68 +174,199 @@ const handleSelectNew = () => {
   console.log('새 시험지 생성 선택')
   store.setMode('new')
   store.setSelectedExam(null)
+  
+  // 새로 만들기 모드에서는 학년/과목 선택이 Step1(기존 Step2)에서 이루어짐
+  store.setExamInfo({
+    mode: 'new'
+  })
 }
 
 /**
  * 기존 시험지 편집 선택 핸들러
  * @param {Object} exam - 선택된 기존 시험지
  */
-const handleSelectExisting = (exam) => {
+const handleSelectExisting = async (exam) => {
   console.log('기존 시험지 편집 선택:', exam)
   store.setMode('edit')
   store.setSelectedExam(exam)
   
-  // examInfo 설정 - Step2에서 교과서 필터링에 필요
-  store.setExamInfo({
-    gradeCode: exam.gradeCode,
-    gradeName: exam.gradeName || exam.grade,
-    areaCode: exam.areaCode, // 과목 코드 (MA, KO, EN, SC, SO)
-    areaName: exam.areaName || exam.subject, // 과목명 (수학, 국어 등)
-    subject: exam.areaName || exam.subject // 호환성
-  })
-  
-  console.log('설정된 examInfo:', store.examInfo)
+  // 기존 시험지의 문항들을 로드
+  try {
+    isGenerating.value = true
+    
+    let loadedItems = []
+    
+    // 시험지 문항 로드 (API 호출 또는 exam 객체에서 직접 가져오기)
+    if (exam.items && exam.items.length > 0) {
+      // exam 객체에 이미 문항들이 있는 경우
+      loadedItems = exam.items
+      console.log(`시험지에서 ${exam.items.length}개 문항 로드 완료`)
+    } else if (exam.examId) {
+      // API로 문항 로드 필요한 경우
+      // const response = await examApiService.getExamItems(exam.examId)
+      // loadedItems = response.data
+      
+      // 임시로 더미 데이터 설정 (실제로는 API 호출)
+      loadedItems = Array.from({ length: exam.questionCount || 20 }, (_, i) => ({
+        itemId: `item_${i + 1}`,
+        questionNumber: i + 1,
+        questionHtml: `<p>문제 ${i + 1}: 다음 중 옳은 것은?</p>`,
+        questionType: 'MULTIPLE_CHOICE',
+        choices: ['선택지 1', '선택지 2', '선택지 3', '선택지 4', '선택지 5'],
+        answer: '1',
+        score: 5,
+        difficulty: Math.floor(Math.random() * 5) + 1,
+        chapterName: `단원 ${Math.floor(i / 5) + 1}`
+      }))
+      console.log(`시험지에서 ${loadedItems.length}개 문항 로드 완료 (더미)`)
+    }
+    
+    // itemStore에 선택된 문항들 설정
+    itemStore.setSelectedItems(loadedItems)
+    
+    // examInfo 설정 - Step2에서 교과서 필터링 및 문항 로드에 필요
+    // mode를 'manual'로 설정하여 Step2ItemSelection 컴포넌트가 표시되도록 함
+    store.setExamInfo({
+      mode: 'manual', // 'edit'가 아닌 'manual'로 설정하여 Step2ItemSelection이 표시되도록 함
+      examId: exam.id || exam.examId, // 시험지 ID 추가
+      examName: exam.examName || exam.name,
+      gradeCode: exam.gradeCode,
+      gradeName: exam.gradeName || exam.grade,
+      areaCode: exam.areaCode, // 과목 코드 (MA, KO, EN, SC, SO)
+      areaName: exam.areaName || exam.subject, // 과목명 (수학, 국어 등)
+      subjectName: exam.areaName || exam.subject,
+      subject: exam.areaName || exam.subject, // 호환성
+      selectedItems: loadedItems // Step2에서 자동으로 체크되도록 selectedItems 추가
+    })
+    
+    console.log('설정된 examInfo (selectedItems 포함):', store.examInfo)
+    
+    // 기존 시험지 편집 모드는 Step1(방식선택)을 건너뛰고 바로 Step2(문항선택)로
+    // Step2에서 기존 문항들이 자동으로 체크된 상태로 표시됨
+    setCurrentStep(2)
+  } catch (error) {
+    console.error('시험지 문항 로드 실패:', error)
+    alert('시험지 문항을 불러오는데 실패했습니다.')
+  } finally {
+    isGenerating.value = false
+  }
 }
 
 /**
  * Step 1 완료 및 Step 2로 진행 핸들러
+ * Step1(방식선택) -> Step2(간편생성 또는 문항선택)
  */
-const handleStep1Next = () => {
-  console.log('Step 1 완료, Step 2로 진행')
+const handleStep1Next = (data) => {
+  console.log('Step 1(방식선택) 완료, data:', data)
+  
+  // examInfo에 선택한 모드 저장
+  store.setExamInfo({
+    ...store.examInfo,
+    mode: data.mode // 'simple' 또는 'manual'
+  })
+  
+  // 모드에 상관없이 Step2로 이동 (Step2에서 모드에 따라 다른 컴포넌트 표시)
   setCurrentStep(2)
 }
 
 /**
- * Step 2에서 뒤로가기 핸들러
+ * Step 1(방식선택)에서 이전 단계로 돌아가기 핸들러
  */
-const handleStep2Back = () => {
-  console.log('TestWizardView handleStep2Back 호출됨, mode:', store.mode)
-  // 새 시험지 모드면 Step1로, 기존 시험지 편집 모드면 Step0로
-  if (store.mode === 'new') {
-    console.log('새 시험지 모드 - Step1로 이동')
-    setCurrentStep(1)
-  } else {
-    console.log('기존 시험지 편집 모드 - Step0로 이동')
-    setCurrentStep(0)
-  }
-  console.log('현재 step 변경됨:', store.currentStep)
+const handleStep1Back = () => {
+  console.log('Step 1(방식선택)에서 Step 0(모드선택)로 돌아가기')
+  setCurrentStep(0)
 }
 
 /**
- * Step 2 완료 및 Step 3로 진행 핸들러
+ * Step 2 간편 생성 완료 핸들러
+ */
+const handleStep2SimpleNext = async (settings) => {
+  console.log('Step 2(간편 생성) 설정 완료:', settings)
+  
+  try {
+    isGenerating.value = true
+    
+    // 난이도 매핑
+    const difficultyMap = {
+      easy: [1, 2],
+      normal: [2, 3, 4],
+      hard: [4, 5],
+      mixed: [1, 2, 3, 4, 5]
+    }
+    
+    // 랜덤 문항 검색 파라미터
+    const searchParams = {
+      grades: [settings.grade],
+      subjects: [settings.subject],
+      textbook: settings.textbook || undefined,
+      difficulties: settings.difficulty === 'mixed' ? [1, 2, 3, 4, 5] : difficultyMap[settings.difficulty],
+      questionTypes: settings.questionTypes?.length > 0 ? settings.questionTypes : undefined,
+      chapters: settings.chapters?.length > 0 ? settings.chapters : undefined,
+      size: settings.itemCount || 20,
+      random: true,
+      sortBy: 'random',
+      includePassage: settings.includePassage !== false
+    }
+    
+    // 불필요한 undefined 제거
+    Object.keys(searchParams).forEach(key => {
+      if (searchParams[key] === undefined) {
+        delete searchParams[key]
+      }
+    })
+    
+    console.log('문항 검색 파라미터:', searchParams)
+    
+    const result = await itemApiService.searchItems(searchParams)
+    
+    if (result.success && result.data && result.data.length > 0) {
+      // 선택된 문항들을 store에 저장
+      store.setExamInfo({
+        ...store.examInfo,
+        selectedItems: result.data,
+        generationSettings: settings
+      })
+      
+      console.log(`${result.data.length}개 문항이 자동으로 선택되었습니다.`)
+      
+      // 시험지 저장 단계로 이동
+      setCurrentStep(3)
+    } else {
+      alert('조건에 맞는 문항을 찾을 수 없습니다. 다른 조건으로 시도해주세요.')
+    }
+  } catch (error) {
+    console.error('간편 생성 오류:', error)
+    alert('문항 생성 중 오류가 발생했습니다.')
+  } finally {
+    isGenerating.value = false
+  }
+}
+
+/**
+ * Step 2(문항선택) 완료 및 Step 3으로 진행 핸들러
  */
 const handleStep2Next = () => {
-  console.log('Step 2 완료, Step 3로 진행')
+  console.log('Step 2(문항선택) 완료, Step 3(시험지저장)으로 진행')
   setCurrentStep(3)
 }
 
 /**
- * Step 3에서 Step 2로 돌아가기 핸들러
+ * Step 2(문항선택)에서 이전 단계로 돌아가기 핸들러
+ */
+const handleStep2Back = () => {
+  console.log('Step 2(문항선택)에서 Step 1(방식선택)로 돌아가기')
+  setCurrentStep(1)
+}
+
+/**
+ * Step 3(시험지저장)에서 이전 단계로 돌아가기 핸들러
  */
 const handleStep3Back = () => {
+  // 모드에 상관없이 Step2로 돌아감 (Step2에서 모드에 따라 다른 컴포넌트가 표시됨)
   console.log('Step 3에서 Step 2로 돌아가기')
   setCurrentStep(2)
 }
+
 
 /**
  * 마법사 완료 핸들러

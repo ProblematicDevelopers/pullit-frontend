@@ -2,7 +2,7 @@
   시험지 마법사 헤더 컴포넌트
   
   이 컴포넌트는 시험지 생성 마법사의 상단 헤더를 표시합니다.
-  - 3단계 진행 상황 표시 (Step 1: 단원선택, Step 2: 문항편집, Step 3: 시험지저장)
+  - 3단계 진행 상황 표시 (Step 1: 방식선택, Step 2: 문항선택, Step 3: 시험지저장)
   - 각 단계의 활성화/완료 상태 시각적 표현
   - 팝업 창 닫기 버튼
   
@@ -18,7 +18,7 @@
     <!-- 3단계 진행 표시 -->
     <div class="wizard-steps">
       <div class="step-container">
-        <!-- Step 1: 단원선택 -->
+        <!-- Step 1: 방식선택 -->
         <div 
           class="step"
           :class="{ 
@@ -35,7 +35,7 @@
           <!-- 단계 정보 -->
           <div class="step-info">
             <div class="step-label">STEP 1</div>
-            <div class="step-title">단원선택</div>
+            <div class="step-title">방식선택</div>
           </div>
         </div>
 
@@ -56,7 +56,7 @@
           </svg>
         </div>
 
-        <!-- Step 2: 문항편집 -->
+        <!-- Step 2: 문항선택 -->
         <div 
           class="step"
           :class="{ 
@@ -70,7 +70,7 @@
           </div>
           <div class="step-info">
             <div class="step-label">STEP 2</div>
-            <div class="step-title">문항편집</div>
+            <div class="step-title">문항선택</div>
           </div>
         </div>
 
