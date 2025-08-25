@@ -32,7 +32,7 @@ let chart = null
 const viewQuestionDetail = (question, index) => {
   selectedQuestion.value = {
     ...question,
-    answer: question.userAnswer,
+    answer: renderMathInHtml(question.userAnswer),
     questionNumber: index + 1,
   }
   showModal.value = true

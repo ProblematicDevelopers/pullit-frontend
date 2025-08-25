@@ -128,6 +128,7 @@ import DetailReport from '@/components/student/report/DetailReport.vue'
 import QuestionHtmlModal from '@/components/student/report/QuestionHtmlModal.vue'
 import studentApi from '@/services/studentApi.js'
 import reportApi from '@/services/reportApi.js'
+import katex from 'katex'
 
 const route = useRoute()
 const studentGrade = ref('-')
@@ -271,11 +272,108 @@ const normalizeQuestions = (questions) => {
     }
   })
 }
+// 수식 정규화 함수
+const renderMathInHtml = (htmlContent) => {
+  if (!htmlContent) return ''
+
+  // KaTeX를 사용해서 수식 렌더링
+  try {
+    let processedHtml = htmlContent
+
+    // HTML 엔티티를 원래 문자로 변환
+    const decodeHtmlEntities = (text) => {
+      const textarea = document.createElement('textarea')
+      textarea.innerHTML = text
+      return textarea.value
+    }
+
+    // \displaystyle 형태의 수식 처리 - 중첩된 중괄호 고려
+    let displayMatch
+    const displayRegex = /\\displaystyle\s*\{((?:[^{}]|{[^{}]*})*)\}/g
+    while ((displayMatch = displayRegex.exec(processedHtml)) !== null) {
+      try {
+        const formula = decodeHtmlEntities(displayMatch[1])
+        const rendered = katex.renderToString(formula, {
+          throwOnError: false,
+          displayMode: true,
+        })
+        processedHtml = processedHtml.replace(displayMatch[0], rendered)
+        // 정규식 인덱스 재설정
+        displayRegex.lastIndex = 0
+      } catch (error) {
+        console.warn('KaTeX displaystyle 수식 렌더링 실패:', error)
+      }
+    }
+
+    // 인라인 수식 (\(...\)) 처리 - 더 강력한 정규식
+    let match
+    const inlineRegex = /\\\(([^)]*(?:\([^)]*\)[^)]*)*)\\\)/g
+    while ((match = inlineRegex.exec(processedHtml)) !== null) {
+      try {
+        const formula = decodeHtmlEntities(match[1])
+
+        const rendered = katex.renderToString(formula, { throwOnError: false })
+        processedHtml = processedHtml.replace(match[0], rendered)
+        // 정규식 인덱스 재설정
+        inlineRegex.lastIndex = 0
+      } catch (error) {
+        console.warn('KaTeX 인라인 수식 렌더링 실패:', error)
+      }
+    }
+
+    // 블록 수식 (\[...\]) 처리
+    const blockRegex = /\\\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\\\]/g
+    while ((match = blockRegex.exec(processedHtml)) !== null) {
+      try {
+        const formula = decodeHtmlEntities(match[1])
+
+        const rendered = katex.renderToString(formula, {
+          throwOnError: false,
+          displayMode: true,
+        })
+        processedHtml = processedHtml.replace(match[0], rendered)
+        // 정규식 인덱스 재설정
+        blockRegex.lastIndex = 0
+      } catch (error) {
+        console.warn('KaTeX 블록 수식 렌더링 실패:', error)
+      }
+    }
+
+    // 기존 $...$ 형태도 지원
+    processedHtml = processedHtml.replace(/\$([^$]+)\$/g, (match, formula) => {
+      try {
+        return katex.renderToString(decodeHtmlEntities(formula), { throwOnError: false })
+      } catch (error) {
+        console.warn('KaTeX 인라인 수식 렌더링 실패:', error)
+        return match
+      }
+    })
+
+    // 기존 $$...$$ 형태도 지원
+    processedHtml = processedHtml.replace(/\$\$([^$]+)\$\$/g, (match, formula) => {
+      try {
+        return katex.renderToString(decodeHtmlEntities(formula), {
+          throwOnError: false,
+          displayMode: true,
+        })
+      } catch (error) {
+        console.warn('KaTeX 블록 수식 렌더링 실패:', error)
+        return match
+      }
+    })
+
+    return processedHtml
+  } catch (error) {
+    console.error('수식 렌더링 중 오류:', error)
+    return htmlContent
+  }
+}
 
 const viewQuestionDetail = (question, index) => {
   // 문제 상세 보기 모달 열기
   selectedQuestion.value = {
     ...question,
+    answer: renderMathInHtml(question.answer),
     questionNumber: index + 1, // 실제 문제 순서 추가
   }
   showModal.value = true
