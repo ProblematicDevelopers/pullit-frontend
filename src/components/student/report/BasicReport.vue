@@ -1,15 +1,6 @@
 <!-- src/components/student/report/ReportTabs.vue -->
 <template>
   <div class="report-wrap">
-    <!-- 뒤로가기 버튼과 시험 제목 -->
-    <div class="back-button-container">
-      <button class="back-btn" @click="goBack">
-        <span class="back-icon">←</span>
-        뒤로가기
-      </button>
-      <h2 class="exam-title">{{ examTitle }}</h2>
-    </div>
-
     <!-- 탭 헤더 -->
 
     <nav class="tabs" role="tablist" aria-label="리포트 탭">
@@ -73,9 +64,14 @@
           </ul>
         </div>
         <div id="score-box">
-          <span class="score"> {{ examData.score || '0' }}개 </span>
-          <span class="sep"> | </span>
-          <span class="value"> {{ examData.totalQuestions || '0' }}문제 </span>
+          <div class="score-section">
+            <span class="score"> {{ examData.score || '0' }}개 </span>
+            <span class="sep"> | </span>
+            <span class="value"> {{ examData.totalQuestions || '0' }}문제 </span>
+          </div>
+          <div class="duration-section">
+            <span class="duration">{{ formatDuration(examData.totalDuration || 0) }}</span>
+          </div>
         </div>
         <div>
           <table class="errata table table-bordered">
@@ -127,21 +123,21 @@
 
 <script setup>
 import { ref, computed, onMounted } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import DetailReport from '@/components/student/report/DetailReport.vue'
 import QuestionHtmlModal from '@/components/student/report/QuestionHtmlModal.vue'
 import studentApi from '@/services/studentApi.js'
 import reportApi from '@/services/reportApi.js'
+import katex from 'katex'
 
 const route = useRoute()
-const router = useRouter()
 const studentGrade = ref('-')
 const examData = ref({
   score: 0,
   totalQuestions: 0,
+  totalDuration: 0,
   questions: [],
 })
-const examTitle = ref('')
 const loading = ref(false)
 const error = ref(null)
 const showModal = ref(false)
@@ -202,13 +198,12 @@ const fetchExamData = async () => {
 
     // detail report
     examId.value = data.examId
-    // 시험 제목 설정
-    examTitle.value = data.examName || data.title || '시험 리포트'
 
     // API 응답 데이터를 컴포넌트에서 사용할 수 있는 형태로 변환
     examData.value = {
       score: calculateCorrectCount(data.attemptQuestions || []),
       totalQuestions: data.attemptQuestions?.length || 0,
+      totalDuration: calculateTotalDuration(data.attemptQuestions || []),
       questions: normalizeQuestions(data.attemptQuestions || []),
     }
   } catch (err) {
@@ -216,10 +211,10 @@ const fetchExamData = async () => {
     error.value = '시험 데이터를 불러올 수 없습니다.'
 
     // 에러 시 기본 데이터 설정
-    examTitle.value = '시험 리포트'
     examData.value = {
       score: 0,
       totalQuestions: 0,
+      totalDuration: 0,
       questions: [],
     }
   } finally {
@@ -234,6 +229,28 @@ const calculateCorrectCount = (attemptQuestions) => {
   }
 
   return attemptQuestions.filter((question) => question.isCorrect).length
+}
+
+// 총 소요시간 계산 함수
+const calculateTotalDuration = (attemptQuestions) => {
+  if (!Array.isArray(attemptQuestions)) {
+    return 0
+  }
+
+  return attemptQuestions.reduce((total, question) => {
+    return total + (question.duration || 0)
+  }, 0)
+}
+
+// 소요시간을 분:초 형식으로 변환하는 함수
+const formatDuration = (totalSeconds) => {
+  const minutes = Math.floor(totalSeconds / 60)
+  const seconds = totalSeconds % 60
+
+  const formattedMinutes = minutes.toString().padStart(2, '0')
+  const formattedSeconds = seconds.toString().padStart(2, '0')
+
+  return `${formattedMinutes}분 ${formattedSeconds}초`
 }
 
 // 문제 데이터 정규화 함수
@@ -255,11 +272,108 @@ const normalizeQuestions = (questions) => {
     }
   })
 }
+// 수식 정규화 함수
+const renderMathInHtml = (htmlContent) => {
+  if (!htmlContent) return ''
+
+  // KaTeX를 사용해서 수식 렌더링
+  try {
+    let processedHtml = htmlContent
+
+    // HTML 엔티티를 원래 문자로 변환
+    const decodeHtmlEntities = (text) => {
+      const textarea = document.createElement('textarea')
+      textarea.innerHTML = text
+      return textarea.value
+    }
+
+    // \displaystyle 형태의 수식 처리 - 중첩된 중괄호 고려
+    let displayMatch
+    const displayRegex = /\\displaystyle\s*\{((?:[^{}]|{[^{}]*})*)\}/g
+    while ((displayMatch = displayRegex.exec(processedHtml)) !== null) {
+      try {
+        const formula = decodeHtmlEntities(displayMatch[1])
+        const rendered = katex.renderToString(formula, {
+          throwOnError: false,
+          displayMode: true,
+        })
+        processedHtml = processedHtml.replace(displayMatch[0], rendered)
+        // 정규식 인덱스 재설정
+        displayRegex.lastIndex = 0
+      } catch (error) {
+        console.warn('KaTeX displaystyle 수식 렌더링 실패:', error)
+      }
+    }
+
+    // 인라인 수식 (\(...\)) 처리 - 더 강력한 정규식
+    let match
+    const inlineRegex = /\\\(([^)]*(?:\([^)]*\)[^)]*)*)\\\)/g
+    while ((match = inlineRegex.exec(processedHtml)) !== null) {
+      try {
+        const formula = decodeHtmlEntities(match[1])
+
+        const rendered = katex.renderToString(formula, { throwOnError: false })
+        processedHtml = processedHtml.replace(match[0], rendered)
+        // 정규식 인덱스 재설정
+        inlineRegex.lastIndex = 0
+      } catch (error) {
+        console.warn('KaTeX 인라인 수식 렌더링 실패:', error)
+      }
+    }
+
+    // 블록 수식 (\[...\]) 처리
+    const blockRegex = /\\\[([^\]]*(?:\[[^\]]*\][^\]]*)*)\\\]/g
+    while ((match = blockRegex.exec(processedHtml)) !== null) {
+      try {
+        const formula = decodeHtmlEntities(match[1])
+
+        const rendered = katex.renderToString(formula, {
+          throwOnError: false,
+          displayMode: true,
+        })
+        processedHtml = processedHtml.replace(match[0], rendered)
+        // 정규식 인덱스 재설정
+        blockRegex.lastIndex = 0
+      } catch (error) {
+        console.warn('KaTeX 블록 수식 렌더링 실패:', error)
+      }
+    }
+
+    // 기존 $...$ 형태도 지원
+    processedHtml = processedHtml.replace(/\$([^$]+)\$/g, (match, formula) => {
+      try {
+        return katex.renderToString(decodeHtmlEntities(formula), { throwOnError: false })
+      } catch (error) {
+        console.warn('KaTeX 인라인 수식 렌더링 실패:', error)
+        return match
+      }
+    })
+
+    // 기존 $$...$$ 형태도 지원
+    processedHtml = processedHtml.replace(/\$\$([^$]+)\$\$/g, (match, formula) => {
+      try {
+        return katex.renderToString(decodeHtmlEntities(formula), {
+          throwOnError: false,
+          displayMode: true,
+        })
+      } catch (error) {
+        console.warn('KaTeX 블록 수식 렌더링 실패:', error)
+        return match
+      }
+    })
+
+    return processedHtml
+  } catch (error) {
+    console.error('수식 렌더링 중 오류:', error)
+    return htmlContent
+  }
+}
 
 const viewQuestionDetail = (question, index) => {
   // 문제 상세 보기 모달 열기
   selectedQuestion.value = {
     ...question,
+    answer: renderMathInHtml(question.answer),
     questionNumber: index + 1, // 실제 문제 순서 추가
   }
   showModal.value = true
@@ -268,16 +382,6 @@ const viewQuestionDetail = (question, index) => {
 const closeModal = () => {
   showModal.value = false
   selectedQuestion.value = null
-}
-
-const goBack = () => {
-  // 브라우저 히스토리에서 뒤로가기
-  if (window.history.length > 1) {
-    window.history.back()
-  } else {
-    // 히스토리가 없으면 리포트 목록으로 이동
-    router.push({ name: 'student.reportList' })
-  }
 }
 
 const user = computed(() => {
@@ -305,54 +409,6 @@ const currentTab = ref(props.defaultTab)
   max-width: 1000px;
   margin: 80px auto 80px;
   padding: 0 20px;
-}
-
-/* 뒤로가기 버튼과 시험 제목 */
-.back-button-container {
-  margin-top: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-}
-
-.back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: #f3f4f6;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  color: #374151;
-  font-size: 14px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  text-decoration: none;
-}
-
-.back-btn:hover {
-  background: #e5e7eb;
-  border-color: #9ca3af;
-  color: #1f2937;
-}
-
-.back-btn:active {
-  transform: translateY(1px);
-}
-
-.back-icon {
-  font-size: 16px;
-  font-weight: bold;
-}
-
-.exam-title {
-  margin: 0;
-  color: #1f2937;
-  font-size: 18px;
-  font-weight: 600;
-  flex: 1;
-  text-align: right;
 }
 
 /* Tabs */
@@ -467,17 +523,35 @@ const currentTab = ref(props.defaultTab)
   font-weight: 500;
 }
 
+.duration {
+  color: #059669;
+  font-weight: 500;
+  white-space: pre-line;
+  line-height: 1.2;
+}
+
 #score-box {
   margin-top: 60px;
-  height: 100px;
+  height: 120px;
   background: #fff;
   border: 1px solid #d3d3d3;
   border-radius: 6px;
   text-align: center;
-  align-content: center;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
   font-size: 20px;
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
   transition: all 0.3s ease;
+}
+
+.score-section {
+  margin-bottom: 8px;
+}
+
+.duration-section {
+  margin-top: 4px;
 }
 
 /* hover 효과 제거 */

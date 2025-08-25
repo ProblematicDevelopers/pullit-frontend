@@ -136,11 +136,8 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
         this.loading = true
         this.error = null
 
-        console.log('교과서 목록 API 호출 시작')
-
         // API 호출
         const response = await itemProcessingAPI.getTextbooks()
-
 
         // API 응답이 성공인 경우
         if (response.data.success && response.data.data) {
@@ -159,7 +156,6 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
       } finally {
         // 성공/실패와 관계없이 로딩 상태 종료
         this.loading = false
-        console.log('최종 textbooks 상태:', this.textbooks)
       }
     },
 
@@ -189,14 +185,7 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
      * @param {Array} pages - PDF 페이지 배열
      */
     setPdfPages(pages) {
-      console.log('=== Store setPdfPages 호출됨 ===')
-      console.log('이전 pdfPages 길이:', this.pdfPages.length)
-      console.log('새로운 pages 길이:', pages.length)
-      console.log('새로운 pages:', pages.map(p => ({ index: p.index, pageNumber: p.pageNumber })))
-
       this.pdfPages = pages
-
-      console.log('Store pdfPages 업데이트 완료:', this.pdfPages.length)
     },
 
     /**
@@ -206,7 +195,6 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
     addBlobUrl(url) {
       if (url && !this.blobUrls.includes(url)) {
         this.blobUrls.push(url)
-        console.log('Store에 Blob URL 추가됨:', url)
       }
     },
 
@@ -220,7 +208,6 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
           URL.revokeObjectURL(url)
           const index = this.blobUrls.indexOf(url)
           this.blobUrls.splice(index, 1)
-          console.log('Store에서 Blob URL 정리됨:', url)
         } catch (error) {
           console.warn('Blob URL 정리 중 오류:', error)
         }
@@ -231,17 +218,14 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
      * 모든 Blob URL 정리
      */
     cleanupBlobUrls() {
-      console.log(`Store에서 ${this.blobUrls.length}개의 Blob URL 정리 시작`)
       this.blobUrls.forEach(url => {
         try {
           URL.revokeObjectURL(url)
-          console.log('Blob URL 정리됨:', url)
         } catch (error) {
           console.warn('Blob URL 정리 중 오류:', error)
         }
       })
       this.blobUrls = []
-      console.log('Store에서 모든 Blob URL 정리 완료')
     },
 
     /**
@@ -250,16 +234,9 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
      * @param {number} toIndex - 이동할 페이지의 목표 인덱스
      */
     movePage(fromIndex, toIndex) {
-      console.log('=== Store movePage 호출됨 ===')
-      console.log('이동할 페이지 인덱스:', fromIndex, '->', toIndex)
-      console.log('이동 전 pdfPages 길이:', this.pdfPages.length)
-
       if (fromIndex >= 0 && toIndex >= 0 && fromIndex < this.pdfPages.length && toIndex < this.pdfPages.length) {
         const page = this.pdfPages.splice(fromIndex, 1)[0]
         this.pdfPages.splice(toIndex, 0, page)
-
-        console.log('페이지 이동 완료')
-        console.log('이동 후 페이지들:', this.pdfPages.map(p => ({ index: p.index, pageNumber: p.pageNumber })))
       } else {
         console.warn('유효하지 않은 인덱스:', { fromIndex, toIndex, pdfPagesLength: this.pdfPages.length })
       }
@@ -270,10 +247,6 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
      * @param {number} pageIndex - 삭제할 페이지의 인덱스
      */
     removePage(pageIndex) {
-      console.log('=== Store removePage 호출됨 ===')
-      console.log('삭제할 페이지 인덱스:', pageIndex)
-      console.log('삭제 전 pdfPages 길이:', this.pdfPages.length)
-
       if (pageIndex >= 0 && pageIndex < this.pdfPages.length) {
         // Blob URL도 함께 정리
         const page = this.pdfPages[pageIndex]
@@ -281,9 +254,6 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
           this.removeBlobUrl(page.preview)
         }
         this.pdfPages.splice(pageIndex, 1)
-
-        console.log('페이지 삭제 완료, 남은 길이:', this.pdfPages.length)
-        console.log('남은 페이지들:', this.pdfPages.map(p => ({ index: p.index, pageNumber: p.pageNumber })))
       } else {
         console.warn('유효하지 않은 페이지 인덱스:', pageIndex)
       }
@@ -294,20 +264,13 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
      * @param {Array<number>} pageIndexes - 삭제할 페이지 인덱스 배열
      */
     removeMultiplePages(pageIndexes) {
-      console.log('=== Store removeMultiplePages 호출됨 ===')
-      console.log('삭제할 페이지 인덱스들:', pageIndexes)
-      console.log('삭제 전 pdfPages 길이:', this.pdfPages.length)
-
       if (!Array.isArray(pageIndexes) || pageIndexes.length === 0) {
         console.warn('유효하지 않은 페이지 인덱스 배열:', pageIndexes)
         return
       }
 
-      console.log('Store에서 일괄 삭제 시작:', pageIndexes)
-
       // 인덱스를 내림차순으로 정렬하여 뒤에서부터 삭제 (인덱스 변화 방지)
       const sortedIndexes = [...pageIndexes].sort((a, b) => b - a)
-      console.log('정렬된 인덱스 (내림차순):', sortedIndexes)
 
       sortedIndexes.forEach(index => {
         if (index >= 0 && index < this.pdfPages.length) {
@@ -317,14 +280,10 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
             this.removeBlobUrl(page.preview)
           }
           this.pdfPages.splice(index, 1)
-          console.log(`인덱스 ${index} 페이지 삭제 완료`)
         } else {
           console.warn(`유효하지 않은 인덱스 ${index} 건너뜀`)
         }
       })
-
-      console.log('Store에서 일괄 삭제 완료, 남은 페이지 수:', this.pdfPages.length)
-      console.log('남은 페이지들:', this.pdfPages.map(p => ({ index: p.index, pageNumber: p.pageNumber })))
     },
 
     /**
@@ -337,45 +296,177 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
 
     /**
      * 편집된 PDF를 최종 PDF로 생성
+     * @param {Function} progressCallback - 진행률 콜백 함수 (선택사항)
      * @returns {Promise<Blob>} 생성된 최종 PDF Blob
      */
-    async generateFinalPdf() {
+    async generateFinalPdf(progressCallback = null) {
       try {
         if (!this.pdfPages || this.pdfPages.length === 0) {
           throw new Error('편집할 PDF 페이지가 없습니다.')
         }
 
-        console.log('최종 PDF 생성 시작, 페이지 수:', this.pdfPages.length)
+        // 진행률 콜백이 있으면 초기 상태 알림
+        if (progressCallback) {
+          progressCallback({
+            stage: '시작',
+            current: 0,
+            total: this.pdfPages.length,
+            percentage: 0
+          })
+        }
 
-        // PDFDocument 생성
+        // pdf-lib을 사용하여 이미지들을 PDF로 변환 (극한 품질 보존)
         const { PDFDocument } = await import('pdf-lib')
+
+        if (progressCallback) {
+          progressCallback({
+            stage: '라이브러리 로드',
+            current: 0,
+            total: this.pdfPages.length,
+            percentage: 5
+          })
+        }
+
+        // PDF 문서 생성
         const pdfDoc = await PDFDocument.create()
+
+        if (progressCallback) {
+          progressCallback({
+            stage: 'PDF 문서 생성',
+            current: 0,
+            total: this.pdfPages.length,
+            percentage: 10
+          })
+        }
 
         // 편집된 순서대로 페이지 추가
         for (let i = 0; i < this.pdfPages.length; i++) {
           const page = this.pdfPages[i]
-          if (page.blob) {
+
+          if (progressCallback) {
+            progressCallback({
+              stage: `페이지 ${i + 1} 처리 시작`,
+              current: i + 1,
+              total: this.pdfPages.length,
+              percentage: 10 + Math.round((i / this.pdfPages.length) * 30)
+            })
+          }
+
+          if (page.preview) {
             try {
-              const pagePdf = await PDFDocument.load(await page.blob.arrayBuffer())
-              const [copiedPage] = await pdfDoc.copyPages(pagePdf, [0])
-              pdfDoc.addPage(copiedPage)
-              console.log(`페이지 ${i + 1} 추가 완료`)
+              // 이미지 품질을 최대한 보존하기 위해 직접 fetch 사용
+              if (progressCallback) {
+                progressCallback({
+                  stage: `이미지 ${i + 1} 로딩 중...`,
+                  current: i + 1,
+                  total: this.pdfPages.length,
+                  percentage: 10 + Math.round((i / this.pdfPages.length) * 30) + 5
+                })
+              }
+
+              const imageResponse = await fetch(page.preview)
+              const imageArrayBuffer = await imageResponse.arrayBuffer()
+
+              // PNG 이미지를 PDF에 직접 임베딩 (Canvas 처리 없이)
+              if (progressCallback) {
+                progressCallback({
+                  stage: `이미지 ${i + 1} PDF 임베딩 중...`,
+                  current: i + 1,
+                  total: this.pdfPages.length,
+                  percentage: 10 + Math.round((i / this.pdfPages.length) * 30) + 10
+                })
+              }
+
+              const pdfImage = await pdfDoc.embedPng(imageArrayBuffer)
+
+              // 원본 이미지 크기 정보 가져오기
+              let { width, height } = page
+              if (!width || !height) {
+                if (progressCallback) {
+                  progressCallback({
+                    stage: `이미지 ${i + 1} 크기 추출 중...`,
+                    current: i + 1,
+                    total: this.pdfPages.length,
+                    percentage: 10 + Math.round((i / this.pdfPages.length) * 30) + 15
+                  })
+                }
+
+                // 이미지 메타데이터에서 크기 추출
+                const img = new Image()
+                await new Promise((resolve, reject) => {
+                  img.onload = () => {
+                    width = img.naturalWidth
+                    height = img.naturalHeight
+                    resolve()
+                  }
+                  img.onerror = reject
+                  img.src = page.preview
+                })
+              }
+
+              // 새 페이지 생성 (원본 크기)
+              if (progressCallback) {
+                progressCallback({
+                  stage: `페이지 ${i + 1} 생성 중...`,
+                  current: i + 1,
+                  total: this.pdfPages.length,
+                  percentage: 10 + Math.round((i / this.pdfPages.length) * 30) + 20
+                })
+              }
+
+              const pdfPage = pdfDoc.addPage([width, height])
+
+              // 이미지를 페이지에 그리기 (원본 크기 그대로, 품질 손실 없음)
+              pdfPage.drawImage(pdfImage, {
+                x: 0,
+                y: 0,
+                width: width,
+                height: height
+              })
+
+              // 페이지 완료 시 진행률 업데이트
+              if (progressCallback) {
+                progressCallback({
+                  stage: `페이지 ${i + 1} 완료`,
+                  current: i + 1,
+                  total: this.pdfPages.length,
+                  percentage: 10 + Math.round(((i + 1) / this.pdfPages.length) * 30)
+                })
+              }
+
             } catch (pageError) {
               console.warn(`페이지 ${i + 1} 처리 중 오류:`, pageError)
             }
           }
         }
 
+        if (progressCallback) {
+          progressCallback({
+            stage: 'PDF 생성',
+            current: this.pdfPages.length,
+            total: this.pdfPages.length,
+            percentage: 90
+          })
+        }
+
         // 최종 PDF를 Blob으로 변환
         const pdfBytes = await pdfDoc.save()
-        const finalPdfBlob = new Blob([pdfBytes], { type: 'application/pdf' })
+        const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' })
+
+        if (progressCallback) {
+          progressCallback({
+            stage: '완료',
+            current: this.pdfPages.length,
+            total: this.pdfPages.length,
+            percentage: 100
+          })
+        }
 
         // Store에 최종 PDF 저장
-        this.finalPdf = finalPdfBlob
+        this.finalPdf = pdfBlob
         this.finalPdfGeneratedAt = new Date().toISOString()
 
-        console.log('최종 PDF 생성 완료, 크기:', finalPdfBlob.size, 'bytes')
-        return finalPdfBlob
+        return pdfBlob
 
       } catch (error) {
         console.error('최종 PDF 생성 실패:', error)
@@ -385,30 +476,32 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
 
     /**
      * 편집된 PDF를 서버에 업로드
+     * @param {Function} progressCallback - PDF 생성 진행률 콜백 함수 (선택사항)
      * @returns {Promise<Object>} 업로드 결과
      */
-    async uploadProcessedPdf() {
+    async uploadProcessedPdf(progressCallback = null) {
       try {
-        console.log('PDF 업로드 시작:')
-
         // 최종 PDF가 없으면 생성
         if (!this.finalPdf) {
-          console.log('최종 PDF가 없어서 생성 시작')
-          await this.generateFinalPdf()
+          await this.generateFinalPdf(progressCallback)
         }
+
+        // 파일명 생성 (원본 파일명 + 편집됨 + 타임스탬프)
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+        const originalName = this.pdfFile.name.replace('.pdf', '')
+        const fileName = `${originalName}_편집됨_${timestamp}.pdf`
 
         const response = await itemProcessingAPI.uploadProcessedPdf(
           this.finalPdf,          // file
-          this.pdfFile.name,
+          fileName,               // fileName
           "DOCUMENT",             // category
           "file_history",         // entityType
           0,                      // entityId
-          "user uploaded pdf"     // description
+          "편집된 PDF 파일"        // description
         )
-        console.log(response)
+
         if (response.data.success) {
           this.uploadedPdfInfo = response.data.data
-          console.log('PDF 업로드 성공:', response.data.data)
           return response.data.data
         } else {
           throw new Error(response.data.message || 'PDF 업로드에 실패했습니다.')
