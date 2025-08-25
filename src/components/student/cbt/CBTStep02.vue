@@ -45,7 +45,6 @@
                   </div>
                 </div>
               </div>
-
             </div>
           </div>
         </div>
@@ -87,9 +86,9 @@ onMounted(() => {
   const storedExamData = sessionStorage.getItem('examData')
   if (storedExamData) {
     try {
-      examId.value = JSON.parse(storedExamData).examId;
-      examName.value = JSON.parse(storedExamData).examName;
-      examType.value = JSON.parse(storedExamData).examType;
+      examId.value = JSON.parse(storedExamData).examId
+      examName.value = JSON.parse(storedExamData).examName
+      examType.value = JSON.parse(storedExamData).examType
     } catch (error) {
       console.error('CBT 데이터 파싱 오류:', error)
     }
@@ -106,7 +105,6 @@ onMounted(() => {
     }
   }
 
-
   // 현재 시간 설정
   currentTime.value = new Date().toLocaleString('ko-KR')
 
@@ -114,7 +112,7 @@ onMounted(() => {
   if (!examId.value) {
     console.error('CBT ID를 찾을 수 없습니다.')
     alert('CBT 정보를 찾을 수 없습니다. 다시 시도해주세요.')
-    router.push('/student/cbtstep01')
+    router.push('/student/cbt/step01')
   }
 })
 
@@ -140,7 +138,7 @@ function startCBT() {
       'location=no',
       'status=no',
       'directories=no',
-      'fullscreen=yes'
+      'fullscreen=yes',
     ].join(',')
 
     // 전체화면 팝업 창으로 CBT 시험 페이지 열기
@@ -149,7 +147,9 @@ function startCBT() {
 
     // 팝업 창이 차단되었는지 확인
     if (!popupWindow || popupWindow.closed || typeof popupWindow.closed === 'undefined') {
-      alert('팝업이 차단되었습니다.\n\n팝업 차단을 해제하는 방법:\n1. 브라우저 주소창 옆의 팝업 차단 아이콘 클릭\n2. "팝업 허용" 선택\n3. 다시 시도해주세요.')
+      alert(
+        '팝업이 차단되었습니다.\n\n팝업 차단을 해제하는 방법:\n1. 브라우저 주소창 옆의 팝업 차단 아이콘 클릭\n2. "팝업 허용" 선택\n3. 다시 시도해주세요.',
+      )
       return
     }
 
@@ -183,7 +183,7 @@ function goBack() {
   // 세션스토리지 정리
   sessionStorage.removeItem('cbtData')
   sessionStorage.removeItem('examData')
-  router.push('/student/cbtstep01')
+  router.push('/student/cbt/step01')
 }
 </script>
 
