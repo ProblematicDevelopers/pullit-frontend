@@ -478,82 +478,87 @@ export default {
       }
     }, { immediate: true, deep: true })
 
-                // PDF 페이지 렌더링
-        const renderPdfPage = async (pageIndex) => {
-          if (!pdfCanvas.value || !props.pdfPages[pageIndex]) {
-            console.log('PDF Canvas 또는 페이지 데이터가 준비되지 않음')
-            return
-          }
+    // PDF 페이지 렌더링
+    const renderPdfPage = async (pageIndex) => {
+      if (!pdfCanvas.value || !props.pdfPages[pageIndex]) {
+        console.log('PDF Canvas 또는 페이지 데이터가 준비되지 않음')
+        return
+      }
 
-          try {
-            console.log('=== PDF 페이지 렌더링 시작 ===')
-            console.log('페이지 인덱스:', pageIndex)
+      try {
+        console.log('=== PDF 페이지 렌더링 시작 ===')
+        console.log('페이지 인덱스:', pageIndex)
 
-            const pageData = props.pdfPages[pageIndex]
-            if (!pageData.preview) {
-              console.error('페이지에 preview 이미지가 없음:', pageData)
-              return
-            }
-
-            // preview 이미지를 Canvas에 직접 렌더링
-            const img = new Image()
-            img.onload = () => {
-              const canvas = pdfCanvas.value
-              const context = canvas.getContext('2d')
-
-              // Canvas 크기 설정
-              canvas.width = pageData.width || img.width
-              canvas.height = pageData.height || img.height
-
-              console.log('Canvas 크기 설정:', canvas.width, 'x', canvas.height)
-
-              // 이미지 그리기
-              context.drawImage(img, 0, 0, canvas.width, canvas.height)
-              console.log('이미지 렌더링 완료')
-
-              // Canvas 오버레이 설정 - 렌더링 완료 후
-              nextTick(() => {
-                if (pdfCanvas.value && selectionCanvas.value) {
-                  setupCanvasOverlay()
-                } else {
-                  console.log('Canvas 요소들이 아직 준비되지 않음, 오버레이 설정 건너뜀')
-                }
-              })
-            }
-
-            img.onerror = (error) => {
-              console.error('이미지 로드 실패:', error)
-            }
-
-            img.src = pageData.preview
-
-          } catch (error) {
-            console.error('PDF 페이지 렌더링 오류:', error)
-          }
+        const pageData = props.pdfPages[pageIndex]
+        if (!pageData.preview) {
+          console.error('페이지에 preview 이미지가 없음:', pageData)
+          return
         }
 
-        // PDF 페이지 변경 시 렌더링
-        watch(currentPage, (newPage) => {
-          renderPdfPage(newPage)
-        })
+        // preview 이미지를 Canvas에 직접 렌더링
+        const img = new Image()
+        img.onload = () => {
+          const canvas = pdfCanvas.value
+          const context = canvas.getContext('2d')
 
-        // 컴포넌트 마운트 시 첫 번째 페이지 렌더링
-        onMounted(() => {
+          // 원본 이미지 크기 사용 (픽셀 정확도 보장)
+          const originalWidth = img.naturalWidth || img.width
+          const originalHeight = img.naturalHeight || img.height
+
+          // Canvas 크기를 원본 이미지 크기로 설정
+          canvas.width = originalWidth
+          canvas.height = originalHeight
+
+          console.log('Canvas 크기 설정:', canvas.width, 'x', canvas.height)
+          console.log('원본 이미지 크기:', originalWidth, 'x', originalHeight)
+
+          // 이미지 그리기 (원본 크기 그대로)
+          context.drawImage(img, 0, 0, originalWidth, originalHeight)
+          console.log('이미지 렌더링 완료')
+
+          // Canvas 오버레이 설정 - 렌더링 완료 후
           nextTick(() => {
-            if (props.pdfPages && props.pdfPages.length > 0) {
-              console.log('컴포넌트 마운트 완료, 첫 번째 페이지 렌더링 시작')
-              // Canvas 요소들이 준비될 때까지 잠시 대기
-              setTimeout(() => {
-                if (pdfCanvas.value && selectionCanvas.value) {
-                  renderPdfPage(0)
-                } else {
-                  console.log('Canvas 요소들이 아직 준비되지 않음, 100ms 후 재시도')
-                  setTimeout(() => renderPdfPage(0), 100)
-                }
-              }, 50)
+            if (pdfCanvas.value && selectionCanvas.value) {
+              setupCanvasOverlay()
+            } else {
+              console.log('Canvas 요소들이 아직 준비되지 않음, 오버레이 설정 건너뜀')
             }
           })
-        })
+        }
+
+        img.onerror = (error) => {
+          console.error('이미지 로드 실패:', error)
+        }
+
+        img.src = pageData.preview
+
+      } catch (error) {
+        console.error('PDF 페이지 렌더링 오류:', error)
+      }
+    }
+
+    // PDF 페이지 변경 시 렌더링
+    watch(currentPage, (newPage) => {
+      renderPdfPage(newPage)
+    })
+
+    // 컴포넌트 마운트 시 첫 번째 페이지 렌더링
+    onMounted(() => {
+      nextTick(() => {
+        if (props.pdfPages && props.pdfPages.length > 0) {
+          console.log('컴포넌트 마운트 완료, 첫 번째 페이지 렌더링 시작')
+          // Canvas 요소들이 준비될 때까지 잠시 대기
+          setTimeout(() => {
+            if (pdfCanvas.value && selectionCanvas.value) {
+              renderPdfPage(0)
+            } else {
+              console.log('Canvas 요소들이 아직 준비되지 않음, 100ms 후 재시도')
+              setTimeout(() => renderPdfPage(0), 100)
+            }
+          }, 50)
+        }
+      })
+    })
 
     // Canvas 오버레이 설정
     const setupCanvasOverlay = () => {
@@ -566,23 +571,38 @@ export default {
         const pdfCanvasEl = pdfCanvas.value
         const selectionCanvasEl = selectionCanvas.value
 
-        // PDF Canvas 크기에 맞춰 Canvas 크기 설정
-        const pdfCanvasRect = pdfCanvasEl.getBoundingClientRect()
-        selectionCanvasEl.width = pdfCanvasRect.width
-        selectionCanvasEl.height = pdfCanvasRect.height
+        // PDF Canvas의 화면 표시 크기 사용
+        const rect = pdfCanvasEl.getBoundingClientRect()
+        const displayWidth = rect.width
+        const displayHeight = rect.height
 
-        // Canvas를 PDF Canvas 위에 정확히 겹치도록 위치 조정
-        selectionCanvasEl.style.width = pdfCanvasRect.width + 'px'
-        selectionCanvasEl.style.height = pdfCanvasRect.height + 'px'
+        // 선택 Canvas를 PDF Canvas와 정확히 같은 화면 크기로 설정
+        selectionCanvasEl.width = displayWidth
+        selectionCanvasEl.height = displayHeight
+
+        // CSS 스타일도 화면 크기로 정확하게 설정
+        selectionCanvasEl.style.width = displayWidth + 'px'
+        selectionCanvasEl.style.height = displayHeight + 'px'
         selectionCanvasEl.style.position = 'absolute'
         selectionCanvasEl.style.top = '0px'
         selectionCanvasEl.style.left = '0px'
 
-        console.log('Canvas 오버레이 설정 완료:', selectionCanvasEl.width, 'x', selectionCanvasEl.height)
+        console.log('Canvas 오버레이 설정 완료:', {
+          pdfCanvas: {
+            픽셀크기: { width: pdfCanvasEl.width, height: pdfCanvasEl.height },
+            화면크기: { width: displayWidth, height: displayHeight }
+          },
+          selectionCanvas: {
+            width: selectionCanvasEl.width,
+            height: selectionCanvasEl.height
+          }
+        })
+
       } catch (error) {
         console.error('Canvas 오버레이 설정 오류:', error)
       }
     }
+
 
     // 첫 번째 클릭 - 시작 지점
     const firstClick = (event) => {
@@ -590,13 +610,27 @@ export default {
       event.stopPropagation()
 
       const canvas = selectionCanvas.value
+      if (!canvas) {
+        console.log('선택 Canvas가 준비되지 않음')
+        return
+      }
+
+      // Canvas의 실제 픽셀 좌표 계산
       const rect = canvas.getBoundingClientRect()
+
+      // 클릭 좌표를 Canvas 내부 좌표로 변환
       const x = event.clientX - rect.left
       const y = event.clientY - rect.top
 
-      // 첫 번째 클릭으로 시작 지점 설정
+      // 좌표 범위 검증 (화면 좌표 기준)
+      if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
+        console.log('Canvas 범위를 벗어난 클릭:', { x, y, canvasWidth: rect.width, canvasHeight: rect.height })
+        return
+      }
+
+      // 선택 시작 (화면 좌표 사용)
       selection.value = {
-        active: false, // 아직 영역이 완성되지 않음
+        active: false,
         startX: x,
         startY: y,
         x: x,
@@ -606,7 +640,7 @@ export default {
         waitingForSecondClick: true // 두 번째 클릭 대기 중
       }
 
-      console.log('첫 번째 클릭 - 시작 지점:', x, y)
+      console.log('첫 번째 클릭 - 시작 지점 (화면 좌표):', { x, y, rectWidth: rect.width, rectHeight: rect.height })
     }
 
     // 두 번째 클릭 - 종료 지점 및 영역 완성
@@ -621,9 +655,23 @@ export default {
       }
 
       const canvas = selectionCanvas.value
+      if (!canvas) {
+        console.log('선택 Canvas가 준비되지 않음')
+        return
+      }
+
+      // Canvas의 실제 픽셀 좌표 계산
       const rect = canvas.getBoundingClientRect()
+
+      // 클릭 좌표를 Canvas 내부 좌표로 변환
       const endX = event.clientX - rect.left
       const endY = event.clientY - rect.top
+
+      // 좌표 범위 검증 (화면 좌표 기준)
+      if (endX < 0 || endX > rect.width || endY < 0 || endY > rect.height) {
+        console.log('Canvas 범위를 벗어난 클릭:', { endX, endY, canvasWidth: rect.width, canvasHeight: rect.height })
+        return
+      }
 
       // 시작점과 종료점으로 사각형 영역 생성
       const startX = selection.value.startX
@@ -635,14 +683,14 @@ export default {
       const width = Math.abs(endX - startX)
       const height = Math.abs(endY - startY)
 
-      // 최소 크기 체크
+      // 최소 크기 체크 (화면 좌표 기준)
       if (width < 10 || height < 10) {
-        console.log('선택 영역이 너무 작음, 선택 취소')
+        console.log('선택 영역이 너무 작음, 선택 취소:', { width, height })
         clearSelection()
         return
       }
 
-      // 영역 선택 완료
+      // 영역 선택 완료 (화면 좌표 사용)
       selection.value = {
         active: true,
         startX: startX,
@@ -654,10 +702,11 @@ export default {
         waitingForSecondClick: false
       }
 
-      console.log('두 번째 클릭 - 영역 완성:', {
+      console.log('두 번째 클릭 - 영역 완성 (화면 좌표):', {
         start: { x: startX, y: startY },
         end: { x: endX, y: endY },
-        final: { x, y, width, height }
+        final: { x, y, width, height },
+        rect: { width: rect.width, height: rect.height }
       })
     }
 
@@ -744,29 +793,63 @@ export default {
       }
     }
 
-                        // PDF Canvas에서 영역을 이미지로 캡처 (PDF.js 직접 방식)
+                        // PDF Canvas에서 영역을 이미지로 캡처 (화면 좌표를 픽셀 좌표로 변환)
         const capturePdfCanvas = async (pdfCanvas, selection) => {
           try {
             console.log('=== PDF Canvas 영역 캡처 시작 ===')
-            console.log('선택된 영역:', selection)
+            console.log('선택된 영역 (화면 좌표):', selection)
             console.log('PDF Canvas 크기:', pdfCanvas.width, 'x', pdfCanvas.height)
+
+            // PDF Canvas의 화면 표시 크기와 실제 픽셀 크기의 비율 계산
+            const rect = pdfCanvas.getBoundingClientRect()
+            const scaleX = pdfCanvas.width / rect.width
+            const scaleY = pdfCanvas.height / rect.height
+
+            // 화면 좌표를 픽셀 좌표로 변환
+            const pixelX = Math.round(selection.x * scaleX)
+            const pixelY = Math.round(selection.y * scaleY)
+            const pixelWidth = Math.round(selection.width * scaleX)
+            const pixelHeight = Math.round(selection.height * scaleY)
+
+            console.log('변환된 픽셀 좌표:', {
+              화면: selection,
+              픽셀: { x: pixelX, y: pixelY, width: pixelWidth, height: pixelHeight },
+              스케일: { scaleX, scaleY }
+            })
+
+            // 선택 영역이 Canvas 범위를 벗어나지 않는지 확인
+            const maxX = Math.min(pixelX + pixelWidth, pdfCanvas.width)
+            const maxY = Math.min(pixelY + pixelHeight, pdfCanvas.height)
+            const captureX = Math.max(0, pixelX)
+            const captureY = Math.max(0, pixelY)
+            const captureWidth = maxX - captureX
+            const captureHeight = maxY - captureY
+
+            if (captureWidth <= 0 || captureHeight <= 0) {
+              console.error('유효하지 않은 캡처 영역:', { captureX, captureY, captureWidth, captureHeight })
+              return createDummyImage(selection)
+            }
 
             // PDF Canvas에서 직접 선택된 영역 캡처
             const tempCanvas = document.createElement('canvas')
-            tempCanvas.width = selection.width
-            tempCanvas.height = selection.height
+            tempCanvas.width = captureWidth
+            tempCanvas.height = captureHeight
 
             const ctx = tempCanvas.getContext('2d')
 
             // PDF Canvas에서 선택된 영역을 새 Canvas로 복사
-            // 이 방식이 훨씬 더 정확하고 간단함!
             ctx.drawImage(
               pdfCanvas,
-              selection.x, selection.y, selection.width, selection.height,
-              0, 0, selection.width, selection.height
+              captureX, captureY, captureWidth, captureHeight,
+              0, 0, captureWidth, captureHeight
             )
 
-            console.log('PDF Canvas 영역 캡처 성공')
+            console.log('PDF Canvas 영역 캡처 성공:', {
+              원본선택: selection,
+              픽셀변환: { x: pixelX, y: pixelY, width: pixelWidth, height: pixelHeight },
+              실제캡처: { x: captureX, y: captureY, width: captureWidth, height: captureHeight }
+            })
+
             const imageDataUrl = tempCanvas.toDataURL('image/png')
             console.log('생성된 이미지 데이터 길이:', imageDataUrl.length)
             console.log('이미지 데이터 시작:', imageDataUrl.substring(0, 50))
@@ -882,12 +965,29 @@ export default {
     }
 
     // 계산된 속성
-    const selectionStyle = computed(() => ({
-      left: `${selection.value.x}px`,
-      top: `${selection.value.y}px`,
-      width: `${selection.value.width}px`,
-      height: `${selection.value.height}px`
-    }))
+    const selectionStyle = computed(() => {
+      if (!selection.value.active || !pdfCanvas.value) {
+        return {}
+      }
+
+      try {
+        // 화면 좌표를 그대로 사용 (이미 화면 좌표로 저장됨)
+        const x = selection.value.x
+        const y = selection.value.y
+        const width = selection.value.width
+        const height = selection.value.height
+
+        return {
+          left: `${x}px`,
+          top: `${y}px`,
+          width: `${width}px`,
+          height: `${height}px`
+        }
+      } catch (error) {
+        console.error('selectionStyle 계산 오류:', error)
+        return {}
+      }
+    })
 
     // 페이지 변경 감지
     watch(currentPage, () => {
@@ -1083,6 +1183,10 @@ export default {
   min-height: 500px;
   position: relative;
   z-index: 1;
+  /* 픽셀 정확도를 위한 이미지 렌더링 설정 */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
 }
 
 .selection-canvas {
@@ -1090,10 +1194,14 @@ export default {
   top: 0;
   left: 0;
   pointer-events: auto; /* 마우스 이벤트 활성화 */
-  z-index: 10; /* iframe 위에 표시 */
+  z-index: 10; /* PDF Canvas 위에 표시 */
   cursor: crosshair;
   background: transparent; /* 투명 배경 */
   border: 1px solid rgba(59, 130, 246, 0.3); /* 디버깅용 테두리 */
+  /* 픽셀 정확도를 위한 설정 */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
 }
 
 .selection-area {
