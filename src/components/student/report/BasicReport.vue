@@ -113,7 +113,7 @@
 
     <section v-else class="panel">
       <h3 class="panel-title">📊 평가결과 요약</h3>
-        <DetailReport :examId="examId"/>
+      <DetailReport :examId="examId" />
     </section>
 
     <!-- 문제 HTML 모달 -->
@@ -532,6 +532,7 @@ const currentTab = ref(props.defaultTab)
 
 #score-box {
   margin-top: 60px;
+  margin-bottom: 60px;
   height: 120px;
   background: #fff;
   border: 1px solid #d3d3d3;
@@ -557,58 +558,79 @@ const currentTab = ref(props.defaultTab)
 /* hover 효과 제거 */
 
 .errata {
-  margin-top: 60px;
-  border: 1px solid #d3d3d3;
-  border-radius: 6px;
+  margin-top: 20px;
+  margin-bottom: 40px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  background: white;
 }
 
 .errata th {
   background: #f8f9ff;
   color: #3b6cff;
-  font-weight: bold;
-  padding: 8px 12px;
-  border: 1px solid #d3d3d3;
+  font-weight: 600;
+  padding: 16px 20px;
+  border: none;
+  border-bottom: 2px solid #e2e8f0;
   text-align: center;
-  font-size: 14px;
+  font-size: 13px;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
 }
 
 .errata td {
-  padding: 8px 12px;
-  border: 1px solid #d3d3d3;
+  padding: 16px 20px;
+  border: none;
+  border-bottom: 1px solid #f1f5f9;
   text-align: center;
   font-size: 14px;
+  color: #475569;
+  transition: background-color 0.2s ease;
 }
 
 .errata tr:hover {
-  background: #f8f9ff;
+  background: #f8fafc;
+}
+
+.errata tr:last-child td {
+  border-bottom: none;
 }
 
 /* 채점 결과 스타일 */
 .correct {
   color: #10b981;
-  font-weight: bold;
+  font-weight: 600;
+  background: #d1fae5;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
 }
 
 .incorrect {
   color: #ef4444;
-  font-weight: bold;
+  font-weight: 600;
+  background: #fee2e2;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
 }
 
 .view-btn {
-  background: #3b6cff;
+  background: #3b82f6;
   color: white;
   border: none;
-  padding: 6px 20px;
-  border-radius: 4px;
+  padding: 8px 16px;
+  border-radius: 6px;
   cursor: pointer;
   font-size: 12px;
-  transition: background-color 0.2s;
+  font-weight: 500;
+  transition: background-color 0.2s ease;
 }
 
 .view-btn:hover {
-  background: #2d5af5;
+  background: #2563eb;
 }
 
 .view-btn:disabled {
