@@ -109,15 +109,18 @@
               <div class="progress mb-3" style="height: 12px;">
                 <div
                   class="progress-bar bg-primary"
-                  :style="{ width: `${pdfGenerationProgress}%` }"
+                  :style="{ width: `${Math.min(pdfGenerationProgress, 100)}%` }"
                   role="progressbar"
-                  :aria-valuenow="pdfGenerationProgress"
+                  :aria-valuenow="Math.min(pdfGenerationProgress, 100)"
                   :aria-valuemin="0"
                   :aria-valuemax="100"
                 ></div>
               </div>
-              <div class="progress-text d-flex justify-content-between text-muted small">
-                <span>{{ currentPdfPage }}/{{ totalPdfPages }} 페이지</span>
+              <div class="progress-text d-flex justify-content-between text-muted small mb-3">
+                <span>진행률: {{ Math.min(pdfGenerationProgress, 100) }}%</span>
+              </div>
+              <div class="progress-details d-flex justify-content-center text-muted small">
+                <span>{{ currentPdfStage }}</span>
               </div>
             </div>
           </div>
@@ -549,30 +552,64 @@ export default {
         isGeneratingPdf.value = true
         pdfGenerationProgress.value = 0
         currentPdfStage.value = 'PDF 변환 시작'
-        currentPdfPage.value = 0
-        totalPdfPages.value = pdfPages.value.length
 
-        // PDF 생성 진행률 콜백
-        const progressCallback = (progress) => {
-          // 로딩 상태 업데이트
-          isGeneratingPdf.value = true
-          pdfGenerationProgress.value = progress.percentage
-          currentPdfStage.value = progress.stage
-          currentPdfPage.value = progress.current
-          totalPdfPages.value = progress.total
+        // 단계별 진행률 시뮬레이션 (실제 진행률이 없는 경우)
+        const simulateProgress = () => {
+          const stages = [
+            { stage: 'PDF 변환 시작', progress: 10 },
+            { stage: '페이지 처리 중', progress: 30 },
+            { stage: '이미지 최적화', progress: 50 },
+            { stage: 'PDF 생성 중', progress: 80 },
+            { stage: '최종 검증', progress: 95 }
+          ]
+
+          let currentStageIndex = 0
+
+          const progressInterval = setInterval(() => {
+            if (currentStageIndex < stages.length) {
+              const stage = stages[currentStageIndex]
+              currentPdfStage.value = stage.stage
+              pdfGenerationProgress.value = stage.progress
+              currentStageIndex++
+            } else {
+              clearInterval(progressInterval)
+            }
+          }, 1000) // 1초마다 단계 변경
+
+          return progressInterval
         }
 
+        // 진행률 시뮬레이션 시작
+        const progressInterval = simulateProgress()
+
+        // PDF 생성 진행률 콜백 (실제 구현에서 사용)
+        const progressCallback = (progress) => {
+          if (progress && typeof progress.percentage === 'number') {
+            pdfGenerationProgress.value = Math.min(progress.percentage, 100)
+            currentPdfStage.value = progress.stage || currentPdfStage.value
+          }
+        }
+
+        // 실제 PDF 업로드 (진행률 콜백이 작동하지 않는 경우를 대비)
         await itemProcessingStore.uploadProcessedPdf(progressCallback)
 
-        alert('편집된 PDF가 성공적으로 업로드되었습니다.')
+        // 진행률을 100%로 설정
+        pdfGenerationProgress.value = 100
+        currentPdfStage.value = '완료'
 
-        // 로딩 상태 종료 후 OCR 편집 화면으로 이동
-        isGeneratingPdf.value = false
-        showOcrEditor.value = true
+        // 진행률 시뮬레이션 정리
+        clearInterval(progressInterval)
+
+        // 잠시 완료 상태를 보여준 후 다음 단계로
+        setTimeout(() => {
+          alert('편집된 PDF가 성공적으로 업로드되었습니다.')
+          // 로딩 상태 종료 후 OCR 편집 화면으로 이동
+          isGeneratingPdf.value = false
+          showOcrEditor.value = true
+        }, 1000)
 
       } catch (error) {
         errorHandler.handleGeneralError(error, '편집된 PDF 업로드')
-
         // 에러 발생 시 로딩 상태 종료
         isGeneratingPdf.value = false
         return
