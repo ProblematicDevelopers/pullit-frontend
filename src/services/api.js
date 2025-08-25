@@ -26,7 +26,9 @@ api.interceptors.request.use(
     }
 
     // FormData인 경우 Content-Type 헤더 제거 (브라우저가 자동으로 multipart/form-data 설정)
-    if (config.data instanceof FormData) {
+    if (config.data instanceof FormData ||
+        (config.data && config.data.constructor && config.data.constructor.name === 'FormData') ||
+        (config.data && typeof config.data.append === 'function')) {
       delete config.headers['Content-Type']
     }
 
@@ -62,6 +64,7 @@ api.interceptors.response.use(
           }
         }
       } catch (refreshError) {
+        console.error('토큰 갱신 실패:', refreshError)
         tokenManager.clearTokens()
         window.location.href = '/login'
       }
