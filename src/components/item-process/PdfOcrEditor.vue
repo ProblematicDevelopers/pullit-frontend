@@ -1,9 +1,9 @@
 <template>
   <div class="pdf-ocr-editor">
     <div class="editor-header">
-      <h3>PDF OCR 편집</h3>
+      <h3>문제 추출 & 편집 </h3>
       <div class="header-actions">
-        <button @click="$emit('go-back')" class="btn btn-secondary">뒤로가기</button>
+        <button @click="handleGoBack" class="btn btn-secondary">뒤로가기</button>
       </div>
     </div>
 
@@ -102,7 +102,6 @@
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useToast } from '@/composables/useToast'
 import { ocrApi } from '@/services/ocrApi'
-import * as pdfjsLib from 'pdfjs-dist'
 
 export default {
   name: 'PdfOcrEditor',
@@ -126,7 +125,7 @@ export default {
     }
   },
   emits: ['go-back'],
-  setup(props) {
+  setup(props, { emit }) {
     const { success, error: showError } = useToast()
 
     // props로 받은 pdfPages 상태 확인 및 디버깅
@@ -136,14 +135,8 @@ export default {
     console.log('받은 pdfPages 상세:', props.pdfPages.map(p => ({
       index: p.index,
       pageNumber: p.pageNumber,
-      hasPreview: !!p.preview,
-      hasBlob: !!p.blob
+      hasPreview: !!p.preview
     })))
-
-
-
-    // PDF.js 워커 설정
-    pdfjsLib.GlobalWorkerOptions.workerSrc = '/pdf.worker.js'
 
     // PDF 렌더링 관련
     const pdfContainer = ref(null)
@@ -205,50 +198,42 @@ export default {
             console.log('페이지 인덱스:', pageIndex)
 
             const pageData = props.pdfPages[pageIndex]
-            if (!pageData.blob) {
-              console.error('페이지에 blob 데이터가 없음:', pageData)
+            if (!pageData.preview) {
+              console.error('페이지에 preview 이미지가 없음:', pageData)
               return
             }
 
-            // Blob을 ArrayBuffer로 변환
-            const arrayBuffer = await pageData.blob.arrayBuffer()
-            console.log('ArrayBuffer 생성 완료, 크기:', arrayBuffer.byteLength)
+            // preview 이미지를 Canvas에 직접 렌더링
+            const img = new Image()
+            img.onload = () => {
+              const canvas = pdfCanvas.value
+              const context = canvas.getContext('2d')
 
-            // PDF 문서 로드
-            const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-            console.log('PDF 문서 로드 완료, 페이지 수:', pdfDoc.numPages)
+              // Canvas 크기 설정
+              canvas.width = pageData.width || img.width
+              canvas.height = pageData.height || img.height
 
-            // 첫 번째 페이지 가져오기 (이미 분리된 페이지)
-            const page = await pdfDoc.getPage(1)
-            console.log('PDF 페이지 가져오기 완료')
+              console.log('Canvas 크기 설정:', canvas.width, 'x', canvas.height)
 
-            // Canvas 크기 설정
-            const viewport = page.getViewport({ scale: 1.5 })
-            const canvas = pdfCanvas.value
-            const context = canvas.getContext('2d')
+              // 이미지 그리기
+              context.drawImage(img, 0, 0, canvas.width, canvas.height)
+              console.log('이미지 렌더링 완료')
 
-            canvas.height = viewport.height
-            canvas.width = viewport.width
-
-            console.log('Canvas 크기 설정:', canvas.width, 'x', canvas.height)
-
-            // PDF 페이지 렌더링
-            const renderContext = {
-              canvasContext: context,
-              viewport: viewport
+              // Canvas 오버레이 설정 - 렌더링 완료 후
+              nextTick(() => {
+                if (pdfCanvas.value && selectionCanvas.value) {
+                  setupCanvasOverlay()
+                } else {
+                  console.log('Canvas 요소들이 아직 준비되지 않음, 오버레이 설정 건너뜀')
+                }
+              })
             }
 
-            await page.render(renderContext).promise
-            console.log('PDF 페이지 렌더링 완료')
+            img.onerror = (error) => {
+              console.error('이미지 로드 실패:', error)
+            }
 
-            // Canvas 오버레이 설정 - 렌더링 완료 후
-            nextTick(() => {
-              if (pdfCanvas.value && selectionCanvas.value) {
-                setupCanvasOverlay()
-              } else {
-                console.log('Canvas 요소들이 아직 준비되지 않음, 오버레이 설정 건너뜀')
-              }
-            })
+            img.src = pageData.preview
 
           } catch (error) {
             console.error('PDF 페이지 렌더링 오류:', error)
@@ -598,6 +583,10 @@ export default {
       clearSelection()
     })
 
+    const handleGoBack = () => {
+      emit('go-back')
+    }
+
     return {
       // refs
       pdfContainer,
@@ -627,7 +616,8 @@ export default {
       nextPage,
       capturePdfCanvas,
       createDummyImage,
-      handleCanvasClick
+      handleCanvasClick,
+      handleGoBack
     }
   }
 }

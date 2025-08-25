@@ -13,7 +13,18 @@ export function usePdfProcessor() {
    */
   const readPdfFile = async (file) => {
     try {
-      return await file.arrayBuffer()
+      // file.arrayBuffer()가 지원되는 경우 사용
+      if (file.arrayBuffer && typeof file.arrayBuffer === 'function') {
+        return await file.arrayBuffer()
+      } else {
+        // FileReader를 사용한 대체 방법
+        return await new Promise((resolve, reject) => {
+          const reader = new FileReader()
+          reader.onload = () => resolve(reader.result)
+          reader.onerror = () => reject(new Error('파일 읽기 실패'))
+          reader.readAsArrayBuffer(file)
+        })
+      }
     } catch (error) {
       throw new Error(`PDF 파일 읽기 실패: ${error.message}`)
     }
