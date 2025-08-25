@@ -196,7 +196,7 @@ async function createCBT() {
     sessionStorage.setItem('cbtData', JSON.stringify(cbtData))
     sessionStorage.setItem('examData', JSON.stringify(response.data.data))
     router.push({
-      path: '/student/cbtstep02',
+      path: '/student/cbt/step02',
     })
   } catch (error) {
     console.error('CBT 생성 실패:', error)

@@ -15,6 +15,9 @@ import Login from '@/views/Login.vue'
 import CBTStep01 from '@/components/student/cbt/CBTStep01.vue'
 import CBTStep02 from '@/components/student/cbt/CBTStep02.vue'
 import CBTExam from '@/components/student/cbt/CBTExam.vue'
+
+import MyClass from '@/components/student/class-room/myClass.vue'
+
 import ItemProcessing from '@/views/ItemProcessing.vue'
 import ItemProcessingTextbook from '@/views/ItemProcessingTextbook.vue'
 
@@ -35,9 +38,9 @@ const routes = [
     component: Login,
     beforeEnter: preventAuthenticated, // 이미 로그인한 사용자 접근 방지
     meta: {
-      hideHeader: true,  // 헤더 숨김
-      hideFooter: true   // 푸터 숨김
-    }
+      hideHeader: true, // 헤더 숨김
+      hideFooter: true, // 푸터 숨김
+    },
   },
 
   // OAuth2 콜백 처리
@@ -47,8 +50,8 @@ const routes = [
     component: OAuth2Callback,
     meta: {
       hideHeader: true,
-      hideFooter: true
-    }
+      hideFooter: true,
+    },
   },
 
   // 시험지 마법사 경로 (통일)
@@ -56,11 +59,11 @@ const routes = [
     path: '/exam/wizard',
     name: 'ExamWizard',
     component: TestWizardView,
-    beforeEnter: requireAuth,  // 인증 가드 추가
+    beforeEnter: requireAuth, // 인증 가드 추가
     meta: {
       requiresAuth: true,
-      role: 'teacher'  // 선생님만 접근 가능
-    }
+      role: 'teacher', // 선생님만 접근 가능
+    },
   },
 
   {
@@ -73,17 +76,26 @@ const routes = [
       { path: 'report/:id/:attemptId?', name: 'student.basicReport', component: BasicReport },
       // { path: 'exam/:id', name: 'student.exam', component: StudentExam },
 
-      { path: 'cbtstep01', name: 'student.cbt.step1',component: CBTStep01 },
-      { path: 'cbtstep02', name: 'student.cbt.step2',component: CBTStep02 },
       {
-        path: 'cbt/exam/:examId',
-        name: 'student.cbt.exam',
-        component: CBTExam,
-        meta: {
-          hideHeader: true,  // 헤더 숨김
-          hideFooter: true   // 푸터 숨김
-        }
-      }
+        path: 'cbt',
+        children: [
+          { path: 'step01', name: 'student.cbt.step1', component: CBTStep01 },
+          { path: 'step02', name: 'student.cbt.step2', component: CBTStep02 },
+          {
+            path: 'exam/:examId',
+            name: 'student.cbt.exam',
+            component: CBTExam,
+            meta: {
+              hideHeader: true, // 헤더 숨김
+              hideFooter: true, // 푸터 숨김
+            },
+          },
+        ],
+      },
+      {
+        path: 'class-room',
+        children: [{ path: 'my-class', name: 'student.classRoom.myClass', component: MyClass }],
+      },
 
       // { path: 'result/:id', name: 'student.result', component: StudentResult },
     ],
@@ -97,45 +109,45 @@ const routes = [
     beforeEnter: requireAuth,
     meta: {
       requiresAuth: true,
-      role: 'teacher'
-    }
+      role: 'teacher',
+    },
   },
 
-    // 문제 가공
-    {
-      path: '/item-processing',
-      name: "ItemProcessing",
-      component: ItemProcessing,
-      beforeEnter: requireAuth,
-      meta: {
-        requiresAuth: true,
-        role: 'teacher'
-      }
+  // 문제 가공
+  {
+    path: '/item-processing',
+    name: 'ItemProcessing',
+    component: ItemProcessing,
+    beforeEnter: requireAuth,
+    meta: {
+      requiresAuth: true,
+      role: 'teacher',
     },
-    {
-      path: '/item-processing/textbook',
-      name: "ItemProcessingTextbook",
-      component: ItemProcessingTextbook,
-      beforeEnter: requireAuth,
-      meta: {
-        requiresAuth: true,
-        role: 'teacher'
-      }
+  },
+  {
+    path: '/item-processing/textbook',
+    name: 'ItemProcessingTextbook',
+    component: ItemProcessingTextbook,
+    beforeEnter: requireAuth,
+    meta: {
+      requiresAuth: true,
+      role: 'teacher',
     },
-    {
-      path: '/item-processing/cbt',
-      name: "ItemProcessingCBT",
-      component: ItemProcessing,
-      beforeEnter: requireAuth,
-      meta: {
-        requiresAuth: true,
-        role: 'teacher'
-      }
+  },
+  {
+    path: '/item-processing/cbt',
+    name: 'ItemProcessingCBT',
+    component: ItemProcessing,
+    beforeEnter: requireAuth,
+    meta: {
+      requiresAuth: true,
+      role: 'teacher',
     },
+  },
   {
     path: '/pdf-test',
     name: 'PdfTest',
-    component: () => import('@/views/PdfTest.vue')
+    component: () => import('@/views/PdfTest.vue'),
   },
   {
     path: '/signup',
@@ -143,10 +155,10 @@ const routes = [
     component: SignUp,
     beforeEnter: preventAuthenticated,
     meta: {
-      hideHeader: true,  // 헤더 숨김
-      hideFooter: true   // 푸터 숨김
-    }
-  }
+      hideHeader: true, // 헤더 숨김
+      hideFooter: true, // 푸터 숨김
+    },
+  },
 ]
 
 const router = createRouter({
