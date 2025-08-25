@@ -1,15 +1,15 @@
 <template>
-  <div class="item-processing-container">
+  <div class="item-processing-container bg-light min-vh-100">
     <!-- 페이지 헤더 -->
-    <div class="page-header">
+    <div class="page-header bg-white border-bottom py-5 mb-4">
       <div class="container">
-        <h1 class="page-title">문제 등록</h1>
-        <p class="page-subtitle">교과서를 선택하고 PDF를 업로드하여 문제를 가공하세요</p>
+        <h1 class="page-title fw-bold text-dark mb-2">문제 등록</h1>
+        <p class="page-subtitle text-muted mb-0">교과서를 선택하고 PDF를 업로드하여 문제를 가공하세요</p>
       </div>
     </div>
 
     <!-- 메인 컨텐츠 -->
-    <div class="main-content">
+    <div class="main-content container py-5">
       <div class="content-wrapper">
         <!-- 단계별 컴포넌트 렌더링 -->
 
@@ -32,23 +32,27 @@
         />
 
         <!-- PDF 변환 로딩 상태 -->
-        <div v-else-if="isConvertingPdf" class="conversion-loading">
-          <div class="loading-content">
-            <div class="loading-icon">🔄</div>
-            <h3>PDF 변환 중...</h3>
-            <div class="progress-info">
-              <div class="progress-bar">
+        <div v-else-if="isConvertingPdf" class="conversion-loading d-flex justify-content-center align-items-center bg-white rounded-4 border p-5" style="min-height: 400px;">
+          <div class="loading-content text-center">
+            <div class="loading-icon fs-1 mb-3">🔄</div>
+            <h3 class="fw-semibold text-dark mb-4">PDF 변환 중...</h3>
+            <div class="progress-info bg-light rounded-3 p-4 border">
+              <div class="progress mb-3" style="height: 12px;">
                 <div
-                  class="progress-fill"
+                  class="progress-bar bg-primary"
                   :style="{ width: `${(convertedPdfPages / totalPdfPages) * 100}%` }"
+                  role="progressbar"
+                  :aria-valuenow="convertedPdfPages"
+                  :aria-valuemin="0"
+                  :aria-valuemax="totalPdfPages"
                 ></div>
               </div>
-              <div class="progress-text">
+              <div class="progress-text d-flex justify-content-between text-muted small mb-3">
                 <span>{{ convertedPdfPages }}/{{ totalPdfPages }} 페이지</span>
               </div>
-              <div class="progress-details">
+              <div class="progress-details d-flex justify-content-between text-muted small">
                 <span>현재 페이지: {{ currentPdfPage }}</span>
-                <span v-if="estimatedPdfTime">예상 시간: {{ estimatedPdfTime }}</span>
+                <span v-if="estimatedPdfTime">{{ estimatedPdfTime }}</span>
               </div>
             </div>
           </div>
@@ -66,19 +70,23 @@
         />
 
         <!-- PDF 생성 로딩 상태 -->
-        <div v-else-if="isGeneratingPdf" class="pdf-generation-loading">
-          <div class="loading-content">
-            <div class="loading-icon">📄</div>
-            <h3>PDF 생성 중...</h3>
-            <div class="progress-info">
-              <div class="progress-stage">{{ currentPdfStage }}</div>
-              <div class="progress-bar">
+        <div v-else-if="isGeneratingPdf" class="pdf-generation-loading d-flex justify-content-center align-items-center bg-white rounded-4 border p-5" style="min-height: 400px;">
+          <div class="loading-content text-center">
+            <div class="loading-icon fs-1 mb-3">📄</div>
+            <h3 class="fw-semibold text-dark mb-4">PDF 생성 중...</h3>
+            <div class="progress-info bg-light rounded-3 p-4 border">
+              <div class="progress-stage fw-semibold text-primary mb-3">{{ currentPdfStage }}</div>
+              <div class="progress mb-3" style="height: 12px;">
                 <div
-                  class="progress-fill"
+                  class="progress-bar bg-primary"
                   :style="{ width: `${pdfGenerationProgress}%` }"
+                  role="progressbar"
+                  :aria-valuenow="pdfGenerationProgress"
+                  :aria-valuemin="0"
+                  :aria-valuemax="100"
                 ></div>
               </div>
-              <div class="progress-text">
+              <div class="progress-text d-flex justify-content-between text-muted small">
                 <span>{{ currentPdfPage }}/{{ totalPdfPages }} 페이지</span>
               </div>
             </div>
@@ -98,17 +106,17 @@
     </div>
 
     <!-- 에러 메시지 표시 -->
-    <div v-if="errorHandler.hasError()" class="error-overlay">
-      <div class="error-modal">
-        <div class="error-header">
-          <h3>오류 발생</h3>
-          <button @click="errorHandler.clearError()" class="close-btn">&times;</button>
+    <div v-if="errorHandler.hasError()" class="error-overlay position-fixed top-0 start-0 w-100 h-100 d-flex align-items-center justify-content-center" style="background: rgba(0, 0, 0, 0.5); z-index: 1050;">
+      <div class="error-modal bg-white rounded-4 p-4 shadow-custom-lg" style="max-width: 500px; width: 90%;">
+        <div class="error-header d-flex justify-content-between align-items-center mb-3">
+          <h3 class="text-danger fw-semibold mb-0">오류 발생</h3>
+          <button @click="errorHandler.clearError()" class="btn-close" aria-label="Close"></button>
         </div>
-        <div class="error-content">
-          <p>{{ errorHandler.getErrorMessage() }}</p>
-          <p class="error-context">{{ errorHandler.getErrorContext() }}</p>
+        <div class="error-content mb-4">
+          <p class="text-dark mb-2">{{ errorHandler.getErrorMessage() }}</p>
+          <p class="error-context text-muted small fst-italic mb-0">{{ errorHandler.getErrorContext() }}</p>
         </div>
-        <div class="error-actions">
+        <div class="error-actions d-flex justify-content-end">
           <button @click="errorHandler.clearError()" class="btn btn-primary">확인</button>
         </div>
       </div>
@@ -591,229 +599,18 @@ export default {
 </script>
 
 <style scoped>
-/* 메인 컨테이너 스타일 */
-.item-processing-container {
-  min-height: 100vh;
-  background: #f8fafc;
-}
-
-/* 페이지 헤더 스타일 */
-.page-header {
-  background: white;
-  border-bottom: 1px solid #e2e8f0;
-  padding: 2rem 0;
-  margin-bottom: 2rem;
-}
-
-.container {
-  width: 90%;
-  max-width: 1400px;
-  margin: 0 auto;
-}
-
+/* 부트스트랩으로 대체할 수 없는 일부 커스텀 스타일 */
 .page-title {
   font-size: 1.875rem;
-  font-weight: 700;
   color: #1e293b;
-  margin: 0;
-  margin-bottom: 0.5rem;
 }
 
 .page-subtitle {
-  font-size: 1rem;
   color: #64748b;
-  margin: 0;
 }
 
-/* 메인 컨텐츠 영역 */
-.main-content {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 3rem 2rem;
-}
-
-.content-wrapper {
-  /* 컨텐츠 래퍼에 대한 추가 스타일이 필요한 경우 여기에 추가 */
-}
-
-/* 에러 오버레이 */
-.error-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-
-.error-modal {
-  background: white;
-  border-radius: 12px;
-  padding: 2rem;
-  max-width: 500px;
-  width: 90%;
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1);
-}
-
-.error-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.error-header h3 {
-  margin: 0;
-  color: #dc2626;
-  font-size: 1.25rem;
-}
-
-.close-btn {
-  background: none;
-  border: none;
-  font-size: 1.5rem;
-  cursor: pointer;
-  color: #6b7280;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 6px;
-}
-
-.close-btn:hover {
-  background: #f3f4f6;
-  color: #374151;
-}
-
-.error-content {
-  margin-bottom: 1.5rem;
-}
-
-.error-content p {
-  margin: 0 0 0.5rem 0;
-  color: #374151;
-  line-height: 1.5;
-}
-
-.error-context {
-  font-size: 0.875rem;
-  color: #6b7280;
-  font-style: italic;
-}
-
-.error-actions {
-  display: flex;
-  justify-content: flex-end;
-}
-
-.btn {
-  padding: 0.75rem 1.5rem;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-primary {
-  background: #3b82f6;
-  color: white;
-}
-
-.btn-primary:hover {
-  background: #2563eb;
-}
-
-/* 반응형 디자인 */
-@media (max-width: 768px) {
-  .main-content {
-    padding: 2rem 1rem;
-  }
-
-  .error-modal {
-    margin: 1rem;
-    padding: 1.5rem;
-  }
-}
-
-/* 로딩 상태 스타일 */
-.conversion-loading,
-.pdf-generation-loading {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  min-height: 400px;
-  background: #f8fafc;
-  border-radius: 12px;
-  border: 1px solid #e2e8f0;
-}
-
-.loading-content {
-  text-align: center;
-  max-width: 500px;
-}
-
-.loading-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-}
-
-.loading-content h3 {
-  margin: 0 0 1.5rem 0;
-  color: #1e293b;
-  font-size: 1.5rem;
-}
-
-.progress-info {
-  background: white;
-  padding: 1.5rem;
-  border-radius: 8px;
-  border: 1px solid #e2e8f0;
-}
-
-.progress-stage {
-  font-weight: 600;
-  color: #3b82f6;
-  margin-bottom: 1rem;
-  font-size: 1.1rem;
-}
-
-.progress-bar {
-  width: 100%;
-  height: 12px;
-  background: #e2e8f0;
-  border-radius: 6px;
-  overflow: hidden;
-  margin-bottom: 1rem;
-}
-
-.progress-fill {
-  height: 100%;
-  background: linear-gradient(90deg, #3b82f6, #1d4ed8);
-  border-radius: 6px;
-  transition: width 0.3s ease;
-}
-
-.progress-text {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.875rem;
-  color: #64748b;
-  margin-bottom: 0.75rem;
-}
-
-.progress-details {
-  display: flex;
-  justify-content: space-between;
-  font-size: 0.875rem;
-  color: #64748b;
+/* 커스텀 그림자 효과 */
+.shadow-custom-lg {
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1) !important;
 }
 </style>
