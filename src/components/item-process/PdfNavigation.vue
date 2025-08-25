@@ -1,14 +1,30 @@
 <template>
   <div class="navigation-buttons">
-    <button @click="$emit('go-back')" class="btn btn-secondary">뒤로가기</button>
-    <button @click="$emit('next-step')" class="btn btn-primary">다음</button>
+    <button @click="handleGoBack" class="btn btn-secondary">뒤로가기</button>
+    <button @click="handleNextStep" class="btn btn-primary">다음</button>
   </div>
 </template>
 
 <script>
 export default {
   name: 'PdfNavigation',
-  emits: ['go-back', 'next-step']
+  emits: ['go-back', 'next-step'],
+  setup(props, { emit }) {
+    const handleGoBack = () => {
+      emit('go-back')
+    }
+
+    const handleNextStep = () => {
+      console.log('🚀 PdfNavigation: 다음 버튼 클릭됨')
+      console.log('🚀 PdfNavigation: next-step 이벤트 발생')
+      emit('next-step')
+    }
+
+    return {
+      handleGoBack,
+      handleNextStep
+    }
+  }
 }
 </script>
 

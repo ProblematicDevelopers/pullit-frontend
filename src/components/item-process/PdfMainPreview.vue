@@ -2,13 +2,19 @@
   <div class="main-preview">
     <!-- 큰 미리보기 영역 -->
     <div class="large-preview">
-      <iframe
-        v-if="currentPage"
-        :src="currentPage.preview"
-        :title="`페이지 ${currentPageIndex + 1} 미리보기`"
-        class="pdf-large-frame"
-        frameborder="0"
-      ></iframe>
+      <div v-if="currentPage" class="pdf-container">
+        <!-- 이미지 미리보기 -->
+        <img
+          v-if="currentPage.preview"
+          :src="currentPage.preview"
+          :alt="`페이지 ${currentPageIndex + 1}`"
+          class="pdf-preview-image"
+        />
+        <!-- 페이지 번호 오버레이 -->
+        <div class="page-number-overlay">
+          {{ currentPageIndex + 1 }}
+        </div>
+      </div>
       <!-- 페이지가 없을 때 안내 메시지 -->
       <div v-else class="no-page-message">
         <div class="no-page-icon">📄</div>
@@ -19,16 +25,28 @@
 </template>
 
 <script>
+import { computed } from 'vue'
+
 export default {
   name: 'PdfMainPreview',
   props: {
-    currentPage: {
-      type: Object,
-      default: null
+    pdfPages: {
+      type: Array,
+      required: true
     },
     currentPageIndex: {
       type: Number,
       required: true
+    }
+  },
+  setup(props) {
+    // 현재 페이지 정보
+    const currentPage = computed(() => {
+      return props.pdfPages[props.currentPageIndex] || null
+    })
+
+    return {
+      currentPage
     }
   }
 }
@@ -52,11 +70,39 @@ export default {
   overflow: hidden;
 }
 
-.pdf-large-frame {
+.pdf-container {
+  position: relative;
   width: 100%;
   height: 100%;
-  border: none;
+  overflow: auto;
   background: #f8fafc;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.pdf-preview-image {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  border: none;
+  border-radius: 8px;
+  background: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  object-fit: contain;
+}
+
+.page-number-overlay {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 14px;
+  font-weight: 600;
+  z-index: 10;
 }
 
 .no-page-message {
