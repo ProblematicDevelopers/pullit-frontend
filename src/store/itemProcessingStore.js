@@ -453,6 +453,9 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
         const pdfBytes = await pdfDoc.save()
         const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' })
 
+        // 최종 PDF 크기만 간단히 로깅
+        console.log(`📄 최종 PDF 생성: ${(pdfBlob.size / 1024 / 1024).toFixed(2)}MB`)
+
         if (progressCallback) {
           progressCallback({
             stage: '완료',
@@ -490,6 +493,9 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
         const originalName = this.pdfFile.name.replace('.pdf', '')
         const fileName = `${originalName}_편집됨_${timestamp}.pdf`
+
+        // 업로드 파일 크기만 간단히 로깅
+        console.log(`🚀 PDF 업로드: ${(this.finalPdf.size / 1024 / 1024).toFixed(2)}MB (원본: ${(this.pdfFile.size / 1024 / 1024).toFixed(2)}MB)`)
 
         const response = await itemProcessingAPI.uploadProcessedPdf(
           this.finalPdf,          // file
