@@ -17,6 +17,7 @@ import CBTStep02 from '@/components/student/cbt/CBTStep02.vue'
 import CBTExam from '@/components/student/cbt/CBTExam.vue'
 
 import MyClass from '@/components/student/class-room/myClass.vue'
+import LiveExam from '@/components/student/class-room/liveExam.vue'
 
 import ItemProcessing from '@/views/ItemProcessing.vue'
 import ItemProcessingTextbook from '@/views/ItemProcessingTextbook.vue'
@@ -94,7 +95,10 @@ const routes = [
       },
       {
         path: 'class-room',
-        children: [{ path: 'my-class', name: 'student.classRoom.myClass', component: MyClass }],
+        children: [
+          { path: 'my-class', name: 'student.classRoom.myClass', component: MyClass },
+          { path: 'live-exam/:examId', name: 'student.classRoom.liveExam', component: LiveExam },
+        ],
       },
 
       // { path: 'result/:id', name: 'student.result', component: StudentResult },
