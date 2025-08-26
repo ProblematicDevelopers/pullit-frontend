@@ -294,6 +294,14 @@ export const useItemSelectionStore = defineStore('itemSelection', {
     },
 
     /**
+     * 선택된 문항 직접 설정 (스마트 선택 결과용)
+     */
+    setSelectedItems(items) {
+      this.selectedItems = items || []
+      console.log('ItemSelectionStore: 선택된 문항 설정:', this.selectedItems.length)
+    },
+
+    /**
      * 선택된 문항 순서 변경
      */
     reorderSelectedItems(fromIndex, toIndex) {
@@ -328,11 +336,11 @@ export const useItemSelectionStore = defineStore('itemSelection', {
         // 검색 파라미터 준비
         const params = {
           keyword: searchParams.keyword || this.filters.keyword || '',
-          subjects: searchParams.subjects || this.filters.subjects || [],
+          textbook: searchParams.textbook || searchParams.subjects?.[0] || this.filters.subjects?.[0] || null, // textbook 파라미터 지원
+          chapters: searchParams.chapters || searchParams.chapterIds || this.filters.chapterIds || [], // chapters 파라미터 지원
           grades: searchParams.grades || this.filters.grades || [],
           difficulties: searchParams.difficulties || this.filters.difficulties || [],
           categories: searchParams.categories || this.filters.categories || [],
-          chapterIds: searchParams.chapterIds || this.filters.chapterIds || [],
           page: searchParams.page !== undefined ? searchParams.page : (this.currentPage - 1), // 0-based indexing
           size: searchParams.size || this.itemsPerPage,
           sortBy: this.sortBy,

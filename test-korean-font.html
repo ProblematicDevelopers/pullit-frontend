@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Korean Font Test</title>
+    <style>
+        @font-face {
+            font-family: 'NotoSansKR';
+            src: url('./public/NotoSansKR-VariableFont_wght.ttf') format('truetype');
+            font-weight: 100 900;
+        }
+        
+        body {
+            font-family: 'NotoSansKR', sans-serif;
+            padding: 20px;
+        }
+        
+        .test-text {
+            font-size: 20px;
+            margin: 10px 0;
+        }
+        
+        .web-font {
+            font-family: 'Noto Sans KR', sans-serif;
+        }
+        
+        .local-font {
+            font-family: 'NotoSansKR', sans-serif;
+        }
+    </style>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <h1>한글 폰트 테스트</h1>
+    
+    <div class="test-text web-font">
+        <strong>Web Font (Google Fonts):</strong><br>
+        안녕하세요! 한글 폰트가 제대로 표시됩니다.<br>
+        가나다라마바사아자차카타파하
+    </div>
+    
+    <div class="test-text local-font">
+        <strong>Local Font (TTF):</strong><br>
+        안녕하세요! 한글 폰트가 제대로 표시됩니다.<br>
+        가나다라마바사아자차카타파하
+    </div>
+    
+    <script>
+        // Test font loading
+        async function testFontLoading() {
+            try {
+                const response = await fetch('./public/NotoSansKR-VariableFont_wght.ttf');
+                if (response.ok) {
+                    console.log('✅ Local font file loaded successfully');
+                    const fontData = await response.arrayBuffer();
+                    console.log('Font size:', fontData.byteLength, 'bytes');
+                } else {
+                    console.error('❌ Failed to load local font file');
+                }
+            } catch (error) {
+                console.error('❌ Error loading font:', error);
+            }
+        }
+        
+        testFontLoading();
+    </script>
+</body>
+</html>
