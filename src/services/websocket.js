@@ -1,6 +1,17 @@
 import SockJS from 'sockjs-client'
 import { Client } from '@stomp/stompjs'
 
+// WebSocket 기본 URL 설정 (API와 동일한 패턴 사용)
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+
+// 프로덕션 환경인지 확인
+const isProduction = import.meta.env.PROD
+
+// WebSocket URL 생성 (프로덕션에서는 현재 호스트 사용, 로컬에서는 API_BASE_URL 사용)
+const WS_URL = isProduction 
+  ? `${window.location.protocol}//${window.location.host}/ws`
+  : `${API_BASE_URL}/ws`
+
 class WebSocketService {
   constructor() {
     this.stompClient = null
@@ -13,7 +24,7 @@ class WebSocketService {
       try {
         // 새로운 STOMP 클라이언트 생성
         this.stompClient = new Client({
-          webSocketFactory: () => new SockJS('http://localhost:8080/ws'),
+          webSocketFactory: () => new SockJS(WS_URL),
           reconnectDelay: 5000,
           heartbeatIncoming: 4000,
           heartbeatOutgoing: 4000,

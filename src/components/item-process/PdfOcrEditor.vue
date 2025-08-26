@@ -7,6 +7,17 @@
       </div>
     </div>
 
+    <!-- 페이지 네비게이션 -->
+    <div class="page-navigation">
+      <button @click="previousPage" :disabled="currentPage === 0" class="btn btn-secondary">
+        이전
+      </button>
+      <span class="page-info">{{ currentPage + 1 }} / {{ totalPages }}</span>
+      <button @click="nextPage" :disabled="currentPage >= totalPages - 1" class="btn btn-secondary">
+        다음
+      </button>
+    </div>
+
     <div class="editor-content">
       <!-- PDF 뷰어 -->
       <div class="pdf-viewer">
@@ -34,16 +45,7 @@
           </div>
         </div>
 
-        <!-- 페이지 네비게이션 -->
-        <div class="page-navigation">
-          <button @click="previousPage" :disabled="currentPage === 0" class="btn btn-secondary">
-            이전
-          </button>
-          <span class="page-info">{{ currentPage + 1 }} / {{ totalPages }}</span>
-          <button @click="nextPage" :disabled="currentPage >= totalPages - 1" class="btn btn-secondary">
-            다음
-          </button>
-        </div>
+
       </div>
 
       <!-- OCR 컨트롤 패널 -->
@@ -57,22 +59,21 @@
             <button @click="clearSelection" class="btn btn-small btn-secondary">선택 취소</button>
           </div>
 
-          <button
-            @click="performOcr"
-            :disabled="!canExecuteOcr || ocrLoading"
-            class="btn btn-primary"
-          >
-            {{ ocrLoading ? 'OCR 실행 중...' : 'OCR 실행' }}
-          </button>
-
-          <!-- 테스트용 데모 데이터 추가 버튼 -->
-          <button
-            @click="addDemoData"
-            class="btn btn-small btn-secondary"
-            style="margin-top: 0.5rem; width: 100%;"
-          >
-            테스트 데이터 추가
-          </button>
+          <div class="button-group">
+            <button
+              @click="performOcr"
+              :disabled="!canExecuteOcr || ocrLoading"
+              class="btn btn-primary"
+            >
+              {{ ocrLoading ? '추출 실행 중...' : '문제 추출' }}
+            </button>
+            <button
+              @click="addDemoData"
+              class="btn btn-secondary"
+            >
+              테스트 데이터
+            </button>
+          </div>
         </div>
 
         <!-- OCR 결과 요약 -->
@@ -98,10 +99,9 @@
         <div class="ocr-results" v-if="validOcrResults.length > 0">
           <div class="results-header">
             <h4>OCR 결과 ({{ validOcrResults.length }}개)</h4>
-            <div class="results-actions">
-              <button @click="exportResults" class="btn btn-small btn-secondary">JSON 내보내기</button>
-              <button @click="clearAllResults" class="btn btn-small btn-danger">전체 삭제</button>
-            </div>
+                      <div class="results-actions">
+            <button @click="clearAllResults" class="btn btn-small btn-danger">전체 삭제</button>
+          </div>
           </div>
           <div class="result-list">
             <div
@@ -141,20 +141,23 @@
         <div v-else class="no-results">
           <div class="no-results-content">
             <div class="no-results-icon">📄</div>
-            <h4>OCR 결과가 없습니다</h4>
-            <p>PDF에서 텍스트를 추출할 영역을 선택하고 OCR을 실행해보세요.</p>
+            <h4>결과가 없습니다</h4>
+            <p class="no-results-description">
+              문제 추출할 영역을<br> 선택하고
+              실행해보세요.
+            </p>
             <div class="no-results-steps">
               <div class="step">
                 <span class="step-number">1</span>
-                <span>PDF에서 텍스트 영역을 두 번 클릭하여 선택</span>
+                <span class="step-text">영역을 두 번 클릭하여 선택</span>
               </div>
               <div class="step">
                 <span class="step-number">2</span>
-                <span>"OCR 실행" 버튼 클릭</span>
+                <span class="step-text">문제 추출 버튼 클릭</span>
               </div>
               <div class="step">
                 <span class="step-number">3</span>
-                <span>추출된 텍스트를 CKEditor로 편집</span>
+                <span class="step-text">추출된 텍스트를 CKEditor 편집</span>
               </div>
             </div>
           </div>
@@ -171,35 +174,13 @@
         </div>
         <div class="modal-content">
           <div class="editor-container">
-            <div v-if="ckEditorComponent" class="ckeditor-wrapper">
-              <component
-                :is="ckEditorComponent"
-                :editor="editor"
+            <div class="ckeditor-wrapper">
+              <CKEditorComponent
                 v-model="currentEditingText"
-                :config="editorConfig"
+                :show-math-tools="true"
+                :show-output="false"
                 class="ckeditor-component"
-                tag-name="div"
               />
-            </div>
-            <div v-else-if="isLoadingCKEditor" class="loading-editor">
-              <div class="loading-spinner"></div>
-              <p>CKEditor를 로딩 중입니다...</p>
-            </div>
-            <div v-else class="fallback-editor">
-              <div class="editor-toolbar">
-                <button @click="insertMathFormula" class="btn btn-small btn-primary">수식 삽입</button>
-                <button @click="insertMathBlock" class="btn btn-small btn-primary">수식 블록</button>
-              </div>
-              <textarea
-                v-model="currentEditingText"
-                class="fallback-textarea"
-                placeholder="OCR 결과를 여기에 편집하세요...&#10;&#10;수식 삽입 버튼을 사용하여 수학 수식을 추가할 수 있습니다."
-                rows="15"
-              ></textarea>
-              <div class="math-preview" v-if="currentEditingText.includes('$$') || currentEditingText.includes('$')">
-                <h4>수식 미리보기:</h4>
-                <div class="math-content" v-html="renderedMath"></div>
-              </div>
             </div>
           </div>
           <div class="modal-actions">
@@ -210,20 +191,32 @@
       </div>
     </div>
 
+    <!-- OCR 결과 모달 -->
+    <OcrResultModal
+      :is-visible="showOcrModal"
+      :captured-image="capturedImageData"
+      :ocr-results="ocrResults"
+      @close="closeOcrModal"
+      @save="saveOcrResults"
+    />
   </div>
 </template>
 
 <script>
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useToast } from '@/composables/useToast'
+import { useItemProcessingStore } from '@/store/itemProcessingStore.js'
 import { ocrApi } from '@/services/ocrApi'
-import ClassicEditor from '@ckeditor/ckeditor5-build-classic'
-import '@ckeditor/ckeditor5-build-classic/build/translations/ko'
+import katex from 'katex'
+import 'katex/dist/katex.min.css'
+import CKEditorComponent from './CKEditorComponent.vue'
+import OcrResultModal from './OcrResultModal.vue'
 
 export default {
   name: 'PdfOcrEditor',
   components: {
-    // CKEditor 컴포넌트는 동적으로 import
+    CKEditorComponent,
+    OcrResultModal
   },
   props: {
     pdfPages: {
@@ -247,24 +240,9 @@ export default {
   emits: ['go-back'],
   setup(props, { emit }) {
     const { success, error: showError } = useToast()
+    const itemProcessingStore = useItemProcessingStore()
 
-    // CKEditor 관련
-    const editor = ClassicEditor
-    const editorConfig = {
-      language: 'ko',
-      toolbar: {
-        items: [
-          'heading', '|', 'bold', 'italic', 'underline', 'strikethrough', '|',
-          'fontSize', 'fontColor', 'fontBackgroundColor', '|',
-          'alignment', '|', 'numberedList', 'bulletedList', '|',
-          'link', 'blockQuote', 'insertTable', '|',
-          'undo', 'redo'
-        ]
-      },
-      fontSize: {
-        options: [10, 12, 14, 'default', 18, 20, 22, 24, 26, 28, 30, 32, 34, 36]
-      }
-    }
+    // CKEditor 관련 - 동적 import로 처리됨
 
     // props로 받은 pdfPages 상태 확인 및 디버깅
     console.log('=== PdfOcrEditor 컴포넌트 마운트 ===')
@@ -275,6 +253,10 @@ export default {
       pageNumber: p.pageNumber,
       hasPreview: !!p.preview
     })))
+
+    // Store의 pdfPages 상태도 확인
+    console.log('Store의 pdfPages:', itemProcessingStore.pdfPages)
+    console.log('Store의 pdfPages 길이:', itemProcessingStore.pdfPages.length)
 
     // PDF 렌더링 관련
     const pdfContainer = ref(null)
@@ -298,31 +280,144 @@ export default {
     // OCR 관련
     const ocrLoading = ref(false)
     const ocrResults = ref([])
+    const showOcrModal = ref(false)
+    const capturedImageData = ref('')
 
     // CKEditor 편집 관련
     const showEditor = ref(false)
     const currentEditingText = ref('')
     const currentEditingIndex = ref(-1)
-    const ckEditorComponent = ref(null)
-    const isLoadingCKEditor = ref(false) // CKEditor 로딩 상태 추가
-    const renderedMath = ref('') // MathJax 렌더링된 수식
+    const customMath = ref('') // 사용자 정의 수식 입력
+
+    // CKEditor 설정
+    const editorConfig = {
+      language: 'ko',
+      toolbar: {
+        items: [
+          'heading', '|', 'bold', 'italic', '|',
+          'numberedList', 'bulletedList', '|',
+          'link', 'insertTable', '|',
+          'undo', 'redo'
+        ]
+      }
+    }
+
+    // KaTeX를 사용한 수식 렌더링 (computed)
+    const renderedMath = ref('')
+
+
+
+    // 텍스트 변경 시 수식 렌더링 업데이트
+    const updateMathRendering = () => {
+      if (currentEditingText.value) {
+        renderedMath.value = renderMathWithKaTeX(currentEditingText.value)
+      } else {
+        renderedMath.value = ''
+      }
+    }
+
+    // 수식 삽입 함수
+    const insertMath = (mathExpression) => {
+      const mathBlock = `$$${mathExpression}$$`
+      if (currentEditingText.value) {
+        currentEditingText.value += `\n${mathBlock}`
+      } else {
+        currentEditingText.value = mathBlock
+      }
+    }
+
+    // 사용자 정의 수식 삽입
+    const insertCustomMath = () => {
+      if (customMath.value.trim()) {
+        insertMath(customMath.value)
+        customMath.value = ''
+      }
+    }
+
+    // KaTeX를 사용한 수식 렌더링 함수
+    const renderMathWithKaTeX = (text) => {
+      const mathRegex = /\$\$(.*?)\$\$/g
+      let result = text
+      let match
+
+      while ((match = mathRegex.exec(text)) !== null) {
+        try {
+          const rendered = katex.renderToString(match[1], {
+            throwOnError: false,
+            displayMode: true,
+            strict: false,
+            trust: true
+          })
+          result = result.replace(match[0], rendered)
+        } catch (error) {
+          console.error('수식 렌더링 오류:', error)
+          result = result.replace(match[0], `<div class="math-error"><code>${match[1]}</code><br><small>수식 렌더링 오류</small></div>`)
+        }
+      }
+
+      return result
+    }
 
     // MathJax 초기화
     const initMathJax = () => {
       if (window.MathJax) {
-        window.MathJax.typesetPromise()
+        try {
+          // MathJax 설정 개선
+          window.MathJax = {
+            tex: {
+              inlineMath: [['$', '$'], ['\\(', '\\)']],
+              displayMath: [['$$', '$$'], ['\\[', '\\]']],
+              processEscapes: true,
+              processEnvironments: true
+            },
+            options: {
+              skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+          }
+
+          // MathJax 재로드
+          if (window.MathJax.typesetPromise) {
+            return window.MathJax.typesetPromise()
+          }
+        } catch (error) {
+          console.error('MathJax 초기화 오류:', error)
+        }
       }
     }
 
     // MathJax 로드 확인
     const checkMathJaxLoaded = () => {
-      if (window.MathJax) {
+      if (window.MathJax && window.MathJax.typesetPromise) {
         console.log('MathJax가 로드되었습니다.')
         return true
       } else {
         console.log('MathJax가 아직 로드되지 않았습니다.')
         return false
       }
+    }
+
+    // KaTeX 스크립트 로드
+    const loadKaTeX = () => {
+      if (window.katex) return Promise.resolve()
+
+      return new Promise((resolve) => {
+        const katexScript = document.createElement('script')
+        katexScript.src = 'https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js'
+        katexScript.onload = () => {
+          // KaTeX CSS도 로드
+          const katexCSS = document.createElement('link')
+          katexCSS.rel = 'stylesheet'
+          katexCSS.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css'
+          document.head.appendChild(katexCSS)
+          console.log('KaTeX 스크립트 로드 완료')
+          resolve()
+        }
+        katexScript.onerror = () => {
+          console.error('KaTeX 스크립트 로드 실패')
+          resolve()
+        }
+        document.head.appendChild(katexScript)
+      })
     }
 
     // MathJax 스크립트 동적 로드
@@ -333,50 +428,83 @@ export default {
           return
         }
 
-        // Polyfill 로드
-        const polyfillScript = document.createElement('script')
-        polyfillScript.src = 'https://polyfill.io/v3/polyfill.min.js?features=es6'
-        polyfillScript.onload = () => {
-          // MathJax 로드
-          const mathJaxScript = document.createElement('script')
-          mathJaxScript.id = 'MathJax-script'
-          mathJaxScript.async = true
-          mathJaxScript.src = 'https://cdn.jsdelivr.net/npm/mathjax@4/es5/tex-mml-chtml.js'
-          mathJaxScript.onload = () => {
-            console.log('MathJax 스크립트 로드 완료')
-            resolve()
-          }
-          mathJaxScript.onerror = () => {
-            console.error('MathJax 스크립트 로드 실패')
-            resolve()
-          }
-          document.head.appendChild(mathJaxScript)
+        // MathJax 설정 먼저 로드
+        const mathJaxConfig = document.createElement('script')
+        mathJaxConfig.type = 'text/javascript'
+        mathJaxConfig.innerHTML = `
+          window.MathJax = {
+            tex: {
+              inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
+              displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']],
+              processEscapes: true,
+              processEnvironments: true
+            },
+            options: {
+              skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+            }
+          };
+        `
+        document.head.appendChild(mathJaxConfig)
+
+        // MathJax 메인 스크립트 로드 (v3 사용 - 더 안정적)
+        const mathJaxScript = document.createElement('script')
+        mathJaxScript.id = 'MathJax-script'
+        mathJaxScript.async = true
+        mathJaxScript.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'
+        mathJaxScript.onload = () => {
+          console.log('MathJax 스크립트 로드 완료')
+          // MathJax 초기화 대기
+          setTimeout(() => {
+            if (window.MathJax && window.MathJax.typesetPromise) {
+              console.log('MathJax 초기화 완료')
+              resolve()
+            } else {
+              console.warn('MathJax 초기화 대기 중...')
+              resolve()
+            }
+          }, 1000)
         }
-        polyfillScript.onerror = () => {
-          console.error('Polyfill 스크립트 로드 실패')
+        mathJaxScript.onerror = () => {
+          console.error('MathJax 스크립트 로드 실패')
           resolve()
         }
-        document.head.appendChild(polyfillScript)
+        document.head.appendChild(mathJaxScript)
       })
     }
 
-    // 수식 삽입 (인라인)
-    const insertMathFormula = () => {
-      const formula = prompt('수식을 입력하세요 (예: x^2 + y^2 = r^2):')
-      if (formula) {
-        const mathText = `$${formula}$`
-        insertTextAtCursor(mathText)
+    // KaTeX로 수식 렌더링 (MathJax 대안)
+    const renderWithKaTeX = (text) => {
+      try {
+        if (window.katex) {
+          // 인라인 수식 ($...$)
+          text = text.replace(/\$([^$\n]+)\$/g, (match, formula) => {
+            try {
+              return window.katex.renderToString(formula, { displayMode: false })
+            } catch (e) {
+              console.warn('KaTeX 인라인 수식 렌더링 실패:', e)
+              return match
+            }
+          })
+
+          // 블록 수식 ($$...$$)
+          text = text.replace(/\$\$([^$\n]+)\$\$/g, (match, formula) => {
+            try {
+              return window.katex.renderToString(formula, { displayMode: true })
+            } catch (e) {
+              console.warn('KaTeX 블록 수식 렌더링 실패:', e)
+              return match
+            }
+          })
+
+          return text
+        }
+      } catch (error) {
+        console.error('KaTeX 렌더링 오류:', error)
       }
+      return text
     }
 
-    // 수식 블록 삽입
-    const insertMathBlock = () => {
-      const formula = prompt('수식 블록을 입력하세요 (예: \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}):')
-      if (formula) {
-        const mathText = `$$${formula}$$`
-        insertTextAtCursor(mathText)
-      }
-    }
+
 
     // 커서 위치에 텍스트 삽입
     const insertTextAtCursor = (text) => {
@@ -400,61 +528,70 @@ export default {
     // MathJax로 수식 렌더링
     const renderMathContent = async () => {
       if (currentEditingText.value.includes('$$') || currentEditingText.value.includes('$')) {
-        // MathJax 로드 대기
-        await loadMathJax()
+        try {
+          // MathJax 먼저 시도
+          await loadMathJax()
 
-        // MathJax가 로드되어 있는지 확인
-        if (window.MathJax) {
-          // 임시 div에 수식 렌더링
-          const tempDiv = document.createElement('div')
-          tempDiv.innerHTML = currentEditingText.value
+          if (window.MathJax && window.MathJax.typesetPromise) {
+            console.log('MathJax로 수식 렌더링 시작:', currentEditingText.value)
 
-          // MathJax 렌더링
-          window.MathJax.typesetPromise([tempDiv]).then(() => {
-            renderedMath.value = tempDiv.innerHTML
-            // MathJax 초기화
-            initMathJax()
-          }).catch(error => {
-            console.error('MathJax 렌더링 오류:', error)
+            // 임시 div에 수식 렌더링
+            const tempDiv = document.createElement('div')
+            tempDiv.innerHTML = currentEditingText.value
+            tempDiv.style.position = 'absolute'
+            tempDiv.style.left = '-9999px'
+            tempDiv.style.visibility = 'hidden'
+            document.body.appendChild(tempDiv)
+
+            // MathJax 렌더링
+            try {
+              await window.MathJax.typesetPromise([tempDiv])
+              console.log('MathJax 렌더링 완료')
+
+              // 렌더링된 HTML 가져오기
+              renderedMath.value = tempDiv.innerHTML
+
+              // 임시 div 제거
+              document.body.removeChild(tempDiv)
+
+              // MathJax 초기화
+              initMathJax()
+            } catch (renderError) {
+              console.warn('MathJax 렌더링 실패, KaTeX로 대체:', renderError)
+              document.body.removeChild(tempDiv)
+
+              // KaTeX로 fallback
+              await loadKaTeX()
+              renderedMath.value = renderWithKaTeX(currentEditingText.value)
+            }
+          } else {
+            console.warn('MathJax가 로드되지 않음, KaTeX로 대체')
+            // KaTeX로 fallback
+            await loadKaTeX()
+            renderedMath.value = renderWithKaTeX(currentEditingText.value)
+          }
+        } catch (error) {
+          console.error('수식 렌더링 중 오류:', error)
+          // 최종 fallback으로 KaTeX 시도
+          try {
+            await loadKaTeX()
+            renderedMath.value = renderWithKaTeX(currentEditingText.value)
+          } catch (katexError) {
+            console.error('KaTeX 렌더링도 실패:', katexError)
             renderedMath.value = currentEditingText.value
-          })
-        } else {
-          // MathJax가 없으면 원본 텍스트 표시
-          renderedMath.value = currentEditingText.value
+          }
         }
       } else {
         renderedMath.value = ''
       }
     }
 
-    // currentEditingText 변경 감지하여 수식 렌더링
+    // currentEditingText 변경 감지
     watch(currentEditingText, () => {
-      renderMathContent()
+      updateMathRendering()
     })
 
-    // CKEditor 컴포넌트 동적 import
-    const loadCKEditor = async () => {
-      try {
-        isLoadingCKEditor.value = true
-        console.log('CKEditor 컴포넌트 로딩 시작...')
-
-        const ckEditorModule = await import('@ckeditor/ckeditor5-vue')
-        console.log('CKEditor 모듈 로드 성공:', ckEditorModule)
-
-        if (ckEditorModule.Ckeditor) {
-          ckEditorComponent.value = ckEditorModule.Ckeditor
-          console.log('CKEditor 컴포넌트 설정 완료')
-        } else {
-          throw new Error('CKEditor Ckeditor 컴포넌트를 찾을 수 없습니다')
-        }
-
-      } catch (error) {
-        console.error('CKEditor 컴포넌트 로드 실패:', error)
-        showError('에디터를 로드할 수 없습니다: ' + error.message)
-      } finally {
-        isLoadingCKEditor.value = false
-      }
-    }
+    // CKEditor는 정적으로 import되어 사용됨
 
 
     // OCR 실행 버튼 활성화 여부
@@ -478,82 +615,99 @@ export default {
       }
     }, { immediate: true, deep: true })
 
-                // PDF 페이지 렌더링
-        const renderPdfPage = async (pageIndex) => {
-          if (!pdfCanvas.value || !props.pdfPages[pageIndex]) {
-            console.log('PDF Canvas 또는 페이지 데이터가 준비되지 않음')
-            return
-          }
+    // PDF 페이지 렌더링
+    const renderPdfPage = async (pageIndex) => {
+      if (!pdfCanvas.value || !props.pdfPages[pageIndex]) {
+        console.log('PDF Canvas 또는 페이지 데이터가 준비되지 않음')
+        return
+      }
 
-          try {
-            console.log('=== PDF 페이지 렌더링 시작 ===')
-            console.log('페이지 인덱스:', pageIndex)
+      try {
+        console.log('=== PDF 페이지 렌더링 시작 ===')
+        console.log('페이지 인덱스:', pageIndex)
 
-            const pageData = props.pdfPages[pageIndex]
-            if (!pageData.preview) {
-              console.error('페이지에 preview 이미지가 없음:', pageData)
-              return
-            }
-
-            // preview 이미지를 Canvas에 직접 렌더링
-            const img = new Image()
-            img.onload = () => {
-              const canvas = pdfCanvas.value
-              const context = canvas.getContext('2d')
-
-              // Canvas 크기 설정
-              canvas.width = pageData.width || img.width
-              canvas.height = pageData.height || img.height
-
-              console.log('Canvas 크기 설정:', canvas.width, 'x', canvas.height)
-
-              // 이미지 그리기
-              context.drawImage(img, 0, 0, canvas.width, canvas.height)
-              console.log('이미지 렌더링 완료')
-
-              // Canvas 오버레이 설정 - 렌더링 완료 후
-              nextTick(() => {
-                if (pdfCanvas.value && selectionCanvas.value) {
-                  setupCanvasOverlay()
-                } else {
-                  console.log('Canvas 요소들이 아직 준비되지 않음, 오버레이 설정 건너뜀')
-                }
-              })
-            }
-
-            img.onerror = (error) => {
-              console.error('이미지 로드 실패:', error)
-            }
-
-            img.src = pageData.preview
-
-          } catch (error) {
-            console.error('PDF 페이지 렌더링 오류:', error)
-          }
+        const pageData = props.pdfPages[pageIndex]
+        if (!pageData.preview) {
+          console.error('페이지에 preview 이미지가 없음:', pageData)
+          return
         }
 
-        // PDF 페이지 변경 시 렌더링
-        watch(currentPage, (newPage) => {
-          renderPdfPage(newPage)
-        })
+        // preview 이미지를 Canvas에 직접 렌더링
+        const img = new Image()
+        img.onload = () => {
+          const canvas = pdfCanvas.value
+          const context = canvas.getContext('2d')
 
-        // 컴포넌트 마운트 시 첫 번째 페이지 렌더링
-        onMounted(() => {
+          // 원본 이미지 크기 사용 (픽셀 정확도 보장)
+          const originalWidth = img.naturalWidth || img.width
+          const originalHeight = img.naturalHeight || img.height
+
+          // Canvas 크기를 원본 이미지 크기로 설정
+          canvas.width = originalWidth
+          canvas.height = originalHeight
+
+          console.log('Canvas 크기 설정:', canvas.width, 'x', canvas.height)
+          console.log('원본 이미지 크기:', originalWidth, 'x', originalHeight)
+
+          // 이미지 그리기 (원본 크기 그대로)
+          context.drawImage(img, 0, 0, originalWidth, originalHeight)
+          console.log('이미지 렌더링 완료')
+
+          // Canvas 오버레이 설정 - 렌더링 완료 후
           nextTick(() => {
-            if (props.pdfPages && props.pdfPages.length > 0) {
-              console.log('컴포넌트 마운트 완료, 첫 번째 페이지 렌더링 시작')
-              // Canvas 요소들이 준비될 때까지 잠시 대기
-              setTimeout(() => {
-                if (pdfCanvas.value && selectionCanvas.value) {
-                  renderPdfPage(0)
-                } else {
-                  console.log('Canvas 요소들이 아직 준비되지 않음, 100ms 후 재시도')
-                  setTimeout(() => renderPdfPage(0), 100)
-                }
-              }, 50)
+            if (pdfCanvas.value && selectionCanvas.value) {
+              setupCanvasOverlay()
+            } else {
+              console.log('Canvas 요소들이 아직 준비되지 않음, 오버레이 설정 건너뜀')
             }
           })
-        })
+        }
+
+        img.onerror = (error) => {
+          console.error('이미지 로드 실패:', error)
+        }
+
+        img.src = pageData.preview
+
+      } catch (error) {
+        console.error('PDF 페이지 렌더링 오류:', error)
+      }
+    }
+
+    // PDF 페이지 변경 시 렌더링
+    watch(currentPage, (newPage) => {
+      renderPdfPage(newPage)
+    })
+
+    // 컴포넌트 마운트 시 첫 번째 페이지 렌더링
+    onMounted(() => {
+      nextTick(async () => {
+        // MathJax와 KaTeX 미리 로드
+        try {
+          console.log('수학 라이브러리 로딩 시작...')
+          await Promise.all([
+            loadMathJax(),
+            loadKaTeX()
+          ])
+          console.log('수학 라이브러리 로딩 완료')
+        } catch (error) {
+          console.warn('수학 라이브러리 로딩 중 일부 실패:', error)
+        }
+
+        if (props.pdfPages && props.pdfPages.length > 0) {
+          console.log('컴포넌트 마운트 완료, 첫 번째 페이지 렌더링 시작')
+          // Canvas 요소들이 준비될 때까지 잠시 대기
+          setTimeout(() => {
+            if (pdfCanvas.value && selectionCanvas.value) {
+              renderPdfPage(0)
+            } else {
+              console.log('Canvas 요소들이 아직 준비되지 않음, 100ms 후 재시도')
+              setTimeout(() => renderPdfPage(0), 100)
+            }
+          }, 50)
+        }
+      })
+    })
 
     // Canvas 오버레이 설정
     const setupCanvasOverlay = () => {
@@ -566,23 +720,38 @@ export default {
         const pdfCanvasEl = pdfCanvas.value
         const selectionCanvasEl = selectionCanvas.value
 
-        // PDF Canvas 크기에 맞춰 Canvas 크기 설정
-        const pdfCanvasRect = pdfCanvasEl.getBoundingClientRect()
-        selectionCanvasEl.width = pdfCanvasRect.width
-        selectionCanvasEl.height = pdfCanvasRect.height
+        // PDF Canvas의 화면 표시 크기 사용
+        const rect = pdfCanvasEl.getBoundingClientRect()
+        const displayWidth = rect.width
+        const displayHeight = rect.height
 
-        // Canvas를 PDF Canvas 위에 정확히 겹치도록 위치 조정
-        selectionCanvasEl.style.width = pdfCanvasRect.width + 'px'
-        selectionCanvasEl.style.height = pdfCanvasRect.height + 'px'
+        // 선택 Canvas를 PDF Canvas와 정확히 같은 화면 크기로 설정
+        selectionCanvasEl.width = displayWidth
+        selectionCanvasEl.height = displayHeight
+
+        // CSS 스타일도 화면 크기로 정확하게 설정
+        selectionCanvasEl.style.width = displayWidth + 'px'
+        selectionCanvasEl.style.height = displayHeight + 'px'
         selectionCanvasEl.style.position = 'absolute'
         selectionCanvasEl.style.top = '0px'
         selectionCanvasEl.style.left = '0px'
 
-        console.log('Canvas 오버레이 설정 완료:', selectionCanvasEl.width, 'x', selectionCanvasEl.height)
+        console.log('Canvas 오버레이 설정 완료:', {
+          pdfCanvas: {
+            픽셀크기: { width: pdfCanvasEl.width, height: pdfCanvasEl.height },
+            화면크기: { width: displayWidth, height: displayHeight }
+          },
+          selectionCanvas: {
+            width: selectionCanvasEl.width,
+            height: selectionCanvasEl.height
+          }
+        })
+
       } catch (error) {
         console.error('Canvas 오버레이 설정 오류:', error)
       }
     }
+
 
     // 첫 번째 클릭 - 시작 지점
     const firstClick = (event) => {
@@ -590,13 +759,27 @@ export default {
       event.stopPropagation()
 
       const canvas = selectionCanvas.value
+      if (!canvas) {
+        console.log('선택 Canvas가 준비되지 않음')
+        return
+      }
+
+      // Canvas의 실제 픽셀 좌표 계산
       const rect = canvas.getBoundingClientRect()
+
+      // 클릭 좌표를 Canvas 내부 좌표로 변환
       const x = event.clientX - rect.left
       const y = event.clientY - rect.top
 
-      // 첫 번째 클릭으로 시작 지점 설정
+      // 좌표 범위 검증 (화면 좌표 기준)
+      if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
+        console.log('Canvas 범위를 벗어난 클릭:', { x, y, canvasWidth: rect.width, canvasHeight: rect.height })
+        return
+      }
+
+      // 선택 시작 (화면 좌표 사용)
       selection.value = {
-        active: false, // 아직 영역이 완성되지 않음
+        active: false,
         startX: x,
         startY: y,
         x: x,
@@ -606,7 +789,7 @@ export default {
         waitingForSecondClick: true // 두 번째 클릭 대기 중
       }
 
-      console.log('첫 번째 클릭 - 시작 지점:', x, y)
+      console.log('첫 번째 클릭 - 시작 지점 (화면 좌표):', { x, y, rectWidth: rect.width, rectHeight: rect.height })
     }
 
     // 두 번째 클릭 - 종료 지점 및 영역 완성
@@ -621,9 +804,23 @@ export default {
       }
 
       const canvas = selectionCanvas.value
+      if (!canvas) {
+        console.log('선택 Canvas가 준비되지 않음')
+        return
+      }
+
+      // Canvas의 실제 픽셀 좌표 계산
       const rect = canvas.getBoundingClientRect()
+
+      // 클릭 좌표를 Canvas 내부 좌표로 변환
       const endX = event.clientX - rect.left
       const endY = event.clientY - rect.top
+
+      // 좌표 범위 검증 (화면 좌표 기준)
+      if (endX < 0 || endX > rect.width || endY < 0 || endY > rect.height) {
+        console.log('Canvas 범위를 벗어난 클릭:', { endX, endY, canvasWidth: rect.width, canvasHeight: rect.height })
+        return
+      }
 
       // 시작점과 종료점으로 사각형 영역 생성
       const startX = selection.value.startX
@@ -635,14 +832,14 @@ export default {
       const width = Math.abs(endX - startX)
       const height = Math.abs(endY - startY)
 
-      // 최소 크기 체크
+      // 최소 크기 체크 (화면 좌표 기준)
       if (width < 10 || height < 10) {
-        console.log('선택 영역이 너무 작음, 선택 취소')
+        console.log('선택 영역이 너무 작음, 선택 취소:', { width, height })
         clearSelection()
         return
       }
 
-      // 영역 선택 완료
+      // 영역 선택 완료 (화면 좌표 사용)
       selection.value = {
         active: true,
         startX: startX,
@@ -654,10 +851,11 @@ export default {
         waitingForSecondClick: false
       }
 
-      console.log('두 번째 클릭 - 영역 완성:', {
+      console.log('두 번째 클릭 - 영역 완성 (화면 좌표):', {
         start: { x: startX, y: startY },
         end: { x: endX, y: endY },
-        final: { x, y, width, height }
+        final: { x, y, width, height },
+        rect: { width: rect.width, height: rect.height }
       })
     }
 
@@ -718,22 +916,21 @@ export default {
         console.log('캡처된 이미지 크기:', selection.value.width, 'x', selection.value.height, 'px')
         console.log('이미지 데이터 길이:', tempImage.length, 'characters')
 
-        // OCR API 호출
-        const result = await callOcrApi(imageBase64, props.subjectCode)
+        // 캡처된 이미지 데이터 저장
+        capturedImageData.value = tempImage
 
-        // 결과 저장
-        ocrResults.value.push({
-          page: currentPage.value,
-          text: result.message || '텍스트를 추출할 수 없습니다.', // message가 없을 경우 기본값
-          image: tempImage, // 캡처된 이미지 저장
-          x: selection.value.x,
-          y: selection.value.y,
-          width: selection.value.width,
-          height: selection.value.height,
-          edited: false // 초기에는 편집되지 않음
-        })
+        // 디버깅 로그
+        console.log('=== 이미지 캡처 완료 ===')
+        console.log('캡처된 이미지 데이터 길이:', tempImage.length)
+        console.log('이미지 데이터 시작:', tempImage.substring(0, 100))
+        console.log('capturedImageData.value 설정됨:', !!capturedImageData.value)
 
-        success('OCR 처리가 완료되었습니다.')
+        // OCR 모달 표시
+        showOcrModal.value = true
+
+        console.log('OCR 모달 표시됨:', showOcrModal.value)
+
+        success('이미지가 캡처되었습니다. OCR 모달에서 결과를 확인하세요.')
         clearSelection()
 
       } catch (error) {
@@ -744,29 +941,109 @@ export default {
       }
     }
 
-                        // PDF Canvas에서 영역을 이미지로 캡처 (PDF.js 직접 방식)
+    // OCR 모달 관련 함수들
+    const closeOcrModal = () => {
+      showOcrModal.value = false
+    }
+
+    const saveOcrResults = async (problems) => {
+      try {
+        console.log('저장된 문제들:', problems)
+
+        // OCR 결과를 PDF 페이지로 변환
+        if (capturedImageData.value) {
+          const ocrResult = {
+            selectedAreas: {
+              question: {
+                imageData: capturedImageData.value,
+                width: 800, // 기본값 설정
+                height: 600
+              },
+              options: {
+                imageData: capturedImageData.value, // 임시로 같은 이미지 사용
+                width: 800,
+                height: 600
+              }
+            },
+            ocrResults: problems || [],
+            capturedImage: capturedImageData.value,
+            timestamp: new Date().toISOString()
+          }
+
+          // Store를 통해 PDF 페이지로 변환
+          const newPage = await itemProcessingStore.convertOcrToPdfPages(ocrResult)
+          console.log('OCR 결과가 PDF 페이지로 변환됨:', newPage)
+
+          success('OCR 결과가 성공적으로 저장되었습니다.')
+        } else {
+          success('OCR 결과가 저장되었습니다.')
+        }
+
+        closeOcrModal()
+
+      } catch (error) {
+        console.error('OCR 결과 저장 실패:', error)
+        showError('OCR 결과 저장에 실패했습니다: ' + error.message)
+      }
+    }
+
+                        // PDF Canvas에서 영역을 이미지로 캡처 (화면 좌표를 픽셀 좌표로 변환)
         const capturePdfCanvas = async (pdfCanvas, selection) => {
           try {
             console.log('=== PDF Canvas 영역 캡처 시작 ===')
-            console.log('선택된 영역:', selection)
+            console.log('선택된 영역 (화면 좌표):', selection)
             console.log('PDF Canvas 크기:', pdfCanvas.width, 'x', pdfCanvas.height)
+
+            // PDF Canvas의 화면 표시 크기와 실제 픽셀 크기의 비율 계산
+            const rect = pdfCanvas.getBoundingClientRect()
+            const scaleX = pdfCanvas.width / rect.width
+            const scaleY = pdfCanvas.height / rect.height
+
+            // 화면 좌표를 픽셀 좌표로 변환
+            const pixelX = Math.round(selection.x * scaleX)
+            const pixelY = Math.round(selection.y * scaleY)
+            const pixelWidth = Math.round(selection.width * scaleX)
+            const pixelHeight = Math.round(selection.height * scaleY)
+
+            console.log('변환된 픽셀 좌표:', {
+              화면: selection,
+              픽셀: { x: pixelX, y: pixelY, width: pixelWidth, height: pixelHeight },
+              스케일: { scaleX, scaleY }
+            })
+
+            // 선택 영역이 Canvas 범위를 벗어나지 않는지 확인
+            const maxX = Math.min(pixelX + pixelWidth, pdfCanvas.width)
+            const maxY = Math.min(pixelY + pixelHeight, pdfCanvas.height)
+            const captureX = Math.max(0, pixelX)
+            const captureY = Math.max(0, pixelY)
+            const captureWidth = maxX - captureX
+            const captureHeight = maxY - captureY
+
+            if (captureWidth <= 0 || captureHeight <= 0) {
+              console.error('유효하지 않은 캡처 영역:', { captureX, captureY, captureWidth, captureHeight })
+              return createDummyImage(selection)
+            }
 
             // PDF Canvas에서 직접 선택된 영역 캡처
             const tempCanvas = document.createElement('canvas')
-            tempCanvas.width = selection.width
-            tempCanvas.height = selection.height
+            tempCanvas.width = captureWidth
+            tempCanvas.height = captureHeight
 
             const ctx = tempCanvas.getContext('2d')
 
             // PDF Canvas에서 선택된 영역을 새 Canvas로 복사
-            // 이 방식이 훨씬 더 정확하고 간단함!
             ctx.drawImage(
               pdfCanvas,
-              selection.x, selection.y, selection.width, selection.height,
-              0, 0, selection.width, selection.height
+              captureX, captureY, captureWidth, captureHeight,
+              0, 0, captureWidth, captureHeight
             )
 
-            console.log('PDF Canvas 영역 캡처 성공')
+            console.log('PDF Canvas 영역 캡처 성공:', {
+              원본선택: selection,
+              픽셀변환: { x: pixelX, y: pixelY, width: pixelWidth, height: pixelHeight },
+              실제캡처: { x: captureX, y: captureY, width: captureWidth, height: captureHeight }
+            })
+
             const imageDataUrl = tempCanvas.toDataURL('image/png')
             console.log('생성된 이미지 데이터 길이:', imageDataUrl.length)
             console.log('이미지 데이터 시작:', imageDataUrl.substring(0, 50))
@@ -820,31 +1097,7 @@ export default {
       success('모든 OCR 결과가 삭제되었습니다.')
     }
 
-    // 결과 내보내기 (JSON)
-    const exportResults = () => {
-      const resultsToExport = ocrResults.value.map(result => ({
-        page: result.page,
-        text: result.text,
-        image: result.image,
-        coordinates: {
-          x: result.x,
-          y: result.y,
-          width: result.width,
-          height: result.height
-        }
-      }))
-      const jsonString = JSON.stringify(resultsToExport, null, 2)
-      const blob = new Blob([jsonString], { type: 'application/json' })
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `ocr_results_${props.fileId || 'unknown'}.json`
-      document.body.appendChild(a)
-      a.click()
-      document.body.removeChild(a)
-      URL.revokeObjectURL(url)
-      success('OCR 결과가 JSON 파일로 내보내졌습니다.')
-    }
+
 
     // 페이지 네비게이션
     const previousPage = () => {
@@ -882,12 +1135,29 @@ export default {
     }
 
     // 계산된 속성
-    const selectionStyle = computed(() => ({
-      left: `${selection.value.x}px`,
-      top: `${selection.value.y}px`,
-      width: `${selection.value.width}px`,
-      height: `${selection.value.height}px`
-    }))
+    const selectionStyle = computed(() => {
+      if (!selection.value.active || !pdfCanvas.value) {
+        return {}
+      }
+
+      try {
+        // 화면 좌표를 그대로 사용 (이미 화면 좌표로 저장됨)
+        const x = selection.value.x
+        const y = selection.value.y
+        const width = selection.value.width
+        const height = selection.value.height
+
+        return {
+          left: `${x}px`,
+          top: `${y}px`,
+          width: `${width}px`,
+          height: `${height}px`
+        }
+      } catch (error) {
+        console.error('selectionStyle 계산 오류:', error)
+        return {}
+      }
+    })
 
     // 페이지 변경 감지
     watch(currentPage, () => {
@@ -916,12 +1186,6 @@ export default {
     const editResult = async (index) => {
       currentEditingIndex.value = index
       currentEditingText.value = ocrResults.value[index].text
-
-      // CKEditor가 로드되지 않았다면 로드
-      if (!ckEditorComponent.value) {
-        await loadCKEditor()
-      }
-
       showEditor.value = true
     }
 
@@ -942,20 +1206,45 @@ export default {
 
     // 테스트용 데모 데이터 추가 함수
     const addDemoData = () => {
-      const dummyText = '이 텍스트는 테스트용 데모 데이터입니다. 영역을 선택하고 OCR을 실행해보세요.';
-      const dummyImage = createDummyImage({ width: 100, height: 50 }); // 임의의 크기
+      const demoData = [
+        {
+          page: 0,
+          text: '1. 다음 중 올바른 것은?\n\nA) 2x + 3 = 7\nB) 2x + 3 = 8\nC) 2x + 3 = 9\nD) 2x + 3 = 10\n\n정답: A',
+          image: createDummyImage({ width: 300, height: 200 }),
+          x: 150,
+          y: 120,
+          width: 300,
+          height: 200,
+          edited: false
+        },
+        {
+          page: 0,
+          text: '2. 삼각형의 내각의 합은?\n\nA) 90도\nB) 180도\nC) 270도\nD) 360도\n\n정답: B',
+          image: createDummyImage({ width: 280, height: 180 }),
+          x: 500,
+          y: 150,
+          width: 280,
+          height: 180,
+          edited: false
+        },
+        {
+          page: 1,
+          text: '3. 물의 화학식은?\n\nA) H2O\nB) CO2\nC) O2\nD) N2\n\n정답: A',
+          image: createDummyImage({ width: 250, height: 160 }),
+          x: 200,
+          y: 200,
+          width: 250,
+          height: 160,
+          edited: false
+        }
+      ];
 
-      ocrResults.value.push({
-        page: 0, // 예시로 페이지 0
-        text: dummyText,
-        image: dummyImage,
-        x: 100,
-        y: 100,
-        width: 100,
-        height: 50,
-        edited: false
+      // 기존 데이터에 추가
+      demoData.forEach(item => {
+        ocrResults.value.push(item);
       });
-      success('테스트 데이터가 추가되었습니다.');
+
+      success(`${demoData.length}개의 테스트 문제가 추가되었습니다.`);
     };
 
     // 유효한 OCR 결과만 필터링
@@ -975,15 +1264,14 @@ export default {
       selection,
       ocrLoading,
       ocrResults,
+      showOcrModal,
+      capturedImageData,
 
       // CKEditor 관련
-      editor,
-      editorConfig,
       showEditor,
       currentEditingText,
-      ckEditorComponent,
-      isLoadingCKEditor, // 추가된 상태
-      renderedMath, // 추가된 상태
+      customMath, // 추가된 상태
+      editorConfig, // CKEditor 설정
 
       // 계산된 속성
       selectionStyle,
@@ -1007,13 +1295,13 @@ export default {
       editResult,
       closeEditor,
       saveEditedText,
-      exportResults,
       clearAllResults,
       addDemoData,
-      insertMathFormula, // 추가된 메서드
-      insertMathBlock, // 추가된 메서드
-      renderMathContent, // 추가된 메서드
-      loadMathJax // 추가된 메서드
+      insertMath,
+      insertCustomMath,
+      renderMathWithKaTeX,
+      closeOcrModal,
+      saveOcrResults
     }
   }
 }
@@ -1083,6 +1371,10 @@ export default {
   min-height: 500px;
   position: relative;
   z-index: 1;
+  /* 픽셀 정확도를 위한 이미지 렌더링 설정 */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
 }
 
 .selection-canvas {
@@ -1090,10 +1382,14 @@ export default {
   top: 0;
   left: 0;
   pointer-events: auto; /* 마우스 이벤트 활성화 */
-  z-index: 10; /* iframe 위에 표시 */
+  z-index: 10; /* PDF Canvas 위에 표시 */
   cursor: crosshair;
   background: transparent; /* 투명 배경 */
   border: 1px solid rgba(59, 130, 246, 0.3); /* 디버깅용 테두리 */
+  /* 픽셀 정확도를 위한 설정 */
+  image-rendering: -webkit-optimize-contrast;
+  image-rendering: -moz-crisp-edges;
+  image-rendering: pixelated;
 }
 
 .selection-area {
@@ -1144,10 +1440,9 @@ export default {
   justify-content: center;
   align-items: center;
   gap: 1rem;
-  margin-top: 1rem;
-  padding: 1rem;
-  background: #f8fafc;
-  border-radius: 8px;
+  padding: 1rem 2rem;
+  background: white;
+  border-bottom: 1px solid #e2e8f0;
 }
 
 .page-info {
@@ -1194,6 +1489,12 @@ export default {
   margin: 0 0 0.5rem 0;
   color: #01579b;
   font-size: 0.875rem;
+}
+
+.button-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
 }
 
 .ocr-results {
@@ -1540,12 +1841,68 @@ export default {
   padding: 1rem;
   border: 1px solid #e2e8f0;
   border-radius: 6px;
-  min-height: 100px;
-  overflow-x: auto;
+  margin-bottom: 1rem;
 }
 
 .math-content :deep(.MathJax) {
   font-size: 1.1em;
+}
+
+.math-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+  color: #6b7280;
+}
+
+.math-loading .loading-spinner {
+  border: 3px solid rgba(59, 130, 246, 0.3);
+  border-top: 3px solid #3b82f6;
+  border-radius: 50%;
+  width: 30px;
+  height: 30px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 1rem;
+}
+
+.math-loading p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+.math-help {
+  background-color: #e9ecef;
+  padding: 1rem;
+  border-radius: 6px;
+  border-left: 4px solid #3b82f6;
+}
+
+.math-help h5 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.math-help ul {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+
+.math-help li {
+  margin: 0.25rem 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.math-help code {
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.25rem;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
 }
 
 .modal-actions {
@@ -1592,6 +1949,17 @@ export default {
   font-size: 4rem;
 }
 
+.no-results-description {
+  margin: 0;
+  color: #6b7280;
+  font-size: 1rem;
+  line-height: 1.6;
+  text-align: center;
+  max-width: 500px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
 .no-results-steps {
   display: flex;
   flex-direction: column;
@@ -1613,6 +1981,12 @@ export default {
   font-weight: 600;
   color: #3b82f6;
   font-size: 1rem;
+}
+
+.no-results-steps .step-text {
+  color: #4b5563;
+  font-size: 0.875rem;
+  line-height: 1.4;
 }
 
 /* 결과 요약 스타일 */
@@ -1656,5 +2030,137 @@ export default {
   font-weight: 600;
   color: #3b82f6;
   font-size: 1.125rem;
+}
+
+/* 수식 도구 스타일 */
+.math-tools {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background-color: #f8fafc;
+}
+
+.math-tools h4 {
+  margin: 0 0 1rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.math-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.math-btn {
+  padding: 0.5rem 0.75rem;
+  background-color: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.math-btn:hover {
+  background-color: #2563eb;
+}
+
+.custom-math {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.math-input {
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-family: 'Courier New', monospace;
+}
+
+.insert-btn {
+  padding: 0.5rem 1rem;
+  background-color: #10b981;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.2s;
+}
+
+.insert-btn:hover {
+  background-color: #059669;
+}
+
+.math-help {
+  background-color: #e9ecef;
+  padding: 1rem;
+  border-radius: 6px;
+  border-left: 4px solid #3b82f6;
+}
+
+.math-help h5 {
+  margin: 0 0 0.75rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+}
+
+.math-help ul {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+}
+
+.math-help li {
+  margin: 0.25rem 0;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.math-help code {
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.25rem;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.75rem;
+}
+
+/* KaTeX 스타일 오버라이드 */
+:deep(.katex) {
+  font-size: 1.1em;
+}
+
+:deep(.katex-display) {
+  margin: 1em 0;
+  text-align: center;
+}
+
+/* 수식 오류 표시 */
+.math-error {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  padding: 0.75rem;
+  margin: 0.5rem 0;
+  color: #dc2626;
+}
+
+.math-error code {
+  background-color: #f3f4f6;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-family: 'Courier New', monospace;
+  font-size: 0.875rem;
 }
 </style>
