@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MathJax FOUC Test</title>
+  
+  <!-- Critical CSS for preventing FOUC -->
+  <style>
+    /* Hide raw LaTeX formulas before MathJax renders */
+    .mathjax-formula {
+      visibility: hidden !important;
+      position: relative;
+      min-height: 1em;
+    }
+    
+    /* Show a loading indicator */
+    .mathjax-formula::before {
+      content: "";
+      position: absolute;
+      visibility: visible;
+      width: 100%;
+      height: 1em;
+      background: linear-gradient(90deg, #f0f0f0 25%, #f8f8f8 50%, #f0f0f0 75%);
+      background-size: 200% 100%;
+      animation: loading 1.5s infinite;
+      opacity: 0.5;
+    }
+    
+    @keyframes loading {
+      0% { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    
+    /* Show rendered MathJax */
+    mjx-container {
+      visibility: visible !important;
+    }
+    
+    .mathjax-processed {
+      visibility: visible !important;
+    }
+    
+    .mathjax-processed::before {
+      display: none;
+    }
+    
+    body {
+      font-family: 'Noto Sans KR', sans-serif;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+    }
+    
+    .test-section {
+      margin: 30px 0;
+      padding: 20px;
+      border: 1px solid #ddd;
+      border-radius: 8px;
+    }
+    
+    .math-content {
+      margin: 15px 0;
+      padding: 10px;
+      background: #f9f9f9;
+      border-radius: 4px;
+    }
+  </style>
+  
+  <!-- MathJax Configuration -->
+  <script>
+    window.MathJax = {
+      loader: {
+        load: ['ui/lazy']
+      },
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true,
+        processEnvironments: true
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+        lazyMargin: '200px',
+        renderActions: {
+          hideRawTeX: [1, function(doc) {
+            const mathElements = document.querySelectorAll('.math-content');
+            mathElements.forEach(el => {
+              const text = el.textContent || '';
+              if (text.includes('$') || text.includes('\\(') || text.includes('\\[')) {
+                el.classList.add('mathjax-formula');
+              }
+            });
+          }],
+          showRendered: [200, function(doc) {
+            const mathElements = document.querySelectorAll('.mathjax-formula');
+            mathElements.forEach(el => {
+              el.classList.remove('mathjax-formula');
+              el.classList.add('mathjax-processed');
+            });
+          }]
+        }
+      },
+      startup: {
+        typeset: true,  // Enable automatic typesetting for test
+        pageReady: () => {
+          return MathJax.startup.defaultPageReady().then(() => {
+            console.log('MathJax ready with FOUC prevention');
+          });
+        }
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+</head>
+<body>
+  <h1>MathJax FOUC Prevention Test</h1>
+  
+  <div class="test-section">
+    <h2>Inline Math Test</h2>
+    <div class="math-content">
+      이차방정식 $ax^2 + bx + c = 0$의 해는 $x = \frac{-b \pm \sqrt{b^2 - 4ac}}{2a}$ 입니다.
+    </div>
+  </div>
+  
+  <div class="test-section">
+    <h2>Display Math Test</h2>
+    <div class="math-content">
+      가우스 적분:
+      $$\int_{-\infty}^{\infty} e^{-x^2} dx = \sqrt{\pi}$$
+    </div>
+  </div>
+  
+  <div class="test-section">
+    <h2>Complex Math Test</h2>
+    <div class="math-content">
+      오일러 공식: $e^{i\theta} = \cos\theta + i\sin\theta$
+      
+      테일러 급수:
+      $$e^x = \sum_{n=0}^{\infty} \frac{x^n}{n!} = 1 + x + \frac{x^2}{2!} + \frac{x^3}{3!} + \cdots$$
+    </div>
+  </div>
+  
+  <div class="test-section">
+    <h2>Matrix Test</h2>
+    <div class="math-content">
+      행렬의 곱셈:
+      $$
+      \begin{bmatrix}
+      a & b \\
+      c & d
+      \end{bmatrix}
+      \begin{bmatrix}
+      e & f \\
+      g & h
+      \end{bmatrix}
+      =
+      \begin{bmatrix}
+      ae+bg & af+bh \\
+      ce+dg & cf+dh
+      \end{bmatrix}
+      $$
+    </div>
+  </div>
+  
+  <div class="test-section">
+    <h2>Dynamic Content Test</h2>
+    <button onclick="addDynamicMath()">Add Dynamic Math</button>
+    <div id="dynamic-content"></div>
+  </div>
+  
+  <script>
+    // Apply mathjax-formula class before MathJax processes
+    document.addEventListener('DOMContentLoaded', () => {
+      const mathContents = document.querySelectorAll('.math-content');
+      mathContents.forEach(el => {
+        const text = el.textContent || '';
+        if (text.includes('$') || text.includes('\\(') || text.includes('\\[')) {
+          el.classList.add('mathjax-formula');
+        }
+      });
+    });
+    
+    function addDynamicMath() {
+      const container = document.getElementById('dynamic-content');
+      const div = document.createElement('div');
+      div.className = 'math-content mathjax-formula';
+      div.innerHTML = `동적으로 추가된 수식: $\\sin^2\\theta + \\cos^2\\theta = 1$`;
+      container.appendChild(div);
+      
+      // Retypeset the new content
+      if (window.MathJax) {
+        MathJax.typesetPromise([div]).then(() => {
+          div.classList.remove('mathjax-formula');
+          div.classList.add('mathjax-processed');
+        });
+      }
+    }
+  </script>
+</body>
+</html>

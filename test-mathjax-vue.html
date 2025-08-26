@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>MathJax Vue Test</title>
+  
+  <!-- MathJax 3 설정 -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['$', '$'], ['\\(', '\\)']],
+        displayMath: [['$$', '$$'], ['\\[', '\\]']],
+        processEscapes: true,
+        processEnvironments: true
+      },
+      options: {
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      },
+      startup: {
+        typeset: false,  // Manual control
+        ready: () => {
+          MathJax.startup.defaultReady();
+          MathJax.startup.promise.then(() => {
+            console.log('MathJax ready!');
+            // 수동 렌더링 테스트
+            testRender();
+          });
+        }
+      }
+    };
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+  
+  <style>
+    .test-container {
+      margin: 20px;
+      padding: 20px;
+      border: 1px solid #ccc;
+      background: #f5f5f5;
+    }
+    .test-item {
+      margin: 10px 0;
+      padding: 10px;
+      background: white;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+    .status {
+      color: green;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>MathJax 렌더링 테스트 페이지</h1>
+  
+  <div class="test-container">
+    <h2>1. 직접 작성한 수식 (HTML에 직접 포함)</h2>
+    <div class="test-item">
+      <p>인라인 수식: $x^2 + y^2 = z^2$</p>
+      <p>블록 수식: $$\int_{0}^{\infty} e^{-x^2} dx = \frac{\sqrt{\pi}}{2}$$</p>
+    </div>
+  </div>
+  
+  <div class="test-container">
+    <h2>2. JavaScript로 추가한 수식</h2>
+    <div id="dynamic-content" class="test-item">
+      <!-- JavaScript로 채워질 예정 -->
+    </div>
+    <button onclick="addDynamicContent()">동적 콘텐츠 추가</button>
+  </div>
+  
+  <div class="test-container">
+    <h2>3. innerHTML로 추가한 수식 (Vue의 v-html 시뮬레이션)</h2>
+    <div id="vue-simulation" class="test-item">
+      <!-- innerHTML로 채워질 예정 -->
+    </div>
+    <button onclick="simulateVueHTML()">v-html 시뮬레이션</button>
+  </div>
+  
+  <div class="test-container">
+    <h2>4. 렌더링 상태</h2>
+    <div id="status" class="status">대기 중...</div>
+  </div>
+  
+  <script>
+    // 전역 테스트 함수
+    function testRender() {
+      console.log('Initial render test...');
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        window.MathJax.typesetPromise()
+          .then(() => {
+            document.getElementById('status').textContent = 'MathJax 초기 렌더링 완료!';
+            console.log('Initial render complete');
+          })
+          .catch(err => {
+            console.error('Render error:', err);
+            document.getElementById('status').textContent = '오류: ' + err.message;
+          });
+      }
+    }
+    
+    // 동적 콘텐츠 추가
+    function addDynamicContent() {
+      const container = document.getElementById('dynamic-content');
+      container.innerHTML = `
+        <p>동적으로 추가된 인라인 수식: $a^2 + b^2 = c^2$</p>
+        <p>동적 블록 수식: $$E = mc^2$$</p>
+      `;
+      
+      // MathJax 재렌더링
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        window.MathJax.typesetPromise([container])
+          .then(() => {
+            document.getElementById('status').textContent = '동적 콘텐츠 렌더링 완료!';
+            console.log('Dynamic content rendered');
+          })
+          .catch(err => console.error('Dynamic render error:', err));
+      }
+    }
+    
+    // Vue v-html 시뮬레이션
+    function simulateVueHTML() {
+      const container = document.getElementById('vue-simulation');
+      // 실제 데이터에서 올 것 같은 HTML
+      const htmlContent = `
+        <p>다음 식을 풀어라: $x + 2 = 5$</p>
+        <p>답: $x = 3$</p>
+        <p>증명: $$x + 2 = 5 \\Rightarrow x = 5 - 2 = 3$$</p>
+      `;
+      
+      // v-html처럼 innerHTML 설정
+      container.innerHTML = htmlContent;
+      
+      // MathJax 재렌더링
+      if (window.MathJax && window.MathJax.typesetPromise) {
+        // 약간의 지연 후 렌더링 (Vue의 nextTick 시뮬레이션)
+        setTimeout(() => {
+          window.MathJax.typesetPromise([container])
+            .then(() => {
+              document.getElementById('status').textContent = 'v-html 시뮬레이션 렌더링 완료!';
+              console.log('Vue simulation rendered');
+              
+              // 렌더링 결과 확인
+              const mjxContainers = container.querySelectorAll('mjx-container');
+              console.log(`렌더링된 수식 개수: ${mjxContainers.length}`);
+            })
+            .catch(err => console.error('Vue simulation error:', err));
+        }, 0);
+      }
+    }
+    
+    // 페이지 로드 완료 시 상태 업데이트
+    window.addEventListener('load', () => {
+      if (window.MathJax) {
+        console.log('MathJax 객체 확인:', window.MathJax);
+        console.log('MathJax.typesetPromise:', window.MathJax.typesetPromise);
+      } else {
+        console.error('MathJax가 로드되지 않았습니다!');
+      }
+    });
+  </script>
+</body>
+</html>

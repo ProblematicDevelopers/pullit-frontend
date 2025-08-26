@@ -34,20 +34,33 @@
         @selectExisting="handleSelectExisting"
       />
 
-      <!-- Step 1: 단원선택 -->
-      <Step1UnitSelection
+      <!-- Step 1: 생성 방식 선택 -->
+      <Step1ModeSelection
         v-else-if="currentStep === 1"
-        :mode="store.mode"
-        :examId="store.selectedExam?.id"
+        :examInfo="store.examInfo"
+        @back="handleStep1Back"
         @next="handleStep1Next"
-        @cancel="handleCancel"
-        @research="handleResearch"
-        @show-scope="handleShowScope"
       />
 
-      <!-- Step 2: 문항선택 -->
+      <!-- Step 2-1: 간편 생성 설정 -->
+      <Step2SimpleGeneration
+        v-else-if="currentStep === 2 && store.examInfo?.mode === 'simple'"
+        :examInfo="store.examInfo"
+        @back="handleStep2Back"
+        @next="handleStep2SimpleNext"
+      />
+
+      <!-- Step 2-2: 문항 직접 선택 -->
       <Step2ItemSelection
-        v-else-if="currentStep === 2"
+        v-else-if="currentStep === 2 && store.examInfo?.mode === 'manual'"
+        :examInfo="store.examInfo"
+        @back="handleStep2Back"
+        @next="handleStep2Next"
+      />
+      
+      <!-- Step 2-3: 기존 시험지 미리보기 -->
+      <Step2ExamPreview
+        v-else-if="currentStep === 2 && store.examInfo?.mode === 'examPreview'"
         :examInfo="store.examInfo"
         @back="handleStep2Back"
         @next="handleStep2Next"
@@ -72,16 +85,20 @@
  * Pinia store를 통해 상태를 관리하고, 각 단계 간의 전환을 처리합니다.
  */
 
-import { onMounted, onUnmounted } from 'vue'
+import { onMounted, onUnmounted, ref } from 'vue'
 import { useTestBankStore } from '@/stores/testBank'
+import { useItemSelectionStore } from '@/stores/itemSelection'
 import { storeToRefs } from 'pinia'
 import { isPopupWindow, closePopup, sendToParent } from '@/utils/popup'
+import itemApiService from '@/services/itemApi'
 
 // 컴포넌트 import
 import WizardHeader from '@/components/wizard/WizardHeader.vue'
 import Step0SelectMode from '@/components/wizard/Step0SelectMode.vue'
-import Step1UnitSelection from '@/components/wizard/Step1UnitSelection.vue'
+import Step1ModeSelection from '@/components/wizard/Step1ModeSelection.vue'
+import Step2SimpleGeneration from '@/components/wizard/Step2SimpleGeneration.vue'
 import Step2ItemSelection from '@/components/wizard/Step2ItemSelection.vue'
+import Step2ExamPreview from '@/components/wizard/Step2ExamPreview.vue'
 import Step3ExamSave from '@/components/wizard/Step3ExamSave.vue'
 
 // Props 정의
@@ -97,7 +114,11 @@ const emit = defineEmits(['close'])
 
 // Pinia store 사용
 const store = useTestBankStore()
+const itemStore = useItemSelectionStore()
 const { currentStep } = storeToRefs(store)
+
+// 로딩 상태
+const isGenerating = ref(false)
 const { setCurrentStep, resetWizard } = store
 
 /**
@@ -150,14 +171,8 @@ const handleStep0Next = () => {
   console.log('Step 0 완료, 다음 단계로 진행')
   // mode가 설정되어 있어야 진행 가능
   if (store.mode) {
-    // 기존 시험지 편집 모드면 Step2로 바로 이동
-    if (store.mode === 'edit' && store.selectedExam) {
-      console.log('기존 시험지 편집 모드 - Step2로 바로 이동')
-      setCurrentStep(2)
-    } else {
-      // 새 시험지 생성 모드면 Step1로 이동
-      setCurrentStep(1)
-    }
+    // 모든 모드에서 Step1(문항선택)로 이동
+    setCurrentStep(1)
   }
 }
 
@@ -168,68 +183,152 @@ const handleSelectNew = () => {
   console.log('새 시험지 생성 선택')
   store.setMode('new')
   store.setSelectedExam(null)
+  
+  // 새로 만들기 모드에서는 학년/과목 선택이 Step1(기존 Step2)에서 이루어짐
+  store.setExamInfo({
+    mode: 'new'
+  })
 }
 
 /**
  * 기존 시험지 편집 선택 핸들러
  * @param {Object} exam - 선택된 기존 시험지
  */
-const handleSelectExisting = (exam) => {
+const handleSelectExisting = async (exam) => {
   console.log('기존 시험지 편집 선택:', exam)
   store.setMode('edit')
   store.setSelectedExam(exam)
   
-  // examInfo 설정 - Step2에서 교과서 필터링에 필요
-  store.setExamInfo({
-    gradeCode: exam.gradeCode,
-    gradeName: exam.gradeName || exam.grade,
-    areaCode: exam.areaCode, // 과목 코드 (MA, KO, EN, SC, SO)
-    areaName: exam.areaName || exam.subject, // 과목명 (수학, 국어 등)
-    subject: exam.areaName || exam.subject // 호환성
-  })
-  
-  console.log('설정된 examInfo:', store.examInfo)
+  try {
+    isGenerating.value = true
+    
+    // examId 확인 및 설정
+    const examId = exam.id || exam.examId
+    console.log('사용할 examId:', examId)
+    
+    // examInfo 설정 - Step2ExamPreview에서 사용
+    // 문항 로드는 Step2ExamPreview 컴포넌트에서 직접 수행
+    store.setExamInfo({
+      mode: 'examPreview', // 새로운 모드로 설정하여 Step2ExamPreview가 표시되도록 함
+      id: examId, // id 필드 추가
+      examId: examId, // examId도 유지
+      examName: exam.examName || exam.name || exam.title,
+      title: exam.title || exam.examName || exam.name,
+      gradeCode: exam.gradeCode,
+      gradeName: exam.gradeName || exam.grade,
+      areaCode: exam.areaCode,
+      areaName: exam.areaName || exam.subject,
+      subjectName: exam.areaName || exam.subject,
+      subject: exam.areaName || exam.subject,
+      examType: exam.examType || 'TESTWIZARD'
+    })
+    
+    console.log('설정된 examInfo (examPreview 모드):', store.examInfo)
+    
+    // Step0 -> Step2(미리보기) -> Step3 흐름으로 변경
+    // Step1을 건너뛰고 바로 Step2(미리보기)로 이동
+    // 문항 로드는 Step2ExamPreview 컴포넌트의 onMounted에서 수행됨
+    setCurrentStep(2)
+  } catch (error) {
+    console.error('시험지 설정 실패:', error)
+    alert('시험지를 설정하는데 실패했습니다.')
+  } finally {
+    isGenerating.value = false
+  }
 }
 
 /**
  * Step 1 완료 및 Step 2로 진행 핸들러
+ * Step1(방식선택) -> Step2(간편생성 또는 문항선택)
  */
-const handleStep1Next = () => {
-  console.log('Step 1 완료, Step 2로 진행')
+const handleStep1Next = (data) => {
+  console.log('Step 1(방식선택) 완료, data:', data)
+  
+  // examInfo에 선택한 모드 저장
+  store.setExamInfo({
+    ...store.examInfo,
+    mode: data.mode // 'simple' 또는 'manual'
+  })
+  
+  // 모드에 상관없이 Step2로 이동 (Step2에서 모드에 따라 다른 컴포넌트 표시)
   setCurrentStep(2)
 }
 
 /**
- * Step 2에서 뒤로가기 핸들러
+ * Step 1(방식선택)에서 이전 단계로 돌아가기 핸들러
  */
-const handleStep2Back = () => {
-  console.log('TestWizardView handleStep2Back 호출됨, mode:', store.mode)
-  // 새 시험지 모드면 Step1로, 기존 시험지 편집 모드면 Step0로
-  if (store.mode === 'new') {
-    console.log('새 시험지 모드 - Step1로 이동')
-    setCurrentStep(1)
-  } else {
-    console.log('기존 시험지 편집 모드 - Step0로 이동')
-    setCurrentStep(0)
-  }
-  console.log('현재 step 변경됨:', store.currentStep)
+const handleStep1Back = () => {
+  console.log('Step 1(방식선택)에서 Step 0(모드선택)로 돌아가기')
+  setCurrentStep(0)
 }
 
 /**
- * Step 2 완료 및 Step 3로 진행 핸들러
+ * Step 2 간편 생성 완료 핸들러
+ */
+const handleStep2SimpleNext = async (settings) => {
+  console.log('Step 2(간편 생성) 설정 완료:', settings)
+  
+  // Step2SimpleGeneration에서 이미 생성된 문항들이 전달됨
+  if (settings.selectedItems && settings.selectedItems.length > 0) {
+    // 이미 생성된 문항들을 store에 저장
+    store.setExamInfo({
+      ...store.examInfo,
+      grade: settings.grade,
+      subject: settings.subject,
+      textbook: settings.textbook,
+      selectedItems: settings.selectedItems, // Step2SimpleGeneration에서 생성된 문항들
+      generationSettings: {
+        itemCount: settings.itemCount,
+        difficulty: settings.difficulty,
+        questionTypes: settings.questionTypes,
+        chapters: settings.chapters,
+        includePassage: settings.includePassage,
+        avoidDuplicate: settings.avoidDuplicate,
+        prioritizeLatest: settings.prioritizeLatest,
+        selectionMetadata: settings.selectionMetadata,
+        selectionReport: settings.selectionReport
+      }
+    })
+    
+    // itemStore에도 선택된 문항들 설정
+    itemStore.setSelectedItems(settings.selectedItems)
+    
+    console.log(`${settings.selectedItems.length}개 문항이 선택되었습니다.`)
+    console.log('선택된 문항들:', settings.selectedItems)
+    
+    // 시험지 저장 단계로 이동
+    setCurrentStep(3)
+  } else {
+    // 문항이 없는 경우 에러 처리
+    alert('생성된 문항이 없습니다. 다시 시도해주세요.')
+  }
+}
+
+/**
+ * Step 2(문항선택) 완료 및 Step 3으로 진행 핸들러
  */
 const handleStep2Next = () => {
-  console.log('Step 2 완료, Step 3로 진행')
+  console.log('Step 2(문항선택) 완료, Step 3(시험지저장)으로 진행')
   setCurrentStep(3)
 }
 
 /**
- * Step 3에서 Step 2로 돌아가기 핸들러
+ * Step 2(문항선택)에서 이전 단계로 돌아가기 핸들러
+ */
+const handleStep2Back = () => {
+  console.log('Step 2(문항선택)에서 Step 1(방식선택)로 돌아가기')
+  setCurrentStep(1)
+}
+
+/**
+ * Step 3(시험지저장)에서 이전 단계로 돌아가기 핸들러
  */
 const handleStep3Back = () => {
+  // 모드에 상관없이 Step2로 돌아감 (Step2에서 모드에 따라 다른 컴포넌트가 표시됨)
   console.log('Step 3에서 Step 2로 돌아가기')
   setCurrentStep(2)
 }
+
 
 /**
  * 마법사 완료 핸들러
