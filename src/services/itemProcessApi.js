@@ -44,6 +44,27 @@ export const itemProcessingAPI = {
     formData.append('entityId', entityId)
     formData.append('description', description)
 
-    return api.post('/files/upload', formData)
+    // 디버깅을 위한 로그
+    console.log('📤 FormData 전송:', {
+      fileSize: file.size,
+      fileName: fileName,
+      formDataEntries: Array.from(formData.entries()).map(([key, value]) => ({
+        key,
+        valueType: typeof value,
+        isFile: value instanceof File,
+        size: value instanceof File ? value.size : 'N/A'
+      }))
+    })
+
+    return api.post('/files/upload', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      },
+      // 파일 업로드 타임아웃 설정 (큰 파일용)
+      timeout: 300000, // 5분
+      // 최대 파일 크기 설정
+      maxContentLength: Infinity,
+      maxBodyLength: Infinity
+    })
   }
 }
