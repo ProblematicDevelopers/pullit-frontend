@@ -159,6 +159,13 @@ const routes = [
       hideFooter: true, // 푸터 숨김
     },
   },
+  
+  // MathJax 테스트 페이지
+  {
+    path: '/mathjax-test',
+    name: 'MathJaxTest',
+    component: () => import('@/components/MathJaxTest.vue'),
+  },
 ]
 
 const router = createRouter({
