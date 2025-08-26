@@ -21,19 +21,21 @@ class ItemApiService {
    */
   async searchItems(searchParams) {
     try {
+      console.log('searchItems 원본 파라미터:', searchParams)
+      
       // 백엔드 ItemSearchRequest에 맞게 매핑
       const requestData = {
-        subjectId: searchParams.subjects && searchParams.subjects.length > 0 ? searchParams.subjects[0] : null,
+        subjectId: searchParams.textbook ? parseInt(searchParams.textbook) : null,
         largeChapterIds: [],
-        mediumChapterIds: searchParams.chapterIds || [], // 중단원 필터 적용
+        mediumChapterIds: searchParams.chapters ? searchParams.chapters.map(id => parseInt(id)) : [],
         smallChapterIds: [],
         topicChapterIds: [],
-        questionFormCode: searchParams.categories || [],
-        difficultyCode: searchParams.difficulties ? searchParams.difficulties.map(d => {
-          // 문자열을 정수로 변환
-          const val = parseInt(d)
-          return isNaN(val) ? d : val
-        }) : [],
+        questionFormCode: searchParams.categories ? searchParams.categories.map(c => {
+          // 문제 유형 코드를 Long으로 변환 (백엔드에서 Long 타입 기대)
+          // 일단 빈 배열로 처리
+          return []
+        }).flat() : [],
+        difficultyCode: searchParams.difficulties ? searchParams.difficulties.map(d => parseInt(d)) : [],
         keyword: searchParams.keyword || '',
         page: searchParams.page || 0,
         size: searchParams.size || 20,
@@ -43,6 +45,8 @@ class ItemApiService {
         hasHtml: null,
         passageId: null
       }
+      
+      console.log('searchItems 변환된 요청:', requestData)
 
       const response = await api.post('/items/search', requestData)
 
@@ -453,6 +457,93 @@ class ItemApiService {
       }
     }
   }
+
+  /**
+   * Smart Random Selection API - 난이도 비율에 따른 지능형 문항 선택
+   * @param {Object} searchParams - 검색 파라미터
+   * @param {number} searchParams.subjectId - 교과서 ID (필수)
+   * @param {Array<number>} searchParams.chapters - 챕터 ID 배열 (필수)
+   * @param {number} searchParams.itemCount - 생성할 문항 수 (1-100)
+   * @param {string} searchParams.difficulty - 난이도 (easy, normal, hard, mixed)
+   * @param {Array<number>} searchParams.questionTypes - 문제 유형 ID 배열
+   * @param {boolean} searchParams.includePassage - 지문 포함 여부 (기본값: true)
+   * @param {boolean} searchParams.avoidDuplicate - 중복 제외 여부 (기본값: true)
+   * @param {boolean} searchParams.prioritizeLatest - 최신 문항 우선 여부 (기본값: false)
+   * @returns {Promise<Object>} 스마트 선택 결과
+   */
+  async smartRandomSelection(searchParams) {
+    try {
+      console.log('=== Smart Random Selection API 호출 시작 ===')
+      console.log('입력 파라미터:', searchParams)
+
+      // 필수 파라미터 검증
+      if (!searchParams.subjectId) {
+        throw new Error('교과서 ID(subjectId)는 필수입니다')
+      }
+      if (!searchParams.chapters || searchParams.chapters.length === 0) {
+        throw new Error('챕터(chapters)는 최소 1개 이상 선택해야 합니다')
+      }
+
+      const requestData = {
+        subjectId: searchParams.subjectId,
+        chapters: searchParams.chapters || [],
+        itemCount: searchParams.itemCount || 20,
+        difficulty: searchParams.difficulty || 'mixed',
+        questionTypes: searchParams.questionTypes || [],
+        includePassage: searchParams.includePassage !== false,
+        avoidDuplicate: searchParams.avoidDuplicate !== false,
+        prioritizeLatest: searchParams.prioritizeLatest || false
+      }
+
+      console.log('백엔드로 전송할 요청 데이터:', JSON.stringify(requestData, null, 2))
+
+      const response = await api.post('/items/smart-random', requestData)
+      console.log('백엔드 응답 상태:', response.status)
+      console.log('백엔드 응답 데이터:', response.data)
+
+      if (response.data.success) {
+        // SmartSelectionResponse의 items 배열 반환
+        const responseData = response.data.data
+        
+        console.log('=== Smart Random Selection 성공 ===')
+        console.log(`선택된 문항 수: ${responseData.items?.length || 0}개`)
+        
+        if (responseData.metadata) {
+          console.log('메타데이터:', {
+            요청문항수: responseData.metadata.requestedCount,
+            실제문항수: responseData.metadata.actualItemCount,
+            선택단위수: responseData.metadata.selectionUnitCount,
+            지문그룹수: responseData.metadata.passageGroupCount
+          })
+        }
+        
+        return {
+          success: true,
+          data: responseData.items || [],
+          metadata: responseData.metadata,
+          report: responseData.report,
+          message: response.data.message
+        }
+      }
+
+      throw new Error(response.data.message || 'Smart random selection failed')
+    } catch (error) {
+      console.error('=== Smart Random Selection API 오류 ===')
+      console.error('오류 타입:', error.name)
+      console.error('오류 메시지:', error.message)
+      
+      if (error.response) {
+        console.error('응답 상태 코드:', error.response.status)
+        console.error('응답 에러 데이터:', error.response.data)
+      }
+      
+      return {
+        success: false,
+        error: error.response?.data?.message || error.message || 'Smart random selection request failed',
+        data: []
+      }
+    }
+  }
 }
 
 // Create and export singleton instance
@@ -471,5 +562,6 @@ export const {
   getSubjects,
   getTextbooks,
   getItemStats,
-  bulkItemOperation
+  bulkItemOperation,
+  smartRandomSelection
 } = itemApiService

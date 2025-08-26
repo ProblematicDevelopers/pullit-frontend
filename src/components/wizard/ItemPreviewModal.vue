@@ -44,13 +44,13 @@
         <!-- 지문 (있는 경우) -->
         <div v-if="item.passageContent" class="passage-section">
           <h4>지문</h4>
-          <div class="passage-content" v-html="item.passageContent"></div>
+          <div class="passage-content" v-html="item.passageContent" v-mathjax></div>
         </div>
 
         <!-- 문제 -->
         <div class="question-section">
           <h4>문제</h4>
-          <div v-if="item.questionHtml" class="question-content" v-html="item.questionHtml"></div>
+          <div v-if="item.questionHtml" class="question-content" v-html="item.questionHtml" v-mathjax></div>
           <div v-else-if="item.questionImageUrl" class="question-image">
             <img :src="item.questionImageUrl" :alt="`문항 ${item.itemId}`">
           </div>
@@ -65,7 +65,7 @@
           <div class="choices-list">
             <div v-for="(choice, index) in choices" :key="index" class="choice-item">
               <span class="choice-number">{{ choiceNumbers[index] }}</span>
-              <div v-if="choice.html" v-html="choice.html" class="choice-content"></div>
+              <div v-if="choice.html" v-html="choice.html" v-mathjax class="choice-content"></div>
               <div v-else-if="choice.text" class="choice-content">{{ choice.text }}</div>
             </div>
           </div>
@@ -78,7 +78,7 @@
             <span class="answer-value">{{ item.answer }}</span>
             <div v-if="item.explanation" class="answer-explanation">
               <h5>해설</h5>
-              <div v-html="item.explanation"></div>
+              <div v-html="item.explanation" v-mathjax></div>
             </div>
           </div>
         </div>
@@ -98,8 +98,9 @@
 </template>
 
 <script setup>
-import { computed, onMounted, onUnmounted } from 'vue'
+import { computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useTestBankStore } from '@/stores/testBank'
+import { useMathJax } from '@/composables/useMathJax'
 
 const props = defineProps({
   item: {
@@ -111,6 +112,15 @@ const props = defineProps({
 const emit = defineEmits(['close', 'select'])
 
 const store = useTestBankStore()
+
+// MathJax 컴포저블 사용 - Vue 재렌더링 안전 설정
+const { render: renderMath } = useMathJax({
+  immediate: false,
+  watchContent: false,  // Vue 재렌더링과 충돌 방지
+  hideBeforeRender: false,  // 숨기지 않음
+  clearFirst: false,  // 중요: 기존 MathJax 렌더링 유지
+  debounceDelay: 100
+})
 
 // 선택지 데이터 처리
 const choices = computed(() => {
@@ -155,9 +165,19 @@ const handleEscape = (e) => {
   }
 }
 
-onMounted(() => {
+// item 변경 시 MathJax 렌더링
+watch(() => props.item, async () => {
+  await nextTick()
+  await renderMath()
+}, { deep: true })
+
+onMounted(async () => {
   document.addEventListener('keydown', handleEscape)
   document.body.style.overflow = 'hidden'
+  
+  // MathJax 렌더링
+  await nextTick()
+  await renderMath()
 })
 
 onUnmounted(() => {

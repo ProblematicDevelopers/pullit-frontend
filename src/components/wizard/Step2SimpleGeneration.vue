@@ -7,23 +7,238 @@
 
 <template>
   <div class="step2-simple-generation">
-    <!-- 헤더 -->
-    <header class="step-header">
-      <button class="btn-back" @click="handleBack">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-          <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-        </svg>
-        이전
-      </button>
-      
-      <div class="header-info">
-        <h2>간편 생성 설정</h2>
-        <p class="header-desc">시험지를 자동으로 생성하기 위한 조건을 설정해주세요</p>
-      </div>
-    </header>
+    <!-- 생성된 문항 미리보기 화면 -->
+    <div v-if="showPreview && generatedItems.length > 0" class="preview-mode">
+      <!-- 미리보기 헤더 -->
+      <header class="step-header">
+        <button class="btn-back" @click="backToSettings">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          설정으로 돌아가기
+        </button>
+        
+        <div class="header-info">
+          <h2>생성된 문항 확인</h2>
+          <p class="header-desc">AI가 선택한 {{ generatedItems.length }}개의 문항을 확인하세요</p>
+        </div>
+      </header>
 
-    <!-- 메인 컨텐츠 -->
-    <div class="content-wrapper">
+      <!-- 생성 리포트 -->
+      <div class="generation-report" v-if="selectionReport">
+        <div class="report-card">
+          <h4>📊 문항 생성 결과</h4>
+          <div class="report-stats">
+            <div class="stat-item">
+              <span class="stat-label">요청 문항 수:</span>
+              <span class="stat-value">{{ selectionReport.requestedCount }}개</span>
+            </div>
+            <div class="stat-item">
+              <span class="stat-label">실제 생성 문항 수:</span>
+              <span class="stat-value">{{ selectionReport.actualCount }}개</span>
+            </div>
+            <div class="stat-item" v-if="selectionReport.difficultyAdjusted">
+              <span class="stat-label warning">⚠️ 난이도 조정:</span>
+              <span class="stat-value warning">{{ selectionReport.adjustmentMessage }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 문항 목록 -->
+      <div class="preview-items">
+        <div class="items-header">
+          <h3>문항 목록</h3>
+          <span class="item-count">총 {{ generatedItems.length }}문항</span>
+        </div>
+        
+        <!-- 지문 그룹 표시 (passageId가 있는 문제들) -->
+        <div v-if="hasPassageGroups" class="passage-groups">
+          <div 
+            v-for="group in passageGroups"
+            :key="group.passageId"
+            class="passage-group"
+          >
+            <!-- 왼쪽: 지문 영역 -->
+            <div class="passage-section">
+              <div class="passage-header">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15M9 5C9 6.10457 9.89543 7 11 7H13C14.1046 7 15 6.10457 15 5M9 5C9 3.89543 9.89543 3 11 3H13C14.1046 3 15 3.89543 15 5" 
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <span>지문</span>
+              </div>
+              <div class="passage-content">
+                <div v-if="group.passageHtml" v-html="sanitizeHtml(group.passageHtml)" v-mathjax class="passage-text"></div>
+                <div v-else-if="group.passageText" class="passage-text">{{ group.passageText }}</div>
+              </div>
+            </div>
+            
+            <!-- 오른쪽: 문제 영역 -->
+            <div class="passage-items">
+              <div 
+                v-for="item in group.items"
+                :key="item.itemId"
+                class="item-card"
+              >
+                <!-- 카드 헤더 -->
+                <div class="card-header">
+                  <span class="item-id">#{{ item.itemId }}</span>
+                  <div class="item-badges">
+                    <span :class="'badge-difficulty difficulty-' + item.difficulty?.code">
+                      {{ item.difficulty?.name }}
+                    </span>
+                    <span class="badge-type">{{ item.questionForm?.name }}</span>
+                  </div>
+                </div>
+                
+                <!-- 카드 내용 -->
+                <div class="card-body">
+                  <!-- 문제 내용 -->
+                  <div class="question-section">
+                    <div v-if="item.questionHtml" class="item-html" v-html="sanitizeHtml(item.questionHtml)" v-mathjax></div>
+                    <div v-else-if="item.questionImageUrl" class="item-image">
+                      <img 
+                        :src="item.questionImageUrl" 
+                        :alt="`문항 ${item.itemId}`"
+                        loading="lazy"
+                      />
+                    </div>
+                    <div v-else class="item-text">
+                      {{ item.questionText || '내용 없음' }}
+                    </div>
+                  </div>
+
+                  <!-- 선택지 (객관식인 경우) -->
+                  <div v-if="hasChoices(item)" class="item-choices">
+                    <div v-if="item.choice1Html || item.choice1Text" class="choice">
+                      ① <span v-if="item.choice1Html" v-html="sanitizeHtml(item.choice1Html)" v-mathjax></span>
+                      <span v-else>{{ item.choice1Text }}</span>
+                    </div>
+                    <div v-if="item.choice2Html || item.choice2Text" class="choice">
+                      ② <span v-if="item.choice2Html" v-html="sanitizeHtml(item.choice2Html)" v-mathjax></span>
+                      <span v-else>{{ item.choice2Text }}</span>
+                    </div>
+                    <div v-if="item.choice3Html || item.choice3Text" class="choice">
+                      ③ <span v-if="item.choice3Html" v-html="sanitizeHtml(item.choice3Html)" v-mathjax></span>
+                      <span v-else>{{ item.choice3Text }}</span>
+                    </div>
+                    <div v-if="item.choice4Html || item.choice4Text" class="choice">
+                      ④ <span v-if="item.choice4Html" v-html="sanitizeHtml(item.choice4Html)" v-mathjax></span>
+                      <span v-else>{{ item.choice4Text }}</span>
+                    </div>
+                    <div v-if="item.choice5Html || item.choice5Text" class="choice">
+                      ⑤ <span v-if="item.choice5Html" v-html="sanitizeHtml(item.choice5Html)" v-mathjax></span>
+                      <span v-else>{{ item.choice5Text }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 일반 문항 그리드 뷰 (지문이 없는 문제들) -->
+        <div class="items-grid">
+          <div
+            v-for="item in regularItems"
+            :key="item.itemId"
+            class="item-card"
+          >
+            <!-- 카드 헤더 -->
+            <div class="card-header">
+              <span class="item-id">#{{ item.itemId }}</span>
+              <div class="item-badges">
+                <span :class="'badge-difficulty difficulty-' + item.difficulty?.code">
+                  {{ item.difficulty?.name }}
+                </span>
+                <span class="badge-type">{{ item.questionForm?.name }}</span>
+              </div>
+            </div>
+
+            <!-- 카드 내용 -->
+            <div class="card-body">
+              <!-- 문제 내용 -->
+              <div class="question-section">
+                <div v-if="item.questionHtml" class="item-html" v-html="sanitizeHtml(item.questionHtml)"></div>
+                <div v-else-if="item.questionImageUrl" class="item-image">
+                  <img 
+                    :src="item.questionImageUrl" 
+                    :alt="`문항 ${item.itemId}`"
+                    loading="lazy"
+                  />
+                </div>
+                <div v-else class="item-text">
+                  {{ item.questionText || '내용 없음' }}
+                </div>
+              </div>
+
+              <!-- 선택지 (객관식인 경우) -->
+              <div v-if="hasChoices(item)" class="item-choices">
+                <div v-if="item.choice1Html || item.choice1Text" class="choice">
+                  ① <span v-if="item.choice1Html" v-html="sanitizeHtml(item.choice1Html)" v-mathjax></span>
+                  <span v-else>{{ item.choice1Text }}</span>
+                </div>
+                <div v-if="item.choice2Html || item.choice2Text" class="choice">
+                  ② <span v-if="item.choice2Html" v-html="sanitizeHtml(item.choice2Html)" v-mathjax></span>
+                  <span v-else>{{ item.choice2Text }}</span>
+                </div>
+                <div v-if="item.choice3Html || item.choice3Text" class="choice">
+                  ③ <span v-if="item.choice3Html" v-html="sanitizeHtml(item.choice3Html)" v-mathjax></span>
+                  <span v-else>{{ item.choice3Text }}</span>
+                </div>
+                <div v-if="item.choice4Html || item.choice4Text" class="choice">
+                  ④ <span v-if="item.choice4Html" v-html="sanitizeHtml(item.choice4Html)" v-mathjax></span>
+                  <span v-else>{{ item.choice4Text }}</span>
+                </div>
+                <div v-if="item.choice5Html || item.choice5Text" class="choice">
+                  ⑤ <span v-if="item.choice5Html" v-html="sanitizeHtml(item.choice5Html)" v-mathjax></span>
+                  <span v-else>{{ item.choice5Text }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 하단 액션 버튼 -->
+      <footer class="step-footer">
+        <button class="btn btn-secondary" @click="regenerate">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M1 4V10H7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            <path d="M3.51 15C4.15 16.84 5.54 18.34 7.34 19.06C9.14 19.78 11.17 19.68 12.9 18.77C14.63 17.86 15.89 16.25 16.37 14.34C16.85 12.43 16.51 10.39 15.43 8.72C14.35 7.05 12.64 5.89 10.71 5.5C8.78 5.11 6.81 5.52 5.2 6.64L1 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          다시 생성
+        </button>
+        
+        <button class="btn btn-primary" @click="confirmAndProceed">
+          확인 후 다음 단계
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </button>
+      </footer>
+    </div>
+
+    <!-- 기존 설정 화면 -->
+    <template v-else>
+      <!-- 헤더 -->
+      <header class="step-header">
+        <button class="btn-back" @click="handleBack">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          이전
+        </button>
+        
+        <div class="header-info">
+          <h2>간편 생성 설정</h2>
+          <p class="header-desc">시험지를 자동으로 생성하기 위한 조건을 설정해주세요</p>
+        </div>
+      </header>
+
+      <!-- 메인 컨텐츠 -->
+      <div class="content-wrapper">
       <div class="settings-container">
         <!-- 기본 설정 섹션 -->
         <div class="setting-section">
@@ -263,14 +478,16 @@
         </span>
       </button>
     </footer>
+    </template>
   </div>
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import itemApiService from '@/services/itemApi'
 import chapterApi from '@/services/chapterApi'
 import ChapterTreeSelector from './ChapterTreeSelector.vue'
+import { useMathJax } from '@/composables/useMathJax'
 
 // Props & Emits
 const props = defineProps({
@@ -299,6 +516,21 @@ const settings = ref({
 const textbooks = ref([])
 const chapters = ref([])
 const isGenerating = ref(false)
+
+// 미리보기 관련 상태
+const showPreview = ref(false)
+const generatedItems = ref([])
+const selectionMetadata = ref(null)
+const selectionReport = ref(null)
+
+// MathJax 컴포저블 사용 - Vue 재렌더링 안전 설정
+const { render: renderMath } = useMathJax({
+  immediate: false,
+  watchContent: false,  // Vue 재렌더링과 충돌 방지
+  hideBeforeRender: false,  // 숨기지 않음
+  clearFirst: false,  // 중요: 기존 MathJax 렌더링 유지
+  debounceDelay: 100
+})
 
 // 학년 옵션
 const grades = [
@@ -335,6 +567,8 @@ const questionTypes = [
 const canGenerate = computed(() => {
   return settings.value.grade && 
          settings.value.subject && 
+         settings.value.textbook &&  // 교과서 선택 필수
+         settings.value.chapters.length > 0 &&  // 챕터 선택 필수
          settings.value.itemCount > 0
 })
 
@@ -363,7 +597,61 @@ const getQuestionTypesName = computed(() => {
     .join(', ') || '전체'
 })
 
+// 지문 그룹핑 관련 computed properties
+const passageGroups = computed(() => {
+  const groups = new Map()
+  
+  generatedItems.value.forEach(item => {
+    if (item.passageId) {
+      if (!groups.has(item.passageId)) {
+        groups.set(item.passageId, {
+          passageId: item.passageId,
+          passageHtml: item.passageHtml,
+          passageText: item.passageText,
+          items: []
+        })
+      }
+      groups.get(item.passageId).items.push(item)
+    }
+  })
+  
+  return Array.from(groups.values())
+})
+
+// 지문이 없는 일반 문제들
+const regularItems = computed(() => {
+  return generatedItems.value.filter(item => !item.passageId)
+})
+
+// 지문 그룹이 있는지 확인
+const hasPassageGroups = computed(() => {
+  return passageGroups.value.length > 0
+})
+
 // Methods
+// HTML 정리 함수 (수식 이미지 제거)
+const sanitizeHtml = (html) => {
+  if (!html) return ''
+  
+  // 수식 이미지 제거 
+  let cleaned = html
+    .replace(/<img[^>]*>/gi, '') // 모든 이미지 제거
+    .replace(/<script(?! type="math\/tex)[^>]*>[\s\S]*?<\/script>/gi, '') // 위험한 스크립트 제거
+    .replace(/on\w+="[^"]*"/g, '') // 이벤트 핸들러 제거
+    .replace(/on\w+='[^']*'/g, '')
+  
+  return cleaned
+}
+
+// 선택지가 있는지 확인
+const hasChoices = (item) => {
+  return item.choice1Html || item.choice1Text ||
+         item.choice2Html || item.choice2Text ||
+         item.choice3Html || item.choice3Text ||
+         item.choice4Html || item.choice4Text ||
+         item.choice5Html || item.choice5Text
+}
+
 const adjustItemCount = (delta) => {
   const newCount = settings.value.itemCount + delta
   if (newCount >= 1 && newCount <= 50) {
@@ -461,46 +749,119 @@ const handleBack = () => {
   emit('back')
 }
 
+// 미리보기 관련 메서드
+const backToSettings = () => {
+  showPreview.value = false
+  generatedItems.value = []
+  selectionReport.value = null
+}
+
+const regenerate = () => {
+  // 설정 화면으로 돌아가서 다시 생성
+  backToSettings()
+}
+
+const confirmAndProceed = () => {
+  // 생성된 문항과 설정 정보를 다음 단계로 전달
+  const generatedData = {
+    ...settings.value,
+    selectedItems: generatedItems.value,
+    selectionMetadata: selectionMetadata.value,
+    selectionReport: selectionReport.value
+  }
+  
+  emit('next', generatedData)
+}
+
+const getQuestionTypeName = (code) => {
+  const typeMap = {
+    1: '객관식',
+    2: '주관식',
+    3: '서술형'
+  }
+  return typeMap[code] || '기타'
+}
+
 const handleGenerate = async () => {
   if (!canGenerate.value || isGenerating.value) return
   
   try {
     isGenerating.value = true
     
-    // 난이도 매핑
-    const difficultyMap = {
-      easy: [1, 2],
-      normal: [2, 3, 4],
-      hard: [4, 5],
-      mixed: [1, 2, 3, 4, 5]
+    // 교과서가 선택되지 않은 경우
+    if (!settings.value.textbook) {
+      alert('교과서를 선택해주세요.')
+      isGenerating.value = false
+      return
     }
     
-    // 랜덤 문항 검색 파라미터
+    // 챕터가 선택되지 않은 경우
+    if (settings.value.chapters.length === 0) {
+      alert('최소 하나 이상의 단원을 선택해주세요.')
+      isGenerating.value = false
+      return
+    }
+    
+    // 문제 유형 코드를 ID로 매핑 (백엔드에서 필요 시)
+    // 일단 빈 배열로 전송 (백엔드에서 questionTypes는 Long 타입 ID를 기대함)
+    const questionTypeIds = []
+    
+    // Smart Random Selection API 파라미터
     const searchParams = {
-      subjects: [settings.value.subject],
-      grades: [settings.value.grade],
-      difficulties: difficultyMap[settings.value.difficulty] || [1, 2, 3, 4, 5],
-      categories: settings.value.questionTypes.length > 0 ? settings.value.questionTypes : undefined,
-      chapterIds: settings.value.chapters.length > 0 ? settings.value.chapters : undefined,
-      size: settings.value.itemCount,
-      random: true
+      subjectId: parseInt(settings.value.textbook), // 교과서 ID (필수)
+      chapters: settings.value.chapters.map(id => parseInt(id)), // 챕터 ID 배열 (필수)
+      itemCount: settings.value.itemCount,
+      difficulty: settings.value.difficulty, // 문자열 그대로 (easy, normal, hard, mixed)
+      questionTypes: questionTypeIds, // Long 타입 ID 배열
+      includePassage: settings.value.includePassage,
+      avoidDuplicate: settings.value.avoidDuplicate,
+      prioritizeLatest: settings.value.prioritizeLatest
     }
     
-    const result = await itemApiService.searchItems(searchParams)
+    console.log('Smart Random Selection 요청 파라미터:', searchParams)
+    const result = await itemApiService.smartRandomSelection(searchParams)
     
     if (result.success && result.data && result.data.length > 0) {
-      // 생성된 문항과 설정 정보를 다음 단계로 전달
-      const generatedData = {
-        ...settings.value,
-        selectedItems: result.data
+      console.log(`Smart Random Selection 성공: ${result.data.length}개 문항 생성됨`)
+      
+      // 메타데이터와 리포트 로깅
+      if (result.metadata) {
+        console.log('선택 메타데이터:', result.metadata)
+        selectionMetadata.value = result.metadata
+      }
+      if (result.report) {
+        console.log('선택 리포트:', result.report)
+        
+        // 리포트 정보 가공
+        selectionReport.value = {
+          requestedCount: result.metadata?.requestedCount || settings.value.itemCount,
+          actualCount: result.data.length,
+          difficultyAdjusted: result.report?.hasFallback || false,
+          adjustmentMessage: result.report?.fallbackReason || ''
+        }
       }
       
-      emit('next', generatedData)
+      // 생성된 문항 저장
+      generatedItems.value = result.data
+      
+      // 미리보기 화면으로 전환
+      showPreview.value = true
+      
+      // MathJax 렌더링
+      await nextTick()
+      await renderMath()
     } else {
-      alert('조건에 맞는 문항을 찾을 수 없습니다. 다른 조건으로 시도해주세요.')
+      console.warn('Smart Random Selection 결과 없음:', result)
+      
+      // 에러 메시지가 있으면 표시
+      if (result.error) {
+        alert(`문항 생성 실패: ${result.error}`)
+      } else {
+        alert('조건에 맞는 문항을 찾을 수 없습니다. 다른 조건으로 시도해주세요.')
+      }
     }
   } catch (error) {
-    console.error('문항 생성 오류:', error)
+    console.error('Smart Random Selection 오류:', error)
     alert('문항 생성 중 오류가 발생했습니다.')
   } finally {
     isGenerating.value = false
@@ -508,6 +869,22 @@ const handleGenerate = async () => {
 }
 
 // Lifecycle
+// showPreview 변경 시 MathJax 렌더링
+watch(showPreview, async (newVal) => {
+  if (newVal) {
+    await nextTick()
+    await renderMath()
+  }
+})
+
+// generatedItems 변경 시 MathJax 렌더링
+watch(generatedItems, async () => {
+  if (showPreview.value && generatedItems.value.length > 0) {
+    await nextTick()
+    await renderMath()
+  }
+}, { deep: true })
+
 onMounted(async () => {
   // 이전 설정이 있으면 복원
   if (props.examInfo) {
@@ -992,5 +1369,518 @@ onMounted(async () => {
 .btn-secondary:hover {
   background: #F3F4F6;
   border-color: #9CA3AF;
+}
+
+/* 미리보기 모드 스타일 */
+.preview-mode {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #F9FAFB;
+}
+
+/* 문항 카드 스타일 */
+.preview-mode .item-card {
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s;
+  min-height: 280px;
+  max-height: 350px;
+  display: flex;
+  flex-direction: column;
+}
+
+.preview-mode .item-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.preview-mode .card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid #f3f4f6;
+  flex-shrink: 0;
+}
+
+.preview-mode .item-id {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  font-weight: 500;
+}
+
+.preview-mode .item-badges {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.preview-mode .badge-difficulty,
+.preview-mode .badge-type {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.preview-mode .badge-difficulty {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.preview-mode .badge-difficulty.difficulty-1,
+.preview-mode .badge-difficulty.difficulty-L {
+  background: #dcfce7;
+  color: #166534;
+}
+
+.preview-mode .badge-difficulty.difficulty-2,
+.preview-mode .badge-difficulty.difficulty-M {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.preview-mode .badge-difficulty.difficulty-3,
+.preview-mode .badge-difficulty.difficulty-H {
+  background: #fee2e2;
+  color: #991b1b;
+}
+
+.preview-mode .badge-type {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.preview-mode .card-body {
+  flex: 1;
+  padding: 0.75rem;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.preview-mode .question-section {
+  flex: 1;
+}
+
+.preview-mode .item-html,
+.preview-mode .item-text {
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: #374151;
+  word-break: break-word;
+}
+
+.preview-mode .item-image img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.preview-mode .item-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  font-size: 0.8125rem;
+  line-height: 1.4;
+  padding-top: 0.5rem;
+  border-top: 1px solid #f3f4f6;
+}
+
+.preview-mode .choice {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+  color: #4b5563;
+}
+
+/* 지문 그룹 스타일 */
+.passage-groups {
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.passage-group {
+  display: flex;
+  gap: 1.5rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+}
+
+/* 왼쪽 지문 영역 */
+.passage-section {
+  flex: 0 0 40%;
+  display: flex;
+  flex-direction: column;
+  border-right: 2px solid #e5e7eb;
+  padding-right: 1.5rem;
+  height: 100%;
+  min-width: 0; /* flexbox에서 오버플로우 방지 */
+  overflow: hidden; /* 섹션 전체 오버플로우 숨김 */
+}
+
+.passage-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+  font-weight: 600;
+}
+
+.passage-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden; /* 가로 스크롤 제거 */
+  width: 100%;
+  padding-right: 0.5rem; /* 스크롤바 공간 확보 */
+}
+
+.passage-text {
+  line-height: 1.8;
+  color: #4b5563;
+  font-size: 0.9375rem;
+  /* 모든 내용이 컨테이너 내에 들어가도록 설정 */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word; /* 긴 단어도 줄바꿈 */
+  hyphens: auto; /* 자동 하이픈 추가 */
+}
+
+/* 지문 HTML 내부 요소 스타일 */
+.passage-text :deep(*) {
+  max-width: 100% !important; /* 모든 요소가 컨테이너 너비를 초과하지 않도록 */
+  box-sizing: border-box;
+}
+
+.passage-text :deep(p),
+.passage-text :deep(div) {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.passage-text :deep(img) {
+  max-width: 100% !important;
+  height: auto !important;
+  display: block;
+  margin: 0.5rem 0;
+}
+
+.passage-text :deep(table) {
+  max-width: 100% !important;
+  width: 100% !important;
+  overflow: hidden;
+  table-layout: fixed; /* 테이블 레이아웃 고정 */
+  border-collapse: collapse;
+}
+
+.passage-text :deep(table td),
+.passage-text :deep(table th) {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  padding: 0.25rem;
+}
+
+.passage-text :deep(pre) {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+  max-width: 100%;
+  background: #f6f8fa;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem; /* 코드 블록 폰트 크기 줄임 */
+}
+
+/* 수식 처리 */
+.passage-text :deep(.MathJax),
+.passage-text :deep(.MathJax_Display),
+.passage-text :deep(.MathJax_Preview),
+.passage-text :deep(.MJXc-display),
+.passage-text :deep(.math-tex),
+.passage-text :deep(mjx-container) {
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100% !important;
+  display: block;
+  margin: 0.5rem 0;
+  /* 수식이 길 경우 스크롤바 표시 */
+  scrollbar-width: thin;
+  scrollbar-color: #d1d5db transparent;
+}
+
+.passage-text :deep(mjx-container[display="true"]) {
+  display: block !important;
+  text-align: center;
+  margin: 1rem 0;
+}
+
+.passage-text :deep(mjx-container:not([display="true"])) {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  vertical-align: middle;
+}
+
+/* iframe 처리 */
+.passage-text :deep(iframe) {
+  max-width: 100% !important;
+  width: 100% !important;
+  height: auto;
+  min-height: 200px;
+}
+
+/* 오른쪽 문항 영역 */
+.passage-items {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+  align-content: start;
+}
+
+/* 지문 섹션 내 문제 카드 */
+.passage-items .item-card {
+  min-height: 200px;
+  max-height: none;
+  width: 100%;
+}
+
+/* 생성 리포트 */
+.generation-report {
+  padding: 20px 32px;
+  background: white;
+  border-bottom: 1px solid #E5E7EB;
+}
+
+.report-card {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 20px;
+  background: linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%);
+  border-radius: 12px;
+  border: 1px solid #BFDBFE;
+}
+
+.report-card h4 {
+  margin: 0 0 16px 0;
+  color: #1E40AF;
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.report-stats {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+}
+
+.stat-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 12px;
+  background: white;
+  border-radius: 8px;
+  border: 1px solid #DBEAFE;
+}
+
+.stat-label {
+  font-size: 14px;
+  color: #6B7280;
+  font-weight: 500;
+}
+
+.stat-value {
+  font-size: 16px;
+  color: #111827;
+  font-weight: 700;
+}
+
+.stat-label.warning {
+  color: #F59E0B;
+}
+
+.stat-value.warning {
+  color: #D97706;
+}
+
+/* 문항 목록 */
+.preview-items {
+  flex: 1;
+  overflow-y: auto;
+  padding: 20px 32px;
+}
+
+.items-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.items-header h3 {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 700;
+  color: #111827;
+}
+
+.item-count {
+  padding: 6px 12px;
+  background: #3B82F6;
+  color: white;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(400px, 1fr));
+  gap: 20px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.item-card {
+  background: white;
+  border-radius: 12px;
+  border: 1px solid #E5E7EB;
+  padding: 20px;
+  transition: all 0.2s;
+}
+
+.item-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+}
+
+.item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.item-number {
+  font-size: 14px;
+  font-weight: 700;
+  color: #3B82F6;
+}
+
+.item-badges {
+  display: flex;
+  gap: 8px;
+}
+
+.badge {
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.badge.difficulty {
+  background: #F3F4F6;
+  color: #374151;
+}
+
+.badge.difficulty.level-1 {
+  background: #D1FAE5;
+  color: #065F46;
+}
+
+.badge.difficulty.level-2 {
+  background: #DBEAFE;
+  color: #1E40AF;
+}
+
+.badge.difficulty.level-3 {
+  background: #FEF3C7;
+  color: #92400E;
+}
+
+.badge.difficulty.level-4 {
+  background: #FED7AA;
+  color: #C2410C;
+}
+
+.badge.difficulty.level-5 {
+  background: #FEE2E2;
+  color: #991B1B;
+}
+
+.badge.type {
+  background: #E5E7EB;
+  color: #374151;
+}
+
+.item-content {
+  margin-bottom: 16px;
+}
+
+.passage {
+  padding: 12px;
+  background: #F9FAFB;
+  border-left: 4px solid #3B82F6;
+  border-radius: 4px;
+  margin-bottom: 12px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #374151;
+}
+
+.question {
+  font-size: 15px;
+  line-height: 1.6;
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-left: 20px;
+}
+
+.choice {
+  display: flex;
+  gap: 12px;
+  font-size: 14px;
+  color: #374151;
+}
+
+.choice-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  background: #F3F4F6;
+  border-radius: 50%;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.item-footer {
+  padding-top: 12px;
+  border-top: 1px solid #F3F4F6;
+}
+
+.chapter-info {
+  font-size: 12px;
+  color: #9CA3AF;
 }
 </style>

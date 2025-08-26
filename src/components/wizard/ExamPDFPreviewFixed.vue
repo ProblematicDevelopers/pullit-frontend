@@ -130,7 +130,8 @@
 
         <!-- Questions Content -->
         <div class="page-content" :class="`layout-${layoutMode}`">
-          <div class="questions-wrapper">
+          <!-- Single column layout -->
+          <div v-if="layoutMode === 'single'" class="questions-wrapper">
             <template v-for="(group, gIndex) in currentPageGroups" :key="`group-${gIndex}`">
               <!-- 지문이 있는 그룹 -->
               <div v-if="group.type === 'passage-group'" class="passage-group">
@@ -179,31 +180,63 @@
               </template>
             </template>
           </div>
-        </div>
-
-        <!-- Page Footer -->
-        <div class="page-footer">
-          <span>- {{ currentPage }} -</span>
-        </div>
-      </div>
-
-      <!-- All Pages for PDF Generation (Hidden) -->
-      <div v-show="isGeneratingPDF" ref="pdfContent" class="pdf-pages">
-        <div v-for="pageNum in totalPages" :key="pageNum" class="a4-page pdf-page">
-          <!-- Header (First Page Only) -->
-          <div v-if="pageNum === 1" class="page-header">
-            <h1 class="exam-title">{{ examTitle || '2024학년도 중간고사' }}</h1>
-            <div class="exam-info">
-              <span>과목: {{ subject || '수학' }}</span>
-              <span>시간: {{ duration || '50' }}분</span>
-              <span>총점: {{ totalScore || '100' }}점</span>
+          
+          <!-- Two column layout for preview -->
+          <div v-if="layoutMode === 'double'" class="two-column-wrapper">
+            <!-- First column -->
+            <div class="column">
+              <template v-for="(group, gIndex) in getPageColumn(currentPage, 1)" :key="`preview-col1-${gIndex}`">
+                <!-- 지문이 있는 그룹 -->
+                <div v-if="group.type === 'passage-group'" class="passage-group">
+                  <div class="passage-section">
+                    <div class="passage-header">
+                      [{{ group.questionNumbers }}] 다음 글을 읽고 물음에 답하시오.
+                    </div>
+                    <div class="passage-content" v-html="sanitizeHtml(group.passageHtml)"></div>
+                  </div>
+                  
+                  <!-- 그룹의 문제들 -->
+                  <div v-for="item in group.questions" :key="item.id" class="question-item">
+                    <div class="question-header">
+                      <span class="question-number">{{ item.displayNumber }}.</span>
+                      <span class="question-points">({{ item.points || 5 }}점)</span>
+                    </div>
+                    <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                    
+                    <!-- 선택지 -->
+                    <div v-if="item.choices && item.choices.length" class="choices">
+                      <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
+                        <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
+                        <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- 독립 문제 -->
+                <template v-else>
+                  <div v-for="item in group.questions" :key="item.id" class="question-item standalone">
+                    <div class="question-header">
+                      <span class="question-number">{{ item.displayNumber }}.</span>
+                      <span class="question-points">({{ item.points || 5 }}점)</span>
+                    </div>
+                    <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                    
+                    <!-- 선택지 -->
+                    <div v-if="item.choices && item.choices.length" class="choices">
+                      <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
+                        <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
+                        <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </template>
             </div>
-          </div>
-
-          <!-- Questions for this page -->
-          <div class="page-content" :class="`layout-${layoutMode}`">
-            <div class="questions-wrapper">
-              <template v-for="(group, gIndex) in getPageGroups(pageNum)" :key="`pdf-group-${pageNum}-${gIndex}`">
+            
+            <!-- Second column -->
+            <div class="column">
+              <template v-for="(group, gIndex) in getPageColumn(currentPage, 2)" :key="`preview-col2-${gIndex}`">
                 <!-- 지문이 있는 그룹 -->
                 <div v-if="group.type === 'passage-group'" class="passage-group">
                   <div class="passage-section">
@@ -252,6 +285,185 @@
               </template>
             </div>
           </div>
+        </div>
+
+        <!-- Page Footer -->
+        <div class="page-footer">
+          <span>- {{ currentPage }} -</span>
+        </div>
+      </div>
+
+      <!-- All Pages for PDF Generation (Hidden) -->
+      <div v-show="isGeneratingPDF" ref="pdfContent" class="pdf-pages">
+        <div v-for="pageNum in totalPages" :key="pageNum" class="a4-page pdf-page">
+          <!-- Header (First Page Only) -->
+          <div v-if="pageNum === 1" class="page-header">
+            <h1 class="exam-title">{{ examTitle || '2024학년도 중간고사' }}</h1>
+            <div class="exam-info">
+              <span>과목: {{ subject || '수학' }}</span>
+              <span>시간: {{ duration || '50' }}분</span>
+              <span>총점: {{ totalScore || '100' }}점</span>
+            </div>
+          </div>
+
+          <!-- Questions for this page -->
+          <div class="page-content" :class="`layout-${layoutMode}`">
+            <!-- Single column layout -->
+            <div v-if="layoutMode === 'single'" class="questions-wrapper">
+              <template v-for="(group, gIndex) in getPageColumn(pageNum, 1)" :key="`pdf-group-${pageNum}-${gIndex}`">
+                <!-- 지문이 있는 그룹 -->
+                <div v-if="group.type === 'passage-group'" class="passage-group">
+                  <div class="passage-section">
+                    <div class="passage-header">
+                      [{{ group.questionNumbers }}] 다음 글을 읽고 물음에 답하시오.
+                    </div>
+                    <div class="passage-content" v-html="sanitizeHtml(group.passageHtml)"></div>
+                  </div>
+                  
+                  <!-- 그룹의 문제들 -->
+                  <div v-for="item in group.questions" :key="item.id" class="question-item">
+                    <div class="question-header">
+                      <span class="question-number">{{ item.displayNumber }}.</span>
+                      <span class="question-points">({{ item.points || 5 }}점)</span>
+                    </div>
+                    <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                    
+                    <!-- 선택지 -->
+                    <div v-if="item.choices && item.choices.length" class="choices">
+                      <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
+                        <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
+                        <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- 독립 문제 -->
+                <template v-else>
+                  <div v-for="item in group.questions" :key="item.id" class="question-item standalone">
+                    <div class="question-header">
+                      <span class="question-number">{{ item.displayNumber }}.</span>
+                      <span class="question-points">({{ item.points || 5 }}점)</span>
+                    </div>
+                    <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                    
+                    <!-- 선택지 -->
+                    <div v-if="item.choices && item.choices.length" class="choices">
+                      <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
+                        <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
+                        <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </template>
+            </div>
+            
+            <!-- Two column layout -->
+            <div v-if="layoutMode === 'double'" class="two-column-wrapper">
+              <!-- First column -->
+              <div class="column">
+                <template v-for="(group, gIndex) in getPageColumn(pageNum, 1)" :key="`pdf-col1-${pageNum}-${gIndex}`">
+                  <!-- 지문이 있는 그룹 -->
+                  <div v-if="group.type === 'passage-group'" class="passage-group">
+                    <div class="passage-section">
+                      <div class="passage-header">
+                        [{{ group.questionNumbers }}] 다음 글을 읽고 물음에 답하시오.
+                      </div>
+                      <div class="passage-content" v-html="sanitizeHtml(group.passageHtml)"></div>
+                    </div>
+                    
+                    <!-- 그룹의 문제들 -->
+                    <div v-for="item in group.questions" :key="item.id" class="question-item">
+                      <div class="question-header">
+                        <span class="question-number">{{ item.displayNumber }}.</span>
+                        <span class="question-points">({{ item.points || 5 }}점)</span>
+                      </div>
+                      <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                      
+                      <!-- 선택지 -->
+                      <div v-if="item.choices && item.choices.length" class="choices">
+                        <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
+                          <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
+                          <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- 독립 문제 -->
+                  <template v-else>
+                    <div v-for="item in group.questions" :key="item.id" class="question-item standalone">
+                      <div class="question-header">
+                        <span class="question-number">{{ item.displayNumber }}.</span>
+                        <span class="question-points">({{ item.points || 5 }}점)</span>
+                      </div>
+                      <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                      
+                      <!-- 선택지 -->
+                      <div v-if="item.choices && item.choices.length" class="choices">
+                        <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
+                          <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
+                          <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </template>
+              </div>
+              
+              <!-- Second column -->
+              <div class="column">
+                <template v-for="(group, gIndex) in getPageColumn(pageNum, 2)" :key="`pdf-col2-${pageNum}-${gIndex}`">
+                  <!-- 지문이 있는 그룹 -->
+                  <div v-if="group.type === 'passage-group'" class="passage-group">
+                    <div class="passage-section">
+                      <div class="passage-header">
+                        [{{ group.questionNumbers }}] 다음 글을 읽고 물음에 답하시오.
+                      </div>
+                      <div class="passage-content" v-html="sanitizeHtml(group.passageHtml)"></div>
+                    </div>
+                    
+                    <!-- 그룹의 문제들 -->
+                    <div v-for="item in group.questions" :key="item.id" class="question-item">
+                      <div class="question-header">
+                        <span class="question-number">{{ item.displayNumber }}.</span>
+                        <span class="question-points">({{ item.points || 5 }}점)</span>
+                      </div>
+                      <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                      
+                      <!-- 선택지 -->
+                      <div v-if="item.choices && item.choices.length" class="choices">
+                        <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
+                          <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
+                          <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <!-- 독립 문제 -->
+                  <template v-else>
+                    <div v-for="item in group.questions" :key="item.id" class="question-item standalone">
+                      <div class="question-header">
+                        <span class="question-number">{{ item.displayNumber }}.</span>
+                        <span class="question-points">({{ item.points || 5 }}점)</span>
+                      </div>
+                      <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                      
+                      <!-- 선택지 -->
+                      <div v-if="item.choices && item.choices.length" class="choices">
+                        <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
+                          <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
+                          <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                        </div>
+                      </div>
+                    </div>
+                  </template>
+                </template>
+              </div>
+            </div>
+          </div>
 
           <!-- Page Footer -->
           <div class="page-footer">
@@ -272,7 +484,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useItemSelectionStore } from '@/stores/itemSelection'
 
 // Props
@@ -307,15 +519,17 @@ const allQuestions = computed(() => {
     ? props.selectedItems 
     : itemSelectionStore.selectedItems || []
   
+  console.log('Raw selected items:', items.length, items)
+  
   // 테스트 데이터 (개발용)
   if (items.length === 0) {
     console.warn('No items found, using test data')
     items = Array.from({ length: 20 }, (_, i) => ({
       id: `test-${i}`,
-      questionText: `문제 ${i + 1}: 이것은 테스트 문제입니다.`,
+      questionText: `문제 ${i + 1}: 이것은 테스트 문제입니다. 긴 문제 텍스트를 포함합니다.`,
       passageId: i < 3 ? 'passage-1' : i < 6 ? 'passage-2' : null,
-      passageHtml: i < 3 ? '<p>이것은 첫 번째 지문입니다. 매우 긴 내용이 포함되어 있습니다.</p>' : 
-                   i < 6 ? '<p>이것은 두 번째 지문입니다.</p>' : null,
+      passageHtml: i < 3 ? '<p>이것은 첫 번째 지문입니다. 매우 긴 내용이 포함되어 있습니다. 지문은 여러 줄에 걸쳐 표시됩니다.</p>' : 
+                   i < 6 ? '<p>이것은 두 번째 지문입니다. 짧은 지문입니다.</p>' : null,
       choice1: '선택지 1',
       choice2: '선택지 2', 
       choice3: '선택지 3',
@@ -326,12 +540,12 @@ const allQuestions = computed(() => {
     }))
   }
   
-  return items.map((item, index) => ({
+  const processed = items.map((item, index) => ({
     ...item,
     id: item.itemId || item.id || `q-${index}`,
-    displayNumber: index + 1,
-    questionHtml: item.questionHtml || item.questionText || '',
-    passageHtml: item.passageHtml || '',
+    displayNumber: item.displayNumber || index + 1,
+    questionHtml: item.questionHtml || item.questionText || item.question || '',
+    passageHtml: item.passageHtml || item.passage || '',
     passageId: item.passageId || null,
     choices: [
       item.choice1Html || item.choice1,
@@ -342,6 +556,9 @@ const allQuestions = computed(() => {
     ].filter(Boolean),
     points: item.points || 5
   }))
+  
+  console.log('Processed questions:', processed.length, processed)
+  return processed
 })
 
 // Group questions by passage
@@ -398,10 +615,10 @@ const itemsPerPage = computed(() => {
   }
 })
 
-// Dynamic page content storage
+// Dynamic page content storage - 2D structure for two-column layout
 const pageContents = ref([])
 
-// Calculate dynamic pagination based on actual content size
+// Calculate dynamic pagination with proper two-column flow
 const calculateDynamicPagination = () => {
   if (!allQuestions.value.length) {
     pageContents.value = [[]]
@@ -409,108 +626,185 @@ const calculateDynamicPagination = () => {
   }
 
   const pages = []
-  let currentPageGroups = []
-  let currentPageHeight = 0
   
-  // 실제 A4 사용 가능 높이 (mm to px conversion)
-  // A4: 297mm height, 15mm top/bottom margins = 267mm usable
-  // 1mm ≈ 3.78px at 96dpi
+  // 실제 A4 사용 가능 높이 - 더 보수적으로 설정
   const MM_TO_PX = 3.78
-  const USABLE_HEIGHT_MM = 267 // 297mm - 30mm margins
-  const PAGE_HEIGHT = USABLE_HEIGHT_MM * MM_TO_PX // ≈ 1009px
+  const USABLE_HEIGHT_MM = 240 // 297mm - 여백 고려 (더 작게 설정)
+  const PAGE_HEIGHT = USABLE_HEIGHT_MM * MM_TO_PX // ≈ 907px
   
   const HEADER_HEIGHT = 100 // 첫 페이지 헤더
   const FOOTER_HEIGHT = 30
   
-  // 높이 추정 상수 (더 정확한 값)
-  const PASSAGE_HEADER_HEIGHT = 35
-  const PASSAGE_LINE_HEIGHT = 20
-  const QUESTION_HEIGHT = 80
-  const CHOICE_HEIGHT = 25
-  const GROUP_MARGIN = 25
-  
-  let availableHeight = PAGE_HEIGHT - FOOTER_HEIGHT
-  let isFirstPage = true
+  // 높이 추정 상수 - 더 현실적인 값
+  const PASSAGE_HEADER_HEIGHT = 40
+  const PASSAGE_LINE_HEIGHT = 24
+  const QUESTION_HEIGHT = 90
+  const CHOICE_HEIGHT = 30
+  const GROUP_MARGIN = 30
   
   // 모든 그룹 생성
   const allGroups = createAllGroups()
   
-  allGroups.forEach((group, index) => {
-    // 그룹 높이 계산
-    let groupHeight = GROUP_MARGIN
+  if (layoutMode.value === 'double') {
+    // 2단 레이아웃: 완전히 새로운 알고리즘
+    let currentPage = { column1: [], column2: [] }
+    let column1Height = 0
+    let column2Height = 0
+    let pageNum = 1
     
-    if (group.type === 'passage-group') {
-      // 지문 헤더
-      groupHeight += PASSAGE_HEADER_HEIGHT
+    allGroups.forEach((group, index) => {
+      console.log(`Processing group ${index}:`, group.type, group.questions?.length || 0, 'questions')
       
-      // 지문 내용 높이 (HTML 길이 기반 추정)
-      const passageLength = (group.passageHtml || '').replace(/<[^>]*>/g, '').length
-      const estimatedLines = Math.ceil(passageLength / 60) // 한 줄에 약 60자
-      groupHeight += Math.min(estimatedLines * PASSAGE_LINE_HEIGHT, 200) // 최대 200px
+      // 그룹 높이 계산
+      let groupHeight = calculateGroupHeight(group)
+      console.log(`Group height: ${groupHeight}px`)
       
-      // 문제들 높이
-      group.questions.forEach(q => {
-        groupHeight += QUESTION_HEIGHT
-        const choiceCount = [q.choice1Html, q.choice2Html, q.choice3Html, q.choice4Html, q.choice5Html]
-          .filter(c => c).length
-        groupHeight += choiceCount * CHOICE_HEIGHT
-      })
-    } else {
-      // 독립 문제
-      group.questions.forEach(q => {
-        groupHeight += QUESTION_HEIGHT
-        const choiceCount = [q.choice1Html, q.choice2Html, q.choice3Html, q.choice4Html, q.choice5Html]
-          .filter(c => c).length
-        groupHeight += choiceCount * CHOICE_HEIGHT
-      })
-    }
-    
-    // 2단 레이아웃에서는 높이가 약 60% (더 많은 콘텐츠 수용)
-    if (layoutMode.value === 'double') {
-      groupHeight = Math.ceil(groupHeight * 0.6)
-    }
-    
-    // 첫 페이지 처리
-    if (isFirstPage) {
-      availableHeight = PAGE_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT
-    }
-    
-    // 현재 페이지에 맞지 않으면 새 페이지로
-    if (currentPageHeight + groupHeight > availableHeight && currentPageGroups.length > 0) {
-      console.log(`Page ${pages.length + 1} full:`, {
-        currentHeight: currentPageHeight,
-        groupHeight: groupHeight,
-        availableHeight: availableHeight,
-        groupsInPage: currentPageGroups.length
-      })
+      // 현재 페이지의 사용 가능한 높이
+      let availableHeight = pageNum === 1 
+        ? PAGE_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT
+        : PAGE_HEIGHT - FOOTER_HEIGHT
       
-      pages.push([...currentPageGroups])
-      currentPageGroups = []
-      currentPageHeight = 0
-      isFirstPage = false
-      availableHeight = PAGE_HEIGHT - FOOTER_HEIGHT
-    }
-    
-    currentPageGroups.push(group)
-    currentPageHeight += groupHeight
-  })
-  
-  // 마지막 페이지 추가
-  if (currentPageGroups.length > 0) {
-    pages.push(currentPageGroups)
-    console.log(`Final page ${pages.length}:`, {
-      groupsInPage: currentPageGroups.length,
-      currentHeight: currentPageHeight
+      console.log(`Page ${pageNum} - Available: ${availableHeight}, Col1: ${column1Height}, Col2: ${column2Height}`)
+      
+      // 컬럼 선택 로직
+      let placed = false
+      
+      // 1. 더 짧은 컬럼에 먼저 시도
+      if (column1Height <= column2Height) {
+        // 첫 번째 컬럼 시도
+        if (column1Height + groupHeight <= availableHeight) {
+          currentPage.column1.push(group)
+          column1Height += groupHeight
+          placed = true
+          console.log(`Placed in column 1`)
+        } 
+        // 첫 번째가 안되면 두 번째 컬럼 시도
+        else if (column2Height + groupHeight <= availableHeight) {
+          currentPage.column2.push(group)
+          column2Height += groupHeight
+          placed = true
+          console.log(`Placed in column 2`)
+        }
+      } else {
+        // 두 번째 컬럼 먼저 시도
+        if (column2Height + groupHeight <= availableHeight) {
+          currentPage.column2.push(group)
+          column2Height += groupHeight
+          placed = true
+          console.log(`Placed in column 2`)
+        }
+        // 두 번째가 안되면 첫 번째 컬럼 시도
+        else if (column1Height + groupHeight <= availableHeight) {
+          currentPage.column1.push(group)
+          column1Height += groupHeight
+          placed = true
+          console.log(`Placed in column 1`)
+        }
+      }
+      
+      // 2. 두 컬럼 모두 공간이 없으면 새 페이지
+      if (!placed) {
+        console.log(`Creating new page`)
+        // 현재 페이지 저장
+        pages.push(currentPage)
+        
+        // 새 페이지 시작
+        currentPage = { column1: [group], column2: [] }
+        column1Height = groupHeight
+        column2Height = 0
+        pageNum++
+      }
     })
+    
+    // 마지막 페이지 추가
+    if (currentPage.column1.length > 0 || currentPage.column2.length > 0) {
+      pages.push(currentPage)
+    }
+  } else {
+    // 1단 레이아웃
+    let currentPageGroups = []
+    let currentPageHeight = 0
+    let isFirstPage = true
+    let availableHeight = PAGE_HEIGHT - FOOTER_HEIGHT
+    
+    allGroups.forEach((group) => {
+      let groupHeight = calculateGroupHeight(group)
+      
+      if (isFirstPage) {
+        availableHeight = PAGE_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT
+      }
+      
+      if (currentPageHeight + groupHeight > availableHeight && currentPageGroups.length > 0) {
+        pages.push({ column1: currentPageGroups, column2: [] })
+        currentPageGroups = []
+        currentPageHeight = 0
+        isFirstPage = false
+        availableHeight = PAGE_HEIGHT - FOOTER_HEIGHT
+      }
+      
+      currentPageGroups.push(group)
+      currentPageHeight += groupHeight
+    })
+    
+    if (currentPageGroups.length > 0) {
+      pages.push({ column1: currentPageGroups, column2: [] })
+    }
   }
   
   console.log('Pagination complete:', {
     totalPages: pages.length,
-    totalGroups: allGroups.length,
-    layoutMode: layoutMode.value
+    layoutMode: layoutMode.value,
+    pagesStructure: pages,
+    totalGroups: allGroups.length
   })
   
-  pageContents.value = pages.length > 0 ? pages : [[]]
+  // 각 페이지의 컬럼 내용 확인
+  pages.forEach((page, idx) => {
+    console.log(`Page ${idx + 1}:`, {
+      column1Items: page.column1.length,
+      column2Items: page.column2.length
+    })
+  })
+  
+  pageContents.value = pages.length > 0 ? pages : [{ column1: [], column2: [] }]
+}
+
+// Helper function to calculate group height - 더 간단하고 정확한 계산
+const calculateGroupHeight = (group) => {
+  let height = 30 // GROUP_MARGIN
+  
+  if (group.type === 'passage-group') {
+    height += 40 // PASSAGE_HEADER_HEIGHT
+    
+    // 지문 높이 - 간단히 계산
+    const passageLength = (group.passageHtml || '').replace(/<[^>]*>/g, '').length
+    const charsPerLine = layoutMode.value === 'double' ? 30 : 60
+    const lines = Math.ceil(passageLength / charsPerLine)
+    height += Math.min(lines * 20, 200) // 최대 200px
+    
+    // 각 문제
+    group.questions.forEach(q => {
+      height += 80 // 기본 문제 높이
+      const choices = [q.choice1Html, q.choice2Html, q.choice3Html, q.choice4Html, q.choice5Html]
+        .filter(c => c)
+      height += choices.length * 25 // 각 선택지
+    })
+  } else {
+    // 독립 문제
+    group.questions.forEach(q => {
+      height += 80 // 기본 문제 높이
+      const choices = [q.choice1Html, q.choice2Html, q.choice3Html, q.choice4Html, q.choice5Html]
+        .filter(c => c)
+      height += choices.length * 25
+    })
+  }
+  
+  // 2단 레이아웃에서는 공간이 좍으므로 약간 여유 추가
+  if (layoutMode.value === 'double') {
+    height = Math.ceil(height * 1.1)
+  }
+  
+  return height
 }
 
 // 모든 그룹 생성
@@ -546,6 +840,11 @@ const createAllGroups = () => {
     }
   })
   
+  console.log('Created groups:', groups.length, 'total groups')
+  groups.forEach((g, i) => {
+    console.log(`Group ${i}:`, g.type, g.questions.length, 'questions')
+  })
+  
   return groups
 }
 
@@ -561,12 +860,31 @@ const totalPages = computed(() => {
 
 // Get groups for current page
 const currentPageGroups = computed(() => {
-  return pageContents.value[currentPage.value - 1] || []
+  const page = pageContents.value[currentPage.value - 1]
+  if (!page) return []
+  // For single column layout or preview, merge columns
+  return [...(page.column1 || []), ...(page.column2 || [])]
 })
 
 // Get groups for specific page
 const getPageGroups = (pageNum) => {
-  return pageContents.value[pageNum - 1] || []
+  const page = pageContents.value[pageNum - 1]
+  if (!page) return []
+  // For single column layout, merge columns
+  return [...(page.column1 || []), ...(page.column2 || [])]
+}
+
+// Get groups for specific column of a page
+const getPageColumn = (pageNum, columnNum) => {
+  const page = pageContents.value[pageNum - 1]
+  if (!page) {
+    console.warn(`Page ${pageNum} not found`)
+    return []
+  }
+  
+  const result = columnNum === 1 ? (page.column1 || []) : (page.column2 || [])
+  console.log(`getPageColumn(${pageNum}, ${columnNum}):`, result.length, 'items')
+  return result
 }
 
 // Zoom controls
@@ -884,15 +1202,16 @@ onMounted(() => {
 /* A4 Page */
 .a4-page {
   width: 210mm;
-  height: 297mm; /* 고정 높이로 설정 */
+  height: 297mm; /* 고정 높이로 복원 */
   background: white;
   box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
-  padding: 15mm 20mm; /* 상하 여백 줄임 */
+  padding: 20mm 20mm;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
-  overflow: hidden; /* 넘치는 콘텐츠 숨김 */
+  overflow: hidden; /* 페이지 넘침 방지 */
   position: relative;
+  box-sizing: border-box;
 }
 
 .pdf-page {
@@ -928,7 +1247,7 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden; /* 페이지 넘침 방지 */
-  max-height: calc(297mm - 30mm - 4rem); /* A4 높이 - 여백 - 헤더/푸터 */
+  max-height: calc(297mm - 40mm - 6rem); /* 최대 높이 제한 */
 }
 
 /* Single Column Layout */
@@ -940,28 +1259,39 @@ onMounted(() => {
   overflow: hidden;
 }
 
-/* Double Column Layout - Using CSS Columns for natural flow */
-.page-content.layout-double .questions-wrapper {
-  column-count: 2;
-  column-gap: 2rem;
-  column-rule: 1px solid #e0e6ed;
-  column-fill: balance; /* 균형있게 컬럼 채우기 */
-  height: calc(297mm - 30mm - 6rem); /* 정확한 높이 계산 */
-  max-height: calc(297mm - 30mm - 6rem);
-  overflow: hidden; /* 넘치는 내용 숨김 */
+/* Two-column layout - Grid based for proper content flow */
+.two-column-wrapper {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  height: calc(297mm - 40mm - 6rem);
+  max-height: calc(297mm - 40mm - 6rem);
+  overflow: hidden;
+}
+
+.two-column-wrapper .column {
+  overflow: hidden;
+  padding: 0 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.two-column-wrapper .column:first-child {
+  border-right: 1px solid #e0e6ed;
+  padding-right: 1.5rem;
+}
+
+.two-column-wrapper .column:last-child {
+  padding-left: 1.5rem;
 }
 
 /* Passage Group */
 .passage-group {
-  break-inside: avoid; /* 페이지/컬럼 내에서 깨지지 않도록 */
   margin-bottom: 1.5rem;
   page-break-inside: avoid;
-}
-
-/* For double column layout, allow passage to flow naturally */
-.layout-double .passage-group {
-  column-span: none; /* 지문이 한 컬럼 내에서 흐르도록 */
-  break-inside: auto; /* 긴 지문은 다음 컬럼으로 자연스럽게 이동 */
+  break-inside: avoid;
+  -webkit-column-break-inside: avoid;
 }
 
 .passage-section {
@@ -978,6 +1308,8 @@ onMounted(() => {
   margin-bottom: 0.5rem;
   break-inside: avoid;
   break-after: avoid;
+  page-break-inside: avoid;
+  page-break-after: avoid;
 }
 
 .passage-content {
@@ -988,8 +1320,9 @@ onMounted(() => {
   font-size: 0.9375rem;
   line-height: 1.7;
   color: #2c3e50;
-  /* 긴 지문은 자연스럽게 흐르도록 */
-  break-inside: auto;
+  /* 지문을 한 번에 표시하도록 변경 */
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
 
 /* Allow tables and complex HTML in passages to flow naturally */
@@ -1002,12 +1335,16 @@ onMounted(() => {
   break-inside: avoid;
   page-break-inside: avoid;
   column-break-inside: avoid;
+  -webkit-column-break-inside: avoid;
   margin-bottom: 1rem;
+  position: relative;
 }
 
 .question-item.standalone {
   margin-bottom: 1.5rem;
   break-inside: avoid;
+  page-break-inside: avoid;
+  column-break-inside: avoid;
 }
 
 .question-header {
