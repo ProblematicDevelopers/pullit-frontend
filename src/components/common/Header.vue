@@ -101,18 +101,7 @@
               </svg>
               <span>홈</span>
             </router-link>
-            <router-link
-              to="/test-bank"
-              class="nav-item"
-              :class="{ active: isCurrentRoute('/test-bank') }"
-            >
-              <svg viewBox="0 0 24 24" class="nav-icon">
-                <path
-                  d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2M18 20H6V4H13V9H18V20Z"
-                />
-              </svg>
-              <span>문제은행</span>
-            </router-link>
+
 
             <router-link
               to="/exam-management"
@@ -127,18 +116,6 @@
               <span>시험관리</span>
             </router-link>
 
-            <router-link
-              to="/class-report"
-              class="nav-item"
-              :class="{ active: isCurrentRoute('/class-report') }"
-            >
-              <svg viewBox="0 0 24 24" class="nav-icon">
-                <path
-                  d="M16 6L18.29 8.29L13.41 13.17L9.41 9.17L2 16.59L3.41 18L9.41 12L13.41 16L19.71 9.71L22 12V6"
-                />
-              </svg>
-              <span>성적분석</span>
-            </router-link>
 
             <router-link
               to="/class-management"
@@ -151,19 +128,6 @@
                 />
               </svg>
               <span>학급관리</span>
-            </router-link>
-
-            <router-link
-              to="/analytics"
-              class="nav-item"
-              :class="{ active: isCurrentRoute('/analytics') }"
-            >
-              <svg viewBox="0 0 24 24" class="nav-icon">
-                <path
-                  d="M9 11H7V9H9M13 11H11V9H13M17 11H15V9H17M19 4H18V2H16V4H8V2H6V4H5C3.89 4 3.01 4.9 3.01 6L3 20C3 21.1 3.89 22 5 22H19C20.1 22 21 21.1 21 20V6C21 4.9 20.1 4 19 4M19 20H5V8H19V20Z"
-                />
-              </svg>
-              <span>분석리포트</span>
             </router-link>
 
             <router-link
