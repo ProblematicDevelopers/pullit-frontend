@@ -21,6 +21,7 @@
     "@pdfme/schemas": "^5.4.2",
     "@pdfme/ui": "^5.4.2",
     "@stomp/stompjs": "^7.1.1",
+    "@tinymce/tinymce-vue": "^6.3.0",
     "axios": "^1.11.0",
     "bootstrap": "^5.3.7",
     "chart.js": "^4.5.0",
