@@ -54,20 +54,17 @@ class WebSocketService {
             (message) => {
               try {
                 const onlineStatusResponse = JSON.parse(message.body)
-                console.log('📢 채널 전체 온라인 상태 응답:', onlineStatusResponse)
 
                 // OnlineStatusResponse에서 전체 온라인 사용자 목록 처리
                 if (
                   onlineStatusResponse.onlineUsers &&
                   Array.isArray(onlineStatusResponse.onlineUsers)
                 ) {
-                  console.log('👥 전체 온라인 사용자 목록:', onlineStatusResponse.onlineUsers)
                   // 전체 온라인 사용자 목록을 한 번에 전달
                   if (callbacks.onOnlineStatus) {
                     callbacks.onOnlineStatus(onlineStatusResponse)
                   }
                 } else {
-                  console.log('👤 단일 사용자 상태:', onlineStatusResponse)
                   // 단일 사용자 상태인 경우 (기존 형식)
                   if (callbacks.onOnlineStatus) {
                     callbacks.onOnlineStatus(onlineStatusResponse)
@@ -150,6 +147,25 @@ class WebSocketService {
     }
   }
 
+  sendNotice(channelName, message) {
+    if (this.connected && this.stompClient) {
+      try {
+        const messageData = {
+          ...message,
+          channelName: channelName,
+        }
+        this.stompClient.publish({
+          destination: `/app/chat.sendNotice`,
+          body: JSON.stringify(messageData),
+        })
+      } catch (error) {
+        console.error('Error sending message:', error)
+      }
+    } else {
+      console.warn('WebSocket not connected')
+    }
+  }
+
   sendOnlineStatus(channelName, userId, isOnline) {
     if (this.connected && this.stompClient) {
       try {
@@ -204,8 +220,6 @@ class WebSocketService {
           userId: userId,
           timestamp: new Date().toISOString(),
         }
-
-        console.log('📡 getOnlineStatus 요청 보냄:', requestData)
 
         this.stompClient.publish({
           destination: `/app/online.getStatus`,
