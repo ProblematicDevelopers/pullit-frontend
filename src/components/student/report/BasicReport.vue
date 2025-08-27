@@ -113,7 +113,7 @@
 
     <section v-else class="panel">
       <h3 class="panel-title">📊 평가결과 요약</h3>
-      <DetailReport :examId="examId" />
+      <DetailReport :examId="examId" :examName="examName" />
     </section>
 
     <!-- 문제 HTML 모달 -->
@@ -138,6 +138,7 @@ const examData = ref({
   totalDuration: 0,
   questions: [],
 })
+const examName = ref('')
 const loading = ref(false)
 const error = ref(null)
 const showModal = ref(false)
@@ -198,6 +199,9 @@ const fetchExamData = async () => {
 
     // detail report
     examId.value = data.examId
+
+    // 시험 이름 가져오기
+    examName.value = data.examName || data.examTitle || data.title || '시험지'
 
     // API 응답 데이터를 컴포넌트에서 사용할 수 있는 형태로 변환
     examData.value = {
