@@ -130,15 +130,21 @@ async function renderElement(el, options = {}) {
     // DOM이 완전히 업데이트되도록 대기
     await nextTick()
     
-    // MathJax 렌더링
+    // 렌더링 전 숨김 처리
+    el.style.visibility = 'hidden'
+    
+    // MathJax 렌더링 (typesetPromise 사용)
     await renderMathJax(el, {
-      hideBeforeRender: false,  // CSS로 처리하므로 false
+      hideBeforeRender: false,  // 수동으로 처리
       clearFirst: true,
       markProcessed: true,
+      forceHide: false,  // 수동으로 visibility 제어
       ...options
     })
     
-    // 렌더링 성공 후 표시
+    // 렌더링 완료 후 부드러운 표시
+    await new Promise(resolve => requestAnimationFrame(resolve))
+    el.style.visibility = 'visible'
     el.classList.add('mathjax-processed')
     delete el.dataset.mathjaxPending
     
@@ -146,6 +152,7 @@ async function renderElement(el, options = {}) {
   } catch (error) {
     console.error('v-mathjax 렌더링 오류:', error)
     // 오류 발생 시에도 요소 표시
+    el.style.visibility = 'visible'
     el.classList.add('mathjax-processed')
     delete el.dataset.mathjaxPending
   }

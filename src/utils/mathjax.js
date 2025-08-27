@@ -106,12 +106,13 @@ export const showFormulas = (element) => {
  */
 export const renderMathJax = async (element = null, options = {}) => {
   const {
-    hideBeforeRender = false, // CSS로 처리하므로 기본값 false
+    hideBeforeRender = true, // FOUC 방지를 위해 기본값 true로 변경
     clearFirst = true,
     processClass = 'math-content',
     skipTags = ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
     debounceTime = 50,
-    markProcessed = true // 처리된 요소 표시 옵션
+    markProcessed = true, // 처리된 요소 표시 옵션
+    forceHide = true // 강제 숨김 처리 추가
   } = options
   
   try {
@@ -135,6 +136,12 @@ export const renderMathJax = async (element = null, options = {}) => {
       }
     }
     renderingState.set(elementId, Date.now())
+    
+    // FOUC 방지: 렌더링 전 요소 숨김 처리
+    if (forceHide) {
+      targetElement.style.visibility = 'hidden'
+      targetElement.dataset.mathjaxPending = 'true'
+    }
     
     // hideBeforeRender가 true일 때만 수동으로 숨김 처리
     if (hideBeforeRender) {
@@ -175,9 +182,27 @@ export const renderMathJax = async (element = null, options = {}) => {
       window.MathJax.startup.document.updateDocument()
     }
     
-    // MathJax typesetting 실행
-    await window.MathJax.typesetPromise([targetElement])
-    console.log('MathJax 렌더링 완료')
+    // MathJax typesetting 실행 - Promise를 사용한 안전한 렌더링
+    try {
+      await window.MathJax.typesetPromise([targetElement])
+      console.log('MathJax 렌더링 완료')
+      
+      // 렌더링 성공 후 즉시 표시
+      if (forceHide) {
+        // 작은 지연 후 표시 (레이아웃 안정화)
+        await new Promise(resolve => requestAnimationFrame(resolve))
+        targetElement.style.visibility = 'visible'
+        delete targetElement.dataset.mathjaxPending
+      }
+    } catch (typesetError) {
+      console.error('MathJax typesetting 오류:', typesetError)
+      // 오류 발생 시에도 요소 표시
+      if (forceHide) {
+        targetElement.style.visibility = 'visible'
+        delete targetElement.dataset.mathjaxPending
+      }
+      throw typesetError
+    }
     
     // 렌더링 결과 확인
     const renderedContainers = targetElement.querySelectorAll('mjx-container')
@@ -219,7 +244,12 @@ export const renderMathJax = async (element = null, options = {}) => {
     
   } catch (error) {
     console.error('MathJax 렌더링 오류:', error)
-    // 오류 발생 시에도 요소들이 보이도록 처리 - targetElement 변수 수정
+    // 오류 발생 시에도 요소들이 보이도록 처리
+    const targetElement = element || document.body
+    if (forceHide && targetElement) {
+      targetElement.style.visibility = 'visible'
+      delete targetElement.dataset.mathjaxPending
+    }
     if (hideBeforeRender && targetElement) {
       const hiddenElements = targetElement.querySelectorAll('.mathjax-formula')
       hiddenElements.forEach(el => {
