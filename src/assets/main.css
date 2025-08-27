@@ -9,7 +9,7 @@ body {
   margin: 0;
   padding: 0;
   background: #ffffff;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  font-family: 'Noto Sans KR', 'Malgun Gothic', 'Apple SD Gothic Neo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
   line-height: 1.6;
   color: #1e293b;
 }
@@ -173,4 +173,80 @@ input:focus, textarea:focus, select:focus {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #94a3b8;
+}
+
+/* ===== MathJax FOUC Prevention ===== */
+/* Hide raw LaTeX formulas before MathJax renders them */
+
+/* Initially hide content that might contain math */
+.mathjax-content {
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+/* Show content after MathJax processing */
+.mathjax-content.mathjax-processed {
+  opacity: 1;
+}
+
+/* Hide math-containing elements until processed */
+.item-html[data-has-math="true"]:not(.mathjax-processed),
+.question-content[data-has-math="true"]:not(.mathjax-processed),
+.choice-content[data-has-math="true"]:not(.mathjax-processed) {
+  position: relative;
+  min-height: 2em;
+}
+
+/* Skeleton loader for math content */
+.item-html[data-has-math="true"]:not(.mathjax-processed)::before,
+.question-content[data-has-math="true"]:not(.mathjax-processed)::before,
+.choice-content[data-has-math="true"]:not(.mathjax-processed)::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(90deg, #f5f5f5 25%, #ebebeb 50%, #f5f5f5 75%);
+  background-size: 200% 100%;
+  animation: mathJaxLoading 1.5s ease-in-out infinite;
+  border-radius: 4px;
+  z-index: 1;
+}
+
+/* Hide the actual content while loading */
+.item-html[data-has-math="true"]:not(.mathjax-processed) > *,
+.question-content[data-has-math="true"]:not(.mathjax-processed) > *,
+.choice-content[data-has-math="true"]:not(.mathjax-processed) > * {
+  visibility: hidden;
+}
+
+@keyframes mathJaxLoading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+/* Mark processed elements */
+.mathjax-processed {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* MathJax container styles */
+mjx-container {
+  display: inline-block !important;
+  margin: 0.1em 0 !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* Ensure MathJax display math is centered */
+mjx-container[display="true"] {
+  display: block !important;
+  text-align: center !important;
+  margin: 1em 0 !important;
 }

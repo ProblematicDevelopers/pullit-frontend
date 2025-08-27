@@ -1,0 +1,1647 @@
+<template>
+  <div class="step3-container">
+    <!-- 헤더 -->
+    <div class="exam-header">
+      <div class="header-content">
+        <button @click="$emit('back')" class="back-button">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          이전 단계
+        </button>
+
+        <div class="header-info">
+          <h2>시험지 저장 및 출력</h2>
+          <div class="exam-stats">
+            <span>{{ selectedItems.length }}문항 선택됨</span>
+            <span class="separator">•</span>
+            <span>{{ totalPages }}페이지</span>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <button @click="generatePDF" class="btn-primary-outline" :disabled="isGenerating">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2V12M12 12L8 8M12 12L16 8" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M3 12V19C3 20.1046 3.89543 21 5 21H19C20.1046 21 21 20.1046 21 19V12" stroke="currentColor" stroke-width="2"/>
+            </svg>
+            <span v-if="!isGenerating">PDF 다운로드</span>
+            <span v-else>생성 중...</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- 메인 컨텐츠 - 좌우 분할 -->
+    <div class="main-content">
+      <!-- 왼쪽: 설정 패널 -->
+      <div class="settings-panel">
+        <div class="settings-section">
+          <h3>시험지 정보</h3>
+          <div class="form-group">
+            <label>시험지 제목 <span class="required">*</span></label>
+            <input
+              v-model="examInfo.title"
+              type="text"
+              placeholder="예: 2024학년도 1학기 중간고사"
+              class="form-input"
+            />
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>시험 날짜</label>
+              <input
+                v-model="examInfo.date"
+                type="date"
+                class="form-input"
+              />
+            </div>
+            <div class="form-group">
+              <label>제한 시간</label>
+              <select v-model="examInfo.timeLimit" class="form-input">
+                <option value="30">30분</option>
+                <option value="40">40분</option>
+                <option value="50">50분</option>
+                <option value="60">60분</option>
+                <option value="90">90분</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>시험 안내</label>
+            <textarea
+              v-model="examInfo.instructions"
+              rows="3"
+              placeholder="시험 응시 시 주의사항을 입력하세요"
+              class="form-input"
+            ></textarea>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3>출력 옵션</h3>
+          <div class="options-list">
+            <label class="checkbox-option">
+              <input type="checkbox" v-model="printOptions.showAnswers" />
+              <span>정답 포함</span>
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" v-model="printOptions.showPoints" />
+              <span>배점 표시</span>
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" v-model="printOptions.studentInfo" />
+              <span>학생 정보란</span>
+            </label>
+            <label class="checkbox-option">
+              <input type="checkbox" v-model="printOptions.pageNumbers" />
+              <span>페이지 번호</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h3>레이아웃</h3>
+          <div class="layout-options">
+            <label class="layout-option" :class="{ active: layoutMode === 'single' }">
+              <input type="radio" v-model="layoutMode" value="single" />
+              <div class="layout-preview">
+                <div class="layout-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="3" width="18" height="18" stroke="currentColor" stroke-width="2" rx="2"/>
+                  </svg>
+                </div>
+                <span>1열</span>
+                <small>큰 글씨</small>
+              </div>
+            </label>
+            <label class="layout-option" :class="{ active: layoutMode === 'double' }">
+              <input type="radio" v-model="layoutMode" value="double" />
+              <div class="layout-preview">
+                <div class="layout-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="3" width="18" height="18" stroke="currentColor" stroke-width="2" rx="2"/>
+                    <line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" stroke-width="1.5"/>
+                  </svg>
+                </div>
+                <span>2열</span>
+                <small>표준</small>
+              </div>
+            </label>
+            <label class="layout-option" :class="{ active: layoutMode === 'compact' }">
+              <input type="radio" v-model="layoutMode" value="compact" />
+              <div class="layout-preview">
+                <div class="layout-icon">
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+                    <rect x="3" y="3" width="18" height="18" stroke="currentColor" stroke-width="2" rx="2"/>
+                    <line x1="12" y1="3" x2="12" y2="21" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+                    <line x1="3" y1="8" x2="21" y2="8" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+                    <line x1="3" y1="16" x2="21" y2="16" stroke="currentColor" stroke-width="1" opacity="0.5"/>
+                  </svg>
+                </div>
+                <span>압축</span>
+                <small>작은 글씨</small>
+              </div>
+            </label>
+          </div>
+        </div>
+      </div>
+
+      <!-- 오른쪽: 미리보기 영역 -->
+      <div class="preview-panel">
+        <div class="preview-header">
+          <h3>미리보기</h3>
+          <div class="preview-controls">
+            <button @click="prevPage" :disabled="currentPage === 1" class="page-nav-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </button>
+            <span class="page-indicator">{{ currentPage }} / {{ totalPages }}</span>
+            <button @click="nextPage" :disabled="currentPage === totalPages" class="page-nav-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- A4 시험지 미리보기 -->
+        <div class="preview-container">
+          <div class="a4-paper" ref="paperRef" :class="`layout-${layoutMode}`">
+            <!-- 첫 페이지 헤더 -->
+            <div v-if="currentPage === 1" class="paper-title-section">
+              <h1 class="exam-title">{{ examInfo.title || '시험지' }}</h1>
+              <div class="exam-meta-info">
+                <span v-if="examInfo.date">{{ formatDate(examInfo.date) }}</span>
+                <span v-if="examInfo.timeLimit">{{ examInfo.timeLimit }}분</span>
+                <span>총 {{ selectedItems.length }}문항</span>
+              </div>
+              <div v-if="printOptions.studentInfo" class="student-info-box">
+                <div class="info-row">
+                  <span>학교:</span>
+                  <span class="fill-line"></span>
+                  <span>학년/반:</span>
+                  <span class="fill-line"></span>
+                </div>
+                <div class="info-row">
+                  <span>번호:</span>
+                  <span class="fill-line"></span>
+                  <span>이름:</span>
+                  <span class="fill-line"></span>
+                </div>
+              </div>
+              <div v-if="examInfo.instructions" class="exam-instructions">
+                <strong>※ 주의사항</strong>
+                <p>{{ examInfo.instructions }}</p>
+              </div>
+            </div>
+
+            <!-- 문제 영역 - 2컬럼 레이아웃 -->
+            <div class="questions-container" :class="`layout-${layoutMode}`">
+              <!-- 지문이 있는 경우 전체 너비로 표시 -->
+              <template v-for="(group, gIdx) in currentPageGroups" :key="`group-${gIdx}`">
+                <div v-if="group.passageId" class="passage-section full-width">
+                  <div class="passage-header">
+                    <span class="passage-nums">[{{ formatGroupNumbers(group.items) }}]</span>
+                    {{ group.continued ? `※ 앞 페이지 지문 참고` : '다음 글을 읽고 물음에 답하시오.' }}
+                  </div>
+                  <div v-if="group.passageHtml && !group.continued" class="passage-box">
+                    <div class="passage-content" v-html="sanitizeHtml(group.passageHtml)"></div>
+                  </div>
+                </div>
+
+                <!-- 지문 관련 문제들 -->
+                <template v-if="group.passageId">
+                  <div v-for="item in group.items" :key="item.itemId" class="question-item">
+                    <div class="question-wrapper">
+                      <div class="question-header">
+                        <span class="q-number">{{ item.questionNumber || item.displayNumber }}.</span>
+                        <span v-if="printOptions.showPoints" class="q-points">({{ item.points || 5 }}점)</span>
+                      </div>
+                      <div class="question-content">
+                        <div class="q-text" v-html="sanitizeHtml(item.content || item.questionText || item.questionHtml)"></div>
+                        <!-- 보기 렌더링 -->
+                        <div v-if="hasChoices(item)" class="q-choices">
+                          <div v-if="item.choice1Html" class="choice-item">
+                            <span class="choice-number">①</span>
+                            <span class="choice-content" v-html="sanitizeHtml(item.choice1Html)"></span>
+                          </div>
+                          <div v-if="item.choice2Html" class="choice-item">
+                            <span class="choice-number">②</span>
+                            <span class="choice-content" v-html="sanitizeHtml(item.choice2Html)"></span>
+                          </div>
+                          <div v-if="item.choice3Html" class="choice-item">
+                            <span class="choice-number">③</span>
+                            <span class="choice-content" v-html="sanitizeHtml(item.choice3Html)"></span>
+                          </div>
+                          <div v-if="item.choice4Html" class="choice-item">
+                            <span class="choice-number">④</span>
+                            <span class="choice-content" v-html="sanitizeHtml(item.choice4Html)"></span>
+                          </div>
+                          <div v-if="item.choice5Html" class="choice-item">
+                            <span class="choice-number">⑤</span>
+                            <span class="choice-content" v-html="sanitizeHtml(item.choice5Html)"></span>
+                          </div>
+                        </div>
+                        <div v-if="printOptions.showAnswers && item.correctAnswer" class="answer-box">
+                          <strong>정답:</strong> {{ item.correctAnswer }}
+                        </div>
+                        <div class="solution-space"></div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- 독립 문제들 -->
+                <template v-else>
+                  <div v-for="item in group.items" :key="item.itemId" class="question-item">
+                    <div class="question-wrapper">
+                      <div class="question-header">
+                        <span class="q-number">{{ item.questionNumber || item.displayNumber }}.</span>
+                        <span v-if="printOptions.showPoints" class="q-points">({{ item.points || 5 }}점)</span>
+                      </div>
+                      <div class="question-content">
+                        <div class="q-text" v-html="sanitizeHtml(item.questionHtml || item.questionText)"></div>
+                        <!-- 보기 렌더링 -->
+                        <div v-if="hasChoices(item)" class="q-choices">
+                          <div v-if="item.choice1Html" class="choice-item">
+                            <span class="choice-number">①</span>
+                            <span class="choice-content" v-html="sanitizeHtml(item.choice1Html)"></span>
+                          </div>
+                          <div v-if="item.choice2Html" class="choice-item">
+                            <span class="choice-number">②</span>
+                            <span class="choice-content" v-html="sanitizeHtml(item.choice2Html)"></span>
+                          </div>
+                          <div v-if="item.choice3Html" class="choice-item">
+                            <span class="choice-number">③</span>
+                            <span class="choice-content" v-html="sanitizeHtml(item.choice3Html)"></span>
+                          </div>
+                          <div v-if="item.choice4Html" class="choice-item">
+                            <span class="choice-number">④</span>
+                            <span class="choice-content" v-html="sanitizeHtml(item.choice4Html)"></span>
+                          </div>
+                          <div v-if="item.choice5Html" class="choice-item">
+                            <span class="choice-number">⑤</span>
+                            <span class="choice-content" v-html="sanitizeHtml(item.choice5Html)"></span>
+                          </div>
+                        </div>
+                        <div v-if="printOptions.showAnswers && item.correctAnswer" class="answer-box">
+                          <strong>정답:</strong> {{ item.correctAnswer }}
+                        </div>
+                        <div class="solution-space"></div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </template>
+            </div>
+
+            <!-- 페이지 번호 -->
+            <div v-if="printOptions.pageNumbers" class="page-number">
+              - {{ currentPage }} -
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 하단 액션 바 -->
+    <div class="action-footer">
+      <div class="footer-left">
+        <button @click="saveDraft" class="btn-outline">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M17 3H5C3.89 3 3 3.89 3 5V19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V7L17 3Z" stroke="currentColor" stroke-width="2"/>
+          </svg>
+          임시 저장
+        </button>
+      </div>
+      <div class="footer-right">
+        <button @click="saveExam" class="btn-primary" :disabled="!canSave">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+            <path d="M9 11L12 14L22 4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          시험지 저장
+        </button>
+      </div>
+    </div>
+
+    <!-- 로딩 모달 -->
+    <div v-if="isGenerating" class="loading-modal">
+      <div class="loading-box">
+        <div class="spinner"></div>
+        <p>{{ loadingMessage }}</p>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted, nextTick, watch } from 'vue'
+import { useTestBankStore } from '@/stores/testBank'
+import { useItemSelectionStore } from '@/stores/itemSelection'
+import jsPDF from 'jspdf'
+import html2canvas from 'html2canvas'
+
+// Emits
+const emit = defineEmits(['back', 'complete'])
+
+// Stores
+const testBankStore = useTestBankStore()
+const itemSelectionStore = useItemSelectionStore()
+
+// Refs
+const paperRef = ref(null)
+const currentPage = ref(1)
+const isGenerating = ref(false)
+const loadingMessage = ref('')
+const mathRendered = ref(false)
+const layoutMode = ref('double') // 기본값을 2열로 설정
+
+// 시험지 정보
+const examInfo = ref({
+  title: '',
+  date: new Date().toISOString().split('T')[0],
+  timeLimit: 50,
+  instructions: '문제를 잘 읽고 답안을 작성하시오. OMR 카드에 정답을 표기할 때는 반드시 검은색 펜을 사용하시오.'
+})
+
+// 출력 옵션
+const printOptions = ref({
+  showAnswers: false,
+  showPoints: true,
+  studentInfo: true,
+  pageNumbers: true
+})
+
+// 선택된 문항들
+const selectedItems = computed(() => {
+  // 우선순위: 1. itemSelectionStore, 2. testBankStore.examInfo.selectedItems, 3. testBankStore.selectedItems
+  const items = itemSelectionStore.selectedItems ||
+                testBankStore.examInfo?.selectedItems ||
+                testBankStore.selectedItems ||
+                []
+  console.log('Step3 selectedItems 계산:', items.length, '개 문항')
+  return items.map((item, index) => ({
+    ...item,
+    displayNumber: item.questionNumber || (index + 1)
+  }))
+})
+
+// 페이지당 최대 높이 (유동적 레이아웃)
+const getMaxPageHeight = () => {
+  // A4 기준 높이에서 여백을 뺀 실제 사용 가능 높이
+  // 단위: 임의 점수 (지문=150, 일반문제=60)
+  const heights = {
+    single: 600,    // 1열: 더 큰 글씨, 더 적은 내용
+    double: 750,    // 2열: 표준 (줄임)
+    compact: 900    // 압축: 더 많은 내용
+  }
+  return heights[layoutMode.value] || 750
+}
+
+// 컬럼 수 계산
+const getColumnCount = () => {
+  const columns = {
+    single: 1,
+    double: 2,
+    compact: 2
+  }
+  return columns[layoutMode.value] || 2
+}
+
+// 전체 문항 수 계산
+const getTotalItemCount = () => {
+  return selectedItems.value.length
+}
+
+// 지문별 그룹핑
+const groupedItems = computed(() => {
+  const groups = []
+  const passageMap = new Map()
+
+  selectedItems.value.forEach(item => {
+    if (item.passageId) {
+      if (!passageMap.has(item.passageId)) {
+        passageMap.set(item.passageId, {
+          passageId: item.passageId,
+          passageHtml: item.passageHtml,
+          items: []
+        })
+      }
+      passageMap.get(item.passageId).items.push(item)
+    } else {
+      groups.push({
+        passageId: null,
+        items: [item]
+      })
+    }
+  })
+
+  passageMap.forEach(group => groups.push(group))
+
+  return groups.sort((a, b) => {
+    const aMin = Math.min(...a.items.map(i => selectedItems.value.indexOf(i)))
+    const bMin = Math.min(...b.items.map(i => selectedItems.value.indexOf(i)))
+    return aMin - bMin
+  })
+})
+
+// 페이지별 그룹 - 동적 콘텐츠 높이 기반 레이아웃
+const paginatedGroups = computed(() => {
+  const pages = []
+  const maxPageHeight = 800 // 페이지당 최대 높이 (상대 단위)
+
+  // 콘텐츠 높이 계산 함수
+  const calculateContentHeight = (group) => {
+    let height = 0
+
+    if (group.passageId && group.passageHtml) {
+      // 지문 높이 계산 (글자 수 기반)
+      const passageText = group.passageHtml.replace(/<[^>]*>/g, '')
+      const passageLines = Math.ceil(passageText.length / 40) // 한 줄에 약 40자
+      height += Math.min(passageLines * 20, 300) // 최대 300 높이로 제한
+      height += 30 // 지문 헤더와 여백
+    }
+
+    // 각 문항 높이 추가
+    group.items.forEach(item => {
+      height += 60 // 기본 문항 높이
+      if (item.choice1Html) height += 80 // 보기가 있는 경우 추가 높이
+      height += 20 // 문항 간 여백
+    })
+
+    return height
+  }
+
+  // 그룹을 페이지로 분배
+  let currentPage = []
+  let currentPageHeight = 0
+
+  groupedItems.value.forEach(group => {
+    const groupHeight = calculateContentHeight(group)
+
+    // 긴 지문의 경우 분할 처리
+    if (group.passageId && groupHeight > maxPageHeight * 0.7) {
+      // 현재 페이지 저장
+      if (currentPage.length > 0) {
+        pages.push(currentPage)
+        currentPage = []
+        currentPageHeight = 0
+      }
+
+      // 지문과 문항들을 분할
+      const itemsPerPage = Math.ceil(group.items.length / 2)
+      for (let i = 0; i < group.items.length; i += itemsPerPage) {
+        const splitGroup = {
+          passageId: group.passageId,
+          passageHtml: i === 0 ? group.passageHtml : null,
+          continued: i > 0,
+          items: group.items.slice(i, Math.min(i + itemsPerPage, group.items.length))
+        }
+
+        // 새 페이지에 추가
+        pages.push([splitGroup])
+      }
+    } else if (currentPageHeight + groupHeight > maxPageHeight) {
+      // 현재 페이지가 가득 찬 경우
+      if (currentPage.length > 0) {
+        pages.push(currentPage)
+        currentPage = [group]
+        currentPageHeight = groupHeight
+      } else {
+        // 단일 그룹이 너무 큰 경우
+        pages.push([group])
+        currentPageHeight = 0
+      }
+    } else {
+      // 현재 페이지에 추가
+      currentPage.push(group)
+      currentPageHeight += groupHeight
+    }
+  })
+
+  // 마지막 페이지 추가
+  if (currentPage.length > 0) {
+    pages.push(currentPage)
+  }
+
+  return pages
+})
+
+// 현재 페이지 그룹
+const currentPageGroups = computed(() => paginatedGroups.value[currentPage.value - 1] || [])
+
+// 전체 페이지 수
+const totalPages = computed(() => Math.max(1, paginatedGroups.value.length))
+
+// 저장 가능 여부
+const canSave = computed(() => examInfo.value.title && selectedItems.value.length > 0)
+
+// Methods
+const prevPage = () => {
+  if (currentPage.value > 1) currentPage.value--
+}
+
+const nextPage = () => {
+  if (currentPage.value < totalPages.value) currentPage.value++
+}
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return `${date.getFullYear()}년 ${date.getMonth() + 1}월 ${date.getDate()}일`
+}
+
+const formatGroupNumbers = (items) => {
+  const numbers = items.map(i => i.displayNumber)
+  if (numbers.length === 1) return numbers[0]
+  return `${numbers[0]}-${numbers[numbers.length - 1]}`
+}
+
+// 보기가 있는지 확인하는 헬퍼 함수
+const hasChoices = (item) => {
+  return item.choice1Html || item.choice2Html || item.choice3Html ||
+         item.choice4Html || item.choice5Html
+}
+
+const sanitizeHtml = (html) => {
+  if (!html) return ''
+
+  // 수식 이미지 제거 및 HTML 정리
+  return html
+    // 모든 이미지 태그 제거 (수식 이미지 중복 방지)
+    .replace(/<img[^>]*>/gi, '')
+    // 위험한 스크립트 제거 (math/tex는 유지)
+    .replace(/<script(?! type="math\/tex)[^>]*>[\s\S]*?<\/script>/gi, '')
+    .replace(/on\w+="[^"]*"/g, '')
+    .replace(/on\w+='[^']*'/g, '')
+}
+
+// 긴 지문인지 판단하는 헬퍼 함수
+const isLongPassage = (html) => {
+  if (!html) return false
+
+  // HTML 태그 제거하고 텍스트만 추출
+  const textOnly = html.replace(/<[^>]*>/g, '').trim()
+
+  // 글자 수가 600자 이상이거나 줄바꿈이 12개 이상이면 긴 지문으로 판단
+  const charCount = textOnly.length
+  const lineBreaks = (html.match(/<br\s*\/?>/gi) || []).length +
+                     (html.match(/<\/p>/gi) || []).length
+
+  return charCount > 600 || lineBreaks > 12
+}
+
+// PDF 생성
+const generatePDF = async () => {
+  try {
+    isGenerating.value = true
+    loadingMessage.value = 'PDF 생성 준비 중...'
+
+    const pdf = new jsPDF('p', 'mm', 'a4')
+    const pageWidth = pdf.internal.pageSize.getWidth()
+    const pageHeight = pdf.internal.pageSize.getHeight()
+
+    // 각 페이지 처리
+    for (let page = 1; page <= totalPages.value; page++) {
+      currentPage.value = page
+      loadingMessage.value = `페이지 ${page}/${totalPages.value} 생성 중...`
+
+      await nextTick()
+      await new Promise(resolve => setTimeout(resolve, 500))
+
+      // PDF 생성 시에는 MathJax 재렌더링 하지 않음
+      // 이미 미리보기에서 렌더링된 상태 그대로 사용
+
+      // HTML을 캔버스로 변환
+      const element = paperRef.value
+      const canvas = await html2canvas(element, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        windowWidth: element.scrollWidth,
+        windowHeight: element.scrollHeight
+      })
+
+      // 새 페이지 추가
+      if (page > 1) {
+        pdf.addPage()
+      }
+
+      // 캔버스를 PDF에 추가
+      const imgData = canvas.toDataURL('image/png')
+      const imgWidth = pageWidth - 20
+      const imgHeight = (canvas.height * imgWidth) / canvas.width
+
+      // 중앙 정렬
+      const xOffset = (pageWidth - imgWidth) / 2
+      const yOffset = 10
+
+      pdf.addImage(imgData, 'PNG', xOffset, yOffset, imgWidth, Math.min(imgHeight, pageHeight - 20))
+    }
+
+    // PDF 저장
+    const filename = `${examInfo.value.title || '시험지'}_${new Date().toISOString().split('T')[0]}.pdf`
+    pdf.save(filename)
+
+    loadingMessage.value = 'PDF 생성 완료!'
+
+  } catch (error) {
+    console.error('PDF 생성 오류:', error)
+    alert('PDF 생성 중 오류가 발생했습니다.')
+  } finally {
+    isGenerating.value = false
+    currentPage.value = 1
+  }
+}
+
+// 임시 저장
+const saveDraft = () => {
+  const draft = {
+    examInfo: examInfo.value,
+    printOptions: printOptions.value,
+    layoutMode: layoutMode.value,
+    timestamp: new Date().toISOString()
+  }
+  localStorage.setItem('examDraft', JSON.stringify(draft))
+  alert('임시 저장되었습니다.')
+}
+
+// 시험지 저장
+const saveExam = async () => {
+  if (!canSave.value) return
+
+  try {
+    isGenerating.value = true
+    loadingMessage.value = '시험지 저장 중...'
+
+    // TODO: API 호출
+    await new Promise(resolve => setTimeout(resolve, 1000))
+
+    alert('시험지가 저장되었습니다!')
+    emit('complete')
+  } catch (error) {
+    console.error('저장 오류:', error)
+    alert('저장에 실패했습니다.')
+  } finally {
+    isGenerating.value = false
+  }
+}
+
+// MathJax 즉시 렌더링 (최적화된 버전)
+const renderMath = async () => {
+  // PDF 생성 중에는 렌더링 하지 않음
+  if (isGenerating.value) return
+
+  // MathJax가 준비될 때까지 대기
+  if (!window.MathJax || !window.MathJax.startup || !paperRef.value) {
+    // MathJax가 아직 로드되지 않았다면 대기 후 재시도
+    if (!window.MathJax) {
+      setTimeout(() => renderMath(), 100)
+      return
+    }
+    return
+  }
+
+  try {
+    // 이미 렌더링 중이면 스킵
+    if (mathRendered.value === 'rendering') return
+    mathRendered.value = 'rendering'
+
+    // 수식이 포함된 요소들 찾기
+    const mathElements = paperRef.value.querySelectorAll('.q-text, .passage-box, .question-content')
+
+    // 렌더링 중 표시 추가
+    mathElements.forEach(el => el.classList.add('math-rendering'))
+
+    // 기존 렌더링된 요소 제거 (중복 방지)
+    const existingMath = paperRef.value.querySelectorAll('mjx-container, .MathJax, .MathJax_Display, .MathJax_Preview')
+    existingMath.forEach(el => {
+      if (el.tagName && el.tagName.toLowerCase() !== 'script') {
+        el.remove()
+      }
+    })
+
+    // MathJax 문서 초기화
+    if (window.MathJax.startup.document) {
+      window.MathJax.startup.document.clear()
+      window.MathJax.startup.document.updateDocument()
+    }
+
+    // 즉시 렌더링 수행 (동기적으로 가능한 경우)
+    if (window.MathJax.typeset) {
+      // typeset 메서드가 있으면 사용 (더 빠름)
+      window.MathJax.typeset([paperRef.value])
+    } else {
+      // Promise 버전 사용
+      await window.MathJax.typesetPromise([paperRef.value])
+    }
+
+    // 렌더링 완료 후 표시 제거
+    mathElements.forEach(el => el.classList.remove('math-rendering'))
+    mathRendered.value = true
+
+  } catch (e) {
+    console.warn('MathJax 렌더링 경고:', e)
+    mathRendered.value = false
+
+    // 에러 시에도 렌더링 표시 제거
+    const mathElements = paperRef.value.querySelectorAll('.math-rendering')
+    mathElements.forEach(el => el.classList.remove('math-rendering'))
+  }
+}
+
+// Watch - 즉시 렌더링 트리거
+watch(currentPage, () => {
+  // 페이지 변경 시 즉시 렌더링
+  nextTick(() => renderMath())
+})
+
+watch(layoutMode, () => {
+  currentPage.value = 1
+  // 레이아웃 변경 시 즉시 렌더링
+  nextTick(() => renderMath())
+})
+
+// Mounted
+onMounted(async () => {
+  // 임시 저장 불러오기
+  const draft = localStorage.getItem('examDraft')
+  if (draft) {
+    try {
+      const data = JSON.parse(draft)
+      if (data.examInfo) examInfo.value = data.examInfo
+      if (data.printOptions) printOptions.value = data.printOptions
+      if (data.layoutMode) layoutMode.value = data.layoutMode
+    } catch (e) {
+      console.warn('임시 저장 불러오기 실패:', e)
+    }
+  }
+
+  // MathJax가 준비되면 즉시 렌더링
+  if (window.MathJax && window.MathJax.startup) {
+    // MathJax가 이미 준비된 경우 즉시 렌더링
+    if (window.MathJax.startup.document) {
+      renderMath()
+    } else {
+      // MathJax가 아직 준비 중이면 promise 대기
+      await window.MathJax.startup.promise
+      renderMath()
+    }
+  } else {
+    // MathJax가 아직 로드되지 않은 경우 대기 후 렌더링
+    const checkMathJax = setInterval(() => {
+      if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+        clearInterval(checkMathJax)
+        renderMath()
+      }
+    }, 50)
+
+    // 5초 후에도 로드되지 않으면 타임아웃
+    setTimeout(() => clearInterval(checkMathJax), 5000)
+  }
+})
+</script>
+
+<style scoped>
+/* 컨테이너 */
+.step3-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background: #f8f9fa;
+}
+
+/* 헤더 */
+.exam-header {
+  background: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.08);
+  z-index: 10;
+}
+
+.header-content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+}
+
+.back-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  color: #374151;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.back-button:hover {
+  background: #f9fafb;
+  border-color: #d1d5db;
+  transform: translateX(-2px);
+}
+
+.header-info h2 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.exam-stats {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.25rem;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.separator {
+  color: #d1d5db;
+}
+
+.btn-primary-outline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: white;
+  border: 2px solid #3b82f6;
+  border-radius: 8px;
+  color: #3b82f6;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary-outline:hover {
+  background: #3b82f6;
+  color: white;
+}
+
+.btn-primary-outline:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 메인 컨텐츠 */
+.main-content {
+  flex: 1;
+  display: flex;
+  gap: 1.5rem;
+  padding: 1.5rem;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* 설정 패널 */
+.settings-panel {
+  width: 380px;
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  overflow-y: auto;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.settings-section {
+  margin-bottom: 2rem;
+}
+
+.settings-section h3 {
+  margin: 0 0 1rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #e5e7eb;
+}
+
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.required {
+  color: #ef4444;
+}
+
+.form-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.checkbox-option input[type="checkbox"] {
+  width: 1rem;
+  height: 1rem;
+  cursor: pointer;
+}
+
+.layout-options {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+}
+
+.layout-option {
+  position: relative;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.layout-option input[type="radio"] {
+  position: absolute;
+  opacity: 0;
+}
+
+.layout-preview {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.75rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  text-align: center;
+  transition: all 0.2s;
+}
+
+.layout-option:hover .layout-preview {
+  border-color: #9ca3af;
+}
+
+.layout-option.active .layout-preview {
+  border-color: #3b82f6;
+  background: #f0f7ff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.layout-icon {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 32px;
+  height: 32px;
+  margin: 0 auto 0.25rem;
+  color: #6b7280;
+}
+
+.layout-option.active .layout-icon {
+  color: #3b82f6;
+}
+
+.layout-preview span {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #1f2937;
+}
+
+.layout-preview small {
+  font-size: 0.75rem;
+  color: #6b7280;
+  margin-top: 0.125rem;
+}
+
+/* 미리보기 패널 */
+.preview-panel {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: white;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.12);
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.preview-header h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1f2937;
+}
+
+.preview-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.page-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: white;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.page-nav-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.page-nav-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-indicator {
+  padding: 0.25rem 0.75rem;
+  background: #f3f4f6;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+/* A4 Paper */
+.preview-container {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  overflow: auto;
+  padding: 1.5rem;
+  background: #f8f9fa;
+}
+
+.a4-paper {
+  width: 210mm;
+  height: 297mm;
+  padding: 20mm;
+  padding-bottom: 25mm; /* 페이지 번호 공간 */
+  background: white;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.12);
+  box-sizing: border-box;
+  margin: 0 auto;
+  border: 1px solid #e5e7eb;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* 스크롤 제거 - 페이지 단위로 표시 */
+}
+
+/* Paper Content */
+.paper-title-section {
+  margin-bottom: 15mm;
+  text-align: center;
+}
+
+.exam-title {
+  font-size: 20px;
+  font-weight: bold;
+  margin: 0 0 8px 0;
+  color: #1a202c;
+}
+
+.exam-meta-info {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  font-size: 13px;
+  color: #4a5568;
+  margin-bottom: 12px;
+}
+
+.student-info-box {
+  margin: 15px 0;
+  padding: 12px;
+  border: 1px solid #cbd5e0;
+  border-radius: 4px;
+  text-align: left;
+}
+
+.info-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.info-row:last-child {
+  margin-bottom: 0;
+}
+
+.info-row span:first-child,
+.info-row span:nth-child(3) {
+  font-weight: 500;
+  margin-right: 8px;
+  font-size: 13px;
+}
+
+.fill-line {
+  flex: 1;
+  border-bottom: 1px solid #cbd5e0;
+  margin: 0 8px;
+}
+
+.exam-instructions {
+  text-align: left;
+  padding: 12px;
+  background: #f0f7ff;
+  border: 1px solid #3b82f6;
+  border-radius: 6px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.exam-instructions strong {
+  color: #1e40af;
+}
+
+.exam-instructions p {
+  margin: 4px 0 0 0;
+  color: #1f2937;
+}
+
+/* Questions - Flexbox 기반 2컬럼 레이아웃 */
+.questions-container {
+  flex: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 15px;
+  align-content: flex-start;
+  font-size: 13px;
+  line-height: 1.7;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* 전체 너비 섹션 - 지문용 */
+.passage-section.full-width {
+  width: 100%;
+  margin-bottom: 15px;
+}
+
+/* 개별 문제 아이템 - 2컬럼 그리드 */
+.question-item {
+  width: calc(50% - 7.5px); /* 2컬럼, gap 고려 */
+  box-sizing: border-box;
+}
+
+/* layout-single일 때 1컬럼 */
+.questions-container.layout-single .question-item {
+  width: 100%;
+}
+
+/* layout-double일 때 2컬럼 (기본값) */
+.questions-container.layout-double .question-item {
+  width: calc(50% - 7.5px);
+}
+
+/* layout-compact일 때 2컬럼, 좁은 간격 */
+.questions-container.layout-compact {
+  gap: 10px;
+}
+
+.questions-container.layout-compact .question-item {
+  width: calc(50% - 5px);
+  font-size: 11px;
+}
+
+.passage-header {
+  font-weight: 600;
+  margin-bottom: 8px;
+  color: #2d3748;
+  font-size: 13px;
+  /* 헤더는 다음 내용과 함께 유지 */
+  break-after: avoid;
+  page-break-after: avoid;
+  -webkit-column-break-after: avoid;
+}
+
+.passage-nums {
+  color: #374151;
+  font-weight: bold;
+}
+
+/* 지문 박스 */
+.passage-box {
+  padding: 12px;
+  background: #f8f9fa;
+  border-left: 3px solid #6366f1;
+  border-radius: 4px;
+  margin-bottom: 10px;
+  line-height: 1.8;
+  font-size: 12px;
+  width: 100%;
+  box-sizing: border-box;
+  /* 한글 텍스트 최적화 */
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 지문 내용 - HTML 렌더링 영역 */
+.passage-content {
+  /* HTML 컨텐츠 스타일 */
+  word-break: keep-all; /* 한글 최적화 */
+  overflow-wrap: break-word;
+  line-height: 1.75;
+  white-space: pre-wrap; /* 공백 유지하면서 줄바꿈 */
+  text-align: justify; /* 양쪽 정렬 */
+  text-justify: inter-word;
+}
+
+/* 지문 내부 HTML 요소들 스타일 */
+.passage-content p {
+  margin: 0 0 8px 0;
+  line-height: 1.8;
+}
+
+.passage-content p:last-child {
+  margin-bottom: 0;
+}
+
+.passage-content br {
+  line-height: 1.8;
+}
+
+.passage-content ul,
+.passage-content ol {
+  margin: 8px 0;
+  padding-left: 20px;
+}
+
+.passage-content li {
+  margin: 4px 0;
+}
+
+.passage-questions {
+  padding-left: 8px;
+}
+
+/* 개별 문제 래퍼 */
+.question-wrapper {
+  padding: 10px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  margin-bottom: 0;
+  height: 100%;
+  box-sizing: border-box;
+}
+
+.question-header {
+  display: flex;
+  align-items: baseline;
+  margin-bottom: 4px;
+  /* 문제 번호는 내용과 함께 유지 */
+  break-after: avoid;
+  page-break-after: avoid;
+  -webkit-column-break-after: avoid;
+}
+
+.q-number {
+  font-weight: bold;
+  margin-right: 6px;
+  color: #2d3748;
+  font-size: 13px;
+}
+
+.q-points {
+  font-size: 11px;
+  color: #718096;
+}
+
+.question-content {
+  padding-left: 18px;
+}
+
+/* 문제 텍스트 영역 - HTML 렌더링 */
+.q-text {
+  margin-bottom: 8px;
+  line-height: 1.7;
+  font-size: 12px;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 문제 내부 HTML 요소 스타일 */
+.q-text p {
+  margin: 0 0 4px 0;
+  line-height: 1.7;
+}
+
+.q-text p:last-child {
+  margin-bottom: 0;
+}
+
+.q-choices {
+  padding-left: 8px;
+  /* 보기는 문제와 함께 유지 - 분할 방지 불필요 (부모가 이미 처리) */
+}
+
+.choice-item {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 4px;
+  line-height: 1.6;
+  font-size: 12px;
+}
+
+.choice-number {
+  display: inline-block;
+  min-width: 20px;
+  margin-right: 5px;
+  font-weight: 500;
+}
+
+.choice-content {
+  display: inline-block;
+  flex: 1;
+  word-break: keep-all;
+  overflow-wrap: break-word;
+}
+
+/* 풀이 공간 */
+.solution-space {
+  min-height: 30px; /* 공간 절약 */
+  margin-top: 6px;
+  border-bottom: 1px dotted #d1d5db;
+}
+
+
+.answer-box {
+  margin-top: 8px;
+  padding: 6px 10px;
+  background: #fef3c7;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #92400e;
+}
+
+.page-number {
+  position: absolute;
+  bottom: 15mm;
+  left: 50%;
+  transform: translateX(-50%);
+  text-align: center;
+  font-size: 11px;
+  color: #718096;
+}
+
+/* Footer */
+.action-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  background: white;
+  border-top: 1px solid #e5e7eb;
+  box-shadow: 0 -2px 4px rgba(0,0,0,0.05);
+  z-index: 10;
+}
+
+.footer-left,
+.footer-right {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.btn-outline,
+.btn-primary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-outline {
+  background: white;
+  border: 1px solid #d1d5db;
+  color: #374151;
+}
+
+.btn-outline:hover {
+  background: #f3f4f6;
+  border-color: #9ca3af;
+}
+
+.btn-primary {
+  background: #3b82f6;
+  color: white;
+  border: none;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
+}
+
+.btn-primary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Loading Modal */
+.loading-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-box {
+  background: white;
+  padding: 2rem 3rem;
+  border-radius: 12px;
+  text-align: center;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+}
+
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 4px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin: 0 auto 1rem;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.loading-box p {
+  margin: 0;
+  color: #374151;
+  font-weight: 500;
+}
+
+/* 레이아웃별 특별 스타일 - layout-single은 이미 위에 정의됨 */
+.a4-paper.layout-single .questions-container {
+  font-size: 14px;
+}
+
+/* 수식 이미지 제거 */
+.q-text img,
+.passage-box img,
+.question-content img {
+  display: none !important;
+}
+
+/* 모든 지문은 컬럼 내에서 자연스럽게 흐름 */
+
+/* PDF 생성시 최적화 */
+@media print {
+  .a4-paper {
+    overflow: hidden;
+    page-break-after: always;
+    height: 297mm !important;
+  }
+
+  .questions-container {
+    overflow: hidden !important;
+  }
+
+  .question-wrapper {
+    page-break-inside: avoid !important;
+  }
+}
+
+/* MathJax 스타일 정리 */
+.q-text mjx-container,
+.passage-box mjx-container,
+.question-content mjx-container {
+  display: inline-block !important;
+  margin: 0 0.2em !important;
+  vertical-align: middle !important;
+}
+
+/* LaTeX 소스 코드 숨기기 (렌더링 전) */
+.q-text script[type="math/tex"],
+.passage-box script[type="math/tex"],
+.question-content script[type="math/tex"] {
+  display: none !important;
+}
+
+/* 수식 렌더링 중 표시 */
+.q-text.math-rendering,
+.passage-box.math-rendering,
+.question-content.math-rendering {
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+}
+
+/* Print Styles */
+@media print {
+  .step3-container {
+    background: white;
+  }
+
+  .exam-header,
+  .action-footer,
+  .settings-panel,
+  .preview-header {
+    display: none;
+  }
+
+  .main-content {
+    padding: 0;
+  }
+
+  .preview-panel {
+    box-shadow: none;
+  }
+
+  .a4-paper {
+    box-shadow: none;
+    margin: 0;
+    padding: 15mm;
+  }
+}
+
+/* Responsive */
+/* 긴 지문 특별 처리 */
+.passage-box.long-passage {
+  font-size: 11px; /* 더 작은 글씨 */
+  line-height: 1.65;
+  padding: 8px;
+  background: #f1f5f9;
+}
+
+.passage-box.long-passage .passage-content {
+  /* Flexbox 레이아웃 사용, column-count 제거 */
+  max-height: 180mm; /* 더 많은 공간 허용 */
+  display: block; /* 일반 블록 요소로 표시 */
+}
+
+/* 레이아웃 정리 - Flexbox 기반으로 통일 */
+
+@media (max-width: 1024px) {
+  .main-content {
+    flex-direction: column;
+  }
+
+  .settings-panel {
+    width: 100%;
+  }
+
+  .preview-panel {
+    height: 600px;
+  }
+}
+</style>
