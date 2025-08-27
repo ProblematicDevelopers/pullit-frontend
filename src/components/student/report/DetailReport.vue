@@ -17,6 +17,7 @@ const selectedQuestion = ref(null)
 const props = defineProps({
   examId: { type: Number, default: -1 },
   questionId: { type: Number, default: -1 },
+  examName: { type: String, default: '' },
 })
 
 // detail errata
@@ -529,26 +530,63 @@ onMounted(() => {
 })
 
 // 리포트 다운로드 함수
-function downloadReport() {
-  // 현재 날짜와 시간을 파일명에 포함
-  const now = new Date()
-  const dateStr = now.toISOString().slice(0, 10) // YYYY-MM-DD
-  const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '-') // HH-MM-SS
+async function downloadReport() {
+  try {
+    // 로딩 상태 표시
+    const downloadBtn = document.querySelector('.download-btn')
+    if (downloadBtn) {
+      downloadBtn.disabled = true
+      downloadBtn.textContent = '📄 PDF 생성 중...'
+    }
 
-  // 파일명 생성
-  const fileName = `상세리포트_${dateStr}_${timeStr}.pdf`
+    // HTML을 PDF로 변환하는 서비스 사용
+    const { convertDetailReportToPdf } = await import('@/services/htmlToPdfService.js')
 
-  // PDF 다운로드 로직 (실제 구현은 백엔드 API 필요)
-  console.log('다운로드 시작:', fileName)
+    // examName이 있으면 파일명에 포함, 없으면 자동 생성
+    let fileName = null
+    if (props.examName) {
+      const now = new Date()
+      const dateStr = now.toISOString().slice(0, 10) // YYYY-MM-DD
 
-  // 임시로 alert 표시 (실제로는 PDF 생성 및 다운로드 로직 구현)
-  alert('다운로드 기능은 현재 개발 중입니다.')
+      // 사용자 정보 가져오기
+      let userName = '사용자'
+      const userInfo = localStorage.getItem('userInfo')
+      if (userInfo) {
+        try {
+          const user = JSON.parse(userInfo)
+          if (user.fullName) {
+            userName = user.fullName.replace(/[^\w\s가-힣]/g, '_')
+          } else if (user.name) {
+            userName = user.name.replace(/[^\w\s가-힣]/g, '_')
+          } else if (user.username) {
+            userName = user.username.replace(/[^\w\s가-힣]/g, '_')
+          }
+        } catch (error) {
+          console.warn('사용자 정보 파싱 오류:', error)
+        }
+      }
+
+      fileName = `${props.examName}_${userName}_${dateStr}.pdf`
+    }
+
+    await convertDetailReportToPdf(fileName)
+  } catch (error) {
+    console.error('상세리포트 PDF 다운로드 실패:', error)
+    alert('PDF 생성 중 오류가 발생했습니다. 다시 시도해주세요.')
+  } finally {
+    // 버튼 상태 복원
+    const downloadBtn = document.querySelector('.download-btn')
+    if (downloadBtn) {
+      downloadBtn.disabled = false
+      downloadBtn.textContent = '📄 상세 리포트 다운로드'
+    }
+  }
 }
 </script>
 
 <template>
   <!-- 상세 정오표 -->
-  <div>
+  <div class="report-wrap" data-report-container>
     <!-- 로딩 상태 -->
     <div v-if="errataLoading" class="loading-container">
       <div class="loading-spinner"></div>
@@ -1257,5 +1295,12 @@ function downloadReport() {
 
 .download-btn:active {
   transform: translateY(0);
+}
+
+.download-btn:disabled {
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 2px 4px rgba(156, 163, 175, 0.3);
 }
 </style>

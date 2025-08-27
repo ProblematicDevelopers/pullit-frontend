@@ -236,20 +236,28 @@
               <div class="card-body p-0">
                 <div class="list-group list-group-flush">
                   <div class="list-group-item border-0" v-for="exam in examSchedule" :key="exam.id">
-                    <div class="d-flex align-items-center">
-                      <div class="text-center me-3" style="min-width: 60px">
-                        <div class="fw-bold text-primary">{{ exam.day }}</div>
-                        <small class="text-muted">{{ exam.month }}</small>
+                    <router-link
+                      :to="`/student/class-room/live-exam/${exam.id}?classId=${classInfo.classId}`"
+                    >
+                      <div class="d-flex align-items-center">
+                        <div class="text-center me-3" style="min-width: 60px">
+                          <div class="fw-bold text-primary fs-4">
+                            {{ formatExamDate(exam.examDate).day }}
+                          </div>
+                          <small class="text-muted">{{
+                            formatExamDate(exam.examDate).month
+                          }}</small>
+                        </div>
+                        <div class="flex-grow-1">
+                          <div class="fw-semibold text-dark">{{ exam.examName }}</div>
+                          <div class="text-muted small">{{ exam.areaName }}</div>
+                          <div class="text-muted small">{{ exam.timeLimit }} 분</div>
+                        </div>
+                        <div>
+                          <span class="badge bg-danger">{{ exam.examType }}</span>
+                        </div>
                       </div>
-                      <div class="flex-grow-1">
-                        <div class="fw-semibold">{{ exam.title }}</div>
-                        <div class="text-muted small">{{ exam.subject }}</div>
-                        <div class="text-muted small">{{ exam.time }}</div>
-                      </div>
-                      <div>
-                        <span class="badge bg-danger">{{ exam.statusText }}</span>
-                      </div>
-                    </div>
+                    </router-link>
                   </div>
                 </div>
               </div>
@@ -262,7 +270,7 @@
           <div class="col-12">
             <div class="card border-0 shadow-sm">
               <div class="card-header bg-purple text-white">
-                <h5 class="card-title mb-0">
+                <h5 class="card-title mb-0 text-dark">
                   <span class="me-2">💬</span>
                   반 채팅방
                 </h5>
@@ -272,7 +280,11 @@
               </div>
               <div class="card-body p-0">
                 <!-- Chat Messages -->
-                <div class="chat-messages p-3" style="height: 300px; overflow-y: auto">
+                <div
+                  ref="chatContainerRef"
+                  class="chat-messages p-3"
+                  style="height: 300px; overflow-y: auto"
+                >
                   <div
                     v-for="message in chatMessages"
                     :key="message.id"
@@ -340,9 +352,9 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted } from 'vue'
-import WebSocketService from '@/services/websocket'
+import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import classApi from '@/services/classApi'
+import { useClassWebSocket } from './composables/useClassWebSocket'
 
 // 반 정보
 const classInfo = ref({})
@@ -360,34 +372,28 @@ const examSchedule = ref([])
 const userInfo = ref(JSON.parse(localStorage.getItem('userInfo')))
 const currentUserId = ref(userInfo.value.id)
 const currentUserName = ref(userInfo.value.fullName)
-const currentUserRole = ref(userInfo.value.role) // 학생 역할
-
-// 접속중인 학생 수
-const onlineStudents = ref(0)
-
-// 실시간 온라인 사용자 목록
-const onlineUsers = ref(new Set())
-
-// 채팅 관련 데이터
-const chatMessages = ref([])
-
+const currentUserRole = ref(userInfo.value.role)
+// 채팅 입력
 const newMessage = ref('')
+const channelName = ref('')
+
+// 채팅 컨테이너 ref
+const chatContainerRef = ref(null)
+
+// 스크롤을 최하단으로 이동시키는 함수
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (chatContainerRef.value) {
+      chatContainerRef.value.scrollTop = chatContainerRef.value.scrollHeight
+    }
+  })
+}
 
 // 메시지 전송 함수
 const sendMessage = () => {
-  if (newMessage.value.trim()) {
-    const messageData = {
-      classId: classInfo.value.classId,
-      senderId: currentUserId.value,
-      senderName: currentUserName.value,
-      senderRole: currentUserRole.value,
-      content: newMessage.value.trim(),
-      messageType: 'MESSAGE',
-      timestamp: new Date().toISOString(),
-    }
-
-    WebSocketService.sendMessage(classInfo.value.classId, messageData)
+  if (sendChatMessage && sendChatMessage(newMessage.value)) {
     newMessage.value = ''
+    scrollToBottom()
   }
 }
 
@@ -408,6 +414,18 @@ const formatTime = (timestamp) => {
   return messageDate.toLocaleDateString()
 }
 
+// 날짜 포맷팅 함수
+const formatExamDate = (dateString) => {
+  const date = new Date(dateString)
+  const month = date.getMonth() + 1 // getMonth()는 0부터 시작하므로 +1
+  const day = date.getDate()
+
+  return {
+    month: `${month}월`,
+    day: day.toString(),
+  }
+}
+
 // 데이터 로드
 const loadClassData = async () => {
   try {
@@ -419,79 +437,67 @@ const loadClassData = async () => {
     classInfo.value.totalStudents = res.totalStudents
     teacherInfo.value = res.teacher
     classmates.value = res.students
+    channelName.value = 'my_class_' + res.classId
   } catch (error) {
     console.error('반 정보 로드 실패:', error)
   }
 }
 
+const loadExamSchedule = async () => {
+  try {
+    const response = await classApi.getExamSchedule(classInfo.value.classId)
+    examSchedule.value = response.data.data
+  } catch (error) {
+    console.error('시험 일정 로드 실패:', error)
+  }
+}
+
 onMounted(async () => {
   await loadClassData()
+  await loadExamSchedule()
 
-  try {
-    // WebSocket 연결
-    await WebSocketService.connect(
-      classInfo.value.classId,
-      currentUserId.value,
-      currentUserName.value,
-      currentUserRole.value,
-      {
-        onChatMessage: (message) => {
-          // 새 메시지 수신 시 채팅 목록에 추가
-          chatMessages.value.push(message)
-        },
-        onOnlineStatus: (status) => {
-          // 실시간 온라인 사용자 목록 업데이트
-          if (status.status === 'ONLINE') {
-            onlineUsers.value.add(status.userId)
-          } else {
-            onlineUsers.value.delete(status.userId)
-          }
-
-          // 접속중인 학생 수 업데이트 (실시간 데이터 사용)
-          onlineStudents.value = onlineUsers.value.size
-
-          // 기존 classmates 목록도 업데이트 (UI 표시용)
-          const classmate = classmates.value.find((c) => c.studentId == status.userId)
-          if (classmate) {
-            classmate.status = status.status
-          }
-        },
+  // 웹소켓 연결 (channelName이 설정된 후)
+  if (connectWebSocket) {
+    await connectWebSocket({
+      onOnlineStatus: (status) => {
+        // classmates 목록 업데이트 (UI 표시용)
+        updateClassmatesStatus(classmates.value, status)
       },
-    )
+    })
 
-    // 본인을 온라인 사용자 목록에 추가
-    onlineUsers.value.add(currentUserId.value)
-    onlineStudents.value = onlineUsers.value.size
+    // 연결 완료 후 초기 온라인 상태 조회
+    setTimeout(() => {
+      refreshOnlineStatus()
+    }, 1000)
 
-    // 초기 온라인 상태 요청
-    WebSocketService.getOnlineStatus(classInfo.value.classId, currentUserId.value)
-
-    // 초기 온라인 유저 수 출력
-  } catch (error) {
-    console.error('WebSocket 연결 실패:', error)
+    // 초기 스크롤을 최하단으로 이동
+    scrollToBottom()
   }
 })
 
 onUnmounted(() => {
-  // 페이지 떠날 때 퇴장 메시지 전송 후 접속 해제
-  if (WebSocketService.isConnected()) {
-    WebSocketService.removeUser(
-      classInfo.value.classId,
-      currentUserId.value,
-      currentUserName.value,
-      currentUserRole.value,
-    )
-    WebSocketService.updateOnlineStatus(
-      classInfo.value.classId,
-      currentUserId.value,
-      currentUserName.value,
-      currentUserRole.value,
-      'OFFLINE',
-    )
-    WebSocketService.sendOnlineStatus(classInfo.value.classId, currentUserId.value, false)
+  // 페이지 떠날 때 웹소켓 연결 해제
+  if (disconnectWebSocket) {
+    disconnectWebSocket()
   }
-  WebSocketService.disconnect()
 })
+
+// 웹소켓 컴포저블 사용
+const {
+  onlineStudents,
+  chatMessages,
+  connectWebSocket,
+  disconnectWebSocket,
+  sendChatMessage,
+  refreshOnlineStatus,
+  updateClassmatesStatus,
+} = useClassWebSocket(
+  currentUserId.value,
+  currentUserName.value,
+  currentUserRole.value,
+  scrollToBottom,
+  channelName,
+)
 </script>
 
 <style scoped>

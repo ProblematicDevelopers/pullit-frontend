@@ -5,17 +5,23 @@
 
 import { BLANK_PDF } from '@pdfme/common';
 
-// 페이지별 문항 수 설정 (기본값)
-const DEFAULT_QUESTIONS_PER_FIRST_PAGE = 4;
-const DEFAULT_QUESTIONS_PER_PAGE = 4;
-const QUESTION_HEIGHT = 55;
+// HTML 태그 제거 헬퍼 함수
+const stripHtml = (html) => {
+  if (!html) return '';
+  return html.replace(/<[^>]*>/g, '').trim();
+};
 
-// 페이지당 문제 수 옵션
+// 페이지별 문항 수 설정 (기본값) - 이미지를 위해 공간 늘림
+const DEFAULT_QUESTIONS_PER_FIRST_PAGE = 3;  // 첫 페이지는 헤더가 있어서 3개
+const DEFAULT_QUESTIONS_PER_PAGE = 4;  // 다음 페이지는 4개
+const QUESTION_HEIGHT = 65;  // 문항당 높이 늘림
+
+// 페이지당 문제 수 옵션 - 이미지 공간 고려
 export const LAYOUT_OPTIONS = {
-  STANDARD: { firstPage: 4, otherPages: 4 },  // 표준 레이아웃 (4문제씩)
-  HALF_PAGE: { firstPage: 2, otherPages: 2 },  // 반페이지 레이아웃 (2문제씩)
+  STANDARD: { firstPage: 3, otherPages: 4 },  // 표준 레이아웃
+  HALF_PAGE: { firstPage: 2, otherPages: 2 },  // 반페이지 레이아웃
   SINGLE: { firstPage: 1, otherPages: 1 },     // 한 페이지 한 문제
-  COMPACT: { firstPage: 6, otherPages: 6 }     // 압축 레이아웃 (6문제씩)
+  COMPACT: { firstPage: 5, otherPages: 6 }     // 압축 레이아웃
 };
 
 /**
@@ -33,7 +39,8 @@ export const createFirstPageSchema = (questionsPerPage = DEFAULT_QUESTIONS_PER_F
       height: 12,
       alignment: 'center',
       fontSize: 20,
-      fontName: 'NotoSansKR'
+      fontName: 'NotoSansKR',
+      fontWeight: '700'
     },
     // 부제목
     {
@@ -140,6 +147,16 @@ export const createFirstPageSchema = (questionsPerPage = DEFAULT_QUESTIONS_PER_F
       fontWeight: 'bold'
     });
     
+    // 문제 이미지 (HTML 변환된 이미지 또는 원본 이미지)
+    schema.push({
+      name: `questionImage${questionNum}`,
+      type: 'image',
+      position: { x: 20, y: yPos },
+      width: 170,
+      height: 50,
+      fit: 'contain'  // 이미지가 잘리지 않도록
+    });
+    
     // 문제 텍스트
     schema.push({
       name: `questionText${questionNum}`,
@@ -197,6 +214,16 @@ export const createNormalPageSchema = (startQuestionNum, questionsPerPage = DEFA
       height: 8,
       fontSize: 11,
       fontWeight: 'bold'
+    });
+    
+    // 문제 이미지 (HTML 변환된 이미지 또는 원본 이미지)
+    schema.push({
+      name: `questionImage${questionNum}`,
+      type: 'image',
+      position: { x: 20, y: yPos },
+      width: 170,
+      height: 50,
+      fit: 'contain'  // 이미지가 잘리지 않도록
     });
     
     // 문제 텍스트
@@ -298,7 +325,7 @@ export const generateCompleteExamTemplate = (totalQuestions, includeAnswer = fal
 };
 
 /**
- * 입력 데이터 생성
+ * 입력 데이터 생성 - HTML 이미지 지원
  * @param {Object} examData - 시험 정보
  * @param {Array} questions - 문제 목록
  * @param {string} layoutType - 레이아웃 타입
@@ -329,12 +356,42 @@ export const generateInputData = (examData, questions, layoutType = 'STANDARD') 
   // 첫 페이지 문항 추가
   for (let i = 0; i < questionsPerFirstPage && currentQuestion <= questions.length; i++) {
     const q = questions[currentQuestion - 1];
-    firstPageInput[`questionNumber${currentQuestion}`] = `${currentQuestion}.`;
-    firstPageInput[`questionText${currentQuestion}`] = q.questionText || '';
-    firstPageInput[`choices${currentQuestion}`] = formatChoices(q.choices);
+    const qNum = currentQuestion;
+    
+    firstPageInput[`questionNumber${qNum}`] = `${qNum}.`;
+    
+    // 이미지로 변환된 경우 (수식 등)
+    if (q.renderedImageUrl) {
+      firstPageInput[`questionImage${qNum}`] = q.renderedImageUrl;
+    } 
+    // 기존 이미지가 있는 경우
+    else if (q.questionImageUrl) {
+      firstPageInput[`questionImage${qNum}`] = q.questionImageUrl;
+    }
+    // 텍스트 문제 (지문 포함)
+    else {
+      let fullText = '';
+      
+      // 지문이 있는 경우
+      if (q.isFirstInPassage && (q.passageText || q.passageHtml)) {
+        const passageText = q.passageText || stripHtml(q.passageHtml || '');
+        fullText += `【지문】\n${passageText}\n\n`;
+      }
+      
+      // 문제 텍스트
+      const questionText = q.questionText || stripHtml(q.questionHtml || '');
+      fullText += questionText;
+      
+      firstPageInput[`questionText${qNum}`] = fullText;
+      
+      // 보기
+      if (q.choices && q.choices.length > 0) {
+        firstPageInput[`choices${qNum}`] = formatChoices(q.choices);
+      }
+    }
     
     if (examData.includeAnswer) {
-      firstPageInput[`answer${currentQuestion}`] = `정답: ${q.answer}`;
+      firstPageInput[`answer${qNum}`] = `정답: ${q.answer}`;
     }
     
     currentQuestion++;
@@ -351,12 +408,42 @@ export const generateInputData = (examData, questions, layoutType = 'STANDARD') 
     
     for (let i = 0; i < questionsPerPage && currentQuestion <= questions.length; i++) {
       const q = questions[currentQuestion - 1];
-      pageInput[`questionNumber${currentQuestion}`] = `${currentQuestion}.`;
-      pageInput[`questionText${currentQuestion}`] = q.questionText || '';
-      pageInput[`choices${currentQuestion}`] = formatChoices(q.choices);
+      const qNum = currentQuestion;
+      
+      pageInput[`questionNumber${qNum}`] = `${qNum}.`;
+      
+      // 이미지로 변환된 경우 (수식 등)
+      if (q.renderedImageUrl) {
+        pageInput[`questionImage${qNum}`] = q.renderedImageUrl;
+      } 
+      // 기존 이미지가 있는 경우
+      else if (q.questionImageUrl) {
+        pageInput[`questionImage${qNum}`] = q.questionImageUrl;
+      }
+      // 텍스트 문제 (지문 포함)
+      else {
+        let fullText = '';
+        
+        // 지문이 있는 경우
+        if (q.isFirstInPassage && (q.passageText || q.passageHtml)) {
+          const passageText = q.passageText || stripHtml(q.passageHtml || '');
+          fullText += `【지문】\n${passageText}\n\n`;
+        }
+        
+        // 문제 텍스트
+        const questionText = q.questionText || stripHtml(q.questionHtml || '');
+        fullText += questionText;
+        
+        pageInput[`questionText${qNum}`] = fullText;
+        
+        // 보기
+        if (q.choices && q.choices.length > 0) {
+          pageInput[`choices${qNum}`] = formatChoices(q.choices);
+        }
+      }
       
       if (examData.includeAnswer) {
-        pageInput[`answer${currentQuestion}`] = `정답: ${q.answer}`;
+        pageInput[`answer${qNum}`] = `정답: ${q.answer}`;
       }
       
       currentQuestion++;
@@ -370,13 +457,18 @@ export const generateInputData = (examData, questions, layoutType = 'STANDARD') 
 };
 
 /**
- * 보기 포맷팅 함수
+ * 보기 포맷팅 함수 - HTML 지원
  */
 function formatChoices(choices) {
   if (!choices || choices.length === 0) return '';
   
   return choices.map((choice, index) => {
     const num = ['①', '②', '③', '④', '⑤'][index];
+    // choice가 객체인 경우 (HTML 포함)
+    if (typeof choice === 'object' && choice !== null) {
+      return `${num} ${choice.text || ''}`;
+    }
+    // choice가 문자열인 경우
     return `${num} ${choice}`;
   }).join('\n');
 }

@@ -1091,14 +1091,21 @@ const cancelSelection = () => {
 const proceedToNext = () => {
   if (isCreatingNew.value) {
     emit('selectNew')
+    emit('next')
   } else if (selectedExamId.value) {
+    // 선택된 시험지 찾기
     const exam = searchResults.value.find(e => e.id === selectedExamId.value) ||
                  recentExams.value.find(e => e.id === selectedExamId.value) ||
-                 popularExams.value.find(e => e.id === selectedExamId.value)
-    emit('selectExisting', exam)
+                 popularExams.value.find(e => e.id === selectedExamId.value) ||
+                 selectedExamObject.value
+    
+    if (exam) {
+      // selectExisting 이벤트만 발생시킴
+      // TestWizardView의 handleSelectExisting에서 Step2로 이동 처리
+      emit('selectExisting', exam)
+    }
   }
-  store.setCurrentStep(1)
-  emit('next')
+  // store.setCurrentStep은 TestWizardView에서 처리하므로 여기서는 제거
 }
 
 const getSubjectName = (subject) => {

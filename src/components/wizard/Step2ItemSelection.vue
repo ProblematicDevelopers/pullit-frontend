@@ -1,908 +1,1268 @@
 <!--
-  시험지 마법사 Step 2: 문항 선택 (Enhanced)
-
-  이 컴포넌트는 시험지에 포함할 문항들을 선택하는 단계입니다.
-  주요 기능:
-  - 실제 Backend API 연동
-  - Elasticsearch 유사 문항 검색
-  - 실시간 검색 with 디바운싱
-  - 가상 스크롤링으로 성능 최적화
-  - Toast 알림 시스템
-  - 반응형 디자인
-  - 문항 이미지 lazy loading
-  - 향상된 UX/UI
+  Step2 문항 선택 - UI 개선 버전
+  
+  개선사항:
+  - 통합 헤더로 공간 최적화
+  - 사이드바 필터 방식으로 변경
+  - 트리 구조 기본 확장
+  - 컨텐츠 영역 최대화
+  - 깔끔한 디자인
 -->
 
 <template>
-  <div class="step2-container">
-    <!-- 헤더 영역 -->
-    <div class="selection-header">
+  <div class="step2-improved">
+    <!-- 통합 컴팩트 헤더 -->
+    <header class="unified-header">
       <div class="header-left">
-        <button class="btn-back" @click="handleBack">← 이전</button>
-        <h2>문항 선택</h2>
+        <button class="btn-back" @click="handleBack">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          이전
+        </button>
+        <div class="header-info">
+          <h2>문항 선택</h2>
+          <div class="exam-meta">
+            <span class="meta-item">{{ examInfo?.gradeName }}</span>
+            <span class="divider">·</span>
+            <span class="meta-item">{{ examInfo?.subjectName }}</span>
+            <span class="divider">·</span>
+            <span class="meta-item primary">{{ selectedItems.length }}문항 선택</span>
+          </div>
+        </div>
       </div>
-      <div class="header-info">
-        <span class="exam-name">{{ examInfo?.examName || '새 시험지' }}</span>
-        <span class="divider">|</span>
-        <span class="grade">{{ examInfo?.gradeName }}</span>
-        <span class="divider">|</span>
-        <span class="subject">{{ examInfo?.subjectName }}</span>
-      </div>
-    </div>
-
-    <!-- 메인 콘텐츠 영역 -->
-    <div class="main-content">
-      <!-- 왼쪽 패널: 교과서 선택 및 필터 (40%) -->
-      <div class="left-panel">
-        <div class="sidebar-scroll">
-          <!-- 교과서 선택 섹션 -->
-          <div class="textbook-section" v-if="subjects.length > 0">
-            <div class="section-header">
-              <h3>
-                <span class="section-icon">📚</span>
-                교과서 선택
-              </h3>
-              <span class="section-desc">하나의 교과서를 선택하여 문제를 검색합니다</span>
-            </div>
-
-            <!-- 로딩 상태 -->
-            <div v-if="isSubjectsLoading" class="textbook-loading">
-              <div class="spinner"></div>
-              <p>교과서 정보를 불러오는 중...</p>
-            </div>
-
-            <!-- 교과서 그리드 -->
-            <div v-else class="textbook-grid">
-              <div
-                v-for="subject in subjects"
-                :key="subject.subjectId"
-                :class="['textbook-card', { 'selected': selectedTextbook === subject.subjectId }]"
-                @click="selectTextbook(subject.subjectId)"
-              >
-                <!-- 교과서 표지 이미지 -->
-                <div class="textbook-icon">
-                  <img
-                    v-if="subject.subjectThumbnail"
-                    :src="subject.subjectThumbnail"
-                    :alt="subject.subjectName"
-                    class="textbook-cover"
-                    @error="handleCoverImageError($event)"
-                  />
-                  <span v-else>📖</span>
-                </div>
-
-                <div class="textbook-info">
-                  <h5>{{ subject.subjectName }}</h5>
-                  <p class="publisher">{{ subject.gradeName }} | {{ subject.areaName }}</p>
-                  <span class="year-badge">{{ subject.termName || '전체' }}</span>
-                </div>
-
-                <div class="item-count">
-                  <span class="count-number">{{ subject.itemCount || 0 }}</span>
-                  <span class="count-label">문항</span>
-                </div>
-
-                <div class="textbook-radio">
-                  <span v-if="selectedTextbook === subject.subjectId">●</span>
-                  <span v-else>○</span>
-                </div>
-              </div>
-            </div>
-          </div> <!-- textbook-section 닫기 -->
-
-          <!-- 필터 섹션 -->
-          <div class="filter-section">
-            <div class="section-header">
-              <h3>
-                <span class="section-icon">⚙️</span>
-                상세 필터
-              </h3>
-              <button class="btn-reset" @click="resetFilters">
-                <span>↻</span> 초기화
-              </button>
-            </div>
-
-            <div class="filter-content">
-              <!-- 단원 선택 (트리 구조) -->
-              <div class="filter-group" v-if="selectedTextbook && chapterTree.length > 0">
-                <label class="filter-label">
-                  <span class="label-icon">📑</span>
-                  단원 선택
-                  <span class="filter-subtitle">대단원을 클릭하여 중단원을 선택하세요</span>
-                </label>
-                <div class="chapter-tree-container">
-                  <div class="chapter-tree">
-                    <div v-for="largeChapter in chapterTree" :key="largeChapter.id" class="large-chapter">
-                      <div
-                        class="large-chapter-header"
-                        @click="toggleLargeChapter(largeChapter.id)"
-                        :class="{ 'expanded': expandedChapters.includes(largeChapter.id) }"
-                      >
-                        <div class="chapter-header-left">
-                          <span class="expand-icon">
-                            <svg v-if="!expandedChapters.includes(largeChapter.id)" width="16" height="16" viewBox="0 0 24 24" fill="none">
-                              <path d="M9 5L16 12L9 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                            <svg v-else width="16" height="16" viewBox="0 0 24 24" fill="none">
-                              <path d="M5 9L12 16L19 9" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                            </svg>
-                          </span>
-                          <span class="chapter-name">{{ largeChapter.name }}</span>
-                        </div>
-                        <div class="chapter-header-right">
-                          <span class="item-count">
-                            <span class="count-value">{{ largeChapter.itemCount || 0 }}</span>
-                            <span class="count-label">문항</span>
-                          </span>
-                          <span v-if="getSelectedCountInChapter(largeChapter) > 0" class="selected-indicator">
-                            {{ getSelectedCountInChapter(largeChapter) }}개 선택
-                          </span>
-                        </div>
-                      </div>
-
-                      <transition name="slide">
-                        <div v-if="expandedChapters.includes(largeChapter.id)" class="medium-chapters">
-                          <div v-if="largeChapter.mediumChapters && largeChapter.mediumChapters.length > 0">
-                            <label
-                              v-for="mediumChapter in largeChapter.mediumChapters"
-                              :key="mediumChapter.id"
-                              class="medium-chapter-item"
-                              :class="{ 'selected': selectedMediumChapters.includes(mediumChapter.id) }"
-                            >
-                              <div class="checkbox-wrapper">ㄴ
-                                <input
-                                  type="checkbox"
-                                  :id="`medium-${mediumChapter.id}`"
-                                  :value="mediumChapter.id"
-                                  v-model="selectedMediumChapters"
-                                  @change="updateChapterFilter"
-                                />
-                                <label :for="`medium-${mediumChapter.id}`" class="custom-checkbox">
-                                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" class="check-icon">
-                                    <path d="M5 12L10 17L20 7" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                                  </svg>
-                                </label>
-                              </div>
-                              <div class="chapter-info">
-                                <span class="chapter-name">{{ mediumChapter.name }}</span>
-                              </div>
-                              <span class="item-count">
-                                <span class="count-value">{{ mediumChapter.itemCount || 0 }}</span>
-                                <span class="count-label">문항</span>
-                              </span>
-                            </label>
-                          </div>
-                          <div v-else class="no-medium-chapters">
-                            중단원이 없습니다
-                          </div>
-                        </div>
-                      </transition>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 교과서 미선택 안내 -->
-              <div v-else-if="!selectedTextbook" class="filter-group">
-                <div class="no-textbook-message">
-                  <span class="icon">📚</span>
-                  <p>먼저 교과서를 선택해주세요</p>
-                </div>
-              </div>
-
-              <!-- 난이도 선택 (실제 DB 코드 사용) -->
-              <div class="filter-group">
-                <label class="filter-label">
-                  <span class="label-icon">📊</span>
-                  난이도
-                </label>
-                <div class="difficulty-buttons">
-                  <button
-                    :class="['difficulty-btn', 'diff-very-high', { 'active': filters.difficulties.includes('5') }]"
-                    @click="toggleDifficulty('5')"
-                  >
-                    <span class="diff-icon">⚫</span>
-                    <span>최상</span>
-                  </button>
-                  <button
-                    :class="['difficulty-btn', 'diff-high', { 'active': filters.difficulties.includes('4') }]"
-                    @click="toggleDifficulty('4')"
-                  >
-                    <span class="diff-icon">🔴</span>
-                    <span>상</span>
-                  </button>
-                  <button
-                    :class="['difficulty-btn', 'diff-medium', { 'active': filters.difficulties.includes('3') }]"
-                    @click="toggleDifficulty('3')"
-                  >
-                    <span class="diff-icon">🟡</span>
-                    <span>중</span>
-                  </button>
-                  <button
-                    :class="['difficulty-btn', 'diff-low', { 'active': filters.difficulties.includes('2') }]"
-                    @click="toggleDifficulty('2')"
-                  >
-                    <span class="diff-icon">🟢</span>
-                    <span>하</span>
-                  </button>
-                  <button
-                    :class="['difficulty-btn', 'diff-very-low', { 'active': filters.difficulties.includes('1') }]"
-                    @click="toggleDifficulty('1')"
-                  >
-                    <span class="diff-icon">⚪</span>
-                    <span>최하</span>
-                  </button>
-                </div>
-              </div>
-
-              <!-- 문제 유형 (실제 DB 코드 사용) -->
-              <div class="filter-group">
-                <label class="filter-label">
-                  <span class="label-icon">📝</span>
-                  문제 유형
-                </label>
-                <div class="type-buttons">
-                  <button
-                    :class="['type-btn', { 'active': questionFormFilters.includes('50') }]"
-                    @click="toggleQuestionForm('50')"
-                  >
-                    <span class="type-icon">🔘</span>
-                    <span>5지선택</span>
-                  </button>
-                  <button
-                    :class="['type-btn', { 'active': questionFormFilters.includes('60') }]"
-                    @click="toggleQuestionForm('60')"
-                  >
-                    <span class="type-icon">✏️</span>
-                    <span>단답유순</span>
-                  </button>
-                  <button
-                    :class="['type-btn', { 'active': questionFormFilters.includes('70') }]"
-                    @click="toggleQuestionForm('70')"
-                  >
-                    <span class="type-icon">📄</span>
-                    <span>서술형</span>
-                  </button>
-                </div>
-              </div>
-
-              <button class="btn-search" @click="searchItems">
-                <span>🔍</span> 검색하기
-              </button>
-            </div>
-          </div> <!-- filter-section 닫기 -->
-        </div> <!-- sidebar-scroll 닫기 -->
-      </div> <!-- left-panel 닫기 -->
-
-      <!-- 오른쪽 패널: 문항 목록 (60%) -->
-      <div class="right-panel">
-        <div class="items-header">
-          <span>검색 결과 ({{ totalItems }}개)</span>
-          <label class="select-all">
-            <input type="checkbox" @change="toggleSelectAll" :checked="isAllSelected">
-            전체 선택
-          </label>
+      
+      <div class="header-right">
+        <!-- 검색바 -->
+        <div class="search-wrapper">
+          <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" 
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <input
+            v-model="searchKeyword"
+            type="text"
+            placeholder="문항 검색..."
+            class="search-input"
+            @input="handleSearchWithDebounce"
+          />
         </div>
 
-        <!-- 로딩 상태 -->
-        <div v-if="isLoading" class="loading-state">
-          <div class="spinner"></div>
-          <p>문항을 불러오는 중...</p>
-        </div>
-
-        <!-- 문항 그리드 (가상 스크롤링 적용) -->
-        <div v-else class="items-grid" ref="itemsContainer">
-          <div
-            v-for="item in visibleItems"
-            :key="item.itemId"
-            :class="['item-card', { selected: isSelected(item.itemId) }]"
-            :style="{ transform: `translateY(${offsetY}px)` }"
-            @click="toggleSelection(item)"
+        <!-- 뷰 모드 토글 -->
+        <div class="view-toggle">
+          <button 
+            :class="['view-btn', { active: viewMode === 'grid' }]"
+            @click="viewMode = 'grid'"
+            title="그리드 보기"
           >
-            <!-- 가상 스크롤 스페이서 -->
-            <div class="virtual-spacer" :style="{ height: totalHeight + 'px' }"></div>
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <rect x="3" y="3" width="7" height="7" stroke="currentColor" stroke-width="2"/>
+              <rect x="14" y="3" width="7" height="7" stroke="currentColor" stroke-width="2"/>
+              <rect x="3" y="14" width="7" height="7" stroke="currentColor" stroke-width="2"/>
+              <rect x="14" y="14" width="7" height="7" stroke="currentColor" stroke-width="2"/>
+            </svg>
+          </button>
+          <button 
+            :class="['view-btn', { active: viewMode === 'list' }]"
+            @click="viewMode = 'list'"
+            title="리스트 보기"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <path d="M8 6H21M8 12H21M8 18H21M3 6H3.01M3 12H3.01M3 18H3.01" 
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
 
-            <!-- 카드 헤더 -->
-            <div class="item-card-header">
-              <div class="item-header-left">
-                <label class="custom-item-checkbox">
-                  <input
-                    type="checkbox"
-                    :checked="isSelected(item.itemId)"
-                    @click.stop="toggleSelection(item)"
-                  />
-                  <span class="checkbox-mark">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path d="M5 12L10 17L20 7" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
-                    </svg>
-                  </span>
-                </label>
-                <span class="item-number">{{ item.topicChapterName || item.chapterName || `No. ${item.itemId}` }}</span>
-              </div>
-              <div class="item-header-right">
-                <span :class="['difficulty-badge', `difficulty-${item.difficulty?.code}`]">
-                  {{ getDifficultyName(item.difficulty?.code) }}
-                </span>
-                <span class="type-badge">
-                  {{ getQuestionFormName(item.questionForm?.code) }}
-                </span>
-              </div>
+        <!-- 선택된 문항 패널 토글 -->
+        <button 
+          class="btn-selected"
+          @click="showSelectedPanel = !showSelectedPanel"
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+            <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15M9 5C9 6.10457 9.89543 7 11 7H13C14.1046 7 15 6.10457 15 5M9 5C9 3.89543 9.89543 3 11 3H13C14.1046 3 15 3.89543 15 5" 
+                  stroke="currentColor" stroke-width="2"/>
+          </svg>
+          선택 목록
+          <span class="badge">{{ selectedItems.length }}</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- 메인 레이아웃 -->
+    <div class="main-layout">
+      <!-- 왼쪽 사이드바 필터 -->
+      <aside class="filter-sidebar" :class="{ collapsed: filterCollapsed }">
+        <div class="sidebar-header">
+          <h3>필터</h3>
+          <button 
+            class="btn-toggle"
+            @click="filterCollapsed = !filterCollapsed"
+            :title="filterCollapsed ? '필터 열기' : '필터 닫기'"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path :d="filterCollapsed ? 'M9 18L15 12L9 6' : 'M15 18L9 12L15 6'" 
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+
+        <div v-if="!filterCollapsed" class="filter-content">
+          <!-- 학년 선택 -->
+          <div class="filter-section">
+            <h4>학년</h4>
+            <div class="grade-filters">
+              <label 
+                v-for="grade in gradeOptions"
+                :key="grade.code"
+                class="filter-chip"
+                :class="{ active: selectedGrade === grade.code }"
+              >
+                <input 
+                  type="radio"
+                  :value="grade.code"
+                  v-model="selectedGrade"
+                  @change="handleGradeChange"
+                />
+                <span>{{ grade.name }}</span>
+              </label>
             </div>
+          </div>
 
-            <!-- 문항 내용 -->
-            <div class="item-content">
-              <!-- HTML 콘텐츠가 있는 경우 (우선 표시) -->
-              <div v-if="item.hasHtmlData && item.questionHtml" class="item-html-content" ref="mathContent">
-                <div class="question-text mathjax-content" v-html="item.questionHtml"></div>
+          <!-- 과목 선택 -->
+          <div class="filter-section">
+            <h4>과목</h4>
+            <div class="subject-filters">
+              <label 
+                v-for="subject in subjectOptions"
+                :key="subject.code"
+                class="filter-chip"
+                :class="{ active: selectedSubject === subject.code }"
+              >
+                <input 
+                  type="radio"
+                  :value="subject.code"
+                  v-model="selectedSubject"
+                  @change="handleSubjectChange"
+                />
+                <span>{{ subject.name }}</span>
+              </label>
+            </div>
+          </div>
 
-                <!-- 선택지 HTML 표시 -->
-                <div v-if="hasChoices(item)" class="choices-container">
-                  <div class="choices-title">선택지:</div>
-                  <div class="choices-list">
-                    <div v-if="item.choice1Html" class="choice-item mathjax-content">
-                      <span class="choice-number">①</span>
-                      <span v-html="item.choice1Html"></span>
-                    </div>
-                    <div v-if="item.choice2Html" class="choice-item mathjax-content">
-                      <span class="choice-number">②</span>
-                      <span v-html="item.choice2Html"></span>
-                    </div>
-                    <div v-if="item.choice3Html" class="choice-item mathjax-content">
-                      <span class="choice-number">③</span>
-                      <span v-html="item.choice3Html"></span>
-                    </div>
-                    <div v-if="item.choice4Html" class="choice-item mathjax-content">
-                      <span class="choice-number">④</span>
-                      <span v-html="item.choice4Html"></span>
-                    </div>
-                    <div v-if="item.choice5Html" class="choice-item mathjax-content">
-                      <span class="choice-number">⑤</span>
-                      <span v-html="item.choice5Html"></span>
-                    </div>
-                  </div>
+          <!-- 교과서 선택 -->
+          <div class="filter-section">
+            <h4>교과서</h4>
+            <select 
+              v-model="selectedTextbook" 
+              @change="handleTextbookChange"
+              class="select-input"
+              :disabled="!selectedGrade || !selectedSubject"
+            >
+              <option value="">{{ (!selectedGrade || !selectedSubject) ? '학년과 과목을 먼저 선택하세요' : '전체' }}</option>
+              <option 
+                v-for="textbook in textbooks" 
+                :key="textbook.subjectId"
+                :value="textbook.subjectId"
+              >
+                {{ textbook.subjectName }} ({{ textbook.itemCount }}문항)
+              </option>
+            </select>
+          </div>
+
+          <!-- 단원 트리 -->
+          <div class="filter-section" v-if="chapterTree.length > 0">
+            <h4>단원</h4>
+            <div class="chapter-tree">
+              <div 
+                v-for="chapter in chapterTree" 
+                :key="chapter.id"
+                class="chapter-node"
+              >
+                <label class="chapter-item">
+                  <input 
+                    type="checkbox"
+                    :value="chapter.id"
+                    :checked="isChapterSelected(chapter)"
+                    @change="handleLargeChapterChange(chapter, $event)"
+                  />
+                  <span class="chapter-name">{{ chapter.name }}</span>
+                  <span class="item-count">{{ chapter.itemCount }}</span>
+                </label>
+                
+                <!-- 중단원 -->
+                <div v-if="chapter.children" class="sub-chapters">
+                  <label 
+                    v-for="subChapter in chapter.children"
+                    :key="subChapter.id"
+                    class="chapter-item sub"
+                  >
+                    <input 
+                      type="checkbox"
+                      :value="subChapter.id"
+                      v-model="selectedMediumChapters"
+                      @change="handleMediumChapterChange"
+                    />
+                    <span class="chapter-name">{{ subChapter.name }}</span>
+                    <span class="item-count">{{ subChapter.itemCount }}</span>
+                  </label>
                 </div>
               </div>
-
-              <!-- HTML이 없고 이미지가 있는 경우 -->
-              <div v-else-if="item.hasImageData && item.questionImageUrl" class="item-image-container">
-                <img
-                  :src="item.questionImageUrl"
-                  :alt="`문항 ${item.itemId}`"
-                  loading="lazy"
-                  @error="handleImageError($event, item)"
-                  @click.stop="showImageModal(item.questionImageUrl)"
-                  class="item-image"
-                />
-                <button class="btn-zoom" @click.stop="showImageModal(item.questionImageUrl)">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                  </svg>
-                </button>
-              </div>
-
-              <!-- 콘텐츠가 없는 경우 -->
-              <div v-else class="item-placeholder">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 12H15M9 16H15M17 21H7C5.89543 21 5 20.1046 5 19V5C5 3.89543 5.89543 3 7 3H12.5858C12.851 3 13.1054 3.10536 13.2929 3.29289L18.7071 8.70711C18.8946 8.89464 19 9.149 19 9.41421V19C19 20.1046 18.1046 21 17 21Z" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-                </svg>
-                <span>문항 내용이 없습니다</span>
-              </div>
             </div>
+          </div>
 
-            <!-- 카드 푸터 -->
-            <div class="item-card-footer">
-              <div class="chapter-info">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                  <path d="M12 6V12L16 14M22 12C22 17.5228 17.5228 22 12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12Z" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                <span>{{ item.chapterName || item.chapter?.name || '단원 미지정' }}</span>
-              </div>
-              <button
-                class="btn-similar"
-                @click.stop="showSimilarItems(item)"
-                :disabled="isSimilarItemsLoading"
+          <!-- 난이도 필터 -->
+          <div class="filter-section">
+            <h4>난이도</h4>
+            <div class="difficulty-filters">
+              <label 
+                v-for="level in difficultyLevels"
+                :key="level.code"
+                class="filter-chip"
+                :class="{ active: difficultyFilters.includes(level.code) }"
               >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 9L3 3M9 3L3 9M15 9L21 3M21 9L15 3M15 15L21 21M15 21L21 15M9 15L3 21M3 15L9 21" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                </svg>
-                <span>유사</span>
-              </button>
+                <input 
+                  type="checkbox"
+                  :value="level.code"
+                  v-model="difficultyFilters"
+                  @change="applyFilters"
+                />
+                <span :class="'difficulty-' + level.code">{{ level.name }}</span>
+              </label>
             </div>
+          </div>
+
+          <!-- 문제 유형 필터 -->
+          <div class="filter-section">
+            <h4>문제 유형</h4>
+            <div class="type-filters">
+              <label 
+                v-for="type in questionTypes"
+                :key="type.code"
+                class="filter-chip"
+                :class="{ active: questionFormFilters.includes(type.code) }"
+              >
+                <input 
+                  type="checkbox"
+                  :value="type.code"
+                  v-model="questionFormFilters"
+                  @change="applyFilters"
+                />
+                <span>{{ type.name }}</span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 필터 초기화 -->
+          <button 
+            v-if="hasActiveFilters"
+            class="btn-reset-filters"
+            @click="resetFilters"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M4 12V9C4 5.68629 6.68629 3 10 3H20M20 3L17 6M20 3L17 0M20 12V15C20 18.3137 17.3137 21 14 21H4M4 21L7 18M4 21L7 24" 
+                    stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            필터 초기화
+          </button>
+        </div>
+      </aside>
+
+      <!-- 중앙 컨텐츠 영역 -->
+      <main class="content-area">
+        <!-- 컨텐츠 헤더 -->
+        <div class="content-header">
+          <div class="result-info">
+            <span>검색 결과</span>
+            <strong>{{ totalItems }}개</strong>
+          </div>
+          
+          <div class="content-actions">
+            <label class="select-all">
+              <input 
+                type="checkbox" 
+                @change="toggleSelectAll"
+                :checked="isAllSelected"
+              />
+              전체 선택
+            </label>
+            
+            <button 
+              class="btn-random"
+              @click="showRandomGenerator = true"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M19 3L21 5L19 7M5 12H21M19 17L21 19L19 21M5 19H9M14 5H5" 
+                      stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              랜덤 생성
+            </button>
+          </div>
+        </div>
+
+        <!-- 로딩 오버레이 -->
+        <div v-if="isLoading" class="loading-overlay">
+          <div class="loading-content">
+            <div class="spinner"></div>
+            <p>문항을 불러오는 중...</p>
           </div>
         </div>
 
         <!-- 빈 상태 -->
         <div v-if="!isLoading && items.length === 0" class="empty-state">
-          <p>검색 결과가 없습니다.</p>
-          <p class="empty-hint">다른 검색 조건을 시도해보세요.</p>
+          <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" 
+                  stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+          <h3>검색 결과가 없습니다</h3>
+          <p>다른 검색어나 필터를 시도해보세요</p>
+        </div>
+
+        <!-- 지문 그룹 표시 (passageId가 있는 문제들) -->
+        <div v-if="!isLoading && hasPassageGroups && viewMode === 'grid'" class="passage-groups">
+          <div 
+            v-for="group in passageGroups"
+            :key="group.passageId"
+            class="passage-group"
+          >
+            <!-- 왼쪽: 지문 영역 -->
+            <div class="passage-section">
+              <div class="passage-header">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15M9 5C9 6.10457 9.89543 7 11 7H13C14.1046 7 15 6.10457 15 5M9 5C9 3.89543 9.89543 3 11 3H13C14.1046 3 15 3.89543 15 5" 
+                        stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                </svg>
+                <span>지문</span>
+              </div>
+              <div class="passage-content">
+                <div v-if="group.passageHtml" v-html="sanitizeHtml(group.passageHtml)" class="passage-text mathjax-content" data-mathjax-pending="true"></div>
+                <div v-else-if="group.passageText" class="passage-text">{{ group.passageText }}</div>
+              </div>
+            </div>
+            
+            <!-- 오른쪽: 문제 영역 -->
+            <div class="passage-items">
+              <div 
+                v-for="item in group.items"
+                :key="item.itemId"
+                :class="['item-card', { selected: isSelected(item.itemId) }]"
+                @click="toggleSelection(item)"
+              >
+                <!-- 카드 헤더 -->
+                <div class="card-header">
+                  <label class="item-checkbox">
+                    <input
+                      type="checkbox"
+                      :checked="isSelected(item.itemId)"
+                      @click.stop="toggleSelection(item)"
+                    />
+                    <span class="checkbox-icon"></span>
+                  </label>
+                  <span class="item-id">#{{ item.itemId }}</span>
+                  <div class="item-badges">
+                    <span :class="'badge-difficulty difficulty-' + item.difficulty?.code">
+                      {{ item.difficulty?.name }}
+                    </span>
+                    <span class="badge-type">{{ item.questionForm?.name }}</span>
+                  </div>
+                </div>
+                
+                <!-- 카드 내용 -->
+                <div class="card-body">
+                  <!-- 문제 내용 -->
+                  <div class="question-section">
+                    <div v-if="item.questionHtml" class="item-html mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
+                    <div v-else-if="item.questionImageUrl" class="item-image">
+                      <img 
+                        :src="item.questionImageUrl" 
+                        :alt="`문항 ${item.itemId}`"
+                        loading="lazy"
+                        @click.stop="showImageModal(item.questionImageUrl)"
+                      />
+                    </div>
+                    <div v-else class="item-text">
+                      {{ item.questionText || '내용 없음' }}
+                    </div>
+                  </div>
+
+                  <!-- 선택지 (객관식인 경우) -->
+                  <div v-if="hasChoices(item)" class="item-choices">
+                    <div v-if="item.choice1Html || item.choice1Text" class="choice">
+                      ① <span v-if="item.choice1Html" v-html="sanitizeHtml(item.choice1Html)" class="mathjax-content" data-mathjax-pending="true"></span>
+                      <span v-else>{{ item.choice1Text }}</span>
+                    </div>
+                    <div v-if="item.choice2Html || item.choice2Text" class="choice">
+                      ② <span v-if="item.choice2Html" v-html="sanitizeHtml(item.choice2Html)" class="mathjax-content" data-mathjax-pending="true"></span>
+                      <span v-else>{{ item.choice2Text }}</span>
+                    </div>
+                    <div v-if="item.choice3Html || item.choice3Text" class="choice">
+                      ③ <span v-if="item.choice3Html" v-html="sanitizeHtml(item.choice3Html)" class="mathjax-content" data-mathjax-pending="true"></span>
+                      <span v-else>{{ item.choice3Text }}</span>
+                    </div>
+                    <div v-if="item.choice4Html || item.choice4Text" class="choice">
+                      ④ <span v-if="item.choice4Html" v-html="sanitizeHtml(item.choice4Html)" class="mathjax-content" data-mathjax-pending="true"></span>
+                      <span v-else>{{ item.choice4Text }}</span>
+                    </div>
+                    <div v-if="item.choice5Html || item.choice5Text" class="choice">
+                      ⑤ <span v-if="item.choice5Html" v-html="sanitizeHtml(item.choice5Html)" class="mathjax-content" data-mathjax-pending="true"></span>
+                      <span v-else>{{ item.choice5Text }}</span>
+                    </div>
+                  </div>
+                </div>
+                
+                <!-- 카드 푸터 -->
+                <div class="card-footer">
+                  <span class="chapter-info">{{ item.chapterName }}</span>
+                  <div class="card-actions">
+                    <button 
+                      class="btn-icon"
+                      @click.stop="showItemDetail(item)"
+                      title="상세보기"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z" 
+                              stroke="currentColor" stroke-width="2"/>
+                        <path d="M2.45825 12C3.73253 7.94288 7.52281 5 12 5C16.4772 5 20.2675 7.94288 21.5418 12C20.2675 16.0571 16.4772 19 12 19C7.52281 19 3.73253 16.0571 2.45825 12Z" 
+                              stroke="currentColor" stroke-width="2"/>
+                      </svg>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 일반 문항 그리드 뷰 (지문이 없는 문제들) -->
+        <div v-if="!hasPassageGroups && viewMode === 'grid'" class="items-grid">
+          <div
+            v-for="item in paginatedItems"
+            :key="item.itemId"
+            :class="['item-card', { selected: isSelected(item.itemId) }]"
+            @click="toggleSelection(item)"
+          >
+            <!-- 카드 헤더 -->
+            <div class="card-header">
+              <label class="item-checkbox">
+                <input
+                  type="checkbox"
+                  :checked="isSelected(item.itemId)"
+                  @click.stop="toggleSelection(item)"
+                />
+                <span class="checkbox-icon"></span>
+              </label>
+              <span class="item-id">#{{ item.itemId }}</span>
+              <div class="item-badges">
+                <span :class="'badge-difficulty difficulty-' + item.difficulty?.code">
+                  {{ item.difficulty?.name }}
+                </span>
+                <span class="badge-type">{{ item.questionForm?.name }}</span>
+              </div>
+            </div>
+
+            <!-- 카드 내용 -->
+            <div class="card-body">
+              <!-- 문제 내용 -->
+              <div class="question-section">
+                <div v-if="item.questionHtml" class="item-html mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
+                <div v-else-if="item.questionImageUrl" class="item-image">
+                  <img 
+                    :src="item.questionImageUrl" 
+                    :alt="`문항 ${item.itemId}`"
+                    loading="lazy"
+                    @click.stop="showImageModal(item.questionImageUrl)"
+                  />
+                </div>
+                <div v-else class="item-text">
+                  {{ item.questionText || '내용 없음' }}
+                </div>
+              </div>
+
+              <!-- 선택지 (객관식인 경우) -->
+              <div v-if="hasChoices(item)" class="item-choices">
+                <div v-if="item.choice1Html || item.choice1Text" class="choice">
+                  ① <span v-if="item.choice1Html" v-html="sanitizeHtml(item.choice1Html)" class="mathjax-content" data-mathjax-pending="true"></span>
+                  <span v-else>{{ item.choice1Text }}</span>
+                </div>
+                <div v-if="item.choice2Html || item.choice2Text" class="choice">
+                  ② <span v-if="item.choice2Html" v-html="sanitizeHtml(item.choice2Html)" class="mathjax-content" data-mathjax-pending="true"></span>
+                  <span v-else>{{ item.choice2Text }}</span>
+                </div>
+                <div v-if="item.choice3Html || item.choice3Text" class="choice">
+                  ③ <span v-if="item.choice3Html" v-html="sanitizeHtml(item.choice3Html)" class="mathjax-content" data-mathjax-pending="true"></span>
+                  <span v-else>{{ item.choice3Text }}</span>
+                </div>
+                <div v-if="item.choice4Html || item.choice4Text" class="choice">
+                  ④ <span v-if="item.choice4Html" v-html="sanitizeHtml(item.choice4Html)" class="mathjax-content" data-mathjax-pending="true"></span>
+                  <span v-else>{{ item.choice4Text }}</span>
+                </div>
+                <div v-if="item.choice5Html || item.choice5Text" class="choice">
+                  ⑤ <span v-if="item.choice5Html" v-html="sanitizeHtml(item.choice5Html)" class="mathjax-content" data-mathjax-pending="true"></span>
+                  <span v-else>{{ item.choice5Text }}</span>
+                </div>
+              </div>
+            </div>
+
+            <!-- 카드 푸터 -->
+            <div class="card-footer">
+              <span class="chapter-info">{{ item.chapterName }}</span>
+              <div class="card-actions">
+                <button 
+                  class="btn-icon"
+                  @click.stop="showItemDetail(item)"
+                  title="상세보기"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z" 
+                          stroke="currentColor" stroke-width="2"/>
+                    <path d="M2.45825 12C3.73253 7.94288 7.52281 5 12 5C16.4772 5 20.2675 7.94288 21.5418 12C20.2675 16.0571 16.4772 19 12 19C7.52281 19 3.73253 16.0571 2.45825 12Z" 
+                          stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </button>
+                <button 
+                  class="btn-icon"
+                  @click.stop="findSimilarItems(item)"
+                  title="유사문항"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15M9 5C9 6.10457 9.89543 7 11 7H13C14.1046 7 15 6.10457 15 5M9 5C9 3.89543 9.89543 3 11 3H13C14.1046 3 15 3.89543 15 5" 
+                          stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- 문항 리스트 뷰 -->
+        <div v-else-if="viewMode === 'list'" class="items-list">
+          <table class="items-table">
+            <thead>
+              <tr>
+                <th width="40">
+                  <input 
+                    type="checkbox" 
+                    @change="toggleSelectAll"
+                    :checked="isAllSelected"
+                  />
+                </th>
+                <th width="80">번호</th>
+                <th>문제</th>
+                <th width="100">난이도</th>
+                <th width="100">유형</th>
+                <th width="150">단원</th>
+                <th width="100">작업</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr 
+                v-for="item in paginatedItems"
+                :key="item.itemId"
+                :class="{ selected: isSelected(item.itemId) }"
+                @click="toggleSelection(item)"
+              >
+                <td>
+                  <input
+                    type="checkbox"
+                    :checked="isSelected(item.itemId)"
+                    @click.stop="toggleSelection(item)"
+                  />
+                </td>
+                <td class="text-center">#{{ item.itemId }}</td>
+                <td class="question-cell">
+                  <div v-if="item.questionHtml" v-html="sanitizeHtml(item.questionHtml)" class="question-preview mathjax-content" data-mathjax-pending="true"></div>
+                  <div v-else>{{ item.questionText || '내용 없음' }}</div>
+                </td>
+                <td class="text-center">
+                  <span :class="'badge-difficulty difficulty-' + item.difficulty?.code">
+                    {{ item.difficulty?.name }}
+                  </span>
+                </td>
+                <td class="text-center">{{ item.questionForm?.name }}</td>
+                <td>{{ item.chapterName }}</td>
+                <td class="text-center">
+                  <button 
+                    class="btn-icon"
+                    @click.stop="showItemDetail(item)"
+                    title="상세보기"
+                  >
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                      <path d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z" 
+                            stroke="currentColor" stroke-width="2"/>
+                      <path d="M2.45825 12C3.73253 7.94288 7.52281 5 12 5C16.4772 5 20.2675 7.94288 21.5418 12C20.2675 16.0571 16.4772 19 12 19C7.52281 19 3.73253 16.0571 2.45825 12Z" 
+                            stroke="currentColor" stroke-width="2"/>
+                    </svg>
+                  </button>
+                </td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
         <!-- 페이지네이션 -->
         <div v-if="totalPages > 1" class="pagination">
-          <button
-            class="page-btn prev"
+          <button 
+            class="page-btn"
+            @click="currentPage = 1"
             :disabled="currentPage === 1"
-            @click="loadPage(currentPage - 1)"
           >
-            ‹
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M11 17L6 12L11 7M18 17L13 12L18 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
           </button>
-
-          <button
-            v-for="page in displayPages"
-            :key="page"
-            :class="['page-btn', { active: page === currentPage }]"
-            @click="loadPage(page)"
-            :disabled="page === '...'"
+          <button 
+            class="page-btn"
+            @click="currentPage--"
+            :disabled="currentPage === 1"
           >
-            {{ page }}
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
           </button>
-
-          <button
-            class="page-btn next"
+          
+          <div class="page-numbers">
+            <button 
+              v-for="page in visiblePages"
+              :key="page"
+              :class="['page-number', { active: page === currentPage }]"
+              @click="currentPage = page"
+            >
+              {{ page }}
+            </button>
+          </div>
+          
+          <button 
+            class="page-btn"
+            @click="currentPage++"
             :disabled="currentPage === totalPages"
-            @click="loadPage(currentPage + 1)"
           >
-            ›
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+          <button 
+            class="page-btn"
+            @click="currentPage = totalPages"
+            :disabled="currentPage === totalPages"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M13 17L18 12L13 7M6 17L11 12L6 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
           </button>
         </div>
-      </div> <!-- right-panel 닫기 -->
-    </div> <!-- main-content 닫기 -->
+      </main>
 
-    <!-- 선택된 문항 플로팅 버튼 및 패널 -->
-    <button
-      class="selected-items-float-btn"
-      @click="showSelectedPanel = !showSelectedPanel"
-    >
-      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-        <path d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <span class="badge" v-if="selectedItems.length > 0">{{ selectedItems.length }}</span>
-    </button>
-
-    <!-- 선택된 문항 모달 -->
-    <div v-if="showSelectedPanel" class="selected-modal" @click="showSelectedPanel = false">
-      <div class="selected-modal-content" @click.stop>
-        <div class="selected-modal-header">
+      <!-- 오른쪽 선택된 문항 패널 -->
+      <aside 
+        v-if="showSelectedPanel" 
+        class="selected-panel"
+      >
+        <div class="panel-header">
           <h3>선택된 문항</h3>
-          <div class="header-right">
-            <span class="selected-count">{{ selectedItems.length }}개</span>
-            <button class="modal-close" @click="showSelectedPanel = false">×</button>
-          </div>
-        </div>
-
-        <!-- 선택된 문항이 없을 때 -->
-        <div v-if="selectedItems.length === 0" class="no-selection">
-          <p>선택된 문항이 없습니다.</p>
-          <p class="hint">문항을 선택해주세요.</p>
-        </div>
-
-        <!-- 선택된 문항 목록 (Step3 스타일) -->
-        <div v-else class="selected-items-list">
-          <div
-            v-for="(item, index) in selectedItems"
-            :key="`selected-${item.itemId}`"
-            class="preview-item-card"
-            draggable="true"
-            @dragstart="handleDragStart($event, index)"
-            @dragover.prevent
-            @drop="handleDrop($event, index)"
+          <button 
+            class="btn-close"
+            @click="showSelectedPanel = false"
           >
-            <div class="preview-item-header">
-              <div class="item-header-left">
-                <span class="drag-handle">≡</span>
-                <span class="preview-item-number">{{ index + 1 }}</span>
-                <div class="preview-item-badges">
-                  <span :class="['badge', `badge-${getDifficultyClass(item.difficulty)}`]">
-                    {{ item.difficulty?.name || '중' }}
-                  </span>
-                  <span class="badge badge-type">
-                    {{ item.questionForm?.name || '객관식' }}
-                  </span>
-                  <span v-if="item.chapterName" class="badge badge-chapter">
-                    {{ item.chapterName }}
-                  </span>
-                </div>
-              </div>
-              <button class="btn-remove" @click="removeItem(item.itemId)" title="문항 제거">
-                ×
-              </button>
-            </div>
-
-            <div class="preview-item-content">
-              <!-- HTML 콘텐츠 우선 표시 -->
-              <div v-if="item.questionHtml" class="preview-item-text mathjax-content" v-html="item.questionHtml"></div>
-              <div v-else-if="item.questionImageUrl" class="preview-item-image">
-                <img :src="item.questionImageUrl" :alt="`문항 ${index + 1}`" />
-              </div>
-              <div v-else class="preview-item-placeholder">
-                문항 ID: {{ item.itemId }}
-              </div>
-
-              <!-- 선택지 표시 -->
-              <div v-if="hasChoices(item)" class="preview-choices-container">
-                <div class="preview-choices-list">
-                  <div v-if="item.choice1Html" class="preview-choice-item mathjax-content">
-                    <span class="choice-number">①</span>
-                    <span v-html="item.choice1Html"></span>
-                  </div>
-                  <div v-if="item.choice2Html" class="preview-choice-item mathjax-content">
-                    <span class="choice-number">②</span>
-                    <span v-html="item.choice2Html"></span>
-                  </div>
-                  <div v-if="item.choice3Html" class="preview-choice-item mathjax-content">
-                    <span class="choice-number">③</span>
-                    <span v-html="item.choice3Html"></span>
-                  </div>
-                  <div v-if="item.choice4Html" class="preview-choice-item mathjax-content">
-                    <span class="choice-number">④</span>
-                    <span v-html="item.choice4Html"></span>
-                  </div>
-                  <div v-if="item.choice5Html" class="preview-choice-item mathjax-content">
-                    <span class="choice-number">⑤</span>
-                    <span v-html="item.choice5Html"></span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M6 18L18 6M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
         </div>
 
-        <!-- 선택된 문항 액션 -->
-        <div class="selected-actions">
-          <button class="btn btn-outline" @click="clearSelection">
+        <div class="selected-summary">
+          <div class="summary-item">
+            <span class="label">총 문항:</span>
+            <span class="value">{{ selectedItems.length }}개</span>
+          </div>
+          <button 
+            v-if="selectedItems.length > 0"
+            class="btn-clear"
+            @click="clearSelection"
+          >
             전체 해제
           </button>
-          <button class="btn btn-outline" @click="randomizeOrder">
-            순서 섞기
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 하단 액션 버튼 -->
-    <div class="footer-actions">
-      <button class="btn btn-secondary" @click="handleBack">
-        ← 이전 단계
-      </button>
-      <div class="footer-info">
-        <span>선택된 문항: {{ selectedItems.length }}개</span>
-      </div>
-      <button
-        class="btn btn-primary"
-        :disabled="selectedItems.length === 0"
-        @click="proceedToNext"
-      >
-        다음 단계 →
-      </button>
-    </div>
-
-    <!-- 이미지 확대 모달 -->
-    <div v-if="showModal" class="image-modal" @click="closeModal">
-      <div class="modal-content" @click.stop>
-        <button class="modal-close" @click="closeModal">×</button>
-        <img :src="modalImageUrl" alt="확대 이미지" />
-      </div>
-    </div>
-
-    <!-- 유사문항 모달 -->
-    <div v-if="showSimilarModal" class="similar-modal" @click="closeSimilarModal">
-      <div class="similar-modal-content" @click.stop>
-        <div class="similar-modal-header">
-          <h3>유사 문항 검색 결과</h3>
-          <button class="modal-close" @click="closeSimilarModal">×</button>
         </div>
 
-        <div class="similar-modal-body">
-          <!-- 기준 문항 -->
-          <div class="base-item-section">
-            <h4>기준 문항</h4>
-            <div class="base-item-card">
-              <div class="item-number">문항 #{{ currentBaseItem?.itemId }}</div>
-              <div class="item-preview">
-                <div v-if="currentBaseItem?.questionHtml" class="item-html-small mathjax-content" v-html="currentBaseItem.questionHtml"></div>
-                <div v-else-if="currentBaseItem?.questionImageUrl" class="item-image-small">
-                  <img :src="currentBaseItem.questionImageUrl" :alt="`문항 ${currentBaseItem.itemId}`" />
-                </div>
-                <div v-else class="no-content">문항 내용 없음</div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 유사 문항 목록 -->
-          <div class="similar-items-section">
-            <h4>유사 문항 ({{ currentSimilarItems.length }}개)</h4>
-
-            <div v-if="isSimilarItemsLoading" class="similar-loading">
-              <div class="spinner"></div>
-              <p>유사 문항을 검색하는 중...</p>
-            </div>
-
-            <div v-else-if="currentSimilarItems.length === 0" class="no-similar-items">
-              <p>유사한 문항을 찾을 수 없습니다.</p>
-            </div>
-
-            <div v-else class="similar-items-list">
-              <div
-                v-for="similar in currentSimilarItems"
-                :key="similar.item_id"
-                :class="['similar-item-card', { 'selected': isSelected(similar.item_id) }]"
-                @click="toggleSelection(similar)"
-              >
-                <div class="item-checkbox">
-                  <input
-                    type="checkbox"
-                    :checked="isSelected(similar.item_id)"
-                    @click.stop="toggleSelection(similar)"
-                  />
-                </div>
-
-                <div class="item-number">문항 #{{ similar.item_id }}</div>
-
-                <div class="item-content-small">
-                  <div v-if="similar.question_url" class="item-image-small">
-                    <img :src="similar.question_url" :alt="`문항 ${similar.item_id}`" loading="lazy" />
-                  </div>
-                  <div v-else class="no-content">문항 이미지 없음</div>
-                </div>
-
-                <div class="similar-item-meta">
-                  <span class="difficulty-badge">난이도 {{ similar.difficulty_code || '-' }}</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div class="similar-modal-footer">
-          <button class="btn btn-secondary" @click="closeSimilarModal">
-            취소
-          </button>
-          <button class="btn btn-primary" @click="selectAllSimilarItems" :disabled="currentSimilarItems.length === 0">
-            모두 선택 ({{ currentSimilarItems.filter(item => !isSelected(item.item_id || item.itemId)).length }}개)
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Toast 알림 컨테이너 -->
-    <div class="toast-container">
-      <transition-group name="toast" tag="div">
-        <div
-          v-for="toast in toasts"
-          :key="`toast-${toast.id}`"
-          :class="['toast', `toast-${toast.type}`]"
+        <div 
+          class="selected-list"
+          @dragover.prevent="handleDragOver"
+          @drop="handleDrop"
+          @dragleave="handleDragLeave"
         >
-          <div class="toast-icon">
-            <span v-if="toast.type === 'success'">✅</span>
-            <span v-else-if="toast.type === 'error'">❌</span>
-            <span v-else-if="toast.type === 'warning'">⚠️</span>
-            <span v-else>ℹ️</span>
+          <!-- 지문으로 그룹화된 문항들 -->
+          <div 
+            v-for="(group, index) in selectedItemGroups"
+            :key="group.id"
+            class="item-group"
+            :draggable="true"
+            @dragstart="handleDragStart(index, 'group')"
+            @dragend="handleDragEnd"
+            @dragover.prevent="handleDragOver"
+            @dragenter.prevent="handleDragEnter(index)"
+            :class="{ 
+              dragging: draggedItem?.index === index && draggedItem?.type === 'group',
+              'drop-target': dropTargetIndex === index
+            }"
+          >
+            <!-- 지문 그룹 헤더 -->
+            <div v-if="group.passageId" class="group-header">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <rect x="4" y="4" width="16" height="16" rx="2" stroke="currentColor" stroke-width="2"/>
+                <path d="M8 10H16M8 14H16" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+              <span class="group-title">지문 #{{ group.passageId }}</span>
+              <span class="group-count">{{ group.items.length }}문항</span>
+            </div>
+            
+            <!-- 그룹 내 문항들 -->
+            <div class="group-items">
+              <div 
+                v-for="(item, itemIndex) in group.items"
+                :key="item.itemId"
+                class="selected-item"
+                :draggable="!group.passageId"
+                @dragstart.stop="!group.passageId && handleDragStart(index, 'item', itemIndex)"
+                :class="{ 'in-passage': group.passageId }"
+              >
+                <div class="drag-handle">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
+                    <circle cx="8" cy="6" r="1.5" fill="currentColor"/>
+                    <circle cx="16" cy="6" r="1.5" fill="currentColor"/>
+                    <circle cx="8" cy="12" r="1.5" fill="currentColor"/>
+                    <circle cx="16" cy="12" r="1.5" fill="currentColor"/>
+                    <circle cx="8" cy="18" r="1.5" fill="currentColor"/>
+                    <circle cx="16" cy="18" r="1.5" fill="currentColor"/>
+                  </svg>
+                </div>
+                <div class="item-info">
+                  <span class="item-number">#{{ item.itemId }}</span>
+                  <span :class="'badge-difficulty difficulty-' + item.difficulty?.code">
+                    {{ item.difficulty?.name }}
+                  </span>
+                </div>
+                <button 
+                  class="btn-remove"
+                  @click="removeFromSelection(item)"
+                  title="제거"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M6 18L18 6M6 6L18 18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
           </div>
-          <div class="toast-message">{{ toast.message }}</div>
-          <button class="toast-close" @click="removeToast(toast.id)">×</button>
         </div>
-      </transition-group>
-    </div>
-  </div> <!-- step2-container 닫기 -->
-</template><script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-import { useItemSelectionStore } from '@/stores/itemSelection'
-import { useTestBankStore } from '@/stores/testBank'
-import { useToast } from '@/composables/useToast'
-import { useDebounce } from '@/composables/useDebounce'
-import { useVirtualScroll } from '@/composables/useVirtualScroll'
-import { storeToRefs } from 'pinia'
-import itemApiService from '@/services/itemApi'
 
-// Props
+        <div class="panel-footer">
+          <button 
+            class="btn-primary"
+            @click="proceedToNext"
+            :disabled="selectedItems.length === 0"
+          >
+            다음 단계
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+          </button>
+        </div>
+      </aside>
+    </div>
+
+    <!-- 랜덤 문항 생성 모달 -->
+    <RandomItemModal
+      :show="showRandomGenerator"
+      :selectedChapters="getSelectedChapterInfo()"
+      :currentFilters="getCurrentFilters()"
+      :existingItems="selectedItems"
+      :textbooks="textbooks"
+      @close="showRandomGenerator = false"
+      @generate="handleRandomGenerate"
+    />
+
+    <!-- 이미지 모달 -->
+    <div v-if="imageModalUrl" class="image-modal" @click="imageModalUrl = null">
+      <img :src="imageModalUrl" @click.stop />
+      <button class="btn-close" @click="imageModalUrl = null">
+        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+          <path d="M6 18L18 6M6 6L18 18" stroke="white" stroke-width="2" stroke-linecap="round"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- 문항 상세 모달 -->
+    <ItemPreviewModal
+      v-if="detailItem"
+      :item="detailItem"
+      @close="detailItem = null"
+      @select="handleItemSelect"
+    />
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, onMounted, watch, nextTick } from 'vue'
+import { useItemSelectionStore } from '@/stores/itemSelection'
+import itemApiService from '@/services/itemApi'
+import chapterApi from '@/services/chapterApi'
+import examApi from '@/services/examApi'
+import { debounce } from 'lodash-es'
+import RandomItemModal from './RandomItemModal.vue'
+import ItemPreviewModal from './ItemPreviewModal.vue'
+import { useMathJax } from '@/composables/useMathJax'
+import { renderMathJaxParallelHybrid, renderMathJaxSmartHybrid } from '@/utils/mathjax-hybrid'
+// import { renderMathJaxSimple } from '@/utils/mathjax-simple'
+import debugMathJax from '@/utils/mathjax-debug'
+
+// Props & Emits
 const props = defineProps({
-  examInfo: {
-    type: Object,
-    required: true
-  }
+  examInfo: Object
 })
 
-// Emits
 const emit = defineEmits(['back', 'next'])
 
-// Composables
-const { toasts, success, error, warning, info, removeToast } = useToast()
-const { value: searchKeyword, debouncedValue: debouncedSearchKeyword } = useDebounce('', 500)
-
-// Stores
+// Store
 const itemStore = useItemSelectionStore()
-const testBankStore = useTestBankStore()
 
-// Store의 상태를 반응형으로 가져오기
-const {
-  items,
-  selectedItems,
-  currentPage,
-  totalPages,
-  totalItems,
-  isLoading,
-  isSimilarItemsLoading,
-  isSubjectsLoading,
-  filters,
-  subjects,
-  textbooks,
-  chapters
-} = storeToRefs(itemStore)
+// MathJax composable 사용 - FOUC 방지 설정
+const { render: renderMath } = useMathJax({
+  immediate: false,  // 수동 렌더링
+  hideBeforeRender: true,  // FOUC 방지
+  clearFirst: false,  // 기존 렌더링 유지
+  waitForContent: true,  // 컨텐츠 준비 대기
+  debounceDelay: 100
+})
 
-// Store의 getters 가져오기
-const { isItemSelected, isAllSelected } = itemStore
+// State
+const items = ref([])
+const selectedItems = ref([])
+const totalItems = ref(0)
+const currentPage = ref(1)
+const itemsPerPage = 6  // 한 페이지에 6개 문제 표시 (3열 x 2행)
+const isLoading = ref(false)
+const isLoadingTextbooks = ref(false) // 교과서 로딩 상태 추가
+const draggedItem = ref(null) // 드래그 중인 아이템 정보
+const dropTargetIndex = ref(null) // 드롭 대상 인덱스
 
-// Virtual Scrolling
-const itemsContainer = ref(null)
-const { visibleItems, totalHeight, offsetY } = useVirtualScroll(items, 250, 600)
+// UI State
+const viewMode = ref('grid') // 'grid' | 'list'
+const filterCollapsed = ref(false)
+const showSelectedPanel = ref(false)
+const showRandomGenerator = ref(false)
+const imageModalUrl = ref(null)
+const detailItem = ref(null)
 
-// Local State (Store에서 관리하지 않는 UI 상태)
-const showModal = ref(false)
-const modalImageUrl = ref('')
-const draggedIndex = ref(null)
-
-// 유사문항 모달 상태
-const showSimilarModal = ref(false)
-const currentBaseItem = ref(null)
-const currentSimilarItems = ref([])
-
-// 교과서 관련 상태
-const selectedTextbook = ref(null) // 단일 선택으로 변경
-const chapterTree = ref([]) // 대단원-중단원 트리 구조
-const expandedChapters = ref([]) // 확장된 대단원 ID 목록
-const selectedMediumChapters = ref([]) // 선택된 중단원 ID 목록
-
-// UI 상태
-const showSelectedPanel = ref(false) // 선택된 문항 패널 표시 여부
-
-// 문제 유형 필터 (실제 DB 코드 반영)
+// Search & Filters
+const searchKeyword = ref('')
+const selectedGrade = ref(null) // 학년 선택
+const selectedSubject = ref(null) // 과목 선택
+const selectedTextbook = ref(null)
+const selectedChapters = ref([])
+const selectedMediumChapters = ref([]) // 중단원 선택 추가
+const difficultyFilters = ref([])
 const questionFormFilters = ref([])
 
-// 검색 상태
-const lastSearchTime = ref(0)
-const searchDebounceTimeout = ref(null)
+// Data
+const textbooks = ref([])
+const chapterTree = ref([])
+const expandedChapters = ref([]) // 확장된 챕터 ID 추가
+const expandedPassages = ref([]) // 확장된 지문 ID 추가
+
+// 학년 옵션 (Step1과 동일)
+const gradeOptions = ref([
+  { code: '07', name: '중1', grade: '1', desc: '중등 1학년 과정' },
+  { code: '08', name: '중2', grade: '2', desc: '중등 2학년 과정' },
+  { code: '09', name: '중3', grade: '3', desc: '중등 3학년 과정' }
+])
+
+// 과목 옵션 (Step1과 동일)
+const subjectOptions = ref([
+  { code: 'MA', name: '수학', color: '#3B82F6' },
+  { code: 'KO', name: '국어', color: '#10B981' },
+  { code: 'EN', name: '영어', color: '#F59E0B' },
+  { code: 'SC', name: '과학', color: '#8B5CF6' },
+  { code: 'SO', name: '사회', color: '#EF4444' }
+])
+
+const difficultyLevels = ref([
+  { code: 1, name: '매우쉬움' },
+  { code: 2, name: '쉬움' },
+  { code: 3, name: '보통' },
+  { code: 4, name: '어려움' },
+  { code: 5, name: '매우어려움' }
+])
+const questionTypes = ref([
+  { code: 'OBJ', name: '객관식' },
+  { code: 'SUB', name: '주관식' },
+  { code: 'ESS', name: '서술형' }
+])
 
 // Computed
-const displayPages = computed(() => {
+const totalPages = computed(() => Math.ceil(totalItems.value / itemsPerPage))
+
+// 지문이 있는 문제들만 그룹화
+const passageGroups = computed(() => {
+  const groups = new Map()
+  
+  paginatedItems.value.forEach(item => {
+    if (item.passageId) {
+      if (!groups.has(item.passageId)) {
+        groups.set(item.passageId, {
+          passageId: item.passageId,
+          passageHtml: item.passageHtml,
+          passageText: item.passageText,
+          items: []
+        })
+      }
+      groups.get(item.passageId).items.push(item)
+    }
+  })
+  
+  return Array.from(groups.values())
+})
+
+// 지문이 없는 일반 문제들
+const regularItems = computed(() => {
+  return paginatedItems.value.filter(item => !item.passageId)
+})
+
+// 지문 그룹이 있는지 확인
+const hasPassageGroups = computed(() => {
+  return passageGroups.value.length > 0
+})
+
+const paginatedItems = computed(() => {
+  // 서버에서 이미 페이지네이션된 데이터를 받으므로 그대로 사용
+  return items.value
+})
+
+const visiblePages = computed(() => {
   const pages = []
-  const maxDisplay = 5
-
-  if (totalPages.value <= maxDisplay) {
-    for (let i = 1; i <= totalPages.value; i++) {
-      pages.push(i)
-    }
-  } else {
-    if (currentPage.value <= 3) {
-      for (let i = 1; i <= 4; i++) pages.push(i)
-      pages.push('...')
-      pages.push(totalPages.value)
-    } else if (currentPage.value >= totalPages.value - 2) {
-      pages.push(1)
-      pages.push('...')
-      for (let i = totalPages.value - 3; i <= totalPages.value; i++) {
-        pages.push(i)
-      }
-    } else {
-      pages.push(1)
-      pages.push('...')
-      for (let i = currentPage.value - 1; i <= currentPage.value + 1; i++) {
-        pages.push(i)
-      }
-      pages.push('...')
-      pages.push(totalPages.value)
-    }
+  const total = totalPages.value
+  const current = currentPage.value
+  const maxVisible = 5
+  
+  let start = Math.max(1, current - Math.floor(maxVisible / 2))
+  let end = Math.min(total, start + maxVisible - 1)
+  
+  if (end - start < maxVisible - 1) {
+    start = Math.max(1, end - maxVisible + 1)
   }
-
+  
+  for (let i = start; i <= end; i++) {
+    pages.push(i)
+  }
+  
   return pages
 })
 
+const isAllSelected = computed(() => {
+  return items.value.length > 0 && items.value.every(item => isSelected(item.itemId))
+})
+
+const hasActiveFilters = computed(() => {
+  return selectedTextbook.value || 
+         selectedChapters.value.length > 0 || 
+         selectedMediumChapters.value.length > 0 ||
+         difficultyFilters.value.length > 0 || 
+         questionFormFilters.value.length > 0
+})
+
+// 선택된 문항을 지문별로 그룹화
+const selectedItemGroups = computed(() => {
+  const groups = []
+  const passageGroups = new Map()
+  const regularItems = []
+  
+  // 지문별로 그룹화
+  selectedItems.value.forEach(item => {
+    if (item.passageId) {
+      if (!passageGroups.has(item.passageId)) {
+        passageGroups.set(item.passageId, {
+          id: `passage-${item.passageId}`,
+          passageId: item.passageId,
+          items: []
+        })
+      }
+      passageGroups.get(item.passageId).items.push(item)
+    } else {
+      regularItems.push({
+        id: `item-${item.itemId}`,
+        passageId: null,
+        items: [item]
+      })
+    }
+  })
+  
+  // 지문 그룹 먼저 추가
+  passageGroups.forEach(group => {
+    groups.push(group)
+  })
+  
+  // 일반 문항 추가
+  groups.push(...regularItems)
+  
+  return groups
+})
+
 // Methods
-const selectTextbook = async (textbookId) => {
-  if (selectedTextbook.value === textbookId) {
-    // 이미 선택된 교과서를 다시 클릭하면 선택 해제
-    selectedTextbook.value = null
-    chapterTree.value = []
-    expandedChapters.value = []
-    selectedMediumChapters.value = []
-    filters.value.chapterIds = []
-    itemStore.setChapters([])
-    // info('교과서 선택이 해제되었습니다.')
-  } else {
-    // 새 교과서 선택
-    selectedTextbook.value = textbookId
-    // success('교과서가 선택되었습니다.')
-
-    // 이전 선택 초기화
-    expandedChapters.value = []
-    selectedMediumChapters.value = []
-    filters.value.chapterIds = []
-
-    // 선택된 교과서의 단원 트리 로드
-    await loadChapterTree(textbookId)
+const loadItems = async () => {
+  // 교과서가 선택되지 않았으면 검색하지 않음
+  if (!selectedTextbook.value) {
+    console.log('교과서가 선택되지 않아 검색을 수행하지 않습니다.')
+    items.value = []
+    totalItems.value = 0
+    return
   }
-
-  // 검색 수행
-  performSearchWithDelay()
+  
+  // 로딩 시작 시 기존 항목 즉시 지우기
+  isLoading.value = true
+  items.value = [] // 기존 문항 즉시 클리어
+  totalItems.value = 0 // 총 개수도 초기화
+  
+  try {
+    // itemStore를 통한 검색 실행
+    const searchParams = {
+      page: currentPage.value - 1,
+      size: itemsPerPage,
+      keyword: searchKeyword.value,
+      textbook: selectedTextbook.value || null, // subjects가 아닌 textbook으로 전송
+      chapters: selectedMediumChapters.value.length > 0 ? selectedMediumChapters.value : selectedChapters.value, // chapterIds가 아닌 chapters로 전송
+      difficulties: difficultyFilters.value,
+      categories: questionFormFilters.value // 문제유형 필터 적용
+    }
+    
+    console.log('검색 파라미터:', searchParams)
+    
+    await itemStore.searchItems(searchParams)
+    
+    // store에서 데이터 가져오기 - 서버에서 이미 페이지네이션된 데이터를 받음
+    items.value = itemStore.items || []
+    totalItems.value = itemStore.totalItems || 0
+    
+    console.log(`페이지 ${currentPage.value} 검색 완료: ${itemStore.items?.length}개 문항 찾음, 전체: ${totalItems.value}개`)
+  } catch (error) {
+    console.error('Failed to load items:', error)
+    items.value = []
+    totalItems.value = 0
+  } finally {
+    isLoading.value = false
+    // 로딩이 끝나면 MathJax 하이브리드 병렬 렌더링
+    await nextTick()
+    // DOM이 완전히 업데이트된 후 렌더링
+    requestAnimationFrame(async () => {
+      // 스마트 렌더링: 요소 수에 따라 자동으로 최적 렌더링 방식 선택
+      // 기존 renderMathJax를 Promise.all로 병렬 처리
+      const container = document.querySelector('.items-container') || document.body
+      await renderMathJaxSmartHybrid(container, {
+        hideBeforeRender: true,
+        clearFirst: false
+      })
+    })
+  }
 }
 
-// 챕터 트리 구조 로드 (대단원-중단원)
-const loadChapterTree = async (subjectId) => {
+// 교과서 목록 로드 (Step1에서 선택한 gradeCode와 areaCode 기반)
+const loadSubjectsAndTextbooks = async () => {
   try {
-    console.log('챕터 트리 로드 시작, subjectId:', subjectId)
-
-    const { default: chapterApi } = await import('@/services/chapterApi.js')
-    const response = await chapterApi.getChapterTree(subjectId)
-
-    console.log('챕터 트리 API 응답:', response)
-
-    if (response.data.success && response.data.data) {
-      // 백엔드 응답 구조: LargeNode { id, name, children: MediumNode[] }
-      chapterTree.value = response.data.data.map(largeChapter => {
-        console.log('대단원 처리:', largeChapter)
-
-        // children 배열이 중단원 목록
-        const mediumChapters = (largeChapter.children || []).map(medium => ({
-          id: medium.id,
-          name: medium.name,
-          itemCount: medium.itemCount || 0
-        }))
-
-        return {
-          id: largeChapter.id,
-          name: largeChapter.name,
-          itemCount: largeChapter.itemCount || mediumChapters.reduce((sum, m) => sum + (m.itemCount || 0), 0),
-          mediumChapters: mediumChapters
-        }
-      })
-
-      console.log(`교과서 ${subjectId}의 챕터 트리 로드 완료:`, chapterTree.value)
-
-      // 챕터별 문항 개수 가져오기
-      if (chapterTree.value.length > 0) {
-        // 모든 챕터 ID 수집 (대단원 + 중단원)
-        const allChapterIds = []
-        chapterTree.value.forEach(large => {
-          allChapterIds.push(large.id)
-          if (large.mediumChapters) {
-            large.mediumChapters.forEach(medium => {
-              allChapterIds.push(medium.id)
-            })
-          }
-        })
-
-        // 챕터별 문항 개수 API 호출
-        const countsResult = await itemApiService.getItemCountsByChapters(subjectId, allChapterIds)
-
-        if (countsResult.success) {
-          // 챕터 트리에 문항 개수 업데이트
-          chapterTree.value.forEach(large => {
-            large.itemCount = countsResult.data[large.id] || 0
-            if (large.mediumChapters) {
-              large.mediumChapters.forEach(medium => {
-                medium.itemCount = countsResult.data[medium.id] || 0
-              })
-            }
-          })
-          console.log('챕터별 문항 개수 업데이트 완료:', chapterTree.value)
-        }
-
-        // 첫 번째 대단원 자동 확장
-        expandedChapters.value = [chapterTree.value[0].id]
-      } else {
-        // warning('해당 교과서에 단원 정보가 없습니다.')
+    isLoadingTextbooks.value = true
+    
+    // Step1에서 선택한 gradeCode와 areaCode로 필터링된 교과서 로드
+    const gradeCode = props.examInfo?.gradeCode || props.examInfo?.grade
+    const areaCode = props.examInfo?.areaCode // MA, KO, EN, SC, SO 등
+    
+    console.log('=== 교과서 로드 시작 ===')
+    console.log('전체 examInfo:', props.examInfo)
+    console.log('gradeCode:', gradeCode, 'areaCode:', areaCode)
+    
+    // itemStore의 loadSubjects를 gradeCode와 areaCode 옵션과 함께 호출
+    await itemStore.loadSubjects({
+      gradeCode: gradeCode,
+      areaCode: areaCode,
+      includeTextbooks: true
+    })
+    
+    // subjects 데이터를 textbooks 형태로 변환
+    // API에서 이미 gradeCode와 areaCode로 필터링된 데이터를 받음
+    const subjects = itemStore.subjects
+    console.log('Store에서 가져온 subjects (이미 필터링됨):', subjects)
+    
+    if (subjects && subjects.length > 0) {
+      // 이미 API에서 필터링된 데이터이므로 바로 textbooks 형태로 변환
+      textbooks.value = subjects.map(subject => ({
+        id: subject.subjectId || subject.id,
+        subjectId: subject.subjectId || subject.id,
+        subjectName: subject.name || subject.subjectName,
+        gradeName: props.examInfo?.gradeName,
+        areaName: props.examInfo?.areaName,
+        gradeCode: subject.gradeCode || subject.grade,
+        areaCode: subject.areaCode || subject.area,
+        itemCount: subject.itemCount || 0
+      }))
+      
+      console.log('필터링된 textbooks:', textbooks.value)
+      
+      // 교과서가 하나만 있으면 자동 선택
+      if (textbooks.value.length === 1) {
+        selectedTextbook.value = textbooks.value[0].id || textbooks.value[0].subjectId
+        await loadChapters()
       }
     } else {
-      console.warn('챕터 트리 데이터가 비어있습니다:', response.data)
-      // warning('단원 정보를 찾을 수 없습니다.')
+      console.warn('subjects 데이터가 비어있습니다.')
     }
-  } catch (err) {
-    console.error('챕터 트리 로드 실패:', err)
-    error('단원 정보를 불러오는데 실패했습니다.')
+  } catch (error) {
+    console.error('Failed to load textbooks:', error)
+  } finally {
+    isLoadingTextbooks.value = false
   }
 }
 
-// 대단원 확장/축소 토글
-const toggleLargeChapter = (chapterId) => {
+// 챕터 트리 로드
+const loadChapters = async () => {
+  if (!selectedTextbook.value) {
+    chapterTree.value = []
+    return
+  }
+  
+  try {
+    console.log('챕터 트리 로드 시작 - textbookId:', selectedTextbook.value)
+    // chapterApi를 사용하여 챕터 트리 로드
+    const response = await chapterApi.getChapterTree(selectedTextbook.value)
+    
+    console.log('챕터 API 응답:', response)
+    
+    if (response.success && response.data) {
+      chapterTree.value = response.data
+      console.log('챕터 트리 로드 성공:', chapterTree.value)
+      
+      // Store에도 챕터 정보 저장
+      itemStore.setChapters(response.data)
+      
+      // 첫 번째 대단원 자동 확장
+      if (chapterTree.value.length > 0) {
+        expandedChapters.value = [chapterTree.value[0].id]
+      }
+    } else if (response.data?.success && response.data?.data) {
+      // response.data 안에 success가 있는 경우
+      chapterTree.value = response.data.data
+      console.log('챕터 트리 로드 성공 (nested):', chapterTree.value)
+      
+      // Store에도 챕터 정보 저장
+      itemStore.setChapters(response.data.data)
+      
+      // 첫 번째 대단원 자동 확장
+      if (chapterTree.value.length > 0) {
+        expandedChapters.value = [chapterTree.value[0].id]
+      }
+    } else {
+      console.warn('챕터 트리 데이터가 비어있습니다:', response)
+    }
+  } catch (error) {
+    console.error('Failed to load chapters:', error)
+  }
+}
+
+
+const handleSearchWithDebounce = debounce(() => {
+  currentPage.value = 1
+  loadItems()
+}, 300)
+
+// 학년 변경 핸들러
+const handleGradeChange = () => {
+  // 과목 초기화
+  selectedSubject.value = null
+  selectedTextbook.value = null
+  selectedChapters.value = []
+  selectedMediumChapters.value = []
+  chapterTree.value = []
+  textbooks.value = []
+  
+  // 학년과 과목이 모두 선택되면 교과서 로드
+  if (selectedGrade.value && selectedSubject.value) {
+    loadSubjectsAndTextbooks()
+  }
+}
+
+// 과목 변경 핸들러
+const handleSubjectChange = () => {
+  // 교과서와 단원 초기화
+  selectedTextbook.value = null
+  selectedChapters.value = []
+  selectedMediumChapters.value = []
+  chapterTree.value = []
+  textbooks.value = []
+  
+  // 학년과 과목이 모두 선택되면 교과서 로드
+  if (selectedGrade.value && selectedSubject.value) {
+    // examInfo 업데이트 (loadSubjectsAndTextbooks에서 사용)
+    props.examInfo.gradeCode = selectedGrade.value
+    props.examInfo.areaCode = selectedSubject.value
+    loadSubjectsAndTextbooks()
+  }
+}
+
+const handleTextbookChange = () => {
+  selectedChapters.value = []
+  loadChapters()
+  loadItems()
+}
+
+// 대단원 체크박스 변경 처리
+const handleLargeChapterChange = (chapter, event) => {
+  const isChecked = event.target.checked
+  
+  if (isChecked) {
+    // 대단원 선택 시 모든 중단원 선택
+    if (chapter.children) {
+      chapter.children.forEach(subChapter => {
+        if (!selectedMediumChapters.value.includes(subChapter.id)) {
+          selectedMediumChapters.value.push(subChapter.id)
+        }
+      })
+    }
+    // 대단원 ID도 추가
+    if (!selectedChapters.value.includes(chapter.id)) {
+      selectedChapters.value.push(chapter.id)
+    }
+  } else {
+    // 대단원 선택 해제 시 모든 중단원 선택 해제
+    if (chapter.children) {
+      chapter.children.forEach(subChapter => {
+        const index = selectedMediumChapters.value.indexOf(subChapter.id)
+        if (index > -1) {
+          selectedMediumChapters.value.splice(index, 1)
+        }
+      })
+    }
+    // 대단원 ID도 제거
+    const chapterIndex = selectedChapters.value.indexOf(chapter.id)
+    if (chapterIndex > -1) {
+      selectedChapters.value.splice(chapterIndex, 1)
+    }
+  }
+  
+  loadItems()
+}
+
+// 중단원 체크박스 변경 처리
+const handleMediumChapterChange = () => {
+  loadItems()
+}
+
+// 대단원이 선택되었는지 확인 (모든 중단원이 선택되었을 때)
+const isChapterSelected = (chapter) => {
+  if (!chapter.children || chapter.children.length === 0) {
+    return selectedChapters.value.includes(chapter.id)
+  }
+  
+  // 모든 중단원이 선택되었는지 확인
+  return chapter.children.every(subChapter => 
+    selectedMediumChapters.value.includes(subChapter.id)
+  )
+}
+
+const toggleChapter = (chapterId) => {
   const index = expandedChapters.value.indexOf(chapterId)
   if (index > -1) {
     expandedChapters.value.splice(index, 1)
@@ -911,866 +1271,543 @@ const toggleLargeChapter = (chapterId) => {
   }
 }
 
-// 대단원 내 선택된 중단원 개수 확인
-const getSelectedCountInChapter = (largeChapter) => {
-  if (!largeChapter.mediumChapters) return 0
-  return largeChapter.mediumChapters.filter(m =>
-    selectedMediumChapters.value.includes(m.id)
-  ).length
-}
-
-// 중단원 선택 변경시 필터 업데이트
-const updateChapterFilter = () => {
-  // 선택된 중단원 ID들을 필터에 반영
-  filters.value.chapterIds = [...selectedMediumChapters.value]
-  performSearchWithDelay()
-}
-
-const toggleChapter = (chapterId) => {
-  const index = filters.value.chapterIds.indexOf(chapterId)
-  if (index > -1) {
-    filters.value.chapterIds.splice(index, 1)
-  } else {
-    filters.value.chapterIds.push(chapterId)
-  }
-}
-
-const toggleDifficulty = (level) => {
-  const index = filters.value.difficulties.indexOf(level)
-  if (index > -1) {
-    filters.value.difficulties.splice(index, 1)
-  } else {
-    filters.value.difficulties.push(level)
-  }
-  performSearchWithDelay()
-}
-
-const toggleQuestionForm = (formCode) => {
-  const index = questionFormFilters.value.indexOf(formCode)
-  if (index > -1) {
-    questionFormFilters.value.splice(index, 1)
-  } else {
-    questionFormFilters.value.push(formCode)
-  }
-  performSearchWithDelay()
+const applyFilters = () => {
+  currentPage.value = 1
+  loadItems()
 }
 
 const resetFilters = () => {
-  filters.value.chapterIds = []
-  filters.value.difficulties = []
-  questionFormFilters.value = []
   selectedTextbook.value = null
+  selectedChapters.value = []
   selectedMediumChapters.value = []
-  expandedChapters.value = []
-  chapterTree.value = []
+  difficultyFilters.value = []
+  questionFormFilters.value = []
   searchKeyword.value = ''
-  performSearchWithDelay()
-  // info('필터가 초기화되었습니다.')
-}
-
-// 검색 수행
-const performSearch = async () => {
-  try {
-    // 교과서가 선택되지 않았으면 검색하지 않음
-    if (!selectedTextbook.value) {
-      console.log('교과서가 선택되지 않아 검색을 수행하지 않습니다.')
-      itemStore.setItems([])
-      return
-    }
-
-    const searchParams = {
-      keyword: searchKeyword.value.trim(),
-      subjects: [selectedTextbook.value], // 단일 교과서 ID
-      grades: props.examInfo.gradeCode ? [props.examInfo.gradeCode] : [],
-      difficulties: filters.value.difficulties,
-      categories: questionFormFilters.value,
-      chapterIds: selectedMediumChapters.value, // 선택된 중단원 ID들
-      page: currentPage.value - 1,
-      size: 20
-    }
-
-    console.log('문항 검색 파라미터:', searchParams)
-
-    await itemStore.searchItems(searchParams)
-
-    // 편집 모드이고 기존 문항이 있으면 해당 문항들을 선택 상태로 표시
-    if (testBankStore.mode === 'edit' && testBankStore.existingItemIds.length > 0) {
-      items.value.forEach(item => {
-        const itemId = item.item_id || item.itemId
-        if (testBankStore.existingItemIds.includes(itemId)) {
-          // 이미 selectedItems에 없으면 추가
-          if (!selectedItems.value.includes(itemId)) {
-            console.log('기존 문항 자동 선택:', itemId)
-          }
-        }
-      })
-    }
-
-    if (items.value.length === 0 && !isLoading.value) {
-      warning('검색 결과가 없습니다. 다른 검색 조건을 시도해보세요.')
-    }
-
-  } catch (err) {
-    error('문항 검색 중 오류가 발생했습니다.')
-    console.error('Search error:', err)
-  }
-}
-
-// 디바운싱된 검색
-const performSearchWithDelay = () => {
-  if (searchDebounceTimeout.value) {
-    clearTimeout(searchDebounceTimeout.value)
-  }
-
-  searchDebounceTimeout.value = setTimeout(() => {
-    performSearch()
-  }, 300)
-}
-
-const toggleSelection = (item) => {
-  // backend에서 item_id로 오는 경우와 itemId로 오는 경우 모두 처리
-  const itemId = item.item_id || item.itemId
-  const wasSelected = isSelected(itemId)
-
-  // item 객체 정규화
-  const normalizedItem = {
-    itemId: itemId,
-    questionImageUrl: item.question_url || item.questionImageUrl,
-    answerImageUrl: item.answer_url || item.answerImageUrl,
-    explainImageUrl: item.explain_url || item.explainImageUrl,
-    difficultyCode: item.difficulty_code || item.difficultyCode,
-    subjectId: item.subject_id || item.subjectId,
-    topicChapterId: item.topic_chapter_id || item.topicChapterId
-  }
-
-  itemStore.toggleItemSelection(normalizedItem)
-
-  if (wasSelected) {
-    info(`문항 #${itemId}가 선택 해제되었습니다.`)
-  } else {
-    success(`문항 #${itemId}가 선택되었습니다.`)
-  }
+  loadItems()
 }
 
 const isSelected = (itemId) => {
-  return itemStore.isItemSelected(itemId)
+  return selectedItems.value.some(item => item.itemId === itemId)
+}
+
+const toggleSelection = (item) => {
+  const index = selectedItems.value.findIndex(selected => selected.itemId === item.itemId)
+  if (index > -1) {
+    selectedItems.value.splice(index, 1)
+    itemStore.deselectItem(item.itemId)
+  } else {
+    selectedItems.value.push(item)
+    itemStore.selectItem(item)
+  }
+}
+
+// 지문 확장/축소 토글
+const togglePassageExpand = (passageId) => {
+  const index = expandedPassages.value.indexOf(passageId)
+  if (index > -1) {
+    expandedPassages.value.splice(index, 1)
+  } else {
+    expandedPassages.value.push(passageId)
+  }
 }
 
 const toggleSelectAll = (event) => {
-  itemStore.toggleSelectAll()
-}
-
-const removeItem = (itemId) => {
-  itemStore.deselectItem(itemId)
-  info(`문항 #${itemId}가 선택 해제되었습니다.`)
+  if (event.target.checked) {
+    items.value.forEach(item => {
+      if (!isSelected(item.itemId)) {
+        selectedItems.value.push(item)
+      }
+    })
+  } else {
+    items.value.forEach(item => {
+      const index = selectedItems.value.findIndex(selected => selected.itemId === item.itemId)
+      if (index > -1) {
+        selectedItems.value.splice(index, 1)
+      }
+    })
+  }
 }
 
 const clearSelection = () => {
-  const count = selectedItems.value.length
-  itemStore.clearSelection()
-  info(`${count}개 문항 선택이 모두 해제되었습니다.`)
+  selectedItems.value = []
 }
 
-const randomizeOrder = () => {
-  itemStore.shuffleSelectedItems()
-  info('선택된 문항 순서가 섬어졌습니다.')
-}
-
-// 난이도에 따른 클래스 반환
-const getDifficultyClass = (difficulty) => {
-  const code = difficulty?.code || 'M'
-  switch(code) {
-    case 'L': return 'easy'
-    case 'M': return 'medium'
-    case 'H': return 'hard'
-    default: return 'medium'
+const removeFromSelection = (item) => {
+  const index = selectedItems.value.findIndex(selected => selected.itemId === item.itemId)
+  if (index > -1) {
+    selectedItems.value.splice(index, 1)
   }
-}
-
-const loadPage = (page) => {
-  if (page === '...' || page === currentPage.value) return
-  itemStore.setCurrentPage(page)
-  performSearch()
-}
-
-// 검색 버튼 클릭 시 호출되는 함수
-const searchItems = () => {
-  if (!selectedTextbook.value) {
-    // warning('먼저 교과서를 선택해주세요.')
-    return
-  }
-  performSearch()
-}
-
-const handleImageError = (event, item) => {
-  console.error(`이미지 로드 실패: 문항 ${item.itemId}`)
-  event.target.src = 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2VlZSIvPjx0ZXh0IHRleHQtYW5jaG9yPSJtaWRkbGUiIHg9IjE1MCIgeT0iMTAwIiBzdHlsZT0iZmlsbDojYWFhO2ZvbnQtd2VpZ2h0OmJvbGQ7Zm9udC1zaXplOjE5cHg7Zm9udC1mYW1pbHk6QXJpYWwsSGVsdmV0aWNhLHNhbnMtc2VyaWY7ZG9taW5hbnQtYmFzZWxpbmU6Y2VudHJhbCI+SU1BR0UgTE9BRCBFUlJPUjwvdGV4dD48L3N2Zz4='
-}
-
-const handleCoverImageError = (event) => {
-  console.error('교과서 표지 이미지 로드 실패')
-  // 기본 교과서 아이콘으로 대체
-  event.target.style.display = 'none'
-  event.target.parentElement.innerHTML = '<span>📖</span>'
-}
-
-const showImageModal = (imageUrl) => {
-  modalImageUrl.value = imageUrl
-  showModal.value = true
-}
-
-const closeModal = () => {
-  showModal.value = false
-  modalImageUrl.value = ''
 }
 
 const hasChoices = (item) => {
-  return item.choice1Html || item.choice2Html || item.choice3Html ||
-         item.choice4Html || item.choice5Html
+  return item.choice1Html || item.choice2Html || item.choice3Html || 
+         item.choice4Html || item.choice5Html ||
+         item.choice1Text || item.choice2Text || item.choice3Text ||
+         item.choice4Text || item.choice5Text
 }
 
-const truncateHtml = (html, maxLength) => {
-  if (!html) return ''
-  const tmp = document.createElement('div')
-  tmp.innerHTML = html
-  const text = tmp.textContent || tmp.innerText || ''
-  if (text.length > maxLength) {
-    return text.substring(0, maxLength) + '...'
+const showImageModal = (url) => {
+  imageModalUrl.value = url
+}
+
+const showItemDetail = (item) => {
+  detailItem.value = item
+}
+
+const handleItemSelect = (item) => {
+  if (!isSelected(item.itemId)) {
+    selectedItems.value.push(item)
   }
-  return text
 }
 
-// 유사문항 검색 및 표시
-const showSimilarItems = async (item) => {
+const findSimilarItems = async (item) => {
   try {
-    currentBaseItem.value = item
-    showSimilarModal.value = true
-    currentSimilarItems.value = []
-
-    // Elasticsearch를 통한 유사문항 검색
-    const similarItems = await itemStore.searchSimilarItems(item.itemId, {
-      topicChapterId: item.topicChapterId || item.topicChapter?.id,
-      difficultyCode: item.difficultyCode || item.difficulty?.code || 2,
-      excludeItemIds: [item.itemId, ...itemStore.selectedItems.map(i => i.itemId)],
+    const response = await itemApiService.getSimilarItems({
+      topicChapterId: item.topicChapterId,
+      difficultyCode: item.difficulty?.code,
+      excludeItemIds: [item.itemId],
       size: 10
     })
-
-    currentSimilarItems.value = similarItems
-
-    if (similarItems.length === 0) {
-      warning('유사한 문항을 찾을 수 없습니다.')
-    } else {
-      success(`${similarItems.length}개의 유사 문항을 찾았습니다.`)
+    if (response.success) {
+      console.log('Similar items:', response.data)
+      // TODO: Show similar items in modal or panel
     }
-
-  } catch (err) {
-    error('유사 문항 검색 중 오류가 발생했습니다.')
-    console.error('Similar items search error:', err)
+  } catch (error) {
+    console.error('Failed to find similar items:', error)
   }
 }
 
-const closeSimilarModal = () => {
-  showSimilarModal.value = false
-  currentBaseItem.value = null
-  currentSimilarItems.value = []
+// 선택된 단원 정보 가져오기
+const getSelectedChapterInfo = () => {
+  return chapterTree.value
+    .flatMap(chapter => chapter.children || [])
+    .filter(subChapter => selectedMediumChapters.value.includes(subChapter.id))
 }
 
-const selectAllSimilarItems = () => {
-  let addedCount = 0
-  currentSimilarItems.value.forEach(item => {
-    const itemId = item.item_id || item.itemId
-    if (!isSelected(itemId)) {
-      // item 객체 정규화
-      const normalizedItem = {
-        itemId: itemId,
-        questionImageUrl: item.question_url || item.questionImageUrl,
-        answerImageUrl: item.answer_url || item.answerImageUrl,
-        explainImageUrl: item.explain_url || item.explainImageUrl,
-        difficultyCode: item.difficulty_code || item.difficultyCode,
-        subjectId: item.subject_id || item.subjectId,
-        topicChapterId: item.topic_chapter_id || item.topicChapterId
-      }
-      itemStore.selectItem(normalizedItem)
-      addedCount++
+// 현재 필터 정보 가져오기
+const getCurrentFilters = () => {
+  return {
+    grade: selectedGrade.value,
+    subject: selectedSubject.value,
+    textbook: selectedTextbook.value,
+    difficulties: difficultyFilters.value,
+    questionTypes: questionFormFilters.value
+  }
+}
+
+const handleRandomGenerate = async (config) => {
+  console.log('랜덤 문항 생성 설정:', config)
+  
+  try {
+    isLoading.value = true
+    
+    // 랜덤 문항 생성 API 호출
+    const searchParams = {
+      subjects: [selectedSubject.value].filter(Boolean),
+      chapterIds: selectedMediumChapters.value,
+      difficulties: config.difficultyDistribution ? 
+        Object.keys(config.difficultyDistribution).map(k => parseInt(k)) : [],
+      categories: questionFormFilters.value,
+      size: config.totalCount || 20,
+      random: true // 랜덤 선택 플래그
     }
-  })
-
-  if (addedCount > 0) {
-    success(`${addedCount}개의 유사 문항이 추가되었습니다.`)
-  } else {
-    info('모든 유사 문항이 이미 선택되어 있습니다.')
+    
+    const result = await itemApiService.searchItems(searchParams)
+    
+    if (result.success && result.data) {
+      // 랜덤으로 선택된 문항들을 선택 목록에 추가
+      result.data.forEach(item => {
+        if (!selectedItems.value.find(selected => selected.itemId === item.itemId)) {
+          selectedItems.value.push(item)
+          itemStore.selectItem(item)
+        }
+      })
+      
+      console.log(`${result.data.length}개 문항이 랜덤으로 선택되었습니다.`)
+    }
+  } catch (error) {
+    console.error('랜덤 문항 생성 오류:', error)
+  } finally {
+    isLoading.value = false
+    showRandomGenerator.value = false
   }
-
-  closeSimilarModal()
-}
-
-// 난이도/문제유형 이름 변환 함수
-const getDifficultyName = (code) => {
-  const difficultyMap = {
-    '2': '하',
-    '3': '중',
-    '4': '상',
-    'L': '하',
-    'M': '중',
-    'H': '상'
-  }
-  return difficultyMap[code] || '미정'
-}
-
-const getQuestionFormName = (code) => {
-  const formMap = {
-    '50': '5지선택',
-    '60': '단답유순',
-    '70': '서술형',
-    'MC': '객관식',
-    'SA': '주관식',
-    'ES': '서술형'
-  }
-  return formMap[code] || '기타'
-}
-
-// 드래그 앤 드롭
-const handleDragStart = (event, index) => {
-  draggedIndex.value = index
-  event.dataTransfer.effectAllowed = 'move'
-}
-
-const handleDrop = (event, dropIndex) => {
-  event.preventDefault()
-
-  if (draggedIndex.value === null) return
-
-  itemStore.reorderSelectedItems(draggedIndex.value, dropIndex)
-  draggedIndex.value = null
 }
 
 const handleBack = () => {
-  if (selectedItems.value.length > 0) {
-    const confirmBack = confirm('선택한 문항이 있습니다. 이전 단계로 돌아가시겠습니까?')
-    if (!confirmBack) return
-  }
   emit('back')
 }
 
 const proceedToNext = () => {
-  if (selectedItems.value.length === 0) {
-    // warning('문항을 선택해주세요.')
-    alert('문항을 선택해주세요.') // 경고는 alert로 대체
-    return
-  }
-
-  // testBankStore에도 선택된 문항 저장 (다음 단계에서 사용)
-  testBankStore.setSelectedQuestions(selectedItems.value)
-  // success(`${selectedItems.value.length}개 문항이 선택되어 다음 단계로 이동합니다.`)
+  // itemStore에 선택된 아이템 저장
+  selectedItems.value.forEach(item => {
+    itemStore.selectItem(item)
+  })
   emit('next')
 }
 
-// 실시간 검색을 위한 디바운싱
-watch(debouncedSearchKeyword, (newKeyword) => {
-  if (newKeyword !== searchKeyword.value) {
-    performSearch()
+// 드래그 앤 드롭 관련 메서드
+const handleDragStart = (index, type, itemIndex = null) => {
+  draggedItem.value = {
+    index,
+    type,
+    itemIndex
   }
-})
+}
 
-// 주제목 및 과목 정보 로드
-const loadSubjectsAndTextbooks = async () => {
-  try {
-    // Step1에서 선택한 gradeCode와 areaCode로 필터링된 교과서 로드
-    const gradeCode = props.examInfo.gradeCode || props.examInfo.grade
-    const areaCode = props.examInfo.areaCode // MA, KO, EN, SC, SO
+const handleDragEnd = () => {
+  draggedItem.value = null
+  dropTargetIndex.value = null
+}
 
-    console.log('=== 교과서 로드 시작 ===')
-    console.log('전체 examInfo:', props.examInfo)
-    console.log('gradeCode:', gradeCode, 'areaCode:', areaCode)
+const handleDragOver = (event) => {
+  event.preventDefault()
+}
 
-    if (!gradeCode || !areaCode) {
-      console.warn('gradeCode 또는 areaCode가 없습니다!')
-      console.warn('gradeCode:', gradeCode, 'areaCode:', areaCode)
+const handleDragEnter = (index) => {
+  if (draggedItem.value && index !== draggedItem.value.index) {
+    dropTargetIndex.value = index
+  }
+}
+
+const handleDragLeave = () => {
+  // 드래그가 컨테이너를 완전히 벗어날 때만 초기화
+  setTimeout(() => {
+    if (dropTargetIndex.value !== null) {
+      dropTargetIndex.value = null
     }
+  }, 50)
+}
 
-    // gradeCode와 areaCode로 필터링된 교과서 가져오기
-    await itemStore.loadSubjects({
-      gradeCode: gradeCode,
-      areaCode: areaCode
-    })
+const handleDrop = (event) => {
+  event.preventDefault()
+  
+  if (!draggedItem.value) return
+  
+  // 드롭 위치 계산
+  const dropTarget = dropTargetIndex.value !== null ? dropTargetIndex.value : findDropTarget(event)
+  
+  if (dropTarget !== null && dropTarget !== draggedItem.value.index) {
+    reorderItems(draggedItem.value.index, dropTarget)
+  }
+  
+  draggedItem.value = null
+  dropTargetIndex.value = null
+}
 
-    console.log('로드된 교과서 목록:', subjects.value)
-    console.log('로드된 교과서 개수:', subjects.value?.length || 0)
+const findDropTarget = (event) => {
+  const items = document.querySelectorAll('.item-group')
+  const dropY = event.clientY
+  
+  // 마우스 위치에 가장 가까운 아이템 찾기
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i]
+    const rect = item.getBoundingClientRect()
+    
+    // 드래그 중인 아이템은 건너뜀
+    if (draggedItem.value && i === draggedItem.value.index) continue
+    
+    // 마우스가 아이템의 상단 절반에 있으면 그 위치에 삽입
+    if (dropY < rect.top + rect.height / 2) {
+      return i > draggedItem.value.index ? i - 1 : i
+    }
+  }
+  
+  // 마지막 위치에 드롭
+  return items.length - 1
+}
 
-    // 교과서별 문항 개수 가져오기
-    if (subjects.value && subjects.value.length > 0) {
-      const subjectIds = subjects.value.map(s => s.subjectId)
-      const countsResult = await itemApiService.getItemCountsBySubjects(subjectIds)
-
-      if (countsResult.success) {
-        // 각 교과서에 itemCount 추가
-        subjects.value.forEach(subject => {
-          subject.itemCount = countsResult.data[subject.subjectId] || 0
-        })
-        console.log('문항 개수 업데이트 완료:', subjects.value)
+const reorderItems = (fromIndex, toIndex) => {
+  if (fromIndex === toIndex) return
+  
+  // 현재 그룹 배열 복사
+  const groups = [...selectedItemGroups.value]
+  const draggedGroup = groups[fromIndex]
+  
+  // 새로운 그룹 배열 생성
+  const newGroups = []
+  
+  if (fromIndex < toIndex) {
+    // 아래로 이동
+    for (let i = 0; i < groups.length; i++) {
+      if (i === fromIndex) continue // 드래그한 항목은 건너뜀
+      newGroups.push(groups[i])
+      if (i === toIndex) {
+        newGroups.push(draggedGroup) // 목표 위치에 삽입
       }
     }
-  } catch (err) {
-    error('과목 정보 로드에 실패했습니다.')
-    console.error('Load subjects error:', err)
-  }
-}
-
-
-// MathJax 렌더링 함수
-const renderMathJax = async () => {
-  await nextTick()
-
-  // MathJax가 아직 로드되지 않았으면 대기
-  if (!window.MathJax || !window.MathJax.typesetPromise) {
-    console.log('MathJax not loaded yet, retrying...')
-    setTimeout(() => renderMathJax(), 500)
-    return
-  }
-
-  try {
-    // MathJax 렌더링 전에 기존 렌더링 초기화
-    await window.MathJax.startup.document.clear()
-    await window.MathJax.startup.document.updateDocument()
-
-    // 모든 mathjax-content 클래스를 가진 요소들을 렌더링
-    const elements = document.querySelectorAll('.mathjax-content')
-
-    if (elements.length > 0) {
-      console.log(`Rendering MathJax for ${elements.length} elements`)
-      await window.MathJax.typesetPromise(Array.from(elements))
+  } else {
+    // 위로 이동
+    for (let i = 0; i < groups.length; i++) {
+      if (i === toIndex) {
+        newGroups.push(draggedGroup) // 목표 위치에 삽입
+      }
+      if (i === fromIndex) continue // 드래그한 항목은 건너뜀
+      newGroups.push(groups[i])
     }
+  }
+  
+  // 새로운 순서로 selectedItems 재구성
+  const newItems = []
+  newGroups.forEach(group => {
+    group.items.forEach(item => newItems.push(item))
+  })
+  
+  // selectedItems 업데이트
+  selectedItems.value = newItems
+}
+
+// 시험지의 기존 문항들을 불러오는 함수
+const loadExamItems = async (examId) => {
+  try {
+    console.log('시험지 문항 로드 시작 - examId:', examId)
+    
+    const response = await examApi.getExamItems(examId)
+    console.log('시험지 문항 API 전체 응답:', response)
+    
+    // API 응답에서 itemIds 추출
+    if (response.data?.success && response.data?.data) {
+      const examData = response.data.data
+      console.log('시험지 데이터:', examData)
+      
+      // itemIds가 있는 경우 각 문항의 상세 정보를 가져옴
+      if (examData.itemIds && Array.isArray(examData.itemIds) && examData.itemIds.length > 0) {
+        console.log(`${examData.itemIds.length}개 문항 ID 발견:`, examData.itemIds)
+        
+        // 시험지 정보를 저장 (교과서 정보 업데이트)
+        if (examData.subjectId) {
+          selectedTextbook.value = examData.subjectId
+          await loadChapters() // 챕터 트리 로드
+        }
+        
+        // 각 itemId로 문항 상세 정보 가져오기
+        const itemPromises = examData.itemIds.map(async (itemId) => {
+          try {
+            const itemResponse = await itemApiService.getItemDetail(itemId)
+            if (itemResponse.success && itemResponse.data) {
+              return itemResponse.data
+            }
+            return null
+          } catch (error) {
+            console.error(`문항 ${itemId} 로드 실패:`, error)
+            return null
+          }
+        })
+        
+        // 모든 문항 정보 가져오기
+        const items = await Promise.all(itemPromises)
+        const validItems = items.filter(item => item !== null)
+        
+        console.log(`${validItems.length}개 문항 상세 정보 로드 완료`)
+        
+        if (validItems.length > 0) {
+          // 불러온 문항들을 자동으로 선택
+          validItems.forEach(item => {
+            if (!selectedItems.value.some(selected => selected.itemId === item.itemId)) {
+              selectedItems.value.push(item)
+              itemStore.selectItem(item)
+            }
+          })
+          
+          // 선택된 패널 자동으로 열기
+          showSelectedPanel.value = true
+          
+          return validItems
+        }
+      } else {
+        console.log('시험지에 문항이 없습니다.')
+      }
+    }
+    
+    return []
   } catch (error) {
-    console.error('MathJax rendering error:', error)
-    // 에러 발생 시 재시도
-    setTimeout(() => renderMathJax(), 500)
+    console.error('시험지 문항 로드 실패:', error)
+    return []
   }
 }
 
-// 문항 목록이 변경될 때 MathJax 렌더링
-watch(() => items.value, async () => {
-  // DOM 업데이트를 기다린 후 렌더링
-  await nextTick()
-  setTimeout(() => renderMathJax(), 100)
-}, { deep: true })
+// HTML 정리 함수 (수식은 보존하면서 위험한 요소만 제거)
+const sanitizeHtml = (html) => {
+  if (!html) return ''
+  
+  // MathJax 수식을 임시로 보호
+  const mathPatterns = []
+  let mathIndex = 0
+  
+  // LaTeX 수식 패턴들을 임시 플레이스홀더로 교체
+  let cleaned = html
+    // Display math $$ ... $$ 보호
+    .replace(/\$\$[\s\S]*?\$\$/g, (match) => {
+      mathPatterns.push(match)
+      return `__MATH_${mathIndex++}__`
+    })
+    // Inline math $ ... $ 보호
+    .replace(/\$[^\$\n]+?\$/g, (match) => {
+      mathPatterns.push(match)
+      return `__MATH_${mathIndex++}__`
+    })
+    // \[ ... \] 보호
+    .replace(/\\\[[\s\S]*?\\\]/g, (match) => {
+      mathPatterns.push(match)
+      return `__MATH_${mathIndex++}__`
+    })
+    // \( ... \) 보호
+    .replace(/\\\([\s\S]*?\\\)/g, (match) => {
+      mathPatterns.push(match)
+      return `__MATH_${mathIndex++}__`
+    })
+  
+  // 위험한 요소 제거 (수식 이미지는 제거하되 일반 이미지는 유지 가능)
+  cleaned = cleaned
+    .replace(/<img[^>]*class="[^"]*mathjax[^"]*"[^>]*>/gi, '') // MathJax 관련 이미지만 제거
+    .replace(/<script(?! type="math\/tex)[^>]*>[\s\S]*?<\/script>/gi, '') // 위험한 스크립트 제거
+    .replace(/on\w+="[^"]*"/g, '') // 이벤트 핸들러 제거
+    .replace(/on\w+='[^']*'/g, '')
+  
+  // 보호했던 수식들을 다시 복원
+  mathPatterns.forEach((pattern, index) => {
+    cleaned = cleaned.replace(`__MATH_${index}__`, pattern)
+  })
+  
+  return cleaned
+}
 
-// 선택된 문항이 변경될 때 MathJax 렌더링
-watch(() => selectedItems.value, async () => {
-  await nextTick()
-  setTimeout(() => renderMathJax(), 100)
-}, { deep: true })
-
-// 유사 문항이 표시될 때 MathJax 렌더링
-watch(() => showSimilarModal.value, async (newVal) => {
-  if (newVal) {
-    await nextTick()
-    setTimeout(() => renderMathJax(), 100)
-  }
-})
-
-// 선택된 문항 패널이 표시될 때 MathJax 렌더링
-watch(() => showSelectedPanel.value, async (newVal) => {
-  if (newVal) {
-    await nextTick()
-    setTimeout(() => renderMathJax(), 100)
-  }
-})
 
 // Lifecycle
 onMounted(async () => {
-  try {
-    // MathJax 설정 초기화
-    if (!window.MathJax) {
-      window.MathJax = {
-        tex: {
-          inlineMath: [['$', '$'], ['\\(', '\\)']],
-          displayMath: [['$$', '$$'], ['\\[', '\\]']],
-          processEscapes: true,
-          processEnvironments: true
-        },
-        options: {
-          skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
-        }
-      }
+  console.log('Step2 onMounted - examInfo:', props.examInfo)
+  
+  // Store 초기화 - 기존 선택된 아이템이 있으면 유지
+  if (itemStore.resetFilters) {
+    itemStore.resetFilters()
+  }
+  // selectedItems가 이미 있는 경우(기존 시험지 편집)는 초기화하지 않음
+  if (itemStore.setSelectedItems && !props.examInfo?.selectedItems?.length) {
+    itemStore.setSelectedItems([])
+  }
+  
+  // 초기 MathJax 하이브리드 스마트 렌더링
+  await nextTick()
+  const container = document.querySelector('.items-container') || document.body
+  await renderMathJaxSmartHybrid(container, {
+    hideBeforeRender: true,
+    clearFirst: false
+  })
+  
+  // 편집 모드 또는 기존 문항이 있는 경우: 기존 시험지 정보 사용
+  // mode가 'edit'이거나 selectedItems가 있으면 기존 시험지 편집으로 처리
+  if (props.examInfo?.mode === 'edit' || props.examInfo?.selectedItems?.length > 0) {
+    // 학년과 과목 설정
+    if (props.examInfo.gradeCode) {
+      selectedGrade.value = props.examInfo.gradeCode
     }
-
+    if (props.examInfo.areaCode) {
+      selectedSubject.value = props.examInfo.areaCode
+    }
+    
     // 과목 및 교과서 정보 로드
-    await loadSubjectsAndTextbooks()
-
-    // 편집 모드이고 기존 문항이 있으면 선택 상태로 설정
-    if (testBankStore.mode === 'edit' && testBankStore.existingItemIds.length > 0) {
-      console.log('편집 모드 - 기존 문항 로드:', testBankStore.existingItemIds)
-
-      // 기존 문항 ID들로 문항 정보 조회
-      const itemPromises = testBankStore.existingItemIds.map(async (itemId, index) => {
-        try {
-          // API를 통해 개별 문항 정보 조회
-          const response = await itemApiService.getItemDetail(itemId)
-          if (response.success && response.data) {
-            return response.data
-          }
-        } catch (err) {
-          console.warn(`문항 ${itemId} 정보 조회 실패:`, err)
-        }
-
-        // 조회 실패 시 기본 객체 반환
-        return {
-          itemId: itemId,
-          itemNo: index + 1,
-          difficulty: { code: 'M', name: '중' },
-          questionForm: { code: 'MC', name: '객관식' },
-          chapterName: '기존 문항',
-          hasImageData: false,
-          hasHtmlData: false,
-          questionImageUrl: null,
-          questionHtml: `문항 #${itemId}`
-        }
-      })
-
-      try {
-        const itemsData = await Promise.all(itemPromises)
-
-        // 조회된 문항들을 selectedItems에 추가
-        itemsData.forEach(item => {
-          if (item) {
-            itemStore.selectItem(item)
-          }
-        })
-
-        console.log('기존 문항 선택 완료:', itemStore.selectedItems.length, '개')
-      } catch (err) {
-        console.error('기존 문항 정보 조회 중 오류:', err)
-      }
+    if (selectedGrade.value && selectedSubject.value) {
+      await loadSubjectsAndTextbooks()
     }
-
-    // 교과서를 선택하면 해당 교과서의 챕터를 로드하도록 변경
-    // (subjectId는 교과서 선택 시 결정되므로 여기서는 로드하지 않음)
-
-    // 초기 검색 수행
-    await performSearch()
-
-  } catch (err) {
-    error('초기 데이터 로드에 실패했습니다.')
-    console.error('Mount error:', err)
+    
+    // examId가 있으면 해당 시험지의 문항들을 불러오기
+    if (props.examInfo?.examId && !props.examInfo?.selectedItems?.length) {
+      console.log('편집 모드 - 기존 시험지 문항 로드')
+      await loadExamItems(props.examInfo.examId)
+    }
+    // 또는 기존 문항이 있으면 선택 상태로 설정
+    else if (props.examInfo?.selectedItems?.length > 0) {
+      console.log(`기존 문항 ${props.examInfo.selectedItems.length}개를 선택 상태로 설정`)
+      props.examInfo.selectedItems.forEach(item => {
+        itemStore.selectItem(item)
+        selectedItems.value.push(item)
+      })
+    }
+  }
+  // 새로 만들기 모드: 학년/과목 선택 필요
+  else {
+    // 학년과 과목 초기화 (사용자가 선택해야 함)
+    selectedGrade.value = null
+    selectedSubject.value = null
+    textbooks.value = []
+    chapterTree.value = []
   }
 })
 
-// Cleanup
-onUnmounted(() => {
-  // 디바운스 타이머 정리
-  if (searchDebounceTimeout.value) {
-    clearTimeout(searchDebounceTimeout.value)
-  }
-
-  // 컴포넌트가 언마운트될 때 store 상태 유지 (다시 돌아올 때 복원)
-  // 필요시 itemStore.resetStore() 호출
+// Watchers
+watch(() => props.examInfo, () => {
+  loadSubjectsAndTextbooks()
+  loadItems()
 })
+
+// 페이지 변경 시 데이터 로드 및 수식 렌더링
+watch(currentPage, async () => {
+  await loadItems()  // loadItems 안에서 렌더링 처리됨
+  // MathJax 하이브리드 병렬 렌더링 (페이지 변경 시)
+  await nextTick()
+  requestAnimationFrame(async () => {
+    const elements = document.querySelectorAll('.mathjax-content[data-mathjax-pending="true"]')
+    if (elements.length > 0) {
+      await renderMathJaxParallelHybrid(elements)
+    }
+  })
+})
+
+// 뷰 모드 변경 시 MathJax 하이브리드 병렬 렌더링
+watch(viewMode, async () => {
+  await nextTick()
+  requestAnimationFrame(async () => {
+    const elements = document.querySelectorAll('.mathjax-content[data-mathjax-pending="true"]')
+    if (elements.length > 0) {
+      await renderMathJaxParallelHybrid(elements)
+    }
+  })
+})
+
+// 문항 데이터 변경 감지 - items 직접 감시 (Vue 재렌더링 안전 버전)
+watch(items, async (newItems, oldItems) => {
+  if (newItems && newItems.length > 0) {
+    // 이미 렌더링된 MathJax 개수 확인
+    const existingContainers = document.querySelectorAll('mjx-container').length
+    console.log(`items 변경 감지 - 기존 mjx-containers: ${existingContainers}`)
+    
+    await nextTick()
+    // requestAnimationFrame을 사용하여 렌더링 최적화
+    requestAnimationFrame(async () => {
+      // MathJax 하이브리드 병렬 렌더링로 새로 로드된 문항들 처리
+      const elements = document.querySelectorAll('.mathjax-content[data-mathjax-pending="true"]')
+      if (elements.length > 0) {
+        await renderMathJaxParallelHybrid(elements)
+      }
+        
+      // 렌더링 후 확인
+      const newContainers = document.querySelectorAll('mjx-container').length
+      console.log(`items 변경 후 mjx-containers: ${newContainers}`)
+    })
+  }
+}, { deep: true, immediate: false })
 </script>
 
 <style scoped>
-.step2-container {
+/* 전체 컨테이너 */
+.step2-improved {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
-  position: relative;
+  background: #f8f9fa;
   overflow: hidden;
 }
 
-/* 검색 섹션 */
-.search-section {
+/* 통합 헤더 */
+.unified-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   padding: 0.75rem 1.5rem;
   background: white;
-  border-bottom: 1px solid #e1e4e8;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.search-container {
-  max-width: 800px;
-  margin: 0 auto;
-}
-
-.filter-section .search-input-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  overflow: hidden;
-  transition: all 0.2s ease;
-}
-
-.search-input-wrapper:focus-within {
-  border-color: #3b82f6;
-  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
-}
-
-.search-input {
-  flex: 1;
-  padding: 0.75rem 1rem;
-  background: transparent;
-  border: none;
-  outline: none;
-  font-size: 0.9rem;
-  color: #1a202c;
-}
-
-.search-input::placeholder {
-  color: #64748b;
-}
-
-.search-button {
-  padding: 0.75rem 1rem;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
-  border: none;
-  cursor: pointer;
-  font-size: 1rem;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.search-button:hover:not(:disabled) {
-  background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%);
-}
-
-.search-button:disabled {
-  opacity: 0.6;
-  cursor: not-allowed;
-}
-
-.search-stats {
-  text-align: center;
-  margin-top: 0.5rem;
-  color: #64748b;
-  font-size: 0.85rem;
-}
-
-.spinner-mini {
-  width: 20px;
-  height: 20px;
-  border: 2px solid rgba(255, 255, 255, 0.3);
-  border-top-color: white;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-/* 헤더 */
-.selection-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.5rem;
-  background: white;
-  border-bottom: 1px solid #e1e4e8;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-/* 교과서 선택 섹션 */
-.textbook-section {
-  padding: 1rem;
-  background: linear-gradient(135deg, #f8faff 0%, #f3f7ff 100%);
-}
-
-.textbook-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 3rem;
-  color: #6b7280;
-}
-
-.textbook-loading .spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e5e7eb;
-  border-top-color: #3b82f6;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin-bottom: 1rem;
-}
-
-.subject-group {
-  margin-bottom: 2rem;
-}
-
-.subject-title {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: #1a202c;
-  margin: 0 0 1rem 0;
-  padding-left: 0.5rem;
-  border-left: 4px solid #3b82f6;
-}
-
-.textbook-list {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-}
-
-.section-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 1rem;
-}
-
-.section-header h3 {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 1rem;
-  font-weight: 700;
-  color: #1a202c;
-  margin: 0;
-}
-
-.section-icon {
-  font-size: 1.25rem;
-}
-
-.section-desc {
-  font-size: 0.8125rem;
-  color: #64748b;
-  margin-left: auto;
-  margin-right: 1rem;
-}
-
-.textbook-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.textbook-card {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-  padding: 1rem;
-  background: white;
-  border: 1.5px solid #e2e8f0;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-height: 80px; /* 최소 높이 보장 */
-}
-
-.textbook-card:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  border-color: #3b82f6;
-}
-
-.textbook-card.selected {
-  background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-  border-color: #3b82f6;
-  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.15);
-}
-
-.textbook-check {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  width: 24px;
-  height: 24px;
-  background: #3b82f6;
-  color: white;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: bold;
-  font-size: 0.875rem;
-  opacity: 0;
-  transform: scale(0);
-  transition: all 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-.textbook-card.selected .textbook-check {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.textbook-icon {
-  width: 40px;
-  height: 50px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-  overflow: hidden;
-  border-radius: 4px;
-  background: #f8fafc;
+  border-bottom: 1px solid #e5e7eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  min-height: 56px;
   flex-shrink: 0;
-}
-
-.textbook-cover {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 4px;
-}
-
-.textbook-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.125rem;
-  min-width: 0;
-}
-
-.textbook-info h4,
-.textbook-info h5 {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #1a202c;
-  margin: 0;
-  white-space: normal; /* nowrap → normal로 변경하여 줄바꿈 허용 */
-  word-break: keep-all; /* 한글 단어 단위로 줄바꿈 */
-  line-height: 1.3;
-}
-
-.textbook-info .publisher {
-  font-size: 0.6875rem;
-  color: #64748b;
-  margin: 0;
-}
-
-.year-badge {
-  display: inline-block;
-  padding: 0.125rem 0.25rem;
-  background: #f1f5f9;
-  color: #475569;
-  border-radius: 3px;
-  font-size: 0.625rem;
-  font-weight: 600;
-}
-
-.item-count {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.5rem;
-  background: #f0f4f8;
-  border-radius: 6px;
-  flex-shrink: 0;
-}
-
-.count-number {
-  font-size: 0.875rem;
-  font-weight: 700;
-  color: #3b82f6;
-}
-
-.count-label {
-  font-size: 0.6875rem;
-  color: #64748b;
 }
 
 .header-left {
@@ -1780,2360 +1817,559 @@ onUnmounted(() => {
 }
 
 .btn-back {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: none;
-  border: none;
-  color: #586069;
-  cursor: pointer;
-  font-size: 0.9375rem;
+  gap: 0.25rem;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: 1px solid #e5e7eb;
   border-radius: 6px;
-  transition: all 0.2s ease;
+  color: #6b7280;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
 .btn-back:hover {
   background: #f3f4f6;
-  color: #3b82f6;
+  color: #111827;
 }
 
-.selection-header h2 {
-  font-size: 1.5rem;
-  font-weight: 700;
-  color: #24292e;
+.header-info h2 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #111827;
   margin: 0;
 }
 
-.header-info {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  font-size: 0.9375rem;
-  color: #586069;
-}
-
-.header-info .divider {
-  color: #d1d5db;
-}
-
-.exam-name {
-  font-weight: 600;
-  color: #24292e;
-}
-
-/* 콘텐츠 래퍼 - 3컬럼 레이아웃 (개선) */
-.content-wrapper {
-  flex: 1;
-  display: flex;
-  gap: 1rem;
-  padding: 1rem;
-  overflow: hidden;
-  background: linear-gradient(to bottom, #fafbfc, #f8fafc);
-  min-height: 0; /* flexbox 오버플로 방지 */
-  height: calc(100vh - 200px); /* 명시적 높이 설정 */
-}
-
-/* 왼쪽 사이드바 - 교과서 및 필터 (개선) */
-.left-sidebar {
-  width: 320px; /* 240px → 320px로 증가하여 텍스트 잘림 방지 */
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-  overflow: hidden;
-  border: 1px solid #e2e8f0;
-  height: 100%; /* 명시적 높이 */
-}
-
-.sidebar-scroll {
-  flex: 1;
-  overflow-y: auto;
-  padding: 1.5rem; /* 패딩 증가 */
-}
-
-/* 중앙 패널 - 문항 목록 (개선) */
-.center-panel {
-  flex: 1; /* 남은 공간 모두 차지 */
-  display: flex;
-  flex-direction: column;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.04);
-  overflow: hidden;
-  min-width: 0; /* flexbox가 제대로 작동하도록 */
-  border: 1px solid #e2e8f0;
-  height: 100%; /* 명시적 높이 */
-}
-
-/* 플로팅 토글 버튼 */
-.floating-toggle-btn {
-  position: fixed;
-  right: 2rem;
-  bottom: 2rem;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-  border: none;
-  box-shadow: 0 10px 30px rgba(102, 126, 234, 0.4);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.3s ease;
-  z-index: 1000;
-}
-
-.floating-toggle-btn:hover {
-  transform: scale(1.1);
-  box-shadow: 0 15px 40px rgba(102, 126, 234, 0.5);
-}
-
-.floating-toggle-btn.active {
-  background: linear-gradient(135deg, #f093fb, #f5576c);
-}
-
-.floating-toggle-btn .badge {
-  position: absolute;
-  top: -5px;
-  right: -5px;
-  background: #ff4757;
-  color: white;
-  border-radius: 12px;
-  padding: 2px 8px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  min-width: 24px;
-  text-align: center;
-}
-
-/* 슬라이드 패널 */
-.slide-panel {
-  position: fixed;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  width: 400px;
-  background: white;
-  box-shadow: -10px 0 40px rgba(0, 0, 0, 0.1);
-  z-index: 999;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.panel-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  background: linear-gradient(135deg, #667eea, #764ba2);
-  color: white;
-}
-
-.panel-header h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-
-.btn-close {
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
-  border-radius: 8px;
-  padding: 0.5rem;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  color: white;
-}
-
-.btn-close:hover {
-  background: rgba(255, 255, 255, 0.3);
-  transform: scale(1.1);
-}
-
-/* 슬라이드 애니메이션 */
-.slide-enter-active,
-.slide-leave-active {
-  transition: transform 0.3s ease, opacity 0.3s ease;
-}
-
-.slide-enter-from {
-  transform: translateX(100%);
-  opacity: 0;
-}
-
-.slide-leave-to {
-  transform: translateX(100%);
-  opacity: 0;
-}
-
-/* 스크롤바 공통 스타일 */
-.sidebar-scroll::-webkit-scrollbar,
-.items-grid::-webkit-scrollbar,
-.selected-items-list::-webkit-scrollbar {
-  width: 6px;
-}
-
-.sidebar-scroll::-webkit-scrollbar-track,
-.items-grid::-webkit-scrollbar-track,
-.selected-items-list::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 3px;
-}
-
-.sidebar-scroll::-webkit-scrollbar-thumb,
-.items-grid::-webkit-scrollbar-thumb,
-.selected-items-list::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
-}
-
-.sidebar-scroll::-webkit-scrollbar-thumb:hover,
-.items-grid::-webkit-scrollbar-thumb:hover,
-.selected-items-list::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* 섹션 공통 스타일 */
-.textbook-section,
-.filter-section {
-  margin-bottom: 1rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid #e1e4e8;
-}
-
-.textbook-section:last-child,
-.filter-section:last-child {
-  border-bottom: none;
-}
-
-.filter-content {
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-}
-
-.filter-label {
-  display: flex;
-  align-items: center;
-  gap: 0.375rem;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #475569;
-  margin-bottom: 0.75rem;
-}
-
-.label-icon {
-  font-size: 1rem;
-}
-
-.btn-reset {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.75rem;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 0.8125rem;
-  font-weight: 500;
-  color: #64748b;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-reset:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  color: #475569;
-}
-
-/* 단원 트리 구조 스타일 - 완전히 재디자인 */
-.filter-subtitle {
-  font-size: 0.75rem;
-  color: #94a3b8;
-  font-weight: 400;
-  margin-left: 0.5rem;
-}
-
-.chapter-tree-container {
-  background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
-  border-radius: 12px;
-  padding: 0.75rem;
-  border: 1px solid #e2e8f0;
-  margin-top: 0.75rem;
-  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.chapter-tree {
-  display: flex;
-  flex-direction: column;
-  gap: 0.625rem;
-}
-
-.large-chapter {
-  background: white;
-  border-radius: 10px;
-  overflow: hidden;
-  border: 1px solid #e2e8f0;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
-}
-
-.large-chapter:hover {
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  transform: translateY(-1px);
-}
-
-.large-chapter-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1rem 1.25rem;
-  cursor: pointer;
-  user-select: none;
-  transition: all 0.2s ease;
-  background: white;
-}
-
-.large-chapter-header:hover {
-  background: linear-gradient(to right, #f8fafc, #f1f5f9);
-}
-
-.large-chapter-header.expanded {
-  background: linear-gradient(to right, #eff6ff, #f0f9ff);
-  border-bottom: 1px solid #dbeafe;
-}
-
-.chapter-header-left {
-  display: flex;
-  align-items: center;
-  gap: 0.625rem;
-  flex: 1;
-}
-
-.chapter-header-right {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-}
-
-.expand-icon {
-  width: 20px;
-  height: 20px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #64748b;
-  transition: all 0.2s ease;
-}
-
-.expanded .expand-icon {
-  color: #3b82f6;
-}
-
-.chapter-number {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 28px;
-  height: 28px;
-  padding: 0 0.5rem;
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  color: white;
-  border-radius: 6px;
-  font-size: 0.8125rem;
-  font-weight: 700;
-}
-
-.large-chapter-header .chapter-name {
-  flex: 1;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  color: #1e293b;
-  letter-spacing: -0.01em;
-  padding-left: 0.25rem;
-}
-
-.item-count {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  padding: 0.25rem 0.625rem;
-  background: #f1f5f9;
-  border-radius: 20px;
-  font-size: 0.8125rem;
-}
-
-.count-value {
-  font-weight: 700;
-  color: #475569;
-}
-
-.count-label {
-  color: #64748b;
-  font-weight: 400;
-}
-
-.selected-indicator {
-  padding: 0.25rem 0.625rem;
-  background: linear-gradient(135deg, #dcfce7, #bbf7d0);
-  color: #14532d;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-/* 중단원 스타일 */
-.medium-chapters {
-  padding: 0.75rem;
-  background: #f8fafc;
-}
-
-.slide-enter-active,
-.slide-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.slide-enter-from {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-.slide-leave-to {
-  opacity: 0;
-  transform: translateY(-10px);
-}
-
-.medium-chapter-item {
-  display: flex;
-  align-items: center;
-  gap: 0.875rem;
-  padding: 0.75rem 1rem;
-  margin-bottom: 0.5rem;
-  background: white;
-  border: 2px solid #e2e8f0;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  position: relative;
-  min-height: 48px;
-}
-
-.medium-chapter-item:last-child {
-  margin-bottom: 0;
-}
-
-.medium-chapter-item:hover {
-  background: #fafbfc;
-  border-color: #cbd5e1;
-  transform: translateX(2px);
-}
-
-.medium-chapter-item.selected {
-  background: linear-gradient(to right, #eff6ff, #dbeafe);
-  border-color: #3b82f6;
-  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.15);
-}
-
-/* 커스텀 체크박스 */
-.checkbox-wrapper {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.checkbox-wrapper input[type="checkbox"] {
-  position: absolute;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.custom-checkbox {
-  width: 20px;
-  height: 20px;
-  border: 2px solid #cbd5e1;
-  border-radius: 5px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  background: white;
-  flex-shrink: 0;
-}
-
-.checkbox-wrapper input:checked ~ .custom-checkbox {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  border-color: #3b82f6;
-}
-
-.check-icon {
-  opacity: 0;
-  transform: scale(0);
-  transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-.checkbox-wrapper input:checked ~ .custom-checkbox .check-icon {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.chapter-info {
-  flex: 1;
-  display: flex;
-  align-items: center;
-}
-
-.medium-chapter-item .chapter-name {
-  flex: 1;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #334155;
-  letter-spacing: -0.01em;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.medium-chapter-item.selected .chapter-name {
-  color: #1e40af;
-  font-weight: 600;
-}
-
-.medium-chapter-item .item-count {
-  background: #f8fafc;
-  padding: 0.25rem 0.5rem;
-  border-radius: 16px;
-  flex-shrink: 0;
-  white-space: nowrap;
-}
-
-.medium-chapter-item.selected .item-count {
-  background: white;
-}
-
-.no-medium-chapters {
-  padding: 1.5rem;
-  text-align: center;
-  color: #94a3b8;
-  font-size: 0.875rem;
-  font-style: italic;
-}
-
-.no-textbook-message {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  background: #f8fafc;
-  border-radius: 8px;
-  text-align: center;
-}
-
-.no-textbook-message .icon {
-  font-size: 2.5rem;
-  margin-bottom: 0.75rem;
-  opacity: 0.5;
-}
-
-.no-textbook-message p {
-  font-size: 0.875rem;
-  color: #6b7280;
-  margin: 0;
-}
-
-/* 단일 선택 라디오 버튼 스타일 */
-.textbook-radio {
-  width: 16px;
-  height: 16px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.75rem;
-  color: #3b82f6;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-  margin-left: 0.5rem;
-}
-
-.textbook-card:not(.selected) .textbook-radio {
-  color: #cbd5e1;
-}
-
-/* 단원 선택 버튼 (기존 호환성) */
-.chapter-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 0.75rem;
-}
-
-.chapter-btn {
+.exam-meta {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1rem;
-  background: #f8fafc;
-  border: 2px solid #e2e8f0;
-  border-radius: 10px;
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.exam-meta .divider {
+  color: #d1d5db;
+}
+
+.exam-meta .primary {
+  color: #3b82f6;
+  font-weight: 500;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+/* 검색바 */
+.search-wrapper {
+  position: relative;
+  width: 240px;
+}
+
+.search-icon {
+  position: absolute;
+  left: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #9ca3af;
+}
+
+.search-input {
+  width: 100%;
+  padding: 0.5rem 0.75rem 0.5rem 2.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* 뷰 토글 */
+.view-toggle {
+  display: flex;
+  gap: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.view-btn {
+  padding: 0.5rem;
+  background: white;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.view-btn:not(:last-child) {
+  border-right: 1px solid #e5e7eb;
+}
+
+.view-btn:hover {
+  background: #f3f4f6;
+}
+
+.view-btn.active {
+  background: #3b82f6;
+  color: white;
+}
+
+/* 선택 목록 버튼 */
+.btn-selected {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #374151;
   font-size: 0.875rem;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
 }
 
-.chapter-btn:hover {
-  background: #f1f5f9;
-  border-color: #cbd5e1;
-  transform: translateY(-2px);
+.btn-selected:hover {
+  background: #f3f4f6;
 }
 
-.chapter-btn.active {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  border-color: #3b82f6;
+.btn-selected .badge {
+  padding: 0.125rem 0.375rem;
+  background: #3b82f6;
   color: white;
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
-}
-
-.chapter-num {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 24px;
-  height: 24px;
-  background: rgba(255, 255, 255, 0.2);
-  border-radius: 50%;
-  font-weight: 700;
+  border-radius: 10px;
   font-size: 0.75rem;
+  font-weight: 600;
 }
 
-.chapter-btn.active .chapter-num {
-  background: rgba(255, 255, 255, 0.3);
+/* 메인 레이아웃 */
+.main-layout {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* 사이드바 필터 */
+.filter-sidebar {
+  width: 260px;
+  background: white;
+  border-right: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  transition: width 0.3s;
+  overflow: hidden;
+}
+
+.filter-sidebar.collapsed {
+  width: 48px;
+}
+
+.sidebar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.sidebar-header h3 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin: 0;
+}
+
+.btn-toggle {
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-toggle:hover {
+  color: #111827;
+}
+
+.filter-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+}
+
+.filter-section {
+  margin-bottom: 1.5rem;
+}
+
+.filter-section h4 {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  margin: 0 0 0.75rem 0;
+  letter-spacing: 0.025em;
+}
+
+.select-input {
+  width: 100%;
+  padding: 0.5rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  background: white;
+  cursor: pointer;
+}
+
+/* 단원 트리 */
+.chapter-tree {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.chapter-node {
+  display: flex;
+  flex-direction: column;
+}
+
+.chapter-item {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.chapter-item:hover {
+  background: #f3f4f6;
+}
+
+.chapter-item input[type="checkbox"] {
+  margin-right: 0.5rem;
 }
 
 .chapter-name {
   flex: 1;
-  font-weight: 500;
+  font-size: 0.875rem;
+  color: #374151;
 }
 
-/* 난이도 버튼 */
-.difficulty-buttons {
+.item-count {
+  font-size: 0.75rem;
+  color: #9ca3af;
+  background: #f3f4f6;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}
+
+.sub-chapters {
+  margin-left: 1.25rem;
+  margin-top: 0.25rem;
+}
+
+.chapter-item.sub {
+  font-size: 0.8125rem;
+}
+
+/* 필터 칩 */
+.difficulty-filters,
+.type-filters {
   display: flex;
-  gap: 0.5rem;
   flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-.difficulty-btn {
-  flex: 0 0 calc(20% - 0.4rem);
-  min-width: 60px;
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.375rem 0.75rem;
+  background: #f3f4f6;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.filter-chip:hover {
+  background: #e5e7eb;
+}
+
+.filter-chip.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+.filter-chip input[type="checkbox"] {
+  display: none;
+}
+
+/* 난이도 색상 */
+.difficulty-very_easy { color: #10b981; }
+.difficulty-easy { color: #34d399; }
+.difficulty-normal { color: #fbbf24; }
+.difficulty-hard { color: #fb923c; }
+.difficulty-very_hard { color: #ef4444; }
+
+/* 필터 초기화 */
+.btn-reset-filters {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 0.25rem;
-  flex-direction: column;
-  padding: 0.75rem;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem;
   background: white;
-  border: 2px solid #e2e8f0;
-  border-radius: 10px;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #6b7280;
   font-size: 0.875rem;
-  font-weight: 600;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: all 0.2s;
 }
 
-.difficulty-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+.btn-reset-filters:hover {
+  background: #f3f4f6;
+  color: #111827;
 }
 
-.diff-very-high {
-  color: #1f2937;
+/* 컨텐츠 영역 */
+.content-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #f8f9fa;
+  position: relative; /* 로딩 오버레이를 위한 position 설정 */
 }
 
-.diff-very-high.active {
-  background: linear-gradient(135deg, #e5e7eb 0%, #d1d5db 100%);
-  border-color: #1f2937;
+.content-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  background: white;
+  border-bottom: 1px solid #e5e7eb;
 }
 
-.diff-high {
-  color: #dc2626;
-}
-
-.diff-high.active {
-  background: linear-gradient(135deg, #fee2e2 0%, #fecaca 100%);
-  border-color: #dc2626;
-}
-
-.diff-medium {
-  color: #d97706;
-}
-
-.diff-medium.active {
-  background: linear-gradient(135deg, #fef3c7 0%, #fed7aa 100%);
-  border-color: #d97706;
-}
-
-.diff-low {
-  color: #059669;
-}
-
-.diff-low.active {
-  background: linear-gradient(135deg, #d1fae5 0%, #a7f3d0 100%);
-  border-color: #059669;
-}
-
-.diff-very-low {
+.result-info {
+  font-size: 0.875rem;
   color: #6b7280;
 }
 
-.diff-very-low.active {
-  background: linear-gradient(135deg, #f9fafb 0%, #f3f4f6 100%);
-  border-color: #6b7280;
-}
-
-.diff-icon {
-  font-size: 1.2rem;
-}
-
-.difficulty-btn span:not(.diff-icon) {
-  font-size: 0.75rem;
+.result-info strong {
+  color: #111827;
   font-weight: 600;
+  margin-left: 0.25rem;
 }
 
-/* 난이도 배지 - 모던 스타일 */
-.difficulty-badge {
-  padding: 0.25rem 0.625rem;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.025em;
-}
-
-.difficulty-badge.difficulty-2 {
-  background: linear-gradient(135deg, #86efac, #4ade80);
-  color: #14532d;
-}
-
-.difficulty-badge.difficulty-3 {
-  background: linear-gradient(135deg, #fde047, #facc15);
-  color: #713f12;
-}
-
-.difficulty-badge.difficulty-4 {
-  background: linear-gradient(135deg, #fca5a5, #f87171);
-  color: #7f1d1d;
-}
-
-.type-badge {
-  padding: 0.25rem 0.625rem;
-  background: linear-gradient(135deg, #e0e7ff, #c7d2fe);
-  color: #3730a3;
-  border-radius: 20px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-/* 문제 유형 버튼 */
-.type-buttons {
-  display: flex;
-  gap: 0.75rem;
-}
-
-.type-btn {
-  flex: 1;
+.content-actions {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.375rem;
-  padding: 0.75rem;
-  background: white;
-  border: 2px solid #e2e8f0;
-  border-radius: 10px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #475569;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.type-btn:hover {
-  background: #f8fafc;
-  border-color: #cbd5e1;
-  transform: translateY(-2px);
-}
-
-.type-btn.active {
-  background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
-  border-color: #6366f1;
-  color: #4f46e5;
-}
-
-.type-icon {
-  font-size: 1rem;
-}
-
-
-.btn-search {
-  padding: 0.625rem 1.25rem;
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  white-space: nowrap;
-}
-
-.btn-search:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
-}
-
-/* 문항 섹션 */
-.items-section {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-height: 0;
-  overflow: hidden;
-}
-
-.items-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.25rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
-  background: linear-gradient(135deg, #ffffff 0%, #fafbfc 100%);
-  flex-shrink: 0;
-}
-
-.items-header span {
-  font-size: 0.9375rem;
-  color: #586069;
-  font-weight: 600;
+  gap: 1rem;
 }
 
 .select-all {
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  cursor: pointer;
   font-size: 0.875rem;
-  color: #24292e;
+  color: #374151;
+  cursor: pointer;
 }
 
-/* 문항 그리드 - 큰 카드 */
-.items-grid {
-  flex: 1;
-  padding: 1.5rem;
-  overflow-y: auto;
-  overflow-x: hidden;
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 1.5rem;
-  align-content: start;
-  background: linear-gradient(to bottom, #fafbfc, #f8fafc);
-  min-height: 0;
-}
-
-/* 반응형 그리드 조정 */
-@media (min-width: 1200px) {
-  .items-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (max-width: 1199px) {
-  .items-grid {
-    grid-template-columns: 1fr;
-  }
-}
-
-.item-card {
-  position: relative;
+.btn-random {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
   background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  min-height: 420px;
-  height: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.item-card:hover {
-  border-color: #93c5fd;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.08);
-  transform: translateY(-2px);
-}
-
-.item-card.selected {
-  border-color: #3b82f6;
-  border-width: 2px;
-  background: #f0f9ff;
-  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.15);
-}
-
-/* 카드 헤더 - 개선된 스타일 */
-.item-card-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.5rem; /* 패딩 증가 */
-  border-bottom: 2px solid #f1f5f9;
-  background: linear-gradient(135deg, #fafbfc 0%, #f8fafc 100%);
-  min-height: 56px; /* 최소 높이 설정 */
-}
-
-.item-header-left {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-
-.item-header-right {
-  display: flex;
-  gap: 0.5rem;
-}
-
-/* 커스텀 체크박스 */
-.custom-item-checkbox {
-  position: relative;
-  display: flex;
-  align-items: center;
-  cursor: pointer;
-}
-
-.custom-item-checkbox input {
-  position: absolute;
-  opacity: 0;
-  cursor: pointer;
-}
-
-.checkbox-mark {
-  width: 28px; /* 체크박스 크기 증가 */
-  height: 28px;
-  border: 2px solid #94a3b8;
-  border-radius: 8px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: white;
-  transition: all 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-}
-
-.custom-item-checkbox input:checked ~ .checkbox-mark {
-  background: linear-gradient(135deg, #3b82f6, #2563eb);
-  border-color: #3b82f6;
-}
-
-.checkbox-mark svg {
-  opacity: 0;
-  transform: scale(0);
-  transition: all 0.2s cubic-bezier(0.68, -0.55, 0.265, 1.55);
-}
-
-.custom-item-checkbox input:checked ~ .checkbox-mark svg {
-  opacity: 1;
-  transform: scale(1);
-}
-
-.item-number {
-  font-size: 1rem; /* 폰트 크기 증가 */
-  font-weight: 700;
-  color: #1e293b; /* 더 진한 색상으로 가독성 개선 */
-  letter-spacing: -0.01em;
-  padding: 0.25rem 0.5rem;
-  background: #f1f5f9;
+  border: 1px solid #e5e7eb;
   border-radius: 6px;
-}
-
-/* 문항 내용 영역 - 크기 최적화 */
-.item-content {
-  padding: 0.75rem;
-  min-height: 160px;
-  flex: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #fafbfc;
-  margin: 0.5rem;
-  border-radius: 8px;
-}
-
-.item-image-container {
-  position: relative;
-  width: 100%;
-  max-height: 200px;
-  height: 200px;
-  border-radius: 8px;
-  overflow: hidden;
-  background: linear-gradient(to bottom, #f8fafc, #f1f5f9);
-  border: 1px solid #e2e8f0;
-  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.03);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.item-image {
-  width: auto;
-  height: auto;
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  transition: transform 0.3s ease;
-}
-
-.item-card:hover .item-image {
-  transform: scale(1.02);
-}
-
-.btn-zoom {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  width: 42px; /* 버튼 크기 증가 */
-  height: 42px;
-  background: rgba(255, 255, 255, 0.98);
-  border: 2px solid #e2e8f0;
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  color: #374151;
+  font-size: 0.875rem;
   cursor: pointer;
-  transition: all 0.2s ease;
-  color: #475569;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-  font-size: 1.125rem;
+  transition: all 0.2s;
 }
 
-.btn-zoom:hover {
-  background: white;
-  color: #3b82f6;
-  transform: scale(1.1);
-}
-
-.item-html-content {
-  width: 100%;
-  padding: 1rem;
-  background: #fafbfc;
-  border-radius: 6px;
-  max-height: 280px;
-  overflow-y: auto;
-  font-size: 0.95rem;
-}
-
-.question-text {
-  font-size: 0.95rem;
-  line-height: 1.6;
-  color: #1e293b;
-  font-weight: 400;
-  word-break: break-word;
-}
-
-/* MathJax 스타일 */
-.mathjax-content {
-  overflow-x: auto;
-}
-
-.mathjax-content mjx-container {
-  margin: 0.5em 0 !important;
-  font-size: 1em !important;
-}
-
-.mathjax-content mjx-math {
-  font-size: 1.1em !important;
-}
-
-/* HTML 콘텐츠 내부 스타일 */
-.item-html-content p {
-  margin: 0.5rem 0;
-  line-height: 1.6;
-}
-
-.item-html-content ul,
-.item-html-content ol {
-  margin: 0.5rem 0;
-  padding-left: 1.5rem;
-}
-
-.item-html-content table {
-  width: 100%;
-  border-collapse: collapse;
-  margin: 0.5rem 0;
-}
-
-.item-html-content table td,
-.item-html-content table th {
-  border: 1px solid #e2e8f0;
-  padding: 0.25rem 0.5rem;
-  text-align: left;
-}
-
-.item-html-content img {
-  max-width: 100%;
-  height: auto;
-  display: block;
-  margin: 0.5rem 0;
-}
-
-/* 선택지 스타일 */
-.choices-container {
-  margin-top: 1rem;
-  padding-top: 0.75rem;
-  border-top: 1px solid #e2e8f0;
-}
-
-.choices-title {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #64748b;
-  margin-bottom: 0.5rem;
-}
-
-.choices-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-}
-
-.choice-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  font-size: 0.875rem;
-  line-height: 1.5;
-}
-
-.choice-number {
-  flex-shrink: 0;
-  font-weight: 600;
-  color: #3b82f6;
-  margin-top: 0.125rem;
-}
-
-.choice-item span:not(.choice-number) {
-  flex: 1;
-  color: #475569;
-}
-
-.item-placeholder {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  color: #94a3b8;
-  font-size: 0.875rem;
-}
-
-.item-placeholder svg {
-  color: #cbd5e1;
-}
-
-/* 카드 푸터 - 개선된 스타일 */
-.item-card-footer {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.5rem; /* 패딩 증가 */
-  border-top: 2px solid #f1f5f9;
-  background: linear-gradient(to bottom, #fafbfc, #f8fafc);
-  min-height: 52px;
-  gap: 0.75rem;
-}
-
-.chapter-info {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9375rem; /* 폰트 크기 증가 */
-  color: #475569; /* 더 진한 색상 */
-  font-weight: 500;
-}
-
-.chapter-info svg {
-  color: #94a3b8;
-}
-
-.difficulty-badge,
-.type-badge {
-  padding: 0.375rem 0.75rem; /* 패딩 증가 */
-  border-radius: 6px;
-  font-size: 0.875rem; /* 폰트 크기 증가 */
-  font-weight: 600;
-  letter-spacing: 0.025em;
-  text-transform: uppercase;
-}
-
-.difficulty-badge {
+.btn-random:hover {
   background: #f3f4f6;
-  color: #6b7280;
 }
 
-.difficulty-badge.difficulty-H {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.difficulty-badge.difficulty-M {
-  background: #fef3c7;
-  color: #d97706;
-}
-
-.difficulty-badge.difficulty-L {
-  background: #dbeafe;
-  color: #2563eb;
-}
-
-/* 기존 코드와의 호환성 */
-.difficulty-badge.difficulty-low,
-.difficulty-badge.difficulty-L {
-  background: #dbeafe;
-  color: #2563eb;
-}
-
-.difficulty-badge.difficulty-medium,
-.difficulty-badge.difficulty-M {
-  background: #fef3c7;
-  color: #d97706;
-}
-
-.difficulty-badge.difficulty-high,
-.difficulty-badge.difficulty-H {
-  background: #fee2e2;
-  color: #dc2626;
-}
-
-.type-badge {
-  background: #e0e7ff;
-  color: #4f46e5;
-}
-
-.chapter-info {
-  padding: 0.25rem 0.5rem;
-  font-size: 0.75rem;
-  color: #6b7280;
-}
-
-/* 로딩 상태 */
-.loading-state {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #6b7280;
-}
-
-.spinner {
-  width: 40px;
-  height: 40px;
-  border: 4px solid #e5e7eb;
-  border-top-color: #3b82f6;
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-/* 추가 애니메이션 */
-@keyframes slideInUp {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes fadeInScale {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-.similar-modal-content {
-  animation: fadeInScale 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.similar-item-card {
-  animation: slideInUp 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* 스크롤바 스타일링 */
-.items-grid::-webkit-scrollbar,
-.similar-modal-body::-webkit-scrollbar {
-  width: 8px;
-}
-
-.items-grid::-webkit-scrollbar-track,
-.similar-modal-body::-webkit-scrollbar-track {
-  background: #f1f5f9;
-  border-radius: 4px;
-}
-
-.items-grid::-webkit-scrollbar-thumb,
-.similar-modal-body::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 4px;
-}
-
-.items-grid::-webkit-scrollbar-thumb:hover,
-.similar-modal-body::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
-}
-
-/* 가상 스크롤링 */
-.virtual-spacer {
+/* 로딩/빈 상태 */
+/* 로딩 오버레이 스타일 */
+.loading-overlay {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
-  pointer-events: none;
-}
-
-/* 유사문항 버튼 */
-.btn-similar {
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.95);
   display: flex;
   align-items: center;
-  gap: 0.375rem;
-  padding: 0.375rem 0.625rem;
-  background: white;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  color: #64748b;
-  cursor: pointer;
-  transition: all 0.2s ease;
+  justify-content: center;
+  z-index: 100;
+  min-height: 400px;
 }
 
-.btn-similar:hover:not(:disabled) {
-  background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-  border-color: #8b5cf6;
-  color: white;
-  transform: translateY(-1px);
-  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.25);
+.loading-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: #6b7280;
 }
 
-.btn-similar:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.btn-similar svg {
-  width: 16px;
-  height: 16px;
-}
-
-/* 빈 상태 */
 .empty-state {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 1rem;
   color: #6b7280;
-  padding: 3rem;
+  min-height: 400px;
 }
 
-.empty-hint {
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
-  color: #9ca3af;
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid #e5e7eb;
+  border-top-color: #3b82f6;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
 }
 
-/* 페이지네이션 */
-.pagination {
-  display: flex;
-  justify-content: center;
-  gap: 0.5rem;
-  padding: 1.5rem;
-  border-top: 1px solid #e1e4e8;
+@keyframes spin {
+  to { transform: rotate(360deg); }
 }
 
-.page-btn {
-  min-width: 36px;
-  height: 36px;
-  padding: 0 0.75rem;
-  border: 1px solid #d1d5db;
-  background: white;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 500;
-  color: #374151;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.page-btn:hover:not(:disabled) {
-  border-color: #3b82f6;
-  color: #3b82f6;
-}
-
-.page-btn.active {
-  background: #3b82f6;
-  border-color: #3b82f6;
-  color: white;
-}
-
-.page-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
-.page-btn.prev,
-.page-btn.next {
-  font-weight: bold;
-}
-
-/* 오른쪽 패널 */
-.right-panel {
-  width: 350px;
-  display: flex;
-  flex-direction: column;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
-}
-
-.selected-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1rem;
-  border-bottom: 1px solid #e1e4e8;
-}
-
-.selected-header h3 {
-  font-size: 1rem;
-  font-weight: 700;
-  color: #24292e;
-  margin: 0;
-}
-
-.selected-count {
-  padding: 0.25rem 0.75rem;
-  background: #3b82f6;
-  color: white;
-  border-radius: 20px;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-.no-selection {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 2rem;
-  color: #6b7280;
-}
-
-.no-selection .hint {
-  font-size: 0.875rem;
-  margin-top: 0.5rem;
-  color: #9ca3af;
-}
-
-.selected-items-list {
-  flex: 1;
-  padding: 0.75rem;
-  overflow-y: auto;
-  min-height: 0;
-}
-
-.selected-item {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.625rem;
-  background: #f9fafb;
-  border: 1px solid #e1e4e8;
-  border-radius: 6px;
-  margin-bottom: 0.375rem;
-  cursor: move;
-  transition: all 0.2s ease;
-}
-
-.selected-item:hover {
-  background: #f3f4f6;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-}
-
-.drag-handle {
-  color: #9ca3af;
+.empty-state h3 {
   font-size: 1.125rem;
-  cursor: grab;
-}
-
-.drag-handle:active {
-  cursor: grabbing;
-}
-
-.item-order {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #3b82f6;
-  color: white;
-  border-radius: 50%;
-  font-size: 0.75rem;
   font-weight: 600;
-}
-
-.item-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.item-title {
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #24292e;
-}
-
-.item-meta {
-  font-size: 0.75rem;
-  color: #6b7280;
-}
-
-.btn-remove {
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: none;
-  border: none;
-  color: #dc2626;
-  font-size: 1.25rem;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-}
-
-.btn-remove:hover {
-  background: #fee2e2;
-}
-
-.selected-actions {
-  display: flex;
-  gap: 0.75rem;
-  padding: 1rem 1.5rem;
-  border-top: 1px solid #e1e4e8;
-}
-
-.btn-outline {
-  flex: 1;
-  padding: 0.5rem 1rem;
-  background: white;
-  border: 1px solid #d1d5db;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  font-weight: 500;
   color: #374151;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-outline:hover {
-  border-color: #3b82f6;
-  color: #3b82f6;
-}
-
-/* 하단 액션 */
-.footer-actions {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1rem 1.5rem;
-  background: white;
-  border-top: 1px solid #e1e4e8;
-  box-shadow: 0 -4px 12px rgba(0, 0, 0, 0.08);
-  z-index: 100;
-  height: 60px;
-}
-
-.footer-info {
-  font-size: 0.9375rem;
-  color: #586069;
-  font-weight: 600;
-}
-
-.btn {
-  padding: 0.625rem 1.5rem;
-  border: none;
-  border-radius: 6px;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.btn-secondary {
-  background: #e5e7eb;
-  color: #374151;
-}
-
-.btn-secondary:hover {
-  background: #d1d5db;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
-  color: white;
-}
-
-.btn-primary:hover:not(:disabled) {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.25);
-}
-
-.btn-primary:disabled {
-  background: #9ca3af;
-  cursor: not-allowed;
-}
-
-/* 유사문항 모달 */
-.similar-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.7);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000;
-  padding: 2rem;
-}
-
-.similar-modal-content {
-  background: white;
-  border-radius: 12px;
-  max-width: 900px;
-  max-height: 90vh;
-  width: 100%;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
-}
-
-.similar-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem 2rem;
-  border-bottom: 1px solid #e1e4e8;
-  background: #f8fafc;
-}
-
-.similar-modal-header h3 {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #1a202c;
   margin: 0;
 }
 
-.similar-modal-body {
+.empty-state p {
+  margin: 0;
+  font-size: 0.875rem;
+}
+
+/* 문항 그리드 */
+.items-grid {
   flex: 1;
-  overflow-y: auto;
-  padding: 1.5rem 2rem;
-}
-
-.base-item-section {
-  margin-bottom: 2rem;
-}
-
-.base-item-section h4,
-.similar-items-section h4 {
-  font-size: 1rem;
-  font-weight: 600;
-  color: #374151;
-  margin: 0 0 1rem 0;
-}
-
-.base-item-card {
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 8px;
-  padding: 1rem;
-}
-
-.item-image-small {
-  width: 100%;
-  max-width: 150px;
-  height: 100px;
-  overflow: hidden;
-  border-radius: 4px;
-  background: #f3f4f6;
-  margin: 0.5rem auto;
-}
-
-.item-image-small img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.item-html-small {
-  font-size: 0.75rem;
-  color: #6b7280;
-  line-height: 1.4;
-}
-
-.no-content {
-  font-size: 0.75rem;
-  color: #9ca3af;
-  font-style: italic;
-}
-
-.similar-loading {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 3rem;
-  color: #6b7280;
-}
-
-.no-similar-items {
-  text-align: center;
-  padding: 2rem;
-  color: #6b7280;
-}
-
-.similar-items-list {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-  gap: 1rem;
-  padding: 0.5rem 0;
-}
-
-.similar-item-card {
-  position: relative;
-  background: white;
-  border: 2px solid #e2e8f0;
-  border-radius: 12px;
-  overflow: hidden;
-  cursor: pointer;
-  transition: all 0.2s ease;
-}
-
-.similar-item-card:hover {
-  border-color: #8b5cf6;
-  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
-  transform: translateY(-2px);
-}
-
-.similar-item-card.selected {
-  border-color: #8b5cf6;
-  background: linear-gradient(135deg, #f3f0ff 0%, #ede9fe 100%);
-  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
-}
-
-.similar-item-card .item-checkbox {
-  position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-  z-index: 2;
-}
-
-.similar-item-card .item-checkbox input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
-  cursor: pointer;
-  accent-color: #8b5cf6;
-}
-
-.similar-item-card .item-number {
-  padding: 0.5rem;
-  background: #f9fafb;
-  border-bottom: 1px solid #e5e7eb;
-  font-size: 0.875rem;
-  font-weight: 600;
-  color: #4b5563;
-  text-align: center;
-}
-
-.similar-item-card .item-content-small {
-  height: 120px;
-  padding: 0.5rem;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #fafafa;
-}
-
-.similar-item-card .item-image-small {
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.similar-item-card .item-image-small img {
-  max-width: 100%;
-  max-height: 100%;
-  object-fit: contain;
-  border-radius: 4px;
-}
-
-.similar-item-card .no-content {
-  color: #9ca3af;
-  font-size: 0.813rem;
-  text-align: center;
-}
-
-.similar-item-card .similar-item-meta {
-  padding: 0.5rem;
-  background: #f9fafb;
-  border-top: 1px solid #e5e7eb;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.similar-item-card .difficulty-badge {
-  padding: 0.25rem 0.625rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-  background: linear-gradient(135deg, #fbbf24, #f59e0b);
-  color: white;
-}
-
-.similarity-score {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%);
-  color: white;
-  padding: 0.25rem 0.5rem;
-  border-radius: 12px;
-  font-size: 0.75rem;
-  font-weight: 600;
-}
-
-.item-content-small {
-  margin: 0.75rem 0;
-}
-
-.similar-item-meta {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.75rem;
-}
-
-.similar-modal-footer {
-  display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
-  padding: 1.5rem 2rem;
-  border-top: 1px solid #e1e4e8;
-  background: #f8fafc;
-}
-
-/* 이미지 모달 */
-.image-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-  padding: 2rem;
-}
-
-.modal-content {
-  position: relative;
-  max-width: 90%;
-  max-height: 90%;
-  background: white;
-  border-radius: 8px;
-  overflow: hidden;
-}
-
-.modal-content img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
-.modal-close {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  width: 36px;
-  height: 36px;
-  background: rgba(0, 0, 0, 0.5);
-  color: white;
-  border: none;
-  border-radius: 50%;
-  font-size: 1.5rem;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.modal-close:hover {
-  background: rgba(0, 0, 0, 0.7);
-}
-
-/* 트랜지션 애니메이션 */
-.list-enter-active,
-.list-leave-active {
-  transition: all 0.3s ease;
-}
-
-.list-enter-from {
-  opacity: 0;
-  transform: translateX(30px);
-}
-
-.list-leave-to {
-  opacity: 0;
-  transform: translateX(-30px);
-}
-
-/* Toast 알림 */
-.toast-container {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  z-index: 3000;
-  display: flex;
-  flex-direction: column;
-  gap: 0.5rem;
-  max-width: 400px;
-}
-
-.toast {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 1rem 1.25rem;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-  border-left: 4px solid #3b82f6;
-  min-width: 300px;
-  position: relative;
-}
-
-.toast-success {
-  border-left-color: #059669;
-}
-
-.toast-error {
-  border-left-color: #dc2626;
-}
-
-.toast-warning {
-  border-left-color: #d97706;
-}
-
-.toast-info {
-  border-left-color: #3b82f6;
-}
-
-.toast-icon {
-  font-size: 1.25rem;
-  flex-shrink: 0;
-}
-
-.toast-message {
-  flex: 1;
-  font-size: 0.875rem;
-  color: #374151;
-  line-height: 1.4;
-}
-
-.toast-close {
-  background: none;
-  border: none;
-  color: #9ca3af;
-  cursor: pointer;
-  font-size: 1.25rem;
-  padding: 0;
-  width: 24px;
-  height: 24px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s ease;
-  flex-shrink: 0;
-}
-
-.toast-close:hover {
-  background: #f3f4f6;
-  color: #6b7280;
-}
-
-/* Toast 애니메이션 */
-.toast-enter-active,
-.toast-leave-active {
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.toast-enter-from {
-  opacity: 0;
-  transform: translateX(100%);
-}
-
-.toast-leave-to {
-  opacity: 0;
-  transform: translateX(100%);
-}
-
-/* 반응형 */
-@media (max-width: 1024px) {
-  .content-wrapper {
-    flex-direction: column;
-  }
-
-  .right-panel {
-    width: 100%;
-    max-height: 300px;
-  }
-
-  .filter-row {
-    flex-wrap: wrap;
-  }
-
-  .items-grid {
-    grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
-  }
-
-  .similar-modal-content {
-    margin: 1rem;
-    max-height: calc(100vh - 2rem);
-  }
-
-  .similar-items-list {
-    grid-template-columns: 1fr;
-  }
-
-  .toast-container {
-    left: 1rem;
-    right: 1rem;
-    max-width: none;
-  }
-
-  .toast {
-    min-width: auto;
-  }
-}
-
-@media (max-width: 768px) {
-  .items-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .header-info {
-    display: none;
-  }
-
-  .search-section {
-    padding: 1rem;
-  }
-
-  .search-input {
-    padding: 0.75rem 1rem;
-    font-size: 0.9rem;
-  }
-
-  .search-button {
-    padding: 0.75rem 1rem;
-  }
-
-  .textbook-section {
-    padding: 1rem;
-  }
-
-  .textbook-list {
-    grid-template-columns: 1fr;
-  }
-
-  .difficulty-buttons,
-  .type-buttons {
-    flex-direction: column;
-  }
-
-  .similar-modal-content {
-    margin: 0.5rem;
-    max-height: calc(100vh - 1rem);
-  }
-
-  .similar-modal-header,
-  .similar-modal-body,
-  .similar-modal-footer {
-    padding: 1rem;
-  }
-}
-
-/* 2컬럼 레이아웃 스타일 */
-.main-content {
-  flex: 1;
-  display: flex;
-  gap: 1.5rem;
+  grid-template-columns: repeat(3, 1fr); /* 3열 유지 */
+  gap: 1.25rem;
   padding: 1rem;
-  overflow: hidden;
-  background: transparent;
-  min-height: 0;
-  height: calc(100vh - 120px - 100px); /* 헤더(120px) + footer(60px) + margin(40px) */
-  margin-bottom: 50px; /* Increased margin to prevent footer overlap */
-}
-
-.left-panel {
-  width: 40%;
-  flex-shrink: 0;
-  display: flex;
-  flex-direction: column;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  height: 100%;
-}
-
-.right-panel {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  background: white;
-  border-radius: 12px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-  overflow: hidden;
-  min-width: 0;
-  height: 100%;
-}
-
-/* 선택된 문항 플로팅 버튼 */
-.selected-items-float-btn {
-  position: fixed;
-  right: 2rem;
-  bottom: calc(60px + 1.5rem); /* footer 높이(60px) + 여백 */
-  width: 64px;
-  height: 64px;
-  border-radius: 50%;
-  background: #3b82f6; /* Solid blue color - no gradient */
-  color: white;
-  border: none;
-  box-shadow: 0 8px 24px rgba(59, 130, 246, 0.4);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 1.5rem;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 1000; /* 높은 z-index로 변경 */
-}
-
-.selected-items-float-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 16px rgba(59, 130, 246, 0.4);
-}
-
-.selected-items-float-btn .badge {
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: #ef4444; /* Solid red color - no gradient */
-  color: white;
-  border-radius: 12px;
-  padding: 4px 8px;
-  font-size: 0.8rem;
-  font-weight: 700;
-  min-width: 24px;
-  text-align: center;
-  border: 2px solid white;
-  box-shadow: 0 2px 8px rgba(239, 68, 68, 0.4);
-}
-
-/* 선택된 문항 모달 */
-.selected-modal {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 2000; /* 플로팅 버튼보다 높게 설정 */
-  padding: 2rem;
-}
-
-.selected-modal-content {
-  background: white;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 600px;
-  max-height: 80vh;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.2);
-}
-
-.selected-modal-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 1.5rem;
-  background: #3b82f6; /* Solid blue */
-  color: white;
-}
-
-.selected-modal-header h3 {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 700;
-}
-
-.selected-modal-header .header-right {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-}
-
-.selected-modal-header .selected-count {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  padding: 0.25rem 0.75rem;
-  border-radius: 12px;
-  font-size: 0.875rem;
-  font-weight: 600;
-}
-
-/* 선택된 문항 리스트 */
-.selected-items-list {
-  flex: 1;
   overflow-y: auto;
-  padding: 1.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
 }
 
-/* Step3 스타일 문항 카드 */
-.preview-item-card {
+.item-card {
   background: white;
   border: 1px solid #e5e7eb;
   border-radius: 8px;
-  padding: 1rem;
+  overflow: hidden;
   transition: all 0.2s;
-  cursor: move;
+  cursor: pointer;
+  min-height: 280px; /* 원래 크기로 복원 */
+  max-height: 350px; /* 원래 크기로 복원 */
+  display: flex;
+  flex-direction: column;
 }
 
-.preview-item-card:hover {
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-  transform: translateX(4px);
+.item-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
 }
 
-.preview-item-header {
+.item-card.selected {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.card-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.75rem;
+  padding: 0.5rem 0.75rem; /* 패딩 감소 */
+  border-bottom: 1px solid #f3f4f6;
+  flex-shrink: 0;
 }
 
-.item-header-left {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
+.item-checkbox {
+  position: relative;
+  display: inline-block;
 }
 
-.drag-handle {
-  color: #9ca3af;
-  font-size: 1.125rem;
-  cursor: grab;
+.item-checkbox input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
 }
 
-.preview-item-number {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  background: #6366f1;
-  color: white;
-  border-radius: 50%;
-  font-size: 0.875rem;
-  font-weight: 600;
+.item-id {
+  font-size: 0.8125rem;
+  color: #6b7280;
+  font-weight: 500;
 }
 
-.preview-item-badges {
+.item-badges {
   display: flex;
   gap: 0.5rem;
 }
 
-.badge {
+.badge-difficulty,
+.badge-type {
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 500;
 }
 
-.badge-easy {
+.badge-difficulty {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.badge-difficulty.difficulty-1 {
   background: #d1fae5;
   color: #065f46;
 }
 
-.badge-medium {
+.badge-difficulty.difficulty-2 {
+  background: #d1fae5;
+  color: #047857;
+}
+
+.badge-difficulty.difficulty-3 {
   background: #fed7aa;
   color: #92400e;
 }
 
-.badge-hard {
+.badge-difficulty.difficulty-4 {
+  background: #fed7aa;
+  color: #c2410c;
+}
+
+.badge-difficulty.difficulty-5 {
   background: #fee2e2;
   color: #991b1b;
 }
@@ -4143,132 +2379,794 @@ onUnmounted(() => {
   color: #3730a3;
 }
 
-.badge-chapter {
-  background: #f3f4f6;
-  color: #4b5563;
-}
-
-.btn-remove {
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  border: none;
-  background: #fee2e2;
-  color: #991b1b;
-  font-size: 1.25rem;
-  cursor: pointer;
-  transition: all 0.2s;
+.card-body {
+  padding: 1rem;
+  flex: 1 1 auto;
+  overflow-y: auto;
   display: flex;
-  align-items: center;
-  justify-content: center;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-.btn-remove:hover {
-  background: #fecaca;
-  transform: scale(1.1);
+/* 지문 영역 내 카드 바디는 스크롤 없이 전체 표시 */
+.passage-items .card-body {
+  overflow-y: visible;
+  max-height: none;
 }
 
-.preview-item-content {
-  padding-left: 2.5rem;
+.question-section {
+  flex-shrink: 0;
 }
 
-.preview-item-image img {
+.item-html,
+.item-text {
+  font-size: 0.8125rem;
+  color: #1f2937;
+  line-height: 1.5;
+  /* 전체 텍스트 표시 - 수식 있는 문제 때문에 자르지 않음 */
+}
+
+/* 지문이 있는 문제 */
+/* 지문 스타일 제거 - 별도 처리 예정 */
+
+.item-html {
+  word-break: break-word;
+}
+
+.item-html :deep(p) {
+  margin: 0 0 0.5rem 0;
+}
+
+.item-html :deep(img) {
   max-width: 100%;
-  max-height: 200px;
+  height: auto;
+}
+
+.item-image img {
+  max-width: 100%;
+  max-height: 120px; /* 이미지 높이 증가 */
+  height: auto;
   border-radius: 4px;
+  cursor: zoom-in;
   object-fit: contain;
 }
 
-.preview-item-text {
-  font-size: 0.875rem;
-  color: #374151;
-  line-height: 1.5;
-  max-height: 100px;
-  overflow: hidden;
-}
-
-.preview-item-placeholder {
-  color: #9ca3af;
-  font-style: italic;
-}
-
-/* 선택된 문항의 선택지 스타일 */
-.preview-choices-container {
+.item-choices {
   margin-top: 0.75rem;
-  padding-top: 0.5rem;
-  border-top: 1px solid #e5e7eb;
-}
-
-.preview-choices-list {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.preview-choice-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  font-size: 0.813rem;
-  line-height: 1.4;
-  color: #4b5563;
-}
-
-.preview-choice-item .choice-number {
-  flex-shrink: 0;
-  font-weight: 600;
-  color: #3b82f6;
-  margin-top: 0.125rem;
-}
-
-.preview-choice-item span:not(.choice-number) {
-  flex: 1;
+  padding-top: 0.75rem;
+  border-top: 1px solid #f3f4f6;
   font-size: 0.875rem;
-}
-
-/* 선택된 문항이 없을 때 */
-.no-selection {
-  flex: 1;
   display: flex;
   flex-direction: column;
+  gap: 0.5rem;
+}
+
+.item-choices .choice {
+  display: flex;
+  gap: 0.5rem;
+  color: #4b5563;
+  line-height: 1.5;
+  /* 전체 텍스트 표시를 위해 white-space 관련 속성 제거 */
+}
+
+.card-footer {
+  padding: 0.5rem 0.75rem;
+  background: #f9fafb;
+  border-top: 1px solid #f3f4f6;
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  justify-content: center;
-  padding: 2rem;
+  flex-shrink: 0;
+  font-size: 0.75rem;
+}
+
+.card-footer .chapter-info {
+  font-size: 0.75rem;
+  color: #6b7280;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 150px;
+}
+
+.choice {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.8125rem;
+  color: #374151;
+}
+
+.card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem;
+  background: #f9fafb;
+  border-top: 1px solid #f3f4f6;
+}
+
+.chapter-info {
+  font-size: 0.75rem;
   color: #6b7280;
 }
 
-.no-selection p {
-  margin: 0.5rem 0;
-}
-
-.no-selection .hint {
-  font-size: 0.875rem;
-  color: #9ca3af;
-}
-
-/* 하단 액션 영역 */
-.selected-actions {
-  padding: 1rem 1.5rem;
-  background: #f9fafb;
-  border-top: 1px solid #e5e7eb;
+.card-actions {
   display: flex;
-  gap: 0.75rem;
-  justify-content: center;
+  gap: 0.5rem;
 }
 
-.modal-close {
-  width: 32px;
-  height: 32px;
-  border-radius: 6px;
-  border: none;
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-  font-size: 1.25rem;
+.btn-icon {
+  padding: 0.375rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 4px;
+  color: #6b7280;
   cursor: pointer;
   transition: all 0.2s;
 }
 
-.modal-close:hover {
-  background: rgba(255, 255, 255, 0.3);
+.btn-icon:hover {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+/* 문항 리스트 뷰 */
+.items-list {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.items-table {
+  width: 100%;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  border-collapse: collapse;
+}
+
+.items-table thead {
+  background: #f9fafb;
+}
+
+.items-table th {
+  padding: 0.75rem;
+  text-align: left;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #6b7280;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.items-table tbody tr {
+  border-bottom: 1px solid #f3f4f6;
+  transition: background 0.2s;
+}
+
+.items-table tbody tr:hover {
+  background: #f9fafb;
+}
+
+.items-table tbody tr.selected {
+  background: #eff6ff;
+}
+
+.items-table td {
+  padding: 0.75rem;
+  font-size: 0.875rem;
+  color: #374151;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.question-cell {
+  max-width: 400px;
+}
+
+.question-preview {
+  max-height: 60px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.question-preview :deep(p) {
+  margin: 0;
+}
+
+/* 페이지네이션 */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: white;
+  border-top: 1px solid #e5e7eb;
+}
+
+.page-btn {
+  padding: 0.5rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #374151;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: #f3f4f6;
+}
+
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.page-numbers {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.page-number {
+  min-width: 32px;
+  padding: 0.5rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #374151;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.page-number:hover {
+  background: #f3f4f6;
+}
+
+.page-number.active {
+  background: #3b82f6;
+  border-color: #3b82f6;
+  color: white;
+}
+
+/* MathJax FOUC 방지 스타일 */
+.mathjax-content[data-mathjax-pending="true"],
+[data-mathjax-pending="true"] {
+  visibility: hidden !important;
+  min-height: 1.5em;
+  position: relative;
+}
+
+/* 렌더링 완료된 요소 표시 */
+.mathjax-content:not([data-mathjax-pending]) {
+  visibility: visible !important;
+  transition: visibility 0.1s ease-in-out;
+}
+
+/* MathJax 컨테이너는 항상 표시 */
+.mathjax-content mjx-container {
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+/* 선택된 문항 패널 */
+.selected-panel {
+  width: 360px;
+  background: white;
+  border-left: 1px solid #e5e7eb;
+  display: flex;
+  flex-direction: column;
+  box-shadow: -2px 0 8px rgba(0, 0, 0, 0.05);
+}
+
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.panel-header h3 {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+.btn-close {
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  color: #6b7280;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.btn-close:hover {
+  color: #111827;
+}
+
+.selected-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: #f9fafb;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.summary-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+}
+
+.summary-item .label {
+  color: #6b7280;
+}
+
+.summary-item .value {
+  color: #111827;
+  font-weight: 600;
+}
+
+.btn-clear {
+  padding: 0.375rem 0.75rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #ef4444;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-clear:hover {
+  background: #fee2e2;
+  border-color: #ef4444;
+}
+
+.selected-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.5rem;
+}
+
+/* 문항 그룹 */
+.item-group {
+  margin-bottom: 0.75rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all 0.2s;
+  cursor: move;
+}
+
+.item-group:hover {
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.item-group.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+.item-group.drop-target {
+  border: 2px dashed #3b82f6;
+  background: #eff6ff;
+}
+
+/* 지문 그룹 헤더 */
+.group-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: #eff6ff;
+  border-bottom: 1px solid #dbeafe;
+  color: #1e40af;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.group-title {
+  flex: 1;
+}
+
+.group-count {
+  padding: 0.125rem 0.375rem;
+  background: white;
+  border-radius: 10px;
+  font-size: 0.75rem;
+  color: #3b82f6;
+}
+
+/* 그룹 내 문항들 */
+.group-items {
+  padding: 0.5rem;
+  background: #f9fafb;
+}
+
+.selected-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.625rem;
+  margin-bottom: 0.375rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  transition: all 0.2s;
+}
+
+.selected-item:last-child {
+  margin-bottom: 0;
+}
+
+.selected-item:hover {
+  background: #f3f4f6;
+}
+
+.selected-item.in-passage {
+  border-left: 3px solid #3b82f6;
+}
+
+/* 드래그 핸들 */
+.drag-handle {
+  display: flex;
+  align-items: center;
+  color: #9ca3af;
+  cursor: move;
+  padding: 0.25rem;
+}
+
+.drag-handle:hover {
+  color: #6b7280;
+}
+
+.selected-item .item-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.selected-item .item-number {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.btn-remove {
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  color: #ef4444;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.btn-remove:hover {
+  opacity: 0.7;
+}
+
+.panel-footer {
+  padding: 1rem;
+  border-top: 1px solid #e5e7eb;
+}
+
+.btn-primary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem;
+  background: #3b82f6;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #2563eb;
+}
+
+.btn-primary:disabled {
+  background: #9ca3af;
+  cursor: not-allowed;
+}
+
+/* 이미지 모달 */
+.image-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 2rem;
+}
+
+.image-modal img {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+  border-radius: 8px;
+}
+
+.image-modal .btn-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 6px;
+}
+
+/* 반응형 */
+@media (max-width: 1024px) {
+  .items-grid {
+    grid-template-columns: repeat(2, 1fr); /* 태블릿에서는 2열 */
+  }
+  
+  .selected-panel {
+    width: 280px;
+  }
+}
+
+@media (max-width: 768px) {
+  .header-right {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  
+  .search-wrapper {
+    width: 100%;
+    order: 2;
+  }
+  
+  .filter-sidebar {
+    position: fixed;
+    left: 0;
+    top: 56px;
+    bottom: 0;
+    z-index: 100;
+    box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
+  }
+  
+  .filter-sidebar.collapsed {
+    left: -260px;
+  }
+  
+  .items-grid {
+    grid-template-columns: 1fr; /* 모바일에서는 1열 */
+  }
+  
+  .selected-panel {
+    position: fixed;
+    right: 0;
+    top: 56px;
+    bottom: 0;
+    z-index: 100;
+  }
+}
+
+/* 지문 그룹 스타일 */
+.passage-groups {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.passage-group {
+  display: flex;
+  gap: 1.5rem;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  padding: 1.5rem;
+  /* min-height 제거하여 컨텐츠에 맞게 높이 조정 */
+}
+
+/* 왼쪽 지문 영역 */
+.passage-section {
+  flex: 0 0 40%;
+  display: flex;
+  flex-direction: column;
+  border-right: 2px solid #e5e7eb;
+  padding-right: 1.5rem;
+  height: 100%;
+  min-width: 0; /* flexbox에서 오버플로우 방지 */
+  overflow: hidden; /* 섹션 전체 오버플로우 숨김 */
+}
+
+.passage-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e5e7eb;
+  color: #374151;
+  font-weight: 600;
+}
+
+.passage-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden; /* 가로 스크롤 제거 */
+  width: 100%;
+  padding-right: 0.5rem; /* 스크롤바 공간 확보 */
+}
+
+.passage-text {
+  line-height: 1.8;
+  color: #4b5563;
+  font-size: 0.9375rem;
+  /* 모든 내용이 컨테이너 내에 들어가도록 설정 */
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word; /* 긴 단어도 줄바꿈 */
+  hyphens: auto; /* 자동 하이픈 추가 */
+}
+
+/* 지문 HTML 내부 요소 스타일 */
+.passage-text :deep(*) {
+  max-width: 100% !important; /* 모든 요소가 컨테이너 너비를 초과하지 않도록 */
+  box-sizing: border-box;
+}
+
+.passage-text :deep(p),
+.passage-text :deep(div) {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.passage-text :deep(img) {
+  max-width: 100% !important;
+  height: auto;
+  display: block;
+  margin: 0.5rem 0;
+}
+
+.passage-text :deep(table) {
+  max-width: 100% !important;
+  width: 100% !important;
+  overflow: hidden;
+  table-layout: fixed; /* 테이블 레이아웃 고정 */
+  border-collapse: collapse;
+}
+
+.passage-text :deep(table td),
+.passage-text :deep(table th) {
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  padding: 0.25rem;
+}
+
+.passage-text :deep(pre) {
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-x: auto;
+  max-width: 100%;
+  background: #f6f8fa;
+  padding: 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem; /* 코드 블록 폰트 크기 줄임 */
+}
+
+/* LaTeX 소스 코드 숨기기 (렌더링 전) */
+.item-html :deep(script[type="math/tex"]),
+.passage-text :deep(script[type="math/tex"]),
+.question-preview :deep(script[type="math/tex"]),
+.choice :deep(script[type="math/tex"]) {
+  display: none !important;
+}
+
+/* 수식 이미지 제거 */
+.item-html :deep(img),
+.passage-text :deep(img[src*="latex"]),
+.passage-text :deep(img[src*="math"]),
+.question-preview :deep(img[src*="latex"]),
+.question-preview :deep(img[src*="math"]) {
+  display: none !important;
+}
+
+/* 수식 관련 요소 - 스크롤 가능하게 하되 컨테이너 내에서만 */
+.passage-text :deep(.MathJax),
+.passage-text :deep(.MathJax_Display),
+.passage-text :deep(.katex),
+.passage-text :deep(.math-tex),
+.passage-text :deep(mjx-container) {
+  /* overflow visible로 변경하여 스크롤바 제거 */
+  overflow: visible !important;
+  max-width: 100% !important;
+  display: block;
+  margin: 0.5rem 0;
+  /* 스크롤바 관련 스타일 제거 */
+}
+
+/* 수식 요소 스크롤바 스타일 */
+.passage-text :deep(.MathJax)::-webkit-scrollbar,
+.passage-text :deep(.MathJax_Display)::-webkit-scrollbar,
+.passage-text :deep(.katex)::-webkit-scrollbar,
+.passage-text :deep(.math-tex)::-webkit-scrollbar {
+  height: 6px;
+}
+
+.passage-text :deep(.MathJax)::-webkit-scrollbar-thumb,
+.passage-text :deep(.MathJax_Display)::-webkit-scrollbar-thumb,
+.passage-text :deep(.katex)::-webkit-scrollbar-thumb,
+.passage-text :deep(.math-tex)::-webkit-scrollbar-thumb {
+  background-color: #cbd5e0;
+  border-radius: 3px;
+}
+
+/* MathJax 컨테이너 스타일 */
+.item-html :deep(mjx-container),
+.passage-text :deep(mjx-container),
+.question-preview :deep(mjx-container),
+.choice :deep(mjx-container) {
+  display: inline-block !important;
+  margin: 0 0.2em !important;
+  vertical-align: middle !important;
+}
+
+/* 인라인 수식 */
+.passage-text :deep(.MathJax_inline),
+.passage-text :deep(.katex-inline),
+.item-html :deep(.MathJax_inline),
+.question-preview :deep(.MathJax_inline) {
+  display: inline-block;
+  max-width: 100%;
+  overflow-x: auto;
+  vertical-align: middle;
+}
+
+/* iframe 처리 */
+.passage-text :deep(iframe) {
+  max-width: 100% !important;
+  width: 100% !important;
+  height: auto;
+  min-height: 200px;
+}
+
+/* 오른쪽 문제 영역 */
+.passage-items {
+  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 2열로 배치 */
+  gap: 1rem;
+  align-content: start;
+}
+
+/* 지문 섹션 내 문제 카드 */
+.passage-items .item-card {
+  min-height: 200px;
+  max-height: none;
+  width: 100%;
 }
 </style>

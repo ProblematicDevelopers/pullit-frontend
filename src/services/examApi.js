@@ -26,7 +26,10 @@ const examApi = {
   getExamStats: (examId) => api.get(`/exams/${examId}/stats`),
   getStudentResults: (examId) => api.get(`/exams/${examId}/results`),
   downloadExamPDF: (examId) => api.get(`/exams/${examId}/download/pdf`, { responseType: 'blob' }),
-  downloadAnswerSheet: (examId) => api.get(`/exams/${examId}/download/answer`, { responseType: 'blob' })
+  downloadAnswerSheet: (examId) => api.get(`/exams/${examId}/download/answer`, { responseType: 'blob' }),
+  
+  // 시험지의 문항 목록 가져오기
+  getExamItems: (examId) => api.get(`/exams/${examId}/items`)
 }
 
 export default examApi;

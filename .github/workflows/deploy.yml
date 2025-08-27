@@ -18,6 +18,7 @@ jobs:
       run: |
         docker build \
           --build-arg VITE_API_URL=/api \
+          --build-arg VITE_TINYMCE_KEY=${{ secrets.VITE_TINYMCE_KEY }} \
           -t pullit-frontend:latest \
           -f Dockerfile \
           .
