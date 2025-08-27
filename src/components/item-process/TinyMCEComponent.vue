@@ -20,9 +20,9 @@
       :api-key="apiKey"
       v-model="editorContent"
       :init="editorConfig"
-      @onInit="onEditorInit"
-      @onChange="onEditorChange"
-      @onBlur="onEditorBlur"
+      @init="onEditorInit"
+      @change="onEditorChange"
+      @blur="onEditorBlur"
     />
   </div>
 </template>
@@ -74,13 +74,16 @@ const finalApiKey = computed(() => {
                    import.meta.env.VITE_TINYMCE_API_KEY ||
                    import.meta.env.VUE_APP_TINYMCE_API_KEY || ''
 
+  // API 키 정리 (끝의 % 문자 제거)
+  const cleanEnvApiKey = envApiKey ? envApiKey.replace(/%$/, '') : ''
+
   // API 키가 없으면 기본값 사용 (TinyMCE는 무료 버전도 제공)
-  if (!envApiKey && !props.apiKey) {
+  if (!cleanEnvApiKey && !props.apiKey) {
     console.warn('TinyMCE API 키가 설정되지 않았습니다. 무료 버전을 사용합니다.')
     return ''
   }
 
-  return props.apiKey || envApiKey
+  return props.apiKey || cleanEnvApiKey
 })
 
 // 에디터 설정
@@ -215,7 +218,8 @@ const validateApiKey = () => {
   isApiKeyValid.value = apiKey &&
                         apiKey.trim() !== '' &&
                         apiKey !== 'your-api-key-here' &&
-                        apiKey.length > 10 // 기본적인 길이 검증
+                        apiKey.length > 10 && // 기본적인 길이 검증
+                        !apiKey.endsWith('%') // % 문자로 끝나지 않는지 확인
 
   if (!isApiKeyValid.value) {
     console.warn('TinyMCE API 키가 유효하지 않습니다:', {
@@ -223,7 +227,7 @@ const validateApiKey = () => {
       message: '환경 변수 VITE_TINYMCE_KEY를 설정하거나 Tiny Cloud에서 API 키를 발급받으세요.'
     })
   } else {
-    console.log('TinyMCE API 키가 유효합니다')
+    console.log('TinyMCE API 키가 유효합니다:', apiKey)
   }
 }
 
