@@ -47,12 +47,8 @@ export function useClassWebSocket(
             }
           },
           onOnlineStatus: (status) => {
-            console.log('📡 온라인 상태 업데이트 수신:', status)
-
             // 서버에서 전체 온라인 사용자 목록을 받은 경우
             if (status.onlineUsers && Array.isArray(status.onlineUsers)) {
-              console.log('👥 전체 온라인 사용자 목록 수신:', status.onlineUsers)
-
               // 기존 온라인 사용자 목록 초기화
               onlineUsers.value.clear()
 
@@ -65,10 +61,8 @@ export function useClassWebSocket(
 
               // 접속중인 학생 수 업데이트
               onlineStudents.value = onlineUsers.value.size
-              console.log('📊 접속중인 학생 수 업데이트:', onlineStudents.value)
             } else if (status.userId && status.status) {
               // 개별 사용자 상태 업데이트
-              console.log('👤 개별 사용자 상태 업데이트:', status)
 
               if (status.status === 'ONLINE') {
                 onlineUsers.value.add(status.userId)
@@ -77,7 +71,6 @@ export function useClassWebSocket(
               }
 
               onlineStudents.value = onlineUsers.value.size
-              console.log('📊 접속중인 학생 수 업데이트:', onlineStudents.value)
             }
 
             if (callbacks.onOnlineStatus) {
@@ -139,6 +132,30 @@ export function useClassWebSocket(
     return false
   }
 
+  // 채팅 메시지 전송
+  const sendNoticeMessage = (content) => {
+    console.log('sendNoticeMessage', content.trim())
+    if (!channelName.value) {
+      console.warn('channelName.value이 설정되지 않았습니다.')
+      return false
+    }
+
+    if (content.trim()) {
+      const messageData = {
+        channelName: channelName.value,
+        senderId: currentUserId,
+        senderName: currentUserName,
+        senderRole: currentUserRole,
+        content: content.trim(),
+        messageType: 'NOTICE',
+        timestamp: new Date().toISOString(),
+      }
+      WebSocketService.sendNotice(channelName.value, messageData)
+      return true
+    }
+    return false
+  }
+
   // 온라인 상태 업데이트
   const updateOnlineStatus = (status) => {
     WebSocketService.updateOnlineStatus(
@@ -153,7 +170,6 @@ export function useClassWebSocket(
   // 온라인 상태 조회
   const getOnlineStatus = () => {
     if (channelName.value && currentUserId) {
-      console.log('📡 온라인 상태 조회 요청:', channelName.value, currentUserId)
       WebSocketService.getOnlineStatus(channelName.value, currentUserId)
     } else {
       console.warn('channelName 또는 currentUserId가 설정되지 않았습니다.')
@@ -163,15 +179,12 @@ export function useClassWebSocket(
   // 초기 온라인 상태 강제 조회
   const refreshOnlineStatus = () => {
     if (isWebSocketConnected.value) {
-      console.log('🔄 온라인 상태 강제 새로고침')
       getOnlineStatus()
     }
   }
 
   // classmates 목록 업데이트 (UI 표시용)
   const updateClassmatesStatus = (classmates, status) => {
-    console.log('🔄 classmates 상태 업데이트:', status)
-
     // 전체 온라인 사용자 목록이 있는 경우
     if (status.onlineUsers && Array.isArray(status.onlineUsers)) {
       // 모든 classmates의 상태를 초기화
@@ -185,7 +198,6 @@ export function useClassWebSocket(
           const classmate = classmates.find((c) => c.studentId == onlineUser.userId)
           if (classmate) {
             classmate.status = 'ONLINE'
-            console.log(`✅ ${classmate.studentName} 온라인 상태로 업데이트`)
           }
         }
       })
@@ -194,7 +206,6 @@ export function useClassWebSocket(
       const classmate = classmates.find((c) => c.studentId == status.userId)
       if (classmate) {
         classmate.status = status.status
-        console.log(`🔄 ${classmate.studentName} 상태 업데이트: ${status.status}`)
       }
     }
   }
@@ -205,11 +216,11 @@ export function useClassWebSocket(
     onlineStudents,
     chatMessages,
     isWebSocketConnected,
-
     // 메서드
     connectWebSocket,
     disconnectWebSocket,
     sendChatMessage,
+    sendNoticeMessage,
     updateOnlineStatus,
     getOnlineStatus,
     refreshOnlineStatus,
