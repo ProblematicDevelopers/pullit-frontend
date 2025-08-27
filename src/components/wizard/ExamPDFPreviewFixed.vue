@@ -151,7 +151,7 @@
                   <div class="passage-header">
                     [{{ group.questionNumbers }}] 다음 글을 읽고 물음에 답하시오.
                   </div>
-                  <div class="passage-content" v-html="sanitizeHtml(group.passageHtml)"></div>
+                  <div class="passage-content mathjax-content" v-html="sanitizeHtml(group.passageHtml)" data-mathjax-pending="true"></div>
                 </div>
                 
                 <!-- 그룹의 문제들 -->
@@ -160,13 +160,13 @@
                     <span class="question-number">{{ item.displayNumber }}.</span>
                     <span class="question-points">({{ item.points || 5 }}점)</span>
                   </div>
-                  <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                  <div class="question-text mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
                   
                   <!-- 선택지 -->
                   <div v-if="item.choices && item.choices.length" class="choices">
                     <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
                       <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
-                      <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                      <span class="choice-text mathjax-content" v-html="sanitizeHtml(choice)" data-mathjax-pending="true"></span>
                     </div>
                   </div>
                 </div>
@@ -179,13 +179,13 @@
                     <span class="question-number">{{ item.displayNumber }}.</span>
                     <span class="question-points">({{ item.points || 5 }}점)</span>
                   </div>
-                  <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                  <div class="question-text mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
                   
                   <!-- 선택지 -->
                   <div v-if="item.choices && item.choices.length" class="choices">
                     <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
                       <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
-                      <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                      <span class="choice-text mathjax-content" v-html="sanitizeHtml(choice)" data-mathjax-pending="true"></span>
                     </div>
                   </div>
                 </div>
@@ -202,7 +202,7 @@
                   <div class="passage-header">
                     [{{ group.questionNumbers }}] 다음 글을 읽고 물음에 답하시오.
                   </div>
-                  <div class="passage-content" v-html="sanitizeHtml(group.passageHtml)"></div>
+                  <div class="passage-content mathjax-content" v-html="sanitizeHtml(group.passageHtml)" data-mathjax-pending="true"></div>
                 </div>
                 
                 <!-- 그룹의 문제들 -->
@@ -211,13 +211,13 @@
                     <span class="question-number">{{ item.displayNumber }}.</span>
                     <span class="question-points">({{ item.points || 5 }}점)</span>
                   </div>
-                  <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                  <div class="question-text mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
                   
                   <!-- 선택지 -->
                   <div v-if="item.choices && item.choices.length" class="choices">
                     <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
                       <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
-                      <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                      <span class="choice-text mathjax-content" v-html="sanitizeHtml(choice)" data-mathjax-pending="true"></span>
                     </div>
                   </div>
                 </div>
@@ -230,13 +230,13 @@
                     <span class="question-number">{{ item.displayNumber }}.</span>
                     <span class="question-points">({{ item.points || 5 }}점)</span>
                   </div>
-                  <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                  <div class="question-text mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
                   
                   <!-- 선택지 -->
                   <div v-if="item.choices && item.choices.length" class="choices">
                     <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
                       <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
-                      <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                      <span class="choice-text mathjax-content" v-html="sanitizeHtml(choice)" data-mathjax-pending="true"></span>
                     </div>
                   </div>
                 </div>
@@ -275,7 +275,7 @@
                     <div class="passage-header">
                       [{{ group.questionNumbers }}] 다음 글을 읽고 물음에 답하시오.
                     </div>
-                    <div class="passage-content" v-html="sanitizeHtml(group.passageHtml)"></div>
+                    <div class="passage-content mathjax-content" v-html="sanitizeHtml(group.passageHtml)" data-mathjax-pending="true"></div>
                   </div>
                   
                   <!-- 그룹의 문제들 -->
@@ -284,13 +284,13 @@
                       <span class="question-number">{{ item.displayNumber }}.</span>
                       <span class="question-points">({{ item.points || 5 }}점)</span>
                     </div>
-                    <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                    <div class="question-text mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
                     
                     <!-- 선택지 -->
                     <div v-if="item.choices && item.choices.length" class="choices">
                       <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
                         <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
-                        <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                        <span class="choice-text mathjax-content" v-html="sanitizeHtml(choice)" data-mathjax-pending="true"></span>
                       </div>
                     </div>
                   </div>
@@ -303,13 +303,13 @@
                       <span class="question-number">{{ item.displayNumber }}.</span>
                       <span class="question-points">({{ item.points || 5 }}점)</span>
                     </div>
-                    <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                    <div class="question-text mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
                     
                     <!-- 선택지 -->
                     <div v-if="item.choices && item.choices.length" class="choices">
                       <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
                         <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
-                        <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                        <span class="choice-text mathjax-content" v-html="sanitizeHtml(choice)" data-mathjax-pending="true"></span>
                       </div>
                     </div>
                   </div>
@@ -326,7 +326,7 @@
                     <div class="passage-header">
                       [{{ group.questionNumbers }}] 다음 글을 읽고 물음에 답하시오.
                     </div>
-                    <div class="passage-content" v-html="sanitizeHtml(group.passageHtml)"></div>
+                    <div class="passage-content mathjax-content" v-html="sanitizeHtml(group.passageHtml)" data-mathjax-pending="true"></div>
                   </div>
                   
                   <!-- 그룹의 문제들 -->
@@ -335,13 +335,13 @@
                       <span class="question-number">{{ item.displayNumber }}.</span>
                       <span class="question-points">({{ item.points || 5 }}점)</span>
                     </div>
-                    <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                    <div class="question-text mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
                     
                     <!-- 선택지 -->
                     <div v-if="item.choices && item.choices.length" class="choices">
                       <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
                         <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
-                        <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                        <span class="choice-text mathjax-content" v-html="sanitizeHtml(choice)" data-mathjax-pending="true"></span>
                       </div>
                     </div>
                   </div>
@@ -354,13 +354,13 @@
                       <span class="question-number">{{ item.displayNumber }}.</span>
                       <span class="question-points">({{ item.points || 5 }}점)</span>
                     </div>
-                    <div class="question-text" v-html="sanitizeHtml(item.questionHtml)"></div>
+                    <div class="question-text mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
                     
                     <!-- 선택지 -->
                     <div v-if="item.choices && item.choices.length" class="choices">
                       <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
                         <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
-                        <span class="choice-text" v-html="sanitizeHtml(choice)"></span>
+                        <span class="choice-text mathjax-content" v-html="sanitizeHtml(choice)" data-mathjax-pending="true"></span>
                       </div>
                     </div>
                   </div>
@@ -434,7 +434,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useItemSelectionStore } from '@/stores/itemSelection'
-import { renderMathJaxSmartHybrid } from '@/utils/mathjax-hybrid'
+import { renderMathJaxSmartHybrid, renderMathJaxParallelHybrid } from '@/utils/mathjax-hybrid'
 import { generateEnhancedPDF, generateEnhancedPDFAsBlob } from '@/utils/pdf-generator-enhanced'
 
 // Props
@@ -900,14 +900,48 @@ const getChoiceNumber = (index) => {
 const sanitizeHtml = (html) => {
   if (!html) return ''
   
-  // Remove inline styles, input fields, and clean up
-  return html
-    .replace(/style="[^"]*"/gi, '')
-    .replace(/class="txt\s*"/gi, '')
-    .replace(/<span\s*>([^<]*)<\/span>/gi, '$1')
-    .replace(/<input[^>]*>/gi, '________') // Replace input fields with blank lines
-    .replace(/<textarea[^>]*>.*?<\/textarea>/gi, '________') // Replace textareas
-    .replace(/contenteditable="true"/gi, '') // Remove contenteditable
+  // MathJax 수식을 임시로 보호
+  const mathPatterns = []
+  let mathIndex = 0
+  
+  // LaTeX 수식 패턴들을 임시 플레이스홀더로 교체
+  let cleaned = html
+    // Display math $$ ... $$ 보호
+    .replace(/\$\$[\s\S]*?\$\$/g, (match) => {
+      mathPatterns.push(match)
+      return `__MATH_${mathIndex++}__`
+    })
+    // Inline math $ ... $ 보호
+    .replace(/\$[^\$\n]+?\$/g, (match) => {
+      mathPatterns.push(match)
+      return `__MATH_${mathIndex++}__`
+    })
+    // \[ ... \] 보호
+    .replace(/\\\[[\s\S]*?\\\]/g, (match) => {
+      mathPatterns.push(match)
+      return `__MATH_${mathIndex++}__`
+    })
+    // \( ... \) 보호
+    .replace(/\\\([\s\S]*?\\\)/g, (match) => {
+      mathPatterns.push(match)
+      return `__MATH_${mathIndex++}__`
+    })
+  
+  // 위험한 요소 제거하되 이미지는 유지
+  cleaned = cleaned
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '') // 스크립트 제거
+    .replace(/on\w+="[^"]*"/g, '') // 이벤트 핸들러 제거
+    .replace(/on\w+='[^']*'/g, '')
+    .replace(/<input[^>]*>/gi, '')  // input 제거
+    .replace(/<textarea[^>]*>.*?<\/textarea>/gi, '')  // textarea 제거
+    .replace(/contenteditable="true"/gi, '')  // contenteditable 제거
+  
+  // 보호했던 수식들을 다시 복원
+  mathPatterns.forEach((math, index) => {
+    cleaned = cleaned.replace(`__MATH_${index}__`, math)
+  })
+  
+  return cleaned
 }
 
 // Download PDF with enhanced features - returns blob for upload
@@ -1013,37 +1047,36 @@ const renderMathJaxForPDF = async (container) => {
     clearFirst: false
   })
   
-  // MathJax 렌더링 후 이미지 크기 강제 조정
+  // MathJax 렌더링 후 이미지 크기 조정 (더 크게)
   console.log('MathJax 렌더링 후 이미지 크기 조정 시작')
   const allImages = container.querySelectorAll('img')
   console.log(`총 ${allImages.length}개의 이미지 발견`)
   
   allImages.forEach(img => {
-    // 인라인 스타일로 강제 적용
-    img.style.setProperty('max-width', '60px', 'important')
-    img.style.setProperty('max-height', '15px', 'important')
-    img.style.setProperty('width', 'auto', 'important')
-    img.style.setProperty('height', 'auto', 'important')
-    img.style.setProperty('object-fit', 'scale-down', 'important')
-    img.style.setProperty('display', 'inline-block', 'important')
-    img.style.setProperty('vertical-align', 'middle', 'important')
-    
-    // 천재교육 플랫폼 이미지는 더 작게
-    if (img.src && img.src.includes('chunjae-platform')) {
-      console.log('천재교육 이미지 발견:', img.src)
-      img.style.setProperty('max-width', '50px', 'important')
-      img.style.setProperty('max-height', '12px', 'important')
-    }
-    
-    // img_box 내부 이미지 처리
+    // img_box 내부 이미지 처리 (표 이미지)
     const imgBox = img.closest('.img_box')
     if (imgBox) {
       console.log('img_box 내부 이미지 발견')
-      img.style.setProperty('max-width', '50px', 'important')
-      img.style.setProperty('max-height', '12px', 'important')
-      imgBox.style.setProperty('max-width', '60px', 'important')
+      imgBox.style.setProperty('max-width', '300px', 'important')
       imgBox.style.setProperty('display', 'inline-block', 'important')
       imgBox.style.setProperty('vertical-align', 'middle', 'important')
+      img.style.setProperty('max-width', '100%', 'important')
+      img.style.setProperty('max-height', '160px', 'important')
+      img.style.setProperty('object-fit', 'scale-down', 'important')
+    } else {
+      // 일반 이미지
+      img.style.setProperty('max-width', '250px', 'important')
+      img.style.setProperty('max-height', '180px', 'important')
+      img.style.setProperty('object-fit', 'scale-down', 'important')
+      img.style.setProperty('display', 'inline-block', 'important')
+      img.style.setProperty('vertical-align', 'middle', 'important')
+    }
+    
+    // 천재교육 플랫폼 이미지
+    if (img.src && img.src.includes('chunjae-platform')) {
+      console.log('천재교육 이미지 발견:', img.src)
+      img.style.setProperty('max-width', '280px', 'important')
+      img.style.setProperty('max-height', '150px', 'important')
     }
   })
   
@@ -1121,30 +1154,61 @@ onMounted(async () => {
 // 현재 페이지 MathJax 렌더링
 const renderCurrentPageMath = async () => {
   await nextTick()
-  const container = document.querySelector('.a4-page')
-  if (container) {
-    // 수식 요소에 클래스 추가
-    const mathElements = container.querySelectorAll('.question-text, .passage-content, .choice-text')
-    mathElements.forEach(el => {
-      if (!el.classList.contains('mathjax-content')) {
-        el.classList.add('mathjax-content')
-        el.setAttribute('data-mathjax-pending', 'true')
-      }
-    })
-    
-    // 스마트 렌더링
-    await renderMathJaxSmartHybrid(container)
-  }
+  
+  // requestAnimationFrame을 사용하여 렌더링 최적화 (Step2와 동일)
+  requestAnimationFrame(async () => {
+    const container = document.querySelector('.a4-page') || document.querySelector('.preview-content')
+    if (container) {
+      // 스마트 하이브리드 렌더링 (Step2와 동일한 옵션)
+      await renderMathJaxSmartHybrid(container, {
+        hideBeforeRender: true,
+        clearFirst: false
+      })
+      
+      // 렌더링 후 이미지 크기 조정 (더 크게)
+      const allImages = container.querySelectorAll('img')
+      allImages.forEach(img => {
+        // img_box 내부 이미지 처리 (표 이미지)
+        const imgBox = img.closest('.img_box')
+        if (imgBox) {
+          // img_box 컨테이너 스타일
+          imgBox.style.setProperty('max-width', '320px', 'important')
+          imgBox.style.setProperty('display', 'inline-block', 'important')
+          imgBox.style.setProperty('vertical-align', 'middle', 'important')
+          // 내부 이미지 스타일
+          img.style.setProperty('max-width', '100%', 'important')
+          img.style.setProperty('max-height', '160px', 'important')
+          img.style.setProperty('object-fit', 'scale-down', 'important')
+        }
+        
+        // 천재교육 플랫폼 이미지
+        if (img.src && img.src.includes('chunjae-platform')) {
+          img.style.setProperty('max-width', '280px', 'important')
+          img.style.setProperty('max-height', '150px', 'important')
+        }
+      })
+    }
+  })
 }
 
 // 페이지 변경 시 MathJax 재렌더링
 watch(currentPage, async () => {
   await renderCurrentPageMath()
+  // 병렬 하이브리드로 추가 처리 (Step2 방식)
+  const elements = document.querySelectorAll('.mathjax-content[data-mathjax-pending="true"]')
+  if (elements.length > 0) {
+    await renderMathJaxParallelHybrid(elements)
+  }
 })
 
 // 레이아웃 변경 시 MathJax 재렌더링
 watch(layoutMode, async () => {
   await renderCurrentPageMath()
+  // 병렬 하이브리드로 추가 처리
+  const elements = document.querySelectorAll('.mathjax-content[data-mathjax-pending="true"]')
+  if (elements.length > 0) {
+    await renderMathJaxParallelHybrid(elements)
+  }
 })
 </script>
 
@@ -1506,57 +1570,57 @@ watch(layoutMode, async () => {
   page-break-inside: avoid;
 }
 
-/* Image sizing in all content areas - 더 작게 조정 */
+/* Image sizing in all content areas - 더 크게 조정 */
 .passage-content img,
 .question-text img,
 .choice-text img {
-  max-width: 25% !important; /* 대폭 축소 */
+  max-width: 60% !important;
   width: auto !important;
   height: auto !important;
-  max-height: 35px !important; /* 35px로 대폭 축소 */
+  max-height: 200px !important;
   display: inline-block !important;
-  margin: 0.2rem 0.5rem !important;
+  margin: 0.5rem 0.8rem !important;
   object-fit: contain !important;
   vertical-align: middle !important;
 }
 
-/* img_box 클래스를 가진 컨테이너의 이미지 특별 처리 - 매우 작게 */
+/* img_box 클래스를 가진 컨테이너의 이미지 특별 처리 - 표 이미지 */
 .img_box {
   display: inline-block !important;
-  max-width: 120px !important;
+  max-width: 350px !important;
   width: auto !important;
-  margin: 0.1rem 0.3rem !important;
+  margin: 0.8rem auto !important;
   vertical-align: middle !important;
 }
 
 .img_box img {
   max-width: 100% !important;
-  max-height: 25px !important;
+  max-height: 180px !important;
   width: auto !important;
   height: auto !important;
   object-fit: scale-down !important;
   display: block !important;
 }
 
-/* 문제 내 img_box 더 작게 */
+/* 문제 내 img_box 표 이미지 */
 .question-text .img_box,
 .choice-text .img_box,
 .passage-content .img_box {
-  max-width: 100px !important;
+  max-width: 320px !important;
 }
 
 .question-text .img_box img,
 .choice-text .img_box img,
 .passage-content .img_box img {
-  max-height: 20px !important;
+  max-height: 160px !important;
 }
 
-/* JPG 이미지 특별 처리 (천재교육 플랫폼) - 대폭 축소 */
+/* JPG 이미지 특별 처리 (천재교육 플랫폼) */
 img[src*="chunjae-platform"],
 img[src$=".JPG"],
 img[src$=".jpg"] {
-  max-width: 100px !important;
-  max-height: 25px !important;
+  max-width: 300px !important;
+  max-height: 160px !important;
   object-fit: scale-down !important;
   display: inline-block !important;
 }

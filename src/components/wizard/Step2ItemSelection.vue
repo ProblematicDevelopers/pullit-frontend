@@ -364,6 +364,17 @@
                       {{ item.difficulty?.name }}
                     </span>
                     <span class="badge-type">{{ item.questionForm?.name }}</span>
+                    <button 
+                      class="btn-similar-items"
+                      @click.stop="openSimilarItemsModal(item)"
+                      title="유사 문항 조회"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" 
+                              stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
+                      유사문항
+                    </button>
                   </div>
                 </div>
                 
@@ -457,6 +468,17 @@
                   {{ item.difficulty?.name }}
                 </span>
                 <span class="badge-type">{{ item.questionForm?.name }}</span>
+                <button 
+                  class="btn-similar-items"
+                  @click.stop="openSimilarItemsModal(item)"
+                  title="유사 문항 조회"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" 
+                          stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                  유사문항
+                </button>
               </div>
             </div>
 
@@ -797,6 +819,13 @@
       @close="detailItem = null"
       @select="handleItemSelect"
     />
+
+    <!-- 유사 문항 조회 모달 -->
+    <SimilarItemsModal
+      v-model="showSimilarItemsModal"
+      :item="selectedItemForSimilar"
+      @add-items="handleAddSimilarItems"
+    />
   </div>
 </template>
 
@@ -809,6 +838,7 @@ import examApi from '@/services/examApi'
 import { debounce } from 'lodash-es'
 import RandomItemModal from './RandomItemModal.vue'
 import ItemPreviewModal from './ItemPreviewModal.vue'
+import SimilarItemsModal from '@/components/common/SimilarItemsModal.vue'
 import { useMathJax } from '@/composables/useMathJax'
 import { renderMathJaxParallelHybrid, renderMathJaxSmartHybrid } from '@/utils/mathjax-hybrid'
 // import { renderMathJaxSimple } from '@/utils/mathjax-simple'
@@ -851,6 +881,10 @@ const showSelectedPanel = ref(false)
 const showRandomGenerator = ref(false)
 const imageModalUrl = ref(null)
 const detailItem = ref(null)
+
+// 유사 문항 모달 관련 상태
+const showSimilarItemsModal = ref(false)
+const selectedItemForSimilar = ref(null)
 
 // Search & Filters
 const searchKeyword = ref('')
@@ -1435,6 +1469,34 @@ const handleRandomGenerate = async (config) => {
 
 const handleBack = () => {
   emit('back')
+}
+
+// 유사 문항 모달 메서드
+const openSimilarItemsModal = (item) => {
+  console.log('Opening similar items modal for:', item)
+  selectedItemForSimilar.value = item
+  showSimilarItemsModal.value = true
+}
+
+const handleAddSimilarItems = (similarItems) => {
+  console.log('Adding similar items:', similarItems)
+  // 선택된 유사 문항들을 selectedItems에 추가
+  if (similarItems && similarItems.length > 0) {
+    // 기존 선택된 아이템 ID들
+    const existingIds = selectedItems.value.map(item => item.itemId)
+    
+    // 중복되지 않는 새 아이템만 필터링
+    const newItems = similarItems.filter(item => 
+      !existingIds.includes(item.itemId || item.item_id)
+    )
+    
+    if (newItems.length > 0) {
+      selectedItems.value.push(...newItems)
+      console.log(`Added ${newItems.length} similar items to selection`)
+    } else {
+      console.log('All selected items already exist in the selection')
+    }
+  }
 }
 
 const proceedToNext = () => {
@@ -2334,6 +2396,39 @@ watch(items, async (newItems, oldItems) => {
 .item-badges {
   display: flex;
   gap: 0.5rem;
+  align-items: center;
+}
+
+/* 유사 문항 버튼 */
+.btn-similar-items {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: auto;
+}
+
+.btn-similar-items:hover {
+  background: #f9fafb;
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.btn-similar-items:active {
+  transform: scale(0.95);
+}
+
+.btn-similar-items svg {
+  width: 14px;
+  height: 14px;
 }
 
 .badge-difficulty,
