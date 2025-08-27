@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>MathJax Test</title>
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          displayMath: [['$$', '$$'], ['\\[', '\\]']],
+          processEscapes: true,
+          processEnvironments: true
+        },
+        options: {
+          skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+        },
+        startup: {
+          typeset: true,  // 자동 렌더링 활성화
+          ready: () => {
+            MathJax.startup.defaultReady();
+            console.log('MathJax ready');
+          }
+        }
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+<body>
+    <h1>MathJax 테스트</h1>
+    
+    <h2>인라인 수식</h2>
+    <p>이차방정식의 해는 $x = \frac{-b \pm \sqrt{b^2-4ac}}{2a}$ 입니다.</p>
+    
+    <h2>블록 수식</h2>
+    <p>맥스웰 방정식:</p>
+    $$\nabla \times \vec{\mathbf{B}} - \frac{1}{c} \frac{\partial\vec{\mathbf{E}}}{\partial t} = \frac{4\pi}{c}\vec{\mathbf{j}}$$
+    
+    <h2>다른 표기법</h2>
+    <p>인라인: \(E = mc^2\)</p>
+    <p>블록: \[\int_{-\infty}^{\infty} e^{-x^2} dx = \sqrt{\pi}\]</p>
+    
+    <h2>복잡한 수식</h2>
+    $$\begin{align}
+    \dot{x} & = \sigma(y-x) \\
+    \dot{y} & = \rho x - y - xz \\
+    \dot{z} & = -\beta z + xy
+    \end{align}$$
+</body>
+</html>

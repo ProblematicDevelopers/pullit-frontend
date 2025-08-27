@@ -8,12 +8,11 @@
  * @returns {Promise<Object>} 폰트 객체
  */
 export const loadKoreanFont = async () => {
-  // 시도할 폰트 URL 목록
+  // 시도할 폰트 URL 목록 (실제 파일명으로 수정)
   const fontUrls = [
-    '/NotoSansKR-Regular.ttf',  // 다운로드한 파일명으로 수정
-    '/NotoSansKR-VariableFont_wght.ttf',  // 기존 파일명도 시도
-    'https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2107@1.1/NotoSansKR-Regular.ttf',
-    'https://cdn.jsdelivr.net/gh/noonfonts/noonfonts_2107@1.1/Pretendard-Regular.woff'
+    '/NotoSansKR-VariableFont_wght.ttf',  // public 폴더에 있는 실제 파일
+    'https://cdn.jsdelivr.net/gh/fonts-archive/NotoSansKR/NotoSansKR-Regular.otf',
+    'https://cdn.jsdelivr.net/gh/projectnoonnu/noonfonts_2107@1.1/Pretendard-Regular.woff'
   ];
 
   for (const fontUrl of fontUrls) {

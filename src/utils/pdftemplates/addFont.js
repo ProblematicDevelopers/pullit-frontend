@@ -44,10 +44,23 @@ const addFontToField = (field, fontName) => {
  * @returns {Object} 폰트가 적용된 템플릿
  */
 export const applyFontToTemplate = (template, fontName = 'NotoSansKR') => {
-  return {
-    ...template,
-    schemas: addFontToSchemas(template.schemas, fontName)
-  };
+  const newTemplate = JSON.parse(JSON.stringify(template));
+  
+  // 모든 스키마 페이지를 순회
+  newTemplate.schemas.forEach(pageSchema => {
+    pageSchema.forEach(field => {
+      // text 타입의 필드에 폰트 적용
+      if (field.type === 'text') {
+        field.fontName = fontName;
+        // 폰트 weight도 기본값 설정
+        if (!field.fontWeight) {
+          field.fontWeight = '400';
+        }
+      }
+    });
+  });
+  
+  return newTemplate;
 };
 
 export default {
