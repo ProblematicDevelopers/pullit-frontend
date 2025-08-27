@@ -28,6 +28,10 @@ onMounted(async () => {
   try {
     // URL에서 provider 정보 추출
     const provider = route.params.provider || route.query.provider
+    const status = route.query.status
+    
+    console.log('OAuth2 Callback - Provider:', provider, 'Status:', status)
+    console.log('Full route:', route.fullPath)
 
     if (!provider) {
       statusMessage.value = '잘못된 접근입니다.'
@@ -37,61 +41,69 @@ onMounted(async () => {
 
     statusMessage.value = `${provider} 로그인을 처리하고 있습니다...`
 
-    // 백엔드 OAuth2 성공 엔드포인트 호출
-    const response = await authService.handleOAuth2Callback(provider)
+    // status 파라미터로 처리 분기
+    if (status === 'process' || !status) {
+      console.log('Process mode - calling backend API...')
+      // 백엔드에서 직접 리다이렉트된 경우 - API 호출하여 처리
+      const response = await authService.handleOAuth2Callback(provider)
+      
+      console.log('OAuth2 API response:', response)
+      console.log('Response data:', response.data)
 
-    console.log('OAuth2 response:', response)
+      if (response.success && (response.code === 'LOGIN_SUCCESS' || response.message === 'LOGIN_SUCCESS')) {
+        // 기존 사용자 로그인 성공
+        const user = response.data.user
 
-    if (response.success && response.code === 'LOGIN_SUCCESS') {
-      // 기존 사용자 로그인 성공
-      const user = response.data.user
+        console.log('User info:', user)
+        console.log('Tokens:', {
+          access: response.data.accessToken?.substring(0, 20) + '...',
+          refresh: response.data.refreshToken?.substring(0, 20) + '...'
+        })
+        
+        statusMessage.value = '로그인 성공! 페이지를 이동합니다...'
 
-      statusMessage.value = '로그인 성공! 페이지를 이동합니다...'
+        // 토큰 저장
+        authService.setTokens(response.data.accessToken, response.data.refreshToken)
+        console.log('Tokens saved to localStorage')
 
-      // 토큰 저장
-      authService.setTokens(response.data.accessToken, response.data.refreshToken)
+        // 사용자 정보 저장
+        localStorage.setItem('userInfo', JSON.stringify(user))
+        localStorage.setItem('userType', user.role === 'TEACHER' ? 'teacher' : 'student')
+        localStorage.setItem('isLoggedIn', 'true')
+        console.log('User info saved to localStorage')
 
-      // 사용자 정보 저장
-      localStorage.setItem('userInfo', JSON.stringify(user))
-      localStorage.setItem('userType', user.role === 'TEACHER' ? 'teacher' : 'student')
-      localStorage.setItem('isLoggedIn', 'true')
+        // Layout store 업데이트
+        layoutStore.setUserName(user.fullName || user.username)
+        console.log('Layout store updated')
 
-      // Layout store 업데이트
-      layoutStore.setUserName(user.fullName || user.username)
+        // 메인 화면으로 리다이렉트
+        console.log('Redirecting to main page...')
+        setTimeout(() => {
+          router.push('/')
+        }, 1000)
+      } else if (response.success && (response.code === 'NEW_USER' || response.message === 'NEW_USER')) {
+        // 신규 사용자 - 회원가입 페이지로 이동
+        statusMessage.value = '신규 사용자입니다. 회원가입을 진행해주세요.'
 
-      // 역할에 따라 기본 페이지로 리다이렉트
-      setTimeout(() => {
-        if (user.role === 'ADMIN') {
-          router.push('/class-management')
-        } else if (user.role === 'TEACHER') {
-          router.push('/class-management')
-        } else {
-          router.push('/student/main')
-        }
-      }, 1000)
-    } else if (response.success && (response.code === 'NEW_USER' || response.message === 'NEW_USER')) {
-      // 신규 사용자 - 회원가입 페이지로 이동
-      statusMessage.value = '신규 사용자입니다. 회원가입을 진행해주세요.'
+        const socialInfo = response.data
+        sessionStorage.setItem('oauth2_social_info', JSON.stringify(socialInfo))
 
-      const socialInfo = response.data
-      sessionStorage.setItem('oauth2_social_info', JSON.stringify(socialInfo))
-
-      setTimeout(() => {
-        const query = {
-          oauth2: 'true',
-          provider: provider,
-          email: socialInfo.email,
-          name: socialInfo.name,
-          providerId: socialInfo.providerId,
-          username: socialInfo.username
-        }
-        console.log('Query params:', query)
-        router.push({ path: '/signup', query })
-      }, 2000)
-    } else {
-      // 기타 응답 처리
-      statusMessage.value = '로그인 처리 중 오류가 발생했습니다.'
-      setTimeout(() => router.push('/login'), 2000)
+        setTimeout(() => {
+          const query = {
+            oauth2: 'true',
+            provider: provider,
+            email: socialInfo.email,
+            name: socialInfo.name,
+            providerId: socialInfo.providerId,
+            username: socialInfo.username
+          }
+          console.log('Query params:', query)
+          router.push({ path: '/signup', query })
+        }, 2000)
+      } else {
+        statusMessage.value = '로그인 처리 중 오류가 발생했습니다.'
+        setTimeout(() => router.push('/login'), 2000)
+      }
     }
   } catch (error) {
     console.error('OAuth2 callback error:', error)
