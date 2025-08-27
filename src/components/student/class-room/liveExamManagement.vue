@@ -4,9 +4,10 @@
       <!-- 헤더 -->
       <div class="row mb-4">
         <div class="col-12">
-          <h2 class="text-center mb-3">시험 대기실</h2>
-          <div class="alert" :class="examStatusClass" role="alert">
-            {{ examStatusText }}
+          <h2 class="text-center mb-3">시험 관리실</h2>
+          <div class="alert alert-warning" role="alert">
+            <i class="bi bi-exclamation-triangle me-2"></i>
+            선생님 전용 페이지입니다. 시험을 시작하면 학생들이 응시할 수 있습니다.
           </div>
         </div>
       </div>
@@ -45,56 +46,59 @@
                     <span class="ms-2">{{ examInfo.areaName || '-' }}</span>
                   </div>
                 </div>
-                <div class="col-12">
-                  <div class="d-flex justify-content-center">
-                    <button
-                      class="btn btn-primary btn-lg"
-                      @click="startExam"
-                      :disabled="!canStartExam"
-                      style="width: 100%"
-                    >
-                      <i class="bi bi-play-circle me-2"></i>
-                      {{ canStartExam ? '시험 응시하기' : '시험 시작 대기 중...' }}
-                    </button>
-                  </div>
-                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- 담임 선생님 정보 -->
+      <!-- 시험 관리 버튼 -->
       <div class="row mt-4">
         <div class="col-12">
           <div class="card">
             <div class="card-header">
               <h5 class="mb-0">
-                <i class="bi bi-person-badge me-2"></i>
-                담당 선생님
-                <span v-if="isTeacherOnline" class="badge bg-success ms-2">🟢 접속중</span>
+                <i class="bi bi-gear me-2"></i>
+                시험 관리
               </h5>
             </div>
-            <div class="card-body">
+            <div class="card-body text-center">
               <div class="row">
-                <div class="col-md-6">
-                  <div class="info-item mb-3">
-                    <strong class="text-muted">이름:</strong>
-                    <span class="ms-2"> {{ teacherInfo.teacherName || '-' }} 선생님 </span>
-                  </div>
-                  <div class="info-item mb-3">
-                    <strong class="text-muted">담당 과목:</strong>
-                    <span class="ms-2">{{ teacherInfo.subject || '-' }}</span>
-                  </div>
+                <div class="col-md-4">
+                  <button
+                    class="btn btn-success btn-lg w-100 mb-3"
+                    @click="startExam"
+                    :disabled="examStarted"
+                  >
+                    <i class="bi bi-play-circle me-2"></i>
+                    {{ examStarted ? '시험 진행 중' : '시험 시작하기' }}
+                  </button>
                 </div>
-                <div class="col-md-6">
-                  <div class="info-item mb-3">
-                    <strong class="text-muted">이메일:</strong>
-                    <span class="ms-2">{{ teacherInfo.email || '-' }}</span>
-                  </div>
-                  <div class="info-item mb-3">
-                    <strong class="text-muted">연락처:</strong>
-                    <span class="ms-2">{{ teacherInfo.phoneNumber || '-' }}</span>
+                <div class="col-md-4">
+                  <button
+                    class="btn btn-warning btn-lg w-100 mb-3"
+                    @click="pauseExam"
+                    :disabled="!examStarted || examPaused"
+                  >
+                    <i class="bi bi-pause-circle me-2"></i>
+                    {{ examPaused ? '일시정지됨' : '일시정지' }}
+                  </button>
+                </div>
+                <div class="col-md-4">
+                  <button
+                    class="btn btn-danger btn-lg w-100 mb-3"
+                    @click="endExam"
+                    :disabled="!examStarted"
+                  >
+                    <i class="bi bi-stop-circle me-2"></i>
+                    시험 종료
+                  </button>
+                </div>
+              </div>
+              <div class="row mt-3">
+                <div class="col-12">
+                  <div class="alert" :class="examStatusClass" role="alert">
+                    <strong>시험 상태:</strong> {{ examStatusText }}
                   </div>
                 </div>
               </div>
@@ -110,7 +114,7 @@
             <div class="card-header">
               <h5 class="mb-0">
                 <i class="bi bi-people me-2"></i>
-                실시간 참가자
+                실시간 참가자 ({{ onlineStudents }}명)
               </h5>
             </div>
             <div class="card-body p-0">
@@ -136,7 +140,11 @@
                     <div class="flex-grow-1">
                       <div class="fw-semibold d-flex align-items-center justify-content-between">
                         <span class="me-2">{{ participant.userName }}</span>
+                        <span v-if="participant.status === 'ONLINE'" class="badge bg-success"
+                          >🟢</span
+                        >
                       </div>
+                      <small class="text-muted">{{ participant.userRole }}</small>
                     </div>
                   </div>
                 </div>
@@ -153,7 +161,7 @@
             <div class="card-header">
               <h5 class="mb-0">
                 <i class="bi bi-chat-dots me-2"></i>
-                실시간 채팅
+                실시간 채팅 ({{ chatMessages.length }}개 메시지)
               </h5>
             </div>
             <div class="card-body p-0">
@@ -239,7 +247,6 @@ const router = useRouter()
 
 // 시험 정보
 const examInfo = ref({})
-const teacherInfo = ref({})
 
 // 현재 사용자 정보
 const userInfo = ref(JSON.parse(localStorage.getItem('userInfo')))
@@ -247,26 +254,15 @@ const currentUserId = ref(userInfo.value.id)
 const currentUserName = ref(userInfo.value.fullName)
 const currentUserRole = ref(userInfo.value.role)
 
-// 채팅 관련
-const newMessage = ref('')
-const chatContainerRef = ref(null)
-const channelName = ref('')
-
-// 온라인 참가자 목록
-const onlineParticipants = ref([])
-
-// 선생님 온라인 상태
-const isTeacherOnline = ref(false)
-
 // 시험 상태 관리
 const examStarted = ref(false)
 const examPaused = ref(false)
 
 // 시험 상태 텍스트와 클래스
 const examStatusText = computed(() => {
-  if (!examStarted.value) return '시험이 시작될 때까지 잠시 기다려주세요.'
+  if (!examStarted.value) return '대기 중'
   if (examPaused.value) return '일시정지'
-  return '시험이 진행 중입니다.'
+  return '진행 중'
 })
 
 const examStatusClass = computed(() => {
@@ -275,9 +271,13 @@ const examStatusClass = computed(() => {
   return 'alert-success'
 })
 
-const canStartExam = computed(() => {
-  return examStarted.value && !examPaused.value
-})
+// 채팅 관련
+const newMessage = ref('')
+const chatContainerRef = ref(null)
+const channelName = ref('')
+
+// 온라인 참가자 목록
+const onlineParticipants = ref([])
 
 // 스크롤을 최하단으로 이동시키는 함수
 const scrollToBottom = () => {
@@ -312,39 +312,11 @@ const formatTime = (timestamp) => {
   return messageDate.toLocaleDateString()
 }
 
-// 시험 시작 함수
-const startExam = () => {
-  if (canStartExam.value) {
-    // TODO: 실제 시험 페이지로 이동
-    alert('시험을 시작합니다!')
-    console.log('시험 시작:', examInfo.value)
-  }
-}
-
-// 시험 상태 메시지 처리
-const handleExamStatusMessage = (message) => {
-  if (message.messageType === 'NOTICE') {
-    const content = message.content.toLowerCase()
-
-    if (content.includes('시험이 시작되었습니다')) {
-      examStarted.value = true
-      examPaused.value = false
-    } else if (content.includes('일시정지')) {
-      examPaused.value = true
-    } else if (content.includes('시험이 종료되었습니다')) {
-      examStarted.value = false
-      examPaused.value = false
-    }
-  }
-}
-
 // 시험 정보 로드
 const loadExamInfo = async (examId, classId) => {
   try {
     const response = await classApi.getExam(examId, classId)
     const res = response.data.data
-    console.log('🔍 시험 정보:', res)
-    // TODO: 실제 API 호출로 시험 정보 가져오기
     examInfo.value = {
       examName: res.examName,
       examType: '실시간',
@@ -352,27 +324,88 @@ const loadExamInfo = async (examId, classId) => {
       areaName: res.areaName,
       totalItem: res.totalItems,
     }
-    teacherInfo.value = {
-      teacherName: res.createdBy.fullName,
-      subject: res.areaName,
-      email: res.createdBy.email,
-      phoneNumber: res.createdBy.phone,
-    }
   } catch (error) {
     console.error('시험 정보 로드 실패:', error)
     alert('접근 권한이 없습니다.')
-    router.push('/student/main')
+    router.push('/teacher/main')
   }
 }
 
-const loadTeacherInfo = async () => {
-  try {
-    await classApi.getMyClass()
-  } catch (error) {
-    console.error('클래스 정보 로드 실패:', error)
-    alert('접근 권한이 없습니다.')
-    router.push('/student/main')
+// 시험 시작
+const startExam = () => {
+  examStarted.value = true
+  examPaused.value = false
+
+  // 시험 시작 메시지 전송
+  const startMessage = {
+    channelName: channelName.value,
+    senderId: currentUserId.value,
+    senderName: currentUserName.value,
+    senderRole: currentUserRole.value,
+    content: '시험이 시작되었습니다. 학생들은 이제 응시할 수 있습니다.',
+    messageType: 'NOTICE',
+    timestamp: new Date().toISOString(),
   }
+
+  if (sendNoticeMessage) {
+    sendNoticeMessage(startMessage.content)
+  }
+
+  // 시험 시작 상태를 웹소켓으로 브로드캐스트
+  sendExamStatus('STARTED')
+}
+
+// 시험 일시정지
+const pauseExam = () => {
+  examPaused.value = true
+
+  // 일시정지 메시지 전송
+  const pauseMessage = {
+    channelName: channelName.value,
+    senderId: currentUserId.value,
+    senderName: currentUserName.value,
+    senderRole: currentUserRole.value,
+    content: '시험이 일시정지되었습니다.',
+    messageType: 'NOTICE',
+    timestamp: new Date().toISOString(),
+  }
+
+  if (sendNoticeMessage) {
+    sendNoticeMessage(pauseMessage.content)
+  }
+
+  // 일시정지 상태를 웹소켓으로 브로드캐스트
+  sendExamStatus('PAUSED')
+}
+
+// 시험 종료
+const endExam = () => {
+  examStarted.value = false
+  examPaused.value = false
+
+  // 시험 종료 메시지 전송
+  const endMessage = {
+    channelName: channelName.value,
+    senderId: currentUserId.value,
+    senderName: currentUserName.value,
+    senderRole: currentUserRole.value,
+    content: '시험이 종료되었습니다.',
+    messageType: 'NOTICE',
+    timestamp: new Date().toISOString(),
+  }
+
+  if (sendNoticeMessage) {
+    sendNoticeMessage(endMessage.content)
+  }
+
+  // 시험 종료 상태를 웹소켓으로 브로드캐스트
+  sendExamStatus('ENDED')
+}
+
+// 시험 상태 전송
+const sendExamStatus = (status) => {
+  // TODO: 웹소켓으로 시험 상태 전송
+  console.log('시험 상태 전송:', status)
 }
 
 // 온라인 참가자 상태 업데이트
@@ -381,59 +414,49 @@ const updateParticipantsStatus = (participants, status) => {
   if (status.onlineUsers && Array.isArray(status.onlineUsers)) {
     // 기존 참가자 목록을 완전히 교체 (온라인 사용자만 유지)
     participants.length = 0 // 배열 초기화
-    isTeacherOnline.value = false // 선생님 온라인 상태 초기화
 
-    // 온라인 사용자들만 추가
+    // 온라인 사용자들만 추가 (선생님 제외)
     status.onlineUsers.forEach((onlineUser) => {
-      if (onlineUser.status === 'ONLINE') {
-        // 선생님인 경우 별도로 관리
-        if (onlineUser.userRole === 'TEACHER') {
-          isTeacherOnline.value = true
-        } else {
-          // 학생만 참가자 목록에 추가
-          participants.push({
-            userId: onlineUser.userId,
-            userName: onlineUser.userName,
-            userRole: onlineUser.userRole,
-            status: 'ONLINE',
-          })
-        }
+      if (onlineUser.status === 'ONLINE' && onlineUser.userRole !== 'TEACHER') {
+        participants.push({
+          userId: onlineUser.userId,
+          userName: onlineUser.userName,
+          userRole: onlineUser.userRole,
+          status: 'ONLINE',
+        })
       }
     })
   } else if (status.userId && status.status) {
     // 개별 사용자 상태 업데이트
-    if (status.status === 'ONLINE') {
-      // 선생님인 경우 별도로 관리
-      if (status.userRole === 'TEACHER') {
-        isTeacherOnline.value = true
-      } else {
-        // 학생만 참가자 목록에 추가
-        const existingParticipant = participants.find((p) => p.userId == status.userId)
-        if (!existingParticipant) {
-          participants.push({
-            userId: status.userId,
-            userName: status.userName || '알 수 없음',
-            userRole: status.userRole || 'STUDENT',
-            status: 'ONLINE',
-          })
-        }
+    if (status.status === 'ONLINE' && status.userRole !== 'TEACHER') {
+      // 온라인 상태가 되면 참가자 목록에 추가 (선생님 제외)
+      const existingParticipant = participants.find((p) => p.userId == status.userId)
+      if (!existingParticipant) {
+        participants.push({
+          userId: status.userId,
+          userName: status.userName || '알 수 없음',
+          userRole: status.userRole || 'STUDENT',
+          status: 'ONLINE',
+        })
       }
-    } else if (status.status === 'OFFLINE') {
-      // 선생님인 경우 별도로 관리
-      if (status.userRole === 'TEACHER') {
-        isTeacherOnline.value = false
-      } else {
-        // 학생만 참가자 목록에서 제거
-        const index = participants.findIndex((p) => p.userId == status.userId)
-        if (index !== -1) {
-          participants.splice(index, 1)
-        }
+    } else if (status.status === 'OFFLINE' && status.userRole !== 'TEACHER') {
+      // 오프라인 상태가 되면 참가자 목록에서 제거 (선생님 제외)
+      const index = participants.findIndex((p) => p.userId == status.userId)
+      if (index !== -1) {
+        participants.splice(index, 1)
       }
     }
   }
 }
 
 onMounted(async () => {
+  // 선생님 권한 확인
+  if (currentUserRole.value !== 'TEACHER') {
+    alert('선생님만 접근할 수 있습니다.')
+    router.push('/student/main')
+    return
+  }
+
   // 라우터에서 examId와 classId 가져오기
   const examId = route.params.examId
   const classId = route.query.classId
@@ -443,19 +466,14 @@ onMounted(async () => {
     return
   }
 
-  // 채널명 설정
+  // 채널명 설정 (liveExam.vue와 동일)
   channelName.value = `live_exam_${examId}_${classId}`
 
-  await loadTeacherInfo()
   await loadExamInfo(examId, classId)
 
   // 웹소켓 연결
   if (connectWebSocket) {
     await connectWebSocket({
-      onChatMessage: (message) => {
-        // 시험 상태 메시지 처리
-        handleExamStatusMessage(message)
-      },
       onOnlineStatus: (status) => {
         // 참가자 목록 업데이트
         updateParticipantsStatus(onlineParticipants.value, status)
@@ -475,7 +493,14 @@ onUnmounted(() => {
 })
 
 // 웹소켓 컴포저블 사용
-const { chatMessages, connectWebSocket, disconnectWebSocket, sendChatMessage } = useClassWebSocket(
+const {
+  onlineStudents,
+  chatMessages,
+  connectWebSocket,
+  disconnectWebSocket,
+  sendChatMessage,
+  sendNoticeMessage,
+} = useClassWebSocket(
   currentUserId.value,
   currentUserName.value,
   currentUserRole.value,
