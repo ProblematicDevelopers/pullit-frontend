@@ -18,6 +18,7 @@ import CBTExam from '@/components/student/cbt/CBTExam.vue'
 
 import MyClass from '@/components/student/class-room/myClass.vue'
 import LiveExam from '@/components/student/class-room/liveExam.vue'
+import StudentScore from '@/components/student/class-room/StudentScore.vue'
 import LiveExamManagement from '@/components/student/class-room/liveExamManagement.vue'
 
 import ItemProcessing from '@/views/ItemProcessing.vue'
@@ -101,7 +102,7 @@ const routes = [
           { path: 'live-exam/:examId', name: 'student.classRoom.liveExam', component: LiveExam },
         ],
       },
-
+      { path: 'scores', name: 'student.scores', component: StudentScore}
       // { path: 'result/:id', name: 'student.result', component: StudentResult },
     ],
   },
