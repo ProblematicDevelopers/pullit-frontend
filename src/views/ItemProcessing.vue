@@ -1,10 +1,10 @@
 <template>
   <div class="item-processing-container bg-light min-vh-100">
     <!-- 페이지 헤더 -->
-    <div class="page-header bg-white border-bottom py-5 mb-0">
+    <div class="page-header">
       <div class="container">
-        <h1 class="page-title fw-bold text-dark mb-2">문제 등록</h1>
-        <p class="page-subtitle text-muted mb-0">교과서를 선택하고 PDF를 업로드하여 문제를 가공하세요</p>
+        <h1 class="page-title">문제 등록</h1>
+        <p class="page-subtitle">교과서를 선택하고 PDF를 업로드하여 문제를 가공하세요</p>
       </div>
     </div>
 
@@ -739,14 +739,7 @@ export default {
 }
 
 /* 부트스트랩으로 대체할 수 없는 일부 커스텀 스타일 */
-.page-title {
-  font-size: 1.875rem;
-  color: #1e293b;
-}
-
-.page-subtitle {
-  color: #64748b;
-}
+/* 페이지 헤더 스타일은 common.css에서 관리 */
 
 /* 로딩 상태 스타일 - TextbookSelection과 일관성 */
 .conversion-loading,

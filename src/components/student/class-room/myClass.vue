@@ -1,10 +1,10 @@
 <template>
   <div class="my-class-dashboard bg-light min-vh-100">
     <!-- Page Header -->
-    <div class="page-header bg-white border-bottom py-4 mb-4">
+    <div class="page-header">
       <div class="container">
-        <h1 class="h2 fw-bold text-dark mb-1">내 반 정보</h1>
-        <p class="text-muted mb-0">
+        <h1 class="page-title">내 반 정보</h1>
+        <p class="page-subtitle">
           {{ classInfo.className }} - {{ classInfo.grade }}학년 {{ classInfo.classNumber }}반
         </p>
       </div>
@@ -499,6 +499,12 @@ const {
 </script>
 
 <style scoped>
+/* 페이지 헤더 스타일은 common.css에서 관리 */
+/* 학급관리 전용 헤더 여백 */
+.page-header {
+  margin-bottom: 2rem;
+}
+
 /* 커스텀 스타일 추가 */
 .card {
   transition: transform 0.2s ease-in-out;
