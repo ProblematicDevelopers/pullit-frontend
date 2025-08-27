@@ -18,6 +18,7 @@ import CBTExam from '@/components/student/cbt/CBTExam.vue'
 
 import MyClass from '@/components/student/class-room/myClass.vue'
 import LiveExam from '@/components/student/class-room/liveExam.vue'
+import LiveExamManagement from '@/components/student/class-room/liveExamManagement.vue'
 
 import ItemProcessing from '@/views/ItemProcessing.vue'
 import ItemProcessingTextbook from '@/views/ItemProcessingTextbook.vue'
@@ -104,6 +105,16 @@ const routes = [
       // { path: 'result/:id', name: 'student.result', component: StudentResult },
     ],
   },
+  {
+    path: '/teacher/class-room/live-exam-management/:examId',
+    name: 'teacher.classRoom.liveExamManagement',
+    component: LiveExamManagement,
+    beforeEnter: requireAuth,
+    meta: {
+      requiresAuth: true,
+      role: 'teacher',
+    },
+  },
 
   // 학급관리 페이지 (대시보드)
   {
@@ -163,7 +174,7 @@ const routes = [
       hideFooter: true, // 푸터 숨김
     },
   },
-  
+
   // MathJax 테스트 페이지
   {
     path: '/mathjax-test',
