@@ -234,13 +234,84 @@ const loadSimilarItems = async () => {
   try {
     console.log('Loading similar items for:', originalItem.value)
     
+    // 챕터 ID 추출 - 계층적 챕터 ID를 조합해서 만들어야 함
+    // ElasticSearch는 12자리 topicChapterId를 기대함 (예: 010101010101)
+    const subjectId = originalItem.value.subjectId || originalItem.value.subject?.id || '0000'
+    const largeChapterId = originalItem.value.largeChapterId || originalItem.value.largeChapter?.id || '00'
+    const mediumChapterId = originalItem.value.mediumChapterId || originalItem.value.mediumChapter?.id || '00'
+    const smallChapterId = originalItem.value.smallChapterId || originalItem.value.smallChapter?.id || '00'
+    const topicId = originalItem.value.topicChapterId || originalItem.value.topicChapter?.id || '00'
+    
+    // 12자리 코드 생성 (subject(4) + large(2) + medium(2) + small(2) + topic(2))
+    let chapterId = 0
+    if (subjectId && subjectId !== '0000') {
+      // 각 ID를 문자열로 변환하고 패딩
+      const subjectStr = String(subjectId).padStart(4, '0')
+      const largeStr = String(largeChapterId).padStart(2, '0')
+      const mediumStr = String(mediumChapterId).padStart(2, '0')
+      const smallStr = String(smallChapterId).padStart(2, '0')
+      const topicStr = String(topicId).padStart(2, '0')
+      
+      // 12자리 코드 조합
+      chapterId = parseInt(subjectStr + largeStr + mediumStr + smallStr + topicStr)
+    }
+    
+    // 만약 조합된 ID가 없다면 item의 모든 챕터 관련 필드 확인
+    if (!chapterId || chapterId === 0) {
+      chapterId = originalItem.value.topicChapterId || 
+                  originalItem.value.chapterId ||
+                  originalItem.value.chapter?.id ||
+                  0
+    }
+    
+    // 난이도 코드 추출
+    const diffCode = originalItem.value.difficultyCode || 
+                     originalItem.value.difficulty?.code ||
+                     originalItem.value.difficulty ||
+                     -1
+    
+    // 지문 ID 추출
+    const passId = originalItem.value.passageId || 
+                   originalItem.value.passage_id ||
+                   -1
+    
     const params = {
-      topicChapterId: originalItem.value.topicChapterId || 0,
-      difficultyCode: originalItem.value.difficultyCode || originalItem.value.difficulty?.code || -1,
-      passageId: originalItem.value.passageId || -1,
+      topicChapterId: chapterId,
+      difficultyCode: typeof diffCode === 'object' ? -1 : Number(diffCode),
+      passageId: passId,
       excludeItemIds: [originalItem.value.itemId],
       size: 20
     }
+    
+    console.log('Item structure:', {
+      itemId: originalItem.value.itemId,
+      subjectInfo: {
+        subjectId: originalItem.value.subjectId,
+        subject: originalItem.value.subject,
+        subjectName: originalItem.value.subjectName
+      },
+      chapterFields: {
+        largeChapterId: originalItem.value.largeChapterId,
+        largeChapter: originalItem.value.largeChapter,
+        mediumChapterId: originalItem.value.mediumChapterId,
+        mediumChapter: originalItem.value.mediumChapter,
+        smallChapterId: originalItem.value.smallChapterId,
+        smallChapter: originalItem.value.smallChapter,
+        topicChapterId: originalItem.value.topicChapterId,
+        topicChapter: originalItem.value.topicChapter,
+        chapterId: originalItem.value.chapterId,
+        chapter: originalItem.value.chapter
+      },
+      difficultyFields: {
+        difficultyCode: originalItem.value.difficultyCode,
+        difficulty: originalItem.value.difficulty
+      },
+      passageFields: {
+        passageId: originalItem.value.passageId,
+        passage_id: originalItem.value.passage_id
+      },
+      calculatedChapterId: chapterId
+    })
     
     console.log('Similar items request params:', params)
     
