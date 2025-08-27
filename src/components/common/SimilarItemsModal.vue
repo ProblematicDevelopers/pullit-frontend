@@ -244,7 +244,7 @@ const loadSimilarItems = async () => {
     
     console.log('Similar items request params:', params)
     
-    const result = await itemApi.getSimilarItemsByElastic(params)
+    const result = await itemApi.getSimilarItems(params)
     
     if (result.success) {
       similarItems.value = result.data || []
