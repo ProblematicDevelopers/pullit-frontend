@@ -9,13 +9,13 @@
  * @returns {Object|null} TinyMCE 에디터 인스턴스 또는 null
  */
 export function getTinyMCEInstance(editorId) {
-  if (typeof tinymce === 'undefined') {
+  if (typeof window.tinymce === 'undefined') {
     console.warn('TinyMCE가 로드되지 않았습니다.');
     return null;
   }
 
   try {
-    return tinymce.get(editorId);
+    return window.tinymce.get(editorId);
   } catch (error) {
     console.error('TinyMCE 에디터 인스턴스를 가져오는 중 오류 발생:', error);
     return null;
