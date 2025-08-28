@@ -58,7 +58,7 @@
               <span>지문</span>
             </div>
             <div class="passage-content">
-              <div v-if="group.passageHtml" v-html="sanitizeHtml(group.passageHtml)" v-mathjax class="passage-text"></div>
+              <div v-if="group.passageHtml" v-html="sanitizeHtml(group.passageHtml)" class="passage-text math-content"></div>
               <div v-else-if="group.passageText" class="passage-text">{{ group.passageText }}</div>
             </div>
           </div>
@@ -96,7 +96,7 @@
               <div class="card-body">
                 <!-- 문제 내용 -->
                 <div class="question-section">
-                  <div v-if="item.questionHtml" class="item-html" v-html="sanitizeHtml(item.questionHtml)" v-mathjax></div>
+                  <div v-if="item.questionHtml" class="item-html math-content" v-html="sanitizeHtml(item.questionHtml)"></div>
                   <div v-else-if="item.questionImageUrl" class="item-image">
                     <img 
                       :src="item.questionImageUrl" 
@@ -185,25 +185,25 @@
             </div>
 
             <!-- 선택지 (객관식인 경우) -->
-            <div v-if="hasChoices(item)" class="item-choices">
+            <div v-if="hasChoices(item)" class="item-choices math-content">
               <div v-if="item.choice1Html || item.choice1Text" class="choice">
-                ① <span v-if="item.choice1Html" v-html="sanitizeHtml(item.choice1Html)"></span>
+                ① <span v-if="item.choice1Html" v-html="sanitizeHtml(item.choice1Html)" class="choice-content"></span>
                 <span v-else>{{ item.choice1Text }}</span>
               </div>
               <div v-if="item.choice2Html || item.choice2Text" class="choice">
-                ② <span v-if="item.choice2Html" v-html="sanitizeHtml(item.choice2Html)"></span>
+                ② <span v-if="item.choice2Html" v-html="sanitizeHtml(item.choice2Html)" class="choice-content"></span>
                 <span v-else>{{ item.choice2Text }}</span>
               </div>
               <div v-if="item.choice3Html || item.choice3Text" class="choice">
-                ③ <span v-if="item.choice3Html" v-html="sanitizeHtml(item.choice3Html)"></span>
+                ③ <span v-if="item.choice3Html" v-html="sanitizeHtml(item.choice3Html)" class="choice-content"></span>
                 <span v-else>{{ item.choice3Text }}</span>
               </div>
               <div v-if="item.choice4Html || item.choice4Text" class="choice">
-                ④ <span v-if="item.choice4Html" v-html="sanitizeHtml(item.choice4Html)"></span>
+                ④ <span v-if="item.choice4Html" v-html="sanitizeHtml(item.choice4Html)" class="choice-content"></span>
                 <span v-else>{{ item.choice4Text }}</span>
               </div>
               <div v-if="item.choice5Html || item.choice5Text" class="choice">
-                ⑤ <span v-if="item.choice5Html" v-html="sanitizeHtml(item.choice5Html)"></span>
+                ⑤ <span v-if="item.choice5Html" v-html="sanitizeHtml(item.choice5Html)" class="choice-content"></span>
                 <span v-else>{{ item.choice5Text }}</span>
               </div>
             </div>
@@ -268,13 +268,14 @@ const examTitle = computed(() => props.examInfo?.title || props.examInfo?.examNa
 const showSimilarItemsModal = ref(false)
 const selectedItemForSimilar = ref(null)
 
-// MathJax 컴포저블 사용 - Vue 재렌더링 안전 설정
+// MathJax 컴포저블 사용 - 안전한 렌더링 설정
 const { render: renderMath } = useMathJax({
   immediate: false,
   watchContent: false,  // Vue 재렌더링과 충돌 방지
-  hideBeforeRender: false,  // 숨기지 않음
-  clearFirst: false,  // 중요: 기존 MathJax 렌더링 유지
-  debounceDelay: 100
+  hideBeforeRender: true,  // 렌더링 전 숨김
+  clearFirst: true,  // 기존 렌더링 정리
+  debounceDelay: 200,  // 렌더링 안정화를 위한 지연
+  targetSelector: '.math-content'  // math-content 클래스를 가진 요소만 렌더링
 })
 
 // 지문이 있는 그룹과 일반 문항 분리
@@ -311,27 +312,41 @@ const getItemNumber = (item, index) => {
   return globalIndex >= 0 ? `문항 ${globalIndex + 1}` : `문항 ${index + 1}`
 }
 
-// HTML 정화
+// HTML 정화 - 도수분포표와 지문 콘텐츠 보존
 const sanitizeHtml = (html) => {
   if (!html) return ''
   
-  // 원본 HTML 디버깅
-  if (html.includes('latex_equation')) {
-    console.log('sanitizeHtml 입력 (latex_equation 포함):', html)
-  }
-  
-  // DOMPurify로 정제하되, class와 data 속성 보존
+  // DOMPurify를 사용한 안전한 HTML 정화
+  // LaTeX 수식, MathJax, 테이블, 이미지 모두 보존
   const cleaned = DOMPurify.sanitize(html, {
-    ADD_TAGS: ['math', 'mrow', 'mi', 'mn', 'mo', 'mfrac', 'msup', 'msub', 'munder', 'mover', 'msqrt', 'span'],
-    ADD_ATTR: ['mathvariant', 'display', 'class', 'data-latex', 'data-math'],
+    ADD_TAGS: [
+      // MathJax 관련 태그
+      'math', 'mrow', 'mi', 'mn', 'mo', 'mfrac', 'msup', 'msub', 'munder', 'mover', 'msqrt', 'mroot',
+      // HTML 테이블 태그 (도수분포표용)
+      'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col',
+      // 기본 HTML 태그
+      'span', 'div', 'p', 'br', 'hr', 'strong', 'em', 'u', 'sub', 'sup',
+      // 리스트 태그
+      'ul', 'ol', 'li'
+    ],
+    ADD_ATTR: [
+      // MathJax 속성
+      'mathvariant', 'display', 'data-latex', 'data-math',
+      // 일반 속성
+      'class', 'style', 'id',
+      // 테이블 속성
+      'colspan', 'rowspan', 'border', 'cellpadding', 'cellspacing', 'align', 'valign',
+      // 이미지 속성
+      'src', 'alt', 'width', 'height', 'title'
+    ],
     KEEP_CONTENT: true,
-    ADD_DATA_URI_TAGS: ['span'] // data 속성을 가진 span 태그 허용
+    ALLOW_DATA_ATTR: true,
+    // script 태그만 제거, img는 허용 (도수분포표가 이미지일 수 있음)
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'applet'],
+    FORCE_BODY: false,
+    // 안전한 이미지 URL만 허용
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|data|blob):|[^:]+$)/i
   })
-  
-  // 정제 후 결과 디버깅
-  if (html.includes('latex_equation')) {
-    console.log('sanitizeHtml 출력:', cleaned)
-  }
   
   return cleaned
 }
@@ -885,5 +900,81 @@ onMounted(() => {
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* MathJax 렌더링 스타일 */
+.math-content {
+  /* MathJax 렌더링 전 깜빡임 방지 */
+  min-height: 1em;
+}
+
+/* MathJax 요소 스타일 */
+.math-content mjx-container {
+  display: inline-block !important;
+  margin: 0.2em 0;
+}
+
+/* MathJax 표 스타일 (도수분포표 등) */
+.math-content mjx-container[display="true"] {
+  display: block !important;
+  text-align: center;
+  margin: 1em 0;
+}
+
+/* MathJax 표 내부 정렬 */
+.math-content mjx-mtable {
+  margin: 0 auto;
+}
+
+/* 선택지 내 수식 정렬 */
+.choice-content mjx-container {
+  vertical-align: middle;
+}
+
+/* MathJax 렌더링 중 숨김 처리 */
+.math-content[data-mathjax-pending="true"] {
+  visibility: hidden;
+}
+
+/* MathJax 렌더링 완료 후 표시 */
+.math-content.mathjax-processed {
+  visibility: visible;
+}
+
+/* HTML 테이블 스타일 (도수분포표 등) */
+.math-content table,
+.passage-text table,
+.item-html table {
+  margin: 1em auto;
+  border-collapse: collapse;
+  border: 1px solid #ddd;
+}
+
+.math-content th,
+.math-content td,
+.passage-text th,
+.passage-text td,
+.item-html th,
+.item-html td {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  text-align: center;
+}
+
+.math-content th,
+.passage-text th,
+.item-html th {
+  background-color: #f5f5f5;
+  font-weight: 600;
+}
+
+/* 이미지 스타일 */
+.math-content img,
+.passage-text img,
+.item-html img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1em auto;
 }
 </style>

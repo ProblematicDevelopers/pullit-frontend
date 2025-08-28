@@ -27,6 +27,7 @@ import ItemProcessingTextbook from '@/views/ItemProcessingTextbook.vue'
 // 라우트 가드 import
 import { requireAuth, preventAuthenticated } from './guards'
 import SignUp from '@/views/SignUp.vue'
+import SignUpModern from '@/views/SignUpModern.vue'
 
 // OAuth2 관련 컴포넌트 import
 import OAuth2Callback from '@/components/oauth2/OAuth2Callback.vue'
@@ -168,11 +169,21 @@ const routes = [
   {
     path: '/signup',
     name: 'SignUp',
-    component: SignUp,
+    component: SignUp, // 기존 회원가입 페이지 사용
     beforeEnter: preventAuthenticated,
     meta: {
       hideHeader: true, // 헤더 숨김
       hideFooter: true, // 푸터 숨김
+    },
+  },
+  {
+    path: '/signup-modern',
+    name: 'SignUpModern',
+    component: SignUpModern, // 모던 회원가입 페이지 (백업용)
+    beforeEnter: preventAuthenticated,
+    meta: {
+      hideHeader: true,
+      hideFooter: true,
     },
   },
 

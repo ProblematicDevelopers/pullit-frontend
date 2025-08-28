@@ -15,16 +15,159 @@
       </div>
     </div>
 
-    <!-- PDF 미리보기 컴포넌트 -->
-    <div class="pdf-preview-wrapper">
-      <ExamPDFPreview 
-        ref="pdfPreviewRef"
-        :selected-items="selectedItems"
-        @download="handleDownload"
-        @save="handleSave"
-        @update:gradeInfo="handleGradeUpdate"
-        @update:subjectInfo="handleSubjectUpdate"
-      />
+    <!-- 메인 컨텐츠 영역 -->
+    <div class="content-wrapper">
+      <!-- 왼쪽: PDF 미리보기 -->
+      <div class="pdf-preview-section">
+        <ExamPDFPreview 
+          ref="pdfPreviewRef"
+          :selected-items="selectedItems"
+          @download="handleDownload"
+          @save="handleSave"
+          @update:gradeInfo="handleGradeUpdate"
+          @update:subjectInfo="handleSubjectUpdate"
+        />
+      </div>
+
+      <!-- 오른쪽: 시험 설정 -->
+      <div class="exam-settings-section">
+        <div class="settings-card">
+          <h3 class="settings-title">시험 설정</h3>
+          
+          <!-- 공개 범위 설정 -->
+          <div class="setting-group">
+            <label class="setting-label">공개 범위</label>
+            <div class="radio-group">
+              <label class="radio-option">
+                <input 
+                  type="radio" 
+                  v-model="examSettings.visibility" 
+                  value="PRIVATE"
+                />
+                <span class="radio-label">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M12 2L2 7V11C2 16.55 6.84 21.73 12 23C17.16 21.73 22 16.55 22 11V7L12 2Z" 
+                          stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  비공개
+                  <small>나만 볼 수 있음</small>
+                </span>
+              </label>
+              
+              <label class="radio-option">
+                <input 
+                  type="radio" 
+                  v-model="examSettings.visibility" 
+                  value="PUBLIC"
+                />
+                <span class="radio-label">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="2"/>
+                    <path d="M12 2C14.5 5 14.5 9 12 12C9.5 15 9.5 19 12 22" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  공개
+                  <small>모든 사용자가 볼 수 있음</small>
+                </span>
+              </label>
+              
+              <label class="radio-option">
+                <input 
+                  type="radio" 
+                  v-model="examSettings.visibility" 
+                  value="CLASS_ONLY"
+                />
+                <span class="radio-label">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M17 21V19C17 17.8954 16.1046 17 15 17H9C7.89543 17 7 17.8954 7 19V21" 
+                          stroke="currentColor" stroke-width="2"/>
+                    <circle cx="12" cy="11" r="3" stroke="currentColor" stroke-width="2"/>
+                  </svg>
+                  클래스 전용
+                  <small>특정 클래스만 접근</small>
+                </span>
+              </label>
+            </div>
+          </div>
+
+          <!-- 클래스 선택 (CLASS_ONLY일 때만 표시) -->
+          <div class="setting-group" v-if="examSettings.visibility === 'CLASS_ONLY'">
+            <label class="setting-label">클래스 선택</label>
+            <select v-model="examSettings.classId" class="setting-input">
+              <option :value="null">클래스를 선택하세요</option>
+              <option v-for="cls in availableClasses" :key="cls.id" :value="cls.id">
+                {{ cls.name }}
+              </option>
+            </select>
+          </div>
+
+          <!-- 시험 날짜 설정 -->
+          <div class="setting-group">
+            <label class="setting-label">시험 예정일</label>
+            <input 
+              type="date" 
+              v-model="examSettings.examDate"
+              class="setting-input"
+              :min="todayDate"
+            />
+          </div>
+
+          <!-- 시간 제한 설정 -->
+          <div class="setting-group">
+            <label class="setting-label">제한 시간 (분)</label>
+            <div class="time-input-wrapper">
+              <input 
+                type="number" 
+                v-model.number="examSettings.timeLimit"
+                class="setting-input"
+                min="10"
+                max="180"
+                step="5"
+              />
+              <span class="time-suffix">분</span>
+            </div>
+            <div class="time-presets">
+              <button 
+                v-for="time in [30, 50, 70, 90]" 
+                :key="time"
+                @click="examSettings.timeLimit = time"
+                :class="['preset-btn', { active: examSettings.timeLimit === time }]"
+              >
+                {{ time }}분
+              </button>
+            </div>
+          </div>
+
+          <!-- 설명 추가 -->
+          <div class="setting-group">
+            <label class="setting-label">시험 설명 (선택)</label>
+            <textarea 
+              v-model="examSettings.description"
+              class="setting-textarea"
+              placeholder="이 시험에 대한 설명을 입력하세요..."
+              rows="3"
+            />
+          </div>
+
+          <!-- 추가 옵션 -->
+          <div class="setting-group">
+            <label class="checkbox-option">
+              <input 
+                type="checkbox" 
+                v-model="examSettings.shuffleQuestions"
+              />
+              <span>문제 순서 섞기</span>
+            </label>
+            
+            <label class="checkbox-option">
+              <input 
+                type="checkbox" 
+                v-model="examSettings.showAnswerAfterSubmit"
+              />
+              <span>제출 후 정답 공개</span>
+            </label>
+          </div>
+        </div>
+      </div>
     </div>
 
     <!-- 하단 액션 버튼 -->
@@ -75,6 +218,29 @@ const emit = defineEmits(['back', 'complete'])
 const isSaving = ref(false)
 const examSavedId = ref(null)
 const pdfPreviewRef = ref(null)
+
+// 시험 설정 상태
+const examSettings = ref({
+  visibility: 'PRIVATE',  // PRIVATE, PUBLIC, CLASS_ONLY
+  classId: null,
+  examDate: null,
+  timeLimit: 50,  // 기본 50분
+  description: '',
+  shuffleQuestions: false,
+  showAnswerAfterSubmit: false
+})
+
+// 사용 가능한 클래스 목록 (실제로는 API에서 가져와야 함)
+const availableClasses = ref([
+  { id: 1, name: '중2 A반' },
+  { id: 2, name: '중2 B반' },
+  { id: 3, name: '중3 수학 심화반' }
+])
+
+// 오늘 날짜 (최소 날짜 설정용)
+const todayDate = computed(() => {
+  return new Date().toISOString().split('T')[0]
+})
 
 // Stores
 const testBankStore = useTestBankStore()
@@ -199,24 +365,31 @@ const saveExamToDatabase = async () => {
     // 시험지 저장 데이터 준비
     const examData = {
       // 기본 정보
-      examName: examInfo.title || examInfo.examName || '2024년 시험지',
+      examName: examInfo.title || examInfo.examName || `${new Date().getFullYear()}년 ${examInfo.gradeName || '중2'} ${examInfo.areaName || '수학'} 시험지`,
       gradeCode: examInfo.gradeCode || '08',
       gradeName: examInfo.gradeName || '중2',
       termCode: examInfo.termCode || '1',
       termName: examInfo.termName || '1학기',
-      areaCode: examInfo.areaCode || examInfo.subjectCode,
+      areaCode: examInfo.areaCode || examInfo.subjectCode || 'MAT',
       areaName: examInfo.areaName || examInfo.subject || '수학',
       examType: 'TESTWIZARD',
       
-      // 추가 정보
-      timeLimit: 50, // 기본 50분
-      examDate: null, // 필요시 설정
-      description: `${examInfo.gradeName} ${examInfo.areaName} 시험지`,
+      // 시험 설정 (사용자가 설정한 값 사용)
+      visibility: examSettings.value.visibility,
+      classId: examSettings.value.classId,
+      timeLimit: examSettings.value.timeLimit,
+      examDate: examSettings.value.examDate,
+      description: examSettings.value.description || 
+                   `${examInfo.gradeName || '중2'} ${examInfo.areaName || '수학'} ${examInfo.termName || '1학기'} 시험지`,
+      
+      // 추가 옵션
+      shuffleQuestions: examSettings.value.shuffleQuestions,
+      showAnswerAfterSubmit: examSettings.value.showAnswerAfterSubmit,
       
       // 문항 리스트
       items: selectedItems.value.map((item, index) => ({
         itemId: item.itemId || item.id,
-        subjectId: item.subjectId,
+        subjectId: item.subjectId || null,
         itemOrder: index + 1,
         points: item.points || 5
       }))
@@ -240,19 +413,43 @@ const saveExamToDatabase = async () => {
     console.log('시험지 및 PDF 저장 성공:', response.data)
     examSavedId.value = response.data.id
     
-    // 성공 메시지
-    alert(`시험지가 성공적으로 저장되었습니다. (ID: ${response.data.id})`)
+    // 성공 메시지 (더 친화적으로)
+    const successMessage = pdfBlob 
+      ? '시험지가 PDF와 함께 성공적으로 저장되었습니다!' 
+      : '시험지가 성공적으로 저장되었습니다!'
+    alert(successMessage)
     
-    // store에 저장된 시험지 ID 저장
+    // store에 저장된 시험지 ID와 URL 저장
     testBankStore.setExamInfo({
       ...testBankStore.examInfo,
       savedExamId: response.data.id,
-      pdfUrl: response.data.pdfUrl
+      pdfUrl: response.data.pdfUrl || null,
+      savedAt: new Date().toISOString()
     })
     
   } catch (error) {
     console.error('시험지 저장 실패:', error)
-    alert('시험지 저장 중 오류가 발생했습니다: ' + (error.response?.data?.message || error.message))
+    
+    // 상세한 에러 메시지 처리
+    let errorMessage = '시험지 저장 중 오류가 발생했습니다.'
+    
+    if (error.response) {
+      // 서버 응답 에러
+      if (error.response.status === 413) {
+        errorMessage = 'PDF 파일이 너무 큽니다. 파일 크기를 줄여주세요.'
+      } else if (error.response.status === 400) {
+        errorMessage = error.response.data?.message || '요청 데이터가 올바르지 않습니다.'
+      } else if (error.response.status === 500) {
+        errorMessage = '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.'
+      } else {
+        errorMessage = error.response.data?.message || errorMessage
+      }
+    } else if (error.request) {
+      // 네트워크 에러
+      errorMessage = '네트워크 연결을 확인해주세요.'
+    }
+    
+    alert(errorMessage)
   } finally {
     isSaving.value = false
   }
@@ -400,19 +597,206 @@ onMounted(() => {
   cursor: not-allowed;
 }
 
-/* PDF 미리보기 래퍼 */
-.pdf-preview-wrapper {
+/* 메인 컨텐츠 레이아웃 */
+.content-wrapper {
   flex: 1;
+  display: flex;
+  gap: 1.5rem;
+  padding: 1.5rem 2rem;
+  overflow: hidden;
+}
+
+.pdf-preview-section {
+  flex: 1.5;
   overflow: hidden;
   display: flex;
   flex-direction: column;
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-/* ExamPDFPreview 컴포넌트가 차지할 공간 */
-.pdf-preview-wrapper > :deep(.exam-pdf-preview) {
-  flex: 1;
-  overflow: auto;
+.exam-settings-section {
+  width: 400px;
+  overflow-y: auto;
+  padding-right: 0.5rem;
+}
+
+/* 설정 카드 */
+.settings-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.settings-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #2c3e50;
+  margin: 0 0 1.5rem 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid #e0e6ed;
+}
+
+/* 설정 그룹 */
+.setting-group {
+  margin-bottom: 1.5rem;
+}
+
+.setting-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #606f7b;
+  margin-bottom: 0.5rem;
+}
+
+.setting-input {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #e0e6ed;
+  border-radius: 6px;
+  font-size: 0.9375rem;
+  transition: border-color 0.2s;
+}
+
+.setting-input:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+.setting-textarea {
+  width: 100%;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #e0e6ed;
+  border-radius: 6px;
+  font-size: 0.9375rem;
+  resize: vertical;
+  transition: border-color 0.2s;
+}
+
+.setting-textarea:focus {
+  outline: none;
+  border-color: #2563eb;
+}
+
+/* 라디오 그룹 */
+.radio-group {
   display: flex;
   flex-direction: column;
+  gap: 0.75rem;
+}
+
+.radio-option {
+  display: flex;
+  align-items: center;
+  padding: 0.75rem;
+  border: 1px solid #e0e6ed;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.radio-option:hover {
+  background: #f8fafc;
+  border-color: #cbd5e0;
+}
+
+.radio-option:has(input:checked) {
+  background: #eff6ff;
+  border-color: #2563eb;
+}
+
+.radio-option input[type="radio"] {
+  margin-right: 0.75rem;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex: 1;
+}
+
+.radio-label svg {
+  color: #606f7b;
+}
+
+.radio-label small {
+  display: block;
+  margin-left: auto;
+  font-size: 0.75rem;
+  color: #a0aec0;
+}
+
+/* 시간 입력 */
+.time-input-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.time-suffix {
+  color: #606f7b;
+  font-size: 0.875rem;
+}
+
+.time-presets {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.preset-btn {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #e0e6ed;
+  border-radius: 6px;
+  background: white;
+  color: #606f7b;
+  font-size: 0.875rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.preset-btn:hover {
+  background: #f8fafc;
+  border-color: #cbd5e0;
+}
+
+.preset-btn.active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
+}
+
+/* 체크박스 옵션 */
+.checkbox-option {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0;
+  cursor: pointer;
+}
+
+.checkbox-option input[type="checkbox"] {
+  margin-right: 0.5rem;
+}
+
+.checkbox-option span {
+  font-size: 0.875rem;
+  color: #4a5568;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 1200px) {
+  .content-wrapper {
+    flex-direction: column;
+  }
+  
+  .exam-settings-section {
+    width: 100%;
+    max-width: 600px;
+    margin: 0 auto;
+  }
 }
 </style>
