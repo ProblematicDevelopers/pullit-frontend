@@ -31,7 +31,7 @@ let chart = null
 const normalizeData = (exam) => {
   // 정규화 공식: (값 - 최솟값) / (최댓값 - 최솟값) * 100
   const range = exam.max - exam.min
-  
+
   if (range === 0) {
     // 모든 점수가 같을 경우
     return {
@@ -44,7 +44,7 @@ const normalizeData = (exam) => {
       userScore: 50
     }
   }
-  
+
   return {
     min: 0,  // 정규화된 최솟값은 항상 0
     q1: Math.round((exam.q1 - exam.min) / range * 100 * 100) / 100,
@@ -63,7 +63,7 @@ const createChart = () => {
   }
 
   const ctx = chartCanvas.value.getContext('2d')
-  
+
   // 데이터 변환
   const chartData = props.examData.map(exam => {
     if (props.useNormalized) {
@@ -215,17 +215,17 @@ const createChart = () => {
             },
             label: function(context) {
               const suffix = props.useNormalized ? '%' : '점'
-              
+
               // 사용자 점수 scatter plot인 경우
               if (context.dataset.label === '내 점수') {
                 return `내 점수: ${context.parsed.y}${suffix}`
               }
-              
+
               // 평균값 scatter plot인 경우
               if (context.dataset.label === '평균값') {
                 return `평균값: ${context.parsed.y}${suffix}`
               }
-              
+
               // Box plot인 경우
               const dataPoint = context.parsed
               const userScore = userScoreData[context.dataIndex]
@@ -310,7 +310,7 @@ onBeforeUnmount(() => {
 <style scoped>
 .box-plot-container {
   width: 100%;
-  height: 500px;
+  height: 400px;
   padding: 20px;
   background-color: #f8f9fa;
   border-radius: 8px;
