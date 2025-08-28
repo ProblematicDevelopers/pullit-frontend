@@ -432,11 +432,11 @@ defineExpose({
 <style scoped>
 .chart-container {
   width: 100%;
-  height: 500px;
+  height: 400px;
   position: relative;
   background: white;
   border-radius: 12px;
-  padding: 30px;
+  padding: 20px;
 
   canvas {
     max-width: 100%;
