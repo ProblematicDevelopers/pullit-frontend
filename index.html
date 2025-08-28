@@ -30,17 +30,18 @@
 
     <!-- Critical CSS for preventing MathJax FOUC -->
     <style id="mathjax-fouc-prevention">
-      /* Hide elements ONLY when they have pending math and are not yet processed */
-      [v-mathjax]:not(.mathjax-processed):not(:has(mjx-container)) {
+      /* Pre-hide math content to prevent FOUC */
+      [data-mathjax-pending="true"],
+      .mathjax-formula:not(.mathjax-processed) {
         visibility: hidden !important;
         position: relative;
         min-height: 1em;
       }
       
-      /* Show elements that are processed OR already have MathJax containers */
-      .mathjax-processed,
-      [v-mathjax]:has(mjx-container) {
+      /* Show processed elements */
+      .mathjax-processed {
         visibility: visible !important;
+        transition: visibility 0.1s ease-in-out;
       }
       
       /* MathJax containers are always visible */
@@ -57,32 +58,53 @@
         margin: 1em 0;
       }
       
-      /* Prevent layout shift */
+      /* Prevent layout shift for common containers */
       .item-html,
       .choice,
-      .question-text {
+      .choice-text,
+      .question-text,
+      .math-content {
         min-height: 1.5em;
+        position: relative;
       }
       
-      /* Loading indicator for unprocessed math content */
-      [v-mathjax][data-mathjax-pending="true"]::before {
+      /* Smooth transition when showing math */
+      .item-html mjx-container,
+      .choice mjx-container {
+        animation: fadeIn 0.2s ease-in-out;
+      }
+      
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      
+      /* Loading shimmer effect for pending math */
+      [data-mathjax-pending="true"]::before {
         content: "";
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
         bottom: 0;
-        background: linear-gradient(90deg, #f0f0f0 25%, #f8f8f8 50%, #f0f0f0 75%);
+        background: linear-gradient(90deg, #f5f5f5 25%, #fafafa 50%, #f5f5f5 75%);
         background-size: 200% 100%;
-        animation: shimmer 1.5s infinite;
+        animation: shimmer 1.2s infinite;
         visibility: visible;
         z-index: 1;
         pointer-events: none;
+        border-radius: 4px;
       }
       
       @keyframes shimmer {
         0% { background-position: 200% 0; }
         100% { background-position: -200% 0; }
+      }
+      
+      /* Hide raw LaTeX during processing */
+      .mathjax-processing {
+        color: transparent !important;
+        user-select: none !important;
       }
     </style>
 
@@ -98,6 +120,7 @@
         options: {
           skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
           processHtmlClass: 'mathjax-process',  // Only process elements with this class
+          skipStartupTypeset: false,  // 초기 typesetting 활성화
           ignoreHtmlClass: 'mathjax-ignore'     // Ignore elements with this class
         },
         startup: {

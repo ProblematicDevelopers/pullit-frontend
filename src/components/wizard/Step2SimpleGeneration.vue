@@ -69,7 +69,7 @@
                 <span>지문</span>
               </div>
               <div class="passage-content">
-                <div v-if="group.passageHtml" v-html="sanitizeHtml(group.passageHtml)" v-mathjax class="passage-text"></div>
+                <div v-if="group.passageHtml" v-html="sanitizeHtml(group.passageHtml)" class="passage-text mathjax-content" data-mathjax-pending="true"></div>
                 <div v-else-if="group.passageText" class="passage-text">{{ group.passageText }}</div>
               </div>
             </div>
@@ -89,6 +89,17 @@
                       {{ item.difficulty?.name }}
                     </span>
                     <span class="badge-type">{{ item.questionForm?.name }}</span>
+                    <button 
+                      class="btn-similar-items"
+                      @click.stop="openSimilarItemsModal(item)"
+                      title="유사 문항 조회"
+                    >
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                        <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" 
+                              stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                      </svg>
+                      유사문항
+                    </button>
                   </div>
                 </div>
                 
@@ -96,7 +107,7 @@
                 <div class="card-body">
                   <!-- 문제 내용 -->
                   <div class="question-section">
-                    <div v-if="item.questionHtml" class="item-html" v-html="sanitizeHtml(item.questionHtml)" v-mathjax></div>
+                    <div v-if="item.questionHtml" class="item-html mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
                     <div v-else-if="item.questionImageUrl" class="item-image">
                       <img 
                         :src="item.questionImageUrl" 
@@ -110,25 +121,25 @@
                   </div>
 
                   <!-- 선택지 (객관식인 경우) -->
-                  <div v-if="hasChoices(item)" class="item-choices">
+                  <div v-if="hasChoices(item)" class="item-choices mathjax-content" data-mathjax-pending="true">
                     <div v-if="item.choice1Html || item.choice1Text" class="choice">
-                      ① <span v-if="item.choice1Html" v-html="sanitizeHtml(item.choice1Html)" v-mathjax></span>
+                      ① <span v-if="item.choice1Html" v-html="sanitizeHtml(item.choice1Html)" class="choice-content"></span>
                       <span v-else>{{ item.choice1Text }}</span>
                     </div>
                     <div v-if="item.choice2Html || item.choice2Text" class="choice">
-                      ② <span v-if="item.choice2Html" v-html="sanitizeHtml(item.choice2Html)" v-mathjax></span>
+                      ② <span v-if="item.choice2Html" v-html="sanitizeHtml(item.choice2Html)" class="choice-content"></span>
                       <span v-else>{{ item.choice2Text }}</span>
                     </div>
                     <div v-if="item.choice3Html || item.choice3Text" class="choice">
-                      ③ <span v-if="item.choice3Html" v-html="sanitizeHtml(item.choice3Html)" v-mathjax></span>
+                      ③ <span v-if="item.choice3Html" v-html="sanitizeHtml(item.choice3Html)" class="choice-content"></span>
                       <span v-else>{{ item.choice3Text }}</span>
                     </div>
                     <div v-if="item.choice4Html || item.choice4Text" class="choice">
-                      ④ <span v-if="item.choice4Html" v-html="sanitizeHtml(item.choice4Html)" v-mathjax></span>
+                      ④ <span v-if="item.choice4Html" v-html="sanitizeHtml(item.choice4Html)" class="choice-content"></span>
                       <span v-else>{{ item.choice4Text }}</span>
                     </div>
                     <div v-if="item.choice5Html || item.choice5Text" class="choice">
-                      ⑤ <span v-if="item.choice5Html" v-html="sanitizeHtml(item.choice5Html)" v-mathjax></span>
+                      ⑤ <span v-if="item.choice5Html" v-html="sanitizeHtml(item.choice5Html)" class="choice-content"></span>
                       <span v-else>{{ item.choice5Text }}</span>
                     </div>
                   </div>
@@ -153,6 +164,17 @@
                   {{ item.difficulty?.name }}
                 </span>
                 <span class="badge-type">{{ item.questionForm?.name }}</span>
+                <button 
+                  class="btn-similar-items"
+                  @click.stop="openSimilarItemsModal(item)"
+                  title="유사 문항 조회"
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                    <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" 
+                          stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                  </svg>
+                  유사문항
+                </button>
               </div>
             </div>
 
@@ -160,7 +182,7 @@
             <div class="card-body">
               <!-- 문제 내용 -->
               <div class="question-section">
-                <div v-if="item.questionHtml" class="item-html" v-html="sanitizeHtml(item.questionHtml)"></div>
+                <div v-if="item.questionHtml" class="item-html mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
                 <div v-else-if="item.questionImageUrl" class="item-image">
                   <img 
                     :src="item.questionImageUrl" 
@@ -174,25 +196,25 @@
               </div>
 
               <!-- 선택지 (객관식인 경우) -->
-              <div v-if="hasChoices(item)" class="item-choices">
+              <div v-if="hasChoices(item)" class="item-choices mathjax-content" data-mathjax-pending="true">
                 <div v-if="item.choice1Html || item.choice1Text" class="choice">
-                  ① <span v-if="item.choice1Html" v-html="sanitizeHtml(item.choice1Html)" v-mathjax></span>
+                  ① <span v-if="item.choice1Html" v-html="sanitizeHtml(item.choice1Html)" class="choice-content"></span>
                   <span v-else>{{ item.choice1Text }}</span>
                 </div>
                 <div v-if="item.choice2Html || item.choice2Text" class="choice">
-                  ② <span v-if="item.choice2Html" v-html="sanitizeHtml(item.choice2Html)" v-mathjax></span>
+                  ② <span v-if="item.choice2Html" v-html="sanitizeHtml(item.choice2Html)" class="choice-content"></span>
                   <span v-else>{{ item.choice2Text }}</span>
                 </div>
                 <div v-if="item.choice3Html || item.choice3Text" class="choice">
-                  ③ <span v-if="item.choice3Html" v-html="sanitizeHtml(item.choice3Html)" v-mathjax></span>
+                  ③ <span v-if="item.choice3Html" v-html="sanitizeHtml(item.choice3Html)" class="choice-content"></span>
                   <span v-else>{{ item.choice3Text }}</span>
                 </div>
                 <div v-if="item.choice4Html || item.choice4Text" class="choice">
-                  ④ <span v-if="item.choice4Html" v-html="sanitizeHtml(item.choice4Html)" v-mathjax></span>
+                  ④ <span v-if="item.choice4Html" v-html="sanitizeHtml(item.choice4Html)" class="choice-content"></span>
                   <span v-else>{{ item.choice4Text }}</span>
                 </div>
                 <div v-if="item.choice5Html || item.choice5Text" class="choice">
-                  ⑤ <span v-if="item.choice5Html" v-html="sanitizeHtml(item.choice5Html)" v-mathjax></span>
+                  ⑤ <span v-if="item.choice5Html" v-html="sanitizeHtml(item.choice5Html)" class="choice-content"></span>
                   <span v-else>{{ item.choice5Text }}</span>
                 </div>
               </div>
@@ -479,6 +501,13 @@
       </button>
     </footer>
     </template>
+    
+    <!-- 유사 문항 조회 모달 -->
+    <SimilarItemsModal
+      v-model="showSimilarItemsModal"
+      :item="selectedItemForSimilar"
+      @add-items="handleAddSimilarItems"
+    />
   </div>
 </template>
 
@@ -487,7 +516,10 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import itemApiService from '@/services/itemApi'
 import chapterApi from '@/services/chapterApi'
 import ChapterTreeSelector from './ChapterTreeSelector.vue'
+import SimilarItemsModal from '@/components/common/SimilarItemsModal.vue'
 import { useMathJax } from '@/composables/useMathJax'
+import { renderMathJaxSmartHybrid } from '@/utils/mathjax-hybrid'
+import DOMPurify from 'dompurify'
 
 // Props & Emits
 const props = defineProps({
@@ -523,12 +555,16 @@ const generatedItems = ref([])
 const selectionMetadata = ref(null)
 const selectionReport = ref(null)
 
-// MathJax 컴포저블 사용 - Vue 재렌더링 안전 설정
+// 유사 문항 모달 관련 상태
+const showSimilarItemsModal = ref(false)
+const selectedItemForSimilar = ref(null)
+
+// MathJax 컴포저블 사용 - FOUC 방지 설정
 const { render: renderMath } = useMathJax({
-  immediate: false,
-  watchContent: false,  // Vue 재렌더링과 충돌 방지
-  hideBeforeRender: false,  // 숨기지 않음
-  clearFirst: false,  // 중요: 기존 MathJax 렌더링 유지
+  immediate: false,  // 수동 렌더링
+  hideBeforeRender: true,  // FOUC 방지
+  clearFirst: false,  // 기존 렌더링 유지
+  waitForContent: true,  // 컨텐츠 준비 대기
   debounceDelay: 100
 })
 
@@ -629,16 +665,41 @@ const hasPassageGroups = computed(() => {
 })
 
 // Methods
-// HTML 정리 함수 (수식 이미지 제거)
+// HTML 정리 함수 - 도수분포표와 지문 콘텐츠 보존
 const sanitizeHtml = (html) => {
   if (!html) return ''
   
-  // 수식 이미지 제거 
-  let cleaned = html
-    .replace(/<img[^>]*>/gi, '') // 모든 이미지 제거
-    .replace(/<script(?! type="math\/tex)[^>]*>[\s\S]*?<\/script>/gi, '') // 위험한 스크립트 제거
-    .replace(/on\w+="[^"]*"/g, '') // 이벤트 핸들러 제거
-    .replace(/on\w+='[^']*'/g, '')
+  // DOMPurify를 사용한 안전한 HTML 정화
+  // LaTeX 수식, MathJax, 테이블, 이미지 모두 보존
+  const cleaned = DOMPurify.sanitize(html, {
+    ADD_TAGS: [
+      // MathJax 관련 태그
+      'math', 'mrow', 'mi', 'mn', 'mo', 'mfrac', 'msup', 'msub', 'munder', 'mover', 'msqrt', 'mroot',
+      // HTML 테이블 태그 (도수분포표용)
+      'table', 'thead', 'tbody', 'tfoot', 'tr', 'th', 'td', 'caption', 'colgroup', 'col',
+      // 기본 HTML 태그
+      'span', 'div', 'p', 'br', 'hr', 'strong', 'em', 'u', 'sub', 'sup',
+      // 리스트 태그
+      'ul', 'ol', 'li'
+    ],
+    ADD_ATTR: [
+      // MathJax 속성
+      'mathvariant', 'display', 'data-latex', 'data-math',
+      // 일반 속성
+      'class', 'style', 'id',
+      // 테이블 속성
+      'colspan', 'rowspan', 'border', 'cellpadding', 'cellspacing', 'align', 'valign',
+      // 이미지 속성
+      'src', 'alt', 'width', 'height', 'title'
+    ],
+    KEEP_CONTENT: true,
+    ALLOW_DATA_ATTR: true,
+    // script 태그만 제거, img는 허용 (도수분포표가 이미지일 수 있음)
+    FORBID_TAGS: ['script', 'iframe', 'object', 'embed', 'applet'],
+    FORCE_BODY: false,
+    // 안전한 이미지 URL만 허용
+    ALLOWED_URI_REGEXP: /^(?:(?:https?|data|blob):|[^:]+$)/i
+  })
   
   return cleaned
 }
@@ -749,6 +810,30 @@ const handleBack = () => {
   emit('back')
 }
 
+// 유사 문항 모달 메서드
+const openSimilarItemsModal = (item) => {
+  console.log('Opening similar items modal for:', item)
+  selectedItemForSimilar.value = item
+  showSimilarItemsModal.value = true
+}
+
+const handleAddSimilarItems = (items) => {
+  console.log('Adding similar items:', items)
+  // 선택된 유사 문항들을 generatedItems에 추가
+  if (items && items.length > 0) {
+    // 중복 체크 후 추가
+    const existingItemIds = generatedItems.value.map(item => item.itemId || item.item_id)
+    const newItems = items.filter(item => !existingItemIds.includes(item.itemId || item.item_id))
+    
+    if (newItems.length > 0) {
+      generatedItems.value.push(...newItems)
+      console.log(`Added ${newItems.length} similar items to the list`)
+    } else {
+      console.log('All selected items already exist in the list')
+    }
+  }
+}
+
 // 미리보기 관련 메서드
 const backToSettings = () => {
   showPreview.value = false
@@ -847,9 +932,15 @@ const handleGenerate = async () => {
       // 미리보기 화면으로 전환
       showPreview.value = true
       
-      // MathJax 렌더링
+      // MathJax 스마트 하이브리드 렌더링
       await nextTick()
-      await renderMath()
+      requestAnimationFrame(async () => {
+        const container = document.querySelector('.preview-content') || document.body
+        await renderMathJaxSmartHybrid(container, {
+          hideBeforeRender: true,
+          clearFirst: false
+        })
+      })
     } else {
       console.warn('Smart Random Selection 결과 없음:', result)
       
@@ -873,7 +964,13 @@ const handleGenerate = async () => {
 watch(showPreview, async (newVal) => {
   if (newVal) {
     await nextTick()
-    await renderMath()
+    requestAnimationFrame(async () => {
+      const container = document.querySelector('.preview-content') || document.body
+      await renderMathJaxSmartHybrid(container, {
+        hideBeforeRender: true,
+        clearFirst: false
+      })
+    })
   }
 })
 
@@ -881,7 +978,13 @@ watch(showPreview, async (newVal) => {
 watch(generatedItems, async () => {
   if (showPreview.value && generatedItems.value.length > 0) {
     await nextTick()
-    await renderMath()
+    requestAnimationFrame(async () => {
+      const container = document.querySelector('.preview-content') || document.body
+      await renderMathJaxSmartHybrid(container, {
+        hideBeforeRender: true,
+        clearFirst: false
+      })
+    })
   }
 }, { deep: true })
 
@@ -1475,8 +1578,11 @@ onMounted(async () => {
 }
 
 .preview-mode .item-image img {
-  max-width: 100%;
+  max-width: 400px;  /* 미리보기 모드에서도 크기 제한 */
+  max-height: 300px;
+  width: auto;
   height: auto;
+  object-fit: contain;
   border-radius: 4px;
   cursor: pointer;
 }
@@ -1782,6 +1888,7 @@ onMounted(async () => {
 .item-badges {
   display: flex;
   gap: 8px;
+  align-items: center;
 }
 
 .badge {
@@ -1789,6 +1896,38 @@ onMounted(async () => {
   border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
+}
+
+/* 유사 문항 버튼 */
+.btn-similar-items {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 10px;
+  background: white;
+  border: 1px solid #e5e7eb;
+  border-radius: 6px;
+  color: #374151;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-left: 8px;
+}
+
+.btn-similar-items:hover {
+  background: #f9fafb;
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.btn-similar-items:active {
+  transform: scale(0.95);
+}
+
+.btn-similar-items svg {
+  width: 14px;
+  height: 14px;
 }
 
 .badge.difficulty {
@@ -1882,5 +2021,106 @@ onMounted(async () => {
 .chapter-info {
   font-size: 12px;
   color: #9CA3AF;
+}
+
+/* MathJax 렌더링 스타일 */
+.mathjax-content {
+  /* MathJax 렌더링 전 깜빡임 방지 */
+  min-height: 1em;
+}
+
+/* MathJax 렌더링 중 숨김 */
+.mathjax-content[data-mathjax-pending="true"] {
+  visibility: hidden !important;
+}
+
+/* MathJax 렌더링 완료 후 표시 */
+.mathjax-content.mathjax-rendered {
+  visibility: visible !important;
+}
+
+/* MathJax 요소 스타일 */
+.mathjax-content mjx-container {
+  display: inline-block !important;
+  margin: 0.2em 0;
+}
+
+/* MathJax 표 스타일 (도수분포표 등) */
+.mathjax-content mjx-container[display="true"] {
+  display: block !important;
+  text-align: center;
+  margin: 1em 0;
+}
+
+/* MathJax 표 내부 정렬 */
+.mathjax-content mjx-mtable {
+  margin: 0 auto;
+}
+
+/* 선택지 내 수식 정렬 */
+.choice-content mjx-container {
+  vertical-align: middle;
+}
+
+/* HTML 테이블 스타일 (도수분포표 등) */
+.mathjax-content table,
+.passage-text table,
+.item-html table {
+  margin: 1em auto;
+  border-collapse: collapse;
+  border: 1px solid #ddd;
+}
+
+.mathjax-content th,
+.mathjax-content td,
+.passage-text th,
+.passage-text td,
+.item-html th,
+.item-html td {
+  padding: 8px 12px;
+  border: 1px solid #ddd;
+  text-align: center;
+}
+
+.mathjax-content th,
+.passage-text th,
+.item-html th {
+  background-color: #f5f5f5;
+  font-weight: 600;
+}
+
+/* 이미지 스타일 */
+.mathjax-content img,
+.passage-text img,
+.item-html img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 1em auto;
+}
+
+/* 문제 이미지 크기 제한 */
+.item-image {
+  display: flex;
+  justify-content: center;
+  margin: 1em 0;
+}
+
+.item-image img {
+  max-width: 500px;  /* 최대 너비 500px로 제한 */
+  max-height: 400px; /* 최대 높이 400px로 제한 */
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  border: 1px solid #e5e7eb;
+  border-radius: 8px;
+  padding: 8px;
+  background: #f9fafb;
+}
+
+/* 지문 영역의 문제 이미지는 더 작게 */
+.passage-items .item-image img {
+  max-width: 350px;
+  max-height: 250px;
 }
 </style>

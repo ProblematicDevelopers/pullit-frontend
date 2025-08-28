@@ -435,6 +435,24 @@
                   </div>
                 </div>
 
+                <!-- 선생님인 경우 과목 선택 -->
+                <div class="mb-3" v-if="signupForm.userType === 'teacher'">
+                  <label for="subject" class="form-label fw-bold">담당 과목</label>
+                  <select 
+                    class="form-select" 
+                    id="subject"
+                    v-model="signupForm.subject"
+                    required
+                  >
+                    <option value="">과목을 선택하세요</option>
+                    <option value="MA">수학</option>
+                    <option value="KO">국어</option>
+                    <option value="EN">영어</option>
+                    <option value="SC">과학</option>
+                    <option value="SO">사회</option>
+                  </select>
+                </div>
+
                 <!-- 학교 검색 -->
                 <div class="mb-4">
                   <label for="school" class="form-label fw-bold">학교 정보</label>
@@ -703,6 +721,7 @@ const signupForm = ref({
   phoneNumber: '',
   birthDate: '',
   school: '',
+  subject: '',  // 과목 추가
   fullName: '',
   socialProvider: '',
   socialProviderId: '',
@@ -1234,6 +1253,35 @@ const handleSignup = async () => {
       marketingAgree: agreements.value.marketing,
       socialProvider: signupForm.value.socialProvider,
       socialProviderId: signupForm.value.socialProviderId
+    }
+
+    // Teacher인 경우 teacherInfo 추가
+    if (signupForm.value.userType === 'teacher') {
+      // 과목 선택값을 areaCode와 areaName으로 매핑 (기존 시스템과 동일한 코드 사용)
+      const subjectMapping = {
+        'MA': { code: 'MA', name: '수학' },
+        'KO': { code: 'KO', name: '국어' },
+        'EN': { code: 'EN', name: '영어' },
+        'SC': { code: 'SC', name: '과학' },
+        'SO': { code: 'SO', name: '사회' }
+      }
+      
+      const selectedSubject = subjectMapping[signupForm.value.subject] || { code: '', name: '' }
+      
+      signupData.teacherInfo = {
+        schoolName: signupForm.value.school, // 학교명 또는 ID
+        areaCode: selectedSubject.code, // 과목 코드
+        areaName: selectedSubject.name // 과목명
+      }
+    }
+    
+    // Student인 경우 studentInfo 추가
+    if (signupForm.value.userType === 'student') {
+      signupData.studentInfo = {
+        classGroupId: null, // 추후 구현
+        studentNo: null, // 추후 구현
+        grade: null // 추후 구현
+      }
     }
 
     console.log('회원가입 데이터:', signupData)
