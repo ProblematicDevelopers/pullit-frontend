@@ -1,6 +1,8 @@
 <template>
   <div class="education-platform">
     <!-- Hero Section -->
+     <!-- CTA Section -->
+
     <section class="hero-section">
       <div class="hero-background">
         <div class="hero-pattern"></div>
@@ -10,7 +12,7 @@
           <div class="floating-element element-3"></div>
         </div>
       </div>
-      
+
       <div class="container">
         <div class="hero-content">
           <div class="hero-text fade-in">
@@ -18,9 +20,9 @@
               <svg viewBox="0 0 24 24" fill="currentColor" class="badge-icon">
                 <path d="M12 2L3.09 8.26L12 14L20.91 8.26L12 2M21 16.25L12 22.5L3 16.25V10.75L12 17L21 10.75V16.25Z"/>
               </svg>
-              대한민국 1위 교육 플랫폼
+              스마트 교육 플랫폼
             </div>
-            
+
             <h1 class="hero-title" v-if="userType === 'teacher'">
               중학교를 위한<br>
               <span class="highlight">스마트 문제은행 시스템</span>
@@ -29,16 +31,16 @@
               나만의 학습 파트너<br>
               <span class="highlight">스마트 CBT 시험 시스템</span>
             </h1>
-            
+
             <p class="hero-subtitle" v-if="userType === 'teacher'">
-              AI 기반 문제 분석과 맞춤형 시험지 생성으로<br>
+              문제 분석과 맞춤형 시험지 생성으로<br>
               교육의 질을 한 단계 높여보세요
             </p>
             <p class="hero-subtitle" v-else>
               온라인 시험 응시와 실시간 성적 분석으로<br>
               효과적인 학습 관리를 시작하세요
             </p>
-            
+
             <div class="hero-actions">
               <button class="cta-button primary" @click="showRoleSelection">
                 <svg viewBox="0 0 24 24" fill="currentColor" class="cta-icon">
@@ -53,25 +55,15 @@
                 둘러보기
               </button>
             </div>
-            
+
             <div class="hero-stats">
               <div class="stat-item">
-                <div class="stat-number">15,247</div>
+                <div class="stat-number">30,000+</div>
                 <div class="stat-label">등록 문제</div>
-              </div>
-              <div class="stat-separator"></div>
-              <div class="stat-item">
-                <div class="stat-number">523</div>
-                <div class="stat-label">참여 학교</div>
-              </div>
-              <div class="stat-separator"></div>
-              <div class="stat-item">
-                <div class="stat-number">48,592</div>
-                <div class="stat-label">활성 사용자</div>
               </div>
             </div>
           </div>
-          
+
           <div class="hero-visual slide-up">
             <div class="dashboard-preview">
               <div class="preview-header">
@@ -84,8 +76,9 @@
               </div>
               <div class="preview-content">
                 <div class="preview-sidebar">
-                  <div class="sidebar-item active">문제은행</div>
-                  <div class="sidebar-item">시험관리</div>
+                  <div class="sidebar-item active">학급관리</div>
+                  <div class="sidebar-item">문제등록</div>
+                  <div class="sidebar-item">CBT</div>
                   <div class="sidebar-item">성적분석</div>
                 </div>
                 <div class="preview-main">
@@ -116,7 +109,7 @@
         <div class="role-selection">
           <h3 class="role-title">사용자 유형을 선택해주세요</h3>
           <div class="role-cards">
-            <button 
+            <button
               class="role-card teacher-card"
               :class="{ active: selectedRole === 'teacher' }"
               @click="selectRole('teacher')"
@@ -130,15 +123,15 @@
                 <h4 class="role-name">선생님</h4>
                 <p class="role-desc">문제 출제 및 시험 관리</p>
                 <div class="role-features">
-                  <span>• 시험지 생성</span>
-                  <span>• 문제은행 관리</span>
-                  <span>• 성적 분석</span>
                   <span>• 학급 관리</span>
+                  <span>• 문제 등록</span>
+                  <span>• 시험지 생성</span>
+                  <span>• 성적 분석</span>
                 </div>
               </div>
             </button>
-            
-            <button 
+
+            <button
               class="role-card student-card"
               :class="{ active: selectedRole === 'student' }"
               @click="selectRole('student')"
@@ -152,15 +145,15 @@
                 <h4 class="role-name">학생</h4>
                 <p class="role-desc">학습 및 시험 응시</p>
                 <div class="role-features">
-                  <span>• 맞춤형 학습</span>
-                  <span>• 모의고사 응시</span>
-                  <span>• 학습 진도 확인</span>
+                  <span>• CBT 시험 응시</span>
+                  <span>• 실시간 시험</span>
                   <span>• 성적 분석</span>
+                  <span>• 학습 진도 확인</span>
                 </div>
               </div>
             </button>
           </div>
-          <button 
+          <button
             class="get-started-btn"
             :disabled="!selectedRole"
             @click="startWithRole"
@@ -175,320 +168,7 @@
     </div>
 
     <!-- Highlighted Features Section -->
-    <section class="features-section" id="features">
-      <div class="container">
-        <div class="section-header slide-up">
-          <div class="section-badge">
-            <svg viewBox="0 0 24 24" fill="currentColor" class="badge-icon">
-              <path d="M12 2L1 9L12 15L21 9.18V17H23V9L12 3M5 13.18V17.18L12 21L19 17.18V13.18L12 17L5 13.18Z"/>
-            </svg>
-            FEATURES
-          </div>
-          <h2 class="section-title">
-            교육 현장을 위한<br>
-            <span class="text-primary">전문적인 솔루션</span>
-          </h2>
-          <p class="section-subtitle">
-            선생님과 학생 모두를 위한 강력한 기능들로<br>
-            교육의 효율성을 극대화하세요
-          </p>
-        </div>
-        
-        <!-- Main Feature Tabs -->
-        <div class="feature-tabs slide-up">
-          <div class="tab-buttons">
-            <button 
-              class="tab-button" 
-              :class="{ active: activeTab === 'teacher' }"
-              @click="setActiveTab('teacher')"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" class="tab-icon">
-                <path d="M12 3L1 9L12 15L21 9.18V17H23V9L12 3M5 13.18V17.18L12 21L19 17.18V13.18L12 17L5 13.18Z"/>
-              </svg>
-              선생님 기능
-            </button>
-            <button 
-              class="tab-button" 
-              :class="{ active: activeTab === 'student' }"
-              @click="setActiveTab('student')"
-            >
-              <svg viewBox="0 0 24 24" fill="currentColor" class="tab-icon">
-                <path d="M12 14Q10.35 14 9.175 12.825Q8 11.65 8 10Q8 8.35 9.175 7.175Q10.35 6 12 6Q13.65 6 14.825 7.175Q16 8.35 16 10Q16 11.65 14.825 12.825Q13.65 14 12 14ZM6 22V19.5Q6 18.275 6.688 17.388Q7.375 16.5 8.4 16.1Q10.55 15.25 12.75 15.25Q14.95 15.25 17.1 16.1Q18.125 16.5 18.813 17.388Q19.5 18.275 19.5 19.5V22Z"/>
-              </svg>
-              학생 기능
-            </button>
-          </div>
-          
-          <!-- Teacher Features -->
-          <div class="tab-content" v-if="activeTab === 'teacher'">
-            <div class="feature-grid">
-              <div class="feature-card primary" @click="navigateTo('/test-bank')">
-                <div class="feature-header">
-                  <div class="feature-icon">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2M18 20H6V4H13V9H18V20Z"/>
-                    </svg>
-                  </div>
-                  <div class="feature-badge new">NEW</div>
-                </div>
-                <h3 class="feature-title">AI 문제은행 시스템</h3>
-                <p class="feature-description">
-                  15,000+ 검증된 문제를 AI가 스마트하게 분류하고 관리합니다. 
-                  과목별, 단원별, 난이도별 체계적인 분류로 원하는 문제를 쉽게 찾을 수 있습니다.
-                </p>
-                <div class="feature-highlights">
-                  <div class="highlight-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
-                    </svg>
-                    AI 기반 문제 분류
-                  </div>
-                  <div class="highlight-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
-                    </svg>
-                    23개 과목 지원
-                  </div>
-                  <div class="highlight-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
-                    </svg>
-                    실시간 검색 & 필터링
-                  </div>
-                </div>
-              </div>
-
-              <div class="feature-card" @click="navigateTo('/exam-management')">
-                <div class="feature-header">
-                  <div class="feature-icon">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M19 3H18V1H16V3H8V1H6V3H5C3.89 3 3.01 3.9 3.01 5L3 19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3M19 19H5V8H19V19M7 10H12V15H7"/>
-                    </svg>
-                  </div>
-                  <div class="feature-badge hot">HOT</div>
-                </div>
-                <h3 class="feature-title">스마트 시험지 생성</h3>
-                <p class="feature-description">
-                  원클릭으로 완벽한 시험지를 생성하세요. AI가 난이도를 자동 조절하고 
-                  문제 유형을 균형있게 배치해 최적의 시험지를 만들어 드립니다.
-                </p>
-                <div class="feature-highlights">
-                  <div class="highlight-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
-                    </svg>
-                    자동 난이도 조절
-                  </div>
-                  <div class="highlight-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
-                    </svg>
-                    다양한 출제 템플릿
-                  </div>
-                </div>
-              </div>
-
-              <div class="feature-card" @click="navigateTo('/analytics')">
-                <div class="feature-header">
-                  <div class="feature-icon">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M16 6L18.29 8.29L13.41 13.17L9.41 9.17L2 16.59L3.41 18L9.41 12L13.41 16L19.71 9.71L22 12V6"/>
-                    </svg>
-                  </div>
-                </div>
-                <h3 class="feature-title">심화 성적 분석</h3>
-                <p class="feature-description">
-                  학생별, 문항별, 단원별 세밀한 분석 데이터를 제공합니다. 
-                  개별 맞춤 지도와 효과적인 교육 전략을 수립하세요.
-                </p>
-                <div class="feature-highlights">
-                  <div class="highlight-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
-                    </svg>
-                    실시간 성적 분석
-                  </div>
-                  <div class="highlight-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
-                    </svg>
-                    개별 리포트 생성
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          
-          <!-- Student Features -->
-          <div class="tab-content" v-if="activeTab === 'student'">
-            <div class="feature-grid">
-              <div class="feature-card primary" @click="navigateTo('/student/practice')">
-                <div class="feature-header">
-                  <div class="feature-icon">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 9V7L15 1L13.5 2.5L16.17 5.17L10.5 10.84L10.74 11.06C10.86 11.22 11 11.46 11 11.75C11 12.04 10.86 12.28 10.74 12.44L7.17 16.03L7.76 16.61C8.78 17.64 10.44 17.64 11.47 16.61L16.14 11.94C16.57 11.5 17.24 11.5 17.68 11.94L21 8.64V9M2.08 18.5L4.5 20.92L13.05 12.37C13.1 12.31 13.1 12.22 13.05 12.16C13 12.11 12.91 12.11 12.86 12.16L4.31 20.71"/>
-                    </svg>
-                  </div>
-                  <div class="feature-badge ai">AI</div>
-                </div>
-                <h3 class="feature-title">맞춤형 AI 학습</h3>
-                <p class="feature-description">
-                  개인의 학습 수준과 취약점을 AI가 분석하여 최적화된 문제를 추천합니다. 
-                  효율적이고 체계적인 학습이 가능합니다.
-                </p>
-                <div class="feature-highlights">
-                  <div class="highlight-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
-                    </svg>
-                    AI 기반 문제 추천
-                  </div>
-                  <div class="highlight-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
-                    </svg>
-                    약점 분석 & 보강
-                  </div>
-                  <div class="highlight-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
-                    </svg>
-                    학습 패턴 분석
-                  </div>
-                </div>
-              </div>
-
-              <div class="feature-card" @click="navigateTo('/student/mock-exam')">
-                <div class="feature-header">
-                  <div class="feature-icon">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M12 2L3 7L12 12L21 7L12 2M3 17L12 22L21 17M3 12L12 17L21 12"/>
-                    </svg>
-                  </div>
-                  <div class="feature-badge popular">인기</div>
-                </div>
-                <h3 class="feature-title">실전 모의고사</h3>
-                <p class="feature-description">
-                  실제 시험과 동일한 환경에서 모의고사를 응시하고 실력을 정확히 진단하세요. 
-                  시간 관리 능력과 실전 감각을 기를 수 있습니다.
-                </p>
-                <div class="feature-highlights">
-                  <div class="highlight-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
-                    </svg>
-                    실시간 채점 시스템
-                  </div>
-                  <div class="highlight-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
-                    </svg>
-                    상세한 해설 제공
-                  </div>
-                </div>
-              </div>
-
-              <div class="feature-card" @click="navigateTo('/student/progress')">
-                <div class="feature-header">
-                  <div class="feature-icon">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M7.5 4A5.5 5.5 0 0 0 2 9.5C2 12 4 14 4 14S2 16 2 18.5A5.5 5.5 0 0 0 7.5 24A5.5 5.5 0 0 0 13 18.5C13 16 11 14 11 14S13 12 13 9.5A5.5 5.5 0 0 0 7.5 4M7.5 6A3.5 3.5 0 0 1 11 9.5C11 10.64 10.1 11.5 10.1 11.5S11 12.36 11 13.5S10.1 14.36 10.1 14.36S11 15.22 11 16.36S10.1 17.22 10.1 17.22S11 18.08 11 19.22A3.5 3.5 0 0 1 7.5 22.72A3.5 3.5 0 0 1 4 19.22C4 18.08 4.9 17.22 4.9 17.22S4 16.36 4 15.22S4.9 14.36 4.9 14.36S4 13.5 4 12.36S4.9 11.5 4.9 11.5S4 10.64 4 9.5A3.5 3.5 0 0 1 7.5 6Z"/>
-                    </svg>
-                  </div>
-                </div>
-                <h3 class="feature-title">학습 진도 관리</h3>
-                <p class="feature-description">
-                  체계적인 학습 계획 수립과 진도 관리로 목표를 달성하세요. 
-                  개인별 맞춤 스케줄과 성취도 추적이 가능합니다.
-                </p>
-                <div class="feature-highlights">
-                  <div class="highlight-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
-                    </svg>
-                    진도율 시각화
-                  </div>
-                  <div class="highlight-item">
-                    <svg viewBox="0 0 24 24" fill="currentColor">
-                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
-                    </svg>
-                    목표 설정 & 관리
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- Live Stats Section -->
-    <section class="stats-section">
-      <div class="container">
-        <div class="stats-wrapper">
-          <div class="stats-content">
-            <h2 class="stats-title">실시간 플랫폼 현황</h2>
-            <p class="stats-subtitle">전국 교육기관과 함께하는 PULLIT의 성장</p>
-          </div>
-          <div class="stats-grid">
-            <div class="stat-card">
-              <div class="stat-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2M18 20H6V4H13V9H18V20Z"/>
-                </svg>
-              </div>
-              <div class="stat-info">
-                <div class="stat-number">{{ animatedStats.questions.toLocaleString() }}</div>
-                <div class="stat-label">총 문제 수</div>
-                <div class="stat-change positive">+342 이번 달</div>
-              </div>
-            </div>
-            
-            <div class="stat-card">
-              <div class="stat-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M19 3H18V1H16V3H8V1H6V3H5C3.89 3 3.01 3.9 3.01 5L3 19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3M19 19H5V8H19V19M7 10H12V15H7"/>
-                </svg>
-              </div>
-              <div class="stat-info">
-                <div class="stat-number">{{ animatedStats.exams.toLocaleString() }}</div>
-                <div class="stat-label">생성된 시험지</div>
-                <div class="stat-change positive">+89 이번 주</div>
-              </div>
-            </div>
-            
-            <div class="stat-card">
-              <div class="stat-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 14Q10.35 14 9.175 12.825Q8 11.65 8 10Q8 8.35 9.175 7.175Q10.35 6 12 6Q13.65 6 14.825 7.175Q16 8.35 16 10Q16 11.65 14.825 12.825Q13.65 14 12 14ZM6 22V19.5Q6 18.275 6.688 17.388Q7.375 16.5 8.4 16.1Q10.55 15.25 12.75 15.25Q14.95 15.25 17.1 16.1Q18.125 16.5 18.813 17.388Q19.5 18.275 19.5 19.5V22Z"/>
-                </svg>
-              </div>
-              <div class="stat-info">
-                <div class="stat-number">{{ animatedStats.users.toLocaleString() }}</div>
-                <div class="stat-label">활성 사용자</div>
-                <div class="stat-change positive">+1,247 이번 달</div>
-              </div>
-            </div>
-            
-            <div class="stat-card">
-              <div class="stat-icon">
-                <svg viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M12 2L3 7L12 12L21 7L12 2M3 17L12 22L21 17M3 12L12 17L21 12"/>
-                </svg>
-              </div>
-              <div class="stat-info">
-                <div class="stat-number">{{ animatedStats.schools.toLocaleString() }}</div>
-                <div class="stat-label">참여 학교</div>
-                <div class="stat-change positive">+12 이번 달</div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </section>
-
-    <!-- CTA Section -->
-    <section class="cta-section">
+    <section class="features-section " id="features">
       <div class="container">
         <div class="cta-content">
           <div class="cta-text">
@@ -498,26 +178,234 @@
             </h2>
             <p class="cta-subtitle">
               무료 체험으로 PULLIT의 모든 기능을 사용해보세요.<br>
-              더 스마트하고 효율적인 교육환경을 만들어 드립니다.
             </p>
           </div>
-          <div class="cta-actions">
-            <button class="cta-button primary large" @click="showRoleSelection">
-              무료로 시작하기
-              <svg viewBox="0 0 24 24" fill="currentColor" class="cta-icon">
-                <path d="M8.59 16.59L13.17 12L8.59 7.41L10 6L16 12L10 18L8.59 16.59Z"/>
+        </div>
+        <!-- Main Feature Tabs -->
+        <div class="feature-tabs mt-3 ">
+          <div class="tab-buttons">
+            <button
+              class="tab-button"
+              :class="{ active: activeTab === 'teacher' }"
+              @click="setActiveTab('teacher')"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" class="tab-icon">
+                <path d="M12 3L1 9L12 15L21 9.18V17H23V9L12 3M5 13.18V17.18L12 21L19 17.18V13.18L12 17L5 13.18Z"/>
               </svg>
+              선생님 기능
             </button>
-            <button class="cta-button secondary large" @click="contactSales">
-              도입 문의하기
-              <svg viewBox="0 0 24 24" fill="currentColor" class="cta-icon">
-                <path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/>
+            <button
+              class="tab-button"
+              :class="{ active: activeTab === 'student' }"
+              @click="setActiveTab('student')"
+            >
+              <svg viewBox="0 0 24 24" fill="currentColor" class="tab-icon">
+                <path d="M12 14Q10.35 14 9.175 12.825Q8 11.65 8 10Q8 8.35 9.175 7.175Q10.35 6 12 6Q13.65 6 14.825 7.175Q16 8.35 16 10Q16 11.65 14.825 12.825Q13.65 14 12 14ZM6 22V19.5Q6 18.275 6.688 17.388Q7.375 16.5 8.4 16.1Q10.55 15.25 12.75 15.25Q14.95 15.25 17.1 16.1Q18.125 16.5 18.813 17.388Q19.5 18.275 19.5 19.5V22Z"/>
               </svg>
+              학생 기능
             </button>
+          </div>
+
+          <!-- Teacher Features -->
+          <div class="tab-content" v-if="activeTab === 'teacher'">
+            <div class="feature-grid">
+              <div class="feature-card primary" @click="navigateTo('/class-management')">
+                <div class="feature-header">
+                  <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 5.5A3.5 3.5 0 0 1 15.5 9A3.5 3.5 0 0 1 12 12.5A3.5 3.5 0 0 1 8.5 9A3.5 3.5 0 0 1 12 5.5M5 8C5.56 8 6.08 8.15 6.53 8.42C6.38 9.85 6.8 11.27 7.66 12.38C7.16 13.34 6.16 14 5 14A3 3 0 0 1 2 11A3 3 0 0 1 5 8M19 8A3 3 0 0 1 22 11A3 3 0 0 1 19 14C17.84 14 16.84 13.34 16.34 12.38C17.2 11.27 17.62 9.85 17.47 8.42C17.92 8.15 18.44 8 19 8M5.5 18.25C5.5 16.18 8.41 14.5 12 14.5C15.59 14.5 18.5 16.18 18.5 18.25V20H5.5V18.25M0 20V18.5C0 17.11 1.89 15.94 4.45 15.6C3.86 16.28 3.5 17.22 3.5 18.25V20H0M24 20H20.5V18.25C20.5 17.22 20.14 16.28 19.55 15.6C22.11 15.94 24 17.11 24 18.5V20Z"/>
+                    </svg>
+                  </div>
+                  <div class="feature-badge new">NEW</div>
+                </div>
+                <h3 class="feature-title">학급 관리 시스템</h3>
+                <p class="feature-description">
+                  학급 현황과 학생 관리를 한눈에 파악할 수 있습니다.
+                  생성한 시험지, 완료된 채점, 관리 학생 수 등 주요 통계를 실시간으로 확인하세요.
+                </p>
+                <div class="feature-highlights">
+                  <div class="highlight-item">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                    </svg>
+                    실시간 학급 현황
+                  </div>
+                  <div class="highlight-item">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                    </svg>
+                    학생별 성적 관리
+                  </div>
+                  <div class="highlight-item">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                    </svg>
+                    시험지 생성 통계
+                  </div>
+                </div>
+              </div>
+              <div class="feature-card" @click="navigateTo('/exam/wizard')">
+                <div class="feature-header">
+                  <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M19 3H18V1H16V3H8V1H6V3H5C3.89 3 3.01 3.9 3.01 5L3 19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3M19 19H5V8H19V19M7 10H12V15H7"/>
+                    </svg>
+                  </div>
+                  <div class="feature-badge hot">HOT</div>
+                </div>
+                <h3 class="feature-title">시험지 마법사</h3>
+                <p class="feature-description">
+                  문제은행 기반 시험지 생성 시스템으로 맞춤형 시험지를 만들어보세요.
+                  난이도 조절과 문제 유형을 자동으로 조정합니다.
+                </p>
+                <div class="feature-highlights">
+                  <div class="highlight-item">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                    </svg>
+                    문제은행 기반 선택
+                  </div>
+                  <div class="highlight-item">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                    </svg>
+                    자동 난이도 조절
+                  </div>
+                </div>
+              </div>
+              <div class="feature-card" @click="navigateTo('/item-processing')">
+                <div class="feature-header">
+                  <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2M18 20H6V4H13V9H18V20Z"/>
+                    </svg>
+                  </div>
+                </div>
+                <h3 class="feature-title">문제 등록 및 가공</h3>
+                <p class="feature-description">
+                  교과서를 선택하고 PDF를 업로드하여 문제를 가공하세요.
+                  단계별 진행 표시기로 체계적인 문제 등록이 가능합니다.
+                </p>
+                <div class="feature-highlights">
+                  <div class="highlight-item">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                    </svg>
+                    교과서별 문제 분류
+                  </div>
+                  <div class="highlight-item">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                    </svg>
+                    PDF 편집 및 OCR
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Student Features -->
+          <div class="tab-content" v-if="activeTab === 'student'">
+            <div class="feature-grid">
+              <div class="feature-card primary" @click="navigateTo('/student/cbt/step01')">
+                <div class="feature-header">
+                  <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M14 2H6C4.9 2 4 2.9 4 4V20C4 21.1 4.89 22 5.99 22H18C19.1 22 20 21.1 20 20V8L14 2M18 20H6V4H13V9H18V20Z"/>
+                    </svg>
+                  </div>
+                  <div class="feature-badge ai">AI</div>
+                </div>
+                <h3 class="feature-title">문제은행 CBT</h3>
+                <p class="feature-description">
+                  과목별, 단원별 체계적인 분류로 다양한 문제를 쉽게 찾고 바로 풀 수 있습니다.
+                </p>
+                <div class="feature-highlights">
+                  <div class="highlight-item">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                    </svg>
+                    방대한 문제 은행 데이터
+                  </div>
+                  <div class="highlight-item">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                    </svg>
+                    실시간 생성 & 필터링
+                  </div>
+                  <div class="highlight-item">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                    </svg>
+                    즉시 결과 확인
+                  </div>
+                </div>
+              </div>
+
+              <div class="feature-card" @click="navigateTo('/student/class-room/my-class')">
+                <div class="feature-header">
+                  <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M12 2L3 7L12 12L21 7L12 2M3 17L12 22L21 17M3 12L12 17L21 12"/>
+                    </svg>
+                  </div>
+                  <div class="feature-badge popular">인기</div>
+                </div>
+                <h3 class="feature-title">똑똑한 우리반</h3>
+                <p class="feature-description">
+                  똑똑한 우리반과 함께라면, 온라인 시험도 교실처럼 실시간으로!
+                  체계적으로 공정한 시험 경험을 제공합니다.
+                </p>
+                <div class="feature-highlights">
+                  <div class="highlight-item">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                    </svg>
+                    실시간 동시 시험
+                  </div>
+                  <div class="highlight-item">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                    </svg>
+                    즉시 결과 확인
+                  </div>
+                </div>
+              </div>
+
+              <div class="feature-card" @click="navigateTo('/student/report')">
+                <div class="feature-header">
+                  <div class="feature-icon">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M16 6L18.29 8.29L13.41 13.17L9.41 9.17L2 16.59L3.41 18L9.41 12L13.41 16L19.71 9.71L22 12V6"/>
+                    </svg>
+                  </div>
+                </div>
+                <h3 class="feature-title">성적 분석 및 리포트</h3>
+                <p class="feature-description">
+                  응시한 시험의 상세한 분석 결과를 확인하세요.
+                  개별 문항별 분석과 전체 성적 현황을 한눈에 파악할 수 있습니다.
+                </p>
+                <div class="feature-highlights">
+                  <div class="highlight-item">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                    </svg>
+                    상세한 성적 분석
+                  </div>
+                  <div class="highlight-item">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M9 16.17L4.83 12L3.41 13.41L9 19L21 7L19.59 5.59L9 16.17Z"/>
+                    </svg>
+                    문항별 오답 분석
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </section>
+
 
   </div>
 </template>
@@ -525,7 +413,7 @@
 <script setup>
 /**
  * PULLIT 교육 플랫폼 메인 페이지
- * 전문적인 교육 솔루션을 위한 풀스크린 레이아웃
+ * 현재 프로젝트의 실제 페이지들을 반영한 업데이트된 버전
  */
 
 import { ref, onMounted, onUnmounted, computed } from 'vue'
@@ -552,10 +440,10 @@ const animatedStats = ref({
 })
 
 const targetStats = {
-  questions: 15247,
+  questions: 15000,
   exams: 2156,
-  users: 48592,
-  schools: 523
+  users: 50000,
+  schools: 500
 }
 
 // 역할 선택 관련
@@ -576,14 +464,14 @@ const hideRoleSelection = () => {
 
 const startWithRole = () => {
   if (!selectedRole.value) return
-  
-  // 역할에 따른 라우팅
+
+  // 역할에 따른 라우팅 - 실제 프로젝트의 경로로 수정
   if (selectedRole.value === 'teacher') {
-    router.push('/teacher/dashboard')
+    router.push('/class-management')
   } else if (selectedRole.value === 'student') {
-    router.push('/student/dashboard')
+    router.push('/student/main')
   }
-  
+
   hideRoleSelection()
   console.log(`${selectedRole.value} 역할로 시작`)
 }
@@ -593,7 +481,7 @@ const setActiveTab = (tab) => {
   activeTab.value = tab
 }
 
-// 네비게이션
+// 네비게이션 - 실제 프로젝트의 경로로 수정
 const navigateTo = (path) => {
   router.push(path)
 }
@@ -601,7 +489,7 @@ const navigateTo = (path) => {
 const scrollToFeatures = () => {
   const featuresSection = document.getElementById('features')
   if (featuresSection) {
-    featuresSection.scrollIntoView({ 
+    featuresSection.scrollIntoView({
       behavior: 'smooth',
       block: 'start'
     })
@@ -618,18 +506,18 @@ const animateStats = () => {
   const duration = 2000 // 2초
   const steps = 60
   const stepTime = duration / steps
-  
+
   let currentStep = 0
   const interval = setInterval(() => {
     currentStep++
     const progress = currentStep / steps
     const easeOutQuart = 1 - Math.pow(1 - progress, 4)
-    
+
     animatedStats.value.questions = Math.floor(targetStats.questions * easeOutQuart)
     animatedStats.value.exams = Math.floor(targetStats.exams * easeOutQuart)
     animatedStats.value.users = Math.floor(targetStats.users * easeOutQuart)
     animatedStats.value.schools = Math.floor(targetStats.schools * easeOutQuart)
-    
+
     if (currentStep >= steps) {
       clearInterval(interval)
       animatedStats.value = { ...targetStats }
@@ -643,12 +531,12 @@ const setupObserver = () => {
     threshold: 0.1,
     rootMargin: '0px 0px -100px 0px'
   }
-  
+
   const observer = new IntersectionObserver((entries) => {
     entries.forEach((entry) => {
       if (entry.isIntersecting) {
         entry.target.classList.add('animate')
-        
+
         // 통계 섹션이 보이면 애니메이션 시작
         if (entry.target.classList.contains('stats-section')) {
           animateStats()
@@ -656,7 +544,7 @@ const setupObserver = () => {
       }
     })
   }, observerOptions)
-  
+
   // 애니메이션할 요소들 관찰
   document.querySelectorAll('.slide-up, .fade-in, .stats-section').forEach((el) => {
     observer.observe(el)
@@ -674,12 +562,12 @@ const handleKeydown = (event) => {
 onMounted(() => {
   // 헤더 제목 설정 (메인 페이지는 제목 없음)
   layoutStore.setHeaderTitle('')
-  
+
   // 애니메이션 관찰자 설정
   setTimeout(() => {
     setupObserver()
   }, 100)
-  
+
   // 키보드 이벤트 리스너 추가
   document.addEventListener('keydown', handleKeydown)
 })
@@ -706,7 +594,7 @@ onUnmounted(() => {
 .hero-section {
   position: relative;
   background: linear-gradient(135deg, #0053ed 0%, #003db8 100%);
-  min-height: 100vh;
+  min-height: 60vh;
   width: 100%;
   display: flex;
   align-items: center;
@@ -1720,15 +1608,15 @@ onUnmounted(() => {
   .hero-content {
     gap: 50px;
   }
-  
+
   .hero-title {
     font-size: clamp(28px, 4vw, 48px);
   }
-  
+
   .feature-grid {
     grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
   }
-  
+
   .stats-grid {
     grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   }
@@ -1739,7 +1627,7 @@ onUnmounted(() => {
     min-height: 90vh;
     padding: 40px 0;
   }
-  
+
   .hero-content {
     grid-template-columns: 1fr;
     gap: 40px;
@@ -1747,115 +1635,115 @@ onUnmounted(() => {
     min-height: auto;
     padding: 0 3%;
   }
-  
+
   .hero-badge {
     justify-content: center;
   }
-  
+
   .hero-actions {
     justify-content: center;
     flex-wrap: wrap;
   }
-  
+
   .hero-stats {
     flex-wrap: wrap;
     justify-content: center;
     gap: 20px;
   }
-  
+
   .hero-stats .stat-number {
     font-size: 28px;
   }
-  
+
   .hero-visual {
     order: -1;
   }
-  
+
   .dashboard-preview {
     max-width: 400px;
   }
-  
+
   .features-section {
     padding: 60px 0;
   }
-  
+
   .section-header {
     margin-bottom: 50px;
     padding: 0 3%;
   }
-  
+
   .feature-tabs {
     margin: 0;
   }
-  
+
   .tab-buttons {
     margin: 16px;
   }
-  
+
   .tab-content {
     padding: 24px 16px;
   }
-  
+
   .feature-grid {
     grid-template-columns: 1fr;
     gap: 24px;
   }
-  
+
   .feature-card {
     padding: 32px 24px;
   }
-  
+
   .role-modal {
     padding: 16px;
   }
-  
+
   .role-cards {
     grid-template-columns: 1fr;
     gap: 20px;
   }
-  
+
   .role-selection {
     padding: 40px 24px 24px;
   }
-  
+
   .stats-section {
     padding: 60px 0;
   }
-  
+
   .stats-grid {
     grid-template-columns: 1fr;
     gap: 20px;
   }
-  
+
   .stats-content {
     padding: 0 3%;
   }
-  
+
   .stat-card {
     flex-direction: column;
     text-align: center;
     gap: 20px;
     padding: 32px 24px;
   }
-  
+
   .stat-info {
     text-align: center;
   }
-  
+
   .cta-section {
     padding: 60px 0;
   }
-  
+
   .cta-content {
     padding: 0 3%;
   }
-  
+
   .cta-actions {
     flex-direction: column;
     align-items: center;
     gap: 16px;
   }
-  
+
   .cta-button.large {
     width: 100%;
     max-width: 300px;
@@ -1867,113 +1755,113 @@ onUnmounted(() => {
     min-height: 80vh;
     padding: 40px 0;
   }
-  
+
   .hero-content {
     padding: 0 4%;
   }
-  
+
   .hero-badge {
     font-size: 12px;
     padding: 6px 12px;
   }
-  
+
   .hero-actions {
     flex-direction: column;
     align-items: stretch;
   }
-  
+
   .cta-button {
     padding: 14px 24px;
     font-size: 15px;
   }
-  
+
   .hero-stats {
     flex-direction: column;
     gap: 16px;
   }
-  
+
   .stat-separator {
     width: 60px;
     height: 1px;
   }
-  
+
   .dashboard-preview {
     max-width: 100%;
   }
-  
+
   .preview-content {
     height: 250px;
   }
-  
+
   .preview-sidebar {
     width: 100px;
   }
-  
+
   .sidebar-item {
     padding: 8px 12px;
     font-size: 11px;
   }
-  
+
   .feature-tabs {
     border-radius: 16px;
   }
-  
+
   .tab-buttons {
     flex-direction: column;
     gap: 4px;
   }
-  
+
   .tab-button {
     padding: 12px 16px;
     font-size: 14px;
   }
-  
+
   .feature-card {
     padding: 24px 20px;
   }
-  
+
   .feature-icon {
     width: 60px;
     height: 60px;
   }
-  
+
   .feature-icon svg {
     width: 28px;
     height: 28px;
   }
-  
+
   .feature-title {
     font-size: 20px;
   }
-  
+
   .role-card {
     padding: 24px;
   }
-  
+
   .role-icon {
     width: 56px;
     height: 56px;
   }
-  
+
   .role-icon svg {
     width: 28px;
     height: 28px;
   }
-  
+
   .stat-icon {
     width: 60px;
     height: 60px;
   }
-  
+
   .stat-icon svg {
     width: 28px;
     height: 28px;
   }
-  
+
   .stat-number {
     font-size: 36px;
   }
-  
+
   .stat-label {
     font-size: 16px;
   }
@@ -1984,7 +1872,7 @@ onUnmounted(() => {
   .feature-card {
     border: 2px solid #1e293b;
   }
-  
+
   .stat-card {
     border: 2px solid rgba(255, 255, 255, 0.3);
   }
@@ -1996,7 +1884,7 @@ onUnmounted(() => {
   .chart-bar {
     animation: none !important;
   }
-  
+
   .fade-in,
   .slide-up,
   * {
@@ -2019,17 +1907,17 @@ onUnmounted(() => {
   .education-platform {
     background: white !important;
   }
-  
+
   .hero-section {
     background: white !important;
     color: black !important;
   }
-  
+
   .stats-section {
     background: white !important;
     color: black !important;
   }
-  
+
   .floating-elements,
   .hero-visual {
     display: none !important;

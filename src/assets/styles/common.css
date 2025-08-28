@@ -1,0 +1,76 @@
+/* 공통 페이지 헤더 스타일 */
+.page-header {
+  background: white !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  padding: 3rem 0 !important;
+}
+
+.page-header .page-title {
+  font-size: 1.875rem !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+  margin: 0 !important;
+}
+
+.page-header .page-subtitle {
+  font-size: 1rem !important;
+  color: #64748b !important;
+  margin: 0 !important;
+}
+
+/* 공통 메인 컨테이너 스타일 */
+.main-content {
+  padding: 3rem 0;
+}
+
+.content-wrapper {
+  max-width: 100%;
+}
+
+/* 공통 컨테이너 스타일 */
+.page-header .container,
+.page-header > .container {
+  width: 100% !important;
+  max-width: 1300px !important;
+  margin: 0 auto !important;
+  padding: 0 2px !important;
+  box-sizing: border-box !important;
+}
+
+/* 반응형 컨테이너 */
+@media (max-width: 1200px) {
+  .page-header .container,
+  .page-header > .container {
+    width: 100% !important;
+    max-width: 960px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header .container,
+  .page-header > .container {
+    width: 100% !important;
+    max-width: 720px !important;
+    padding: 0 2px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header .container,
+  .page-header > .container {
+    width: 100% !important;
+    max-width: 540px !important;
+    padding: 0 3px !important;
+  }
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .page-header {
+    padding: 2rem 0;
+  }
+
+  .main-content {
+    padding: 2rem 0;
+  }
+}
