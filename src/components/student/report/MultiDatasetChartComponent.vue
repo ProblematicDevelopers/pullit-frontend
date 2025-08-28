@@ -203,21 +203,34 @@ const chartDatasets = computed(() => {
   return datasets
 })
 
-// 차트 데이터 객체
-const finalChartData = computed(() => ({
-  labels: xAxisLabels.value,
-  datasets: chartDatasets.value,
-}))
+// 차트 데이터 객체 (순환 참조 방지)
+const finalChartData = computed(() => {
+  const labels = [...xAxisLabels.value]
+  const datasets = chartDatasets.value.map(dataset => ({
+    label: dataset.label,
+    data: [...dataset.data],
+    backgroundColor: dataset.backgroundColor,
+    borderColor: dataset.borderColor,
+    borderWidth: dataset.borderWidth,
+    borderRadius: dataset.borderRadius,
+    borderSkipped: dataset.borderSkipped
+  }))
 
-// 차트 옵션
+  return {
+    labels,
+    datasets
+  }
+})
+
+// 차트 옵션 (순환 참조 방지)
 const finalChartOptions = computed(() => {
   const baseOptions = {
     responsive: true,
     maintainAspectRatio: false,
     plugins: {
       title: {
-        display: true,
-        text: props.title,
+        display: !!props.title,
+        text: props.title || '',
         font: {
           size: 18,
           weight: 'bold',
@@ -237,8 +250,8 @@ const finalChartOptions = computed(() => {
         intersect: false,
         callbacks: {
           label: function (context) {
-            const label = context.dataset.label
-            let value = context.parsed.y || context.parsed.r || context.parsed
+            const label = context.dataset.label || ''
+            let value = context.parsed.y || context.parsed.r || context.parsed || 0
 
             // value가 숫자가 아닌 경우 처리
             if (typeof value !== 'number') {
@@ -251,7 +264,7 @@ const finalChartOptions = computed(() => {
             }
 
             // 원본 값에 적절한 단위 추가
-            const xLabel = context.label
+            const xLabel = context.label || ''
             let unit = ''
             if (xLabel.includes('률') || xLabel.includes('Rate')) unit = '%'
             else if (xLabel.includes('시간') || xLabel.includes('Time')) unit = '분'
@@ -332,11 +345,31 @@ const createChart = () => {
     if (!chartCanvas.value) return // 컴포넌트가 언마운트된 경우 체크
 
     try {
-      chartInstance.value = new ChartJS(ctx, {
+      // 데이터 복사 (순환 참조 방지)
+      const chartData = {
+        labels: [...finalChartData.value.labels],
+        datasets: finalChartData.value.datasets.map(dataset => ({
+          label: dataset.label,
+          data: [...dataset.data],
+          backgroundColor: dataset.backgroundColor,
+          borderColor: dataset.borderColor,
+          borderWidth: dataset.borderWidth,
+          borderRadius: dataset.borderRadius,
+          borderSkipped: dataset.borderSkipped
+        }))
+      }
+
+            chartInstance.value = new ChartJS(ctx, {
         type: props.chartType,
-        data: finalChartData.value,
+        data: chartData,
         options: finalChartOptions.value,
       })
+
+      // 차트 인스턴스를 canvas에 저장 (PDF 변환 시 참조용)
+      if (chartCanvas.value) {
+        chartCanvas.value.chart = chartInstance.value
+      }
+
     } catch (error) {
       console.error('차트 생성 중 오류:', error)
     }

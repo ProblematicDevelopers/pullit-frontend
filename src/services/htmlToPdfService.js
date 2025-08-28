@@ -20,12 +20,13 @@ export const convertHtmlToPdf = async (element, filename = 'report.pdf') => {
     // 차트나 동적 콘텐츠가 있는지 확인하고 추가 대기
     const charts = element.querySelectorAll('canvas')
     if (charts.length > 0) {
+      console.log('차트 발견:', charts.length, '개')
       await new Promise((resolve) => setTimeout(resolve, 2000)) // 차트가 있으면 추가 2초 대기
     }
 
     // HTML을 캔버스로 변환
     const canvas = await html2canvas(element, {
-      scale: 2, // 고해상도
+      scale: 1.5, // 해상도 최적화
       useCORS: true, // 외부 이미지 허용
       allowTaint: true, // 외부 리소스 허용
       backgroundColor: '#ffffff', // 배경색
@@ -36,21 +37,135 @@ export const convertHtmlToPdf = async (element, filename = 'report.pdf') => {
       windowWidth: element.scrollWidth,
       windowHeight: element.scrollHeight,
       logging: false, // 로그 비활성화
-      onclone: (clonedDoc) => {
-        // 복제된 문서에서 차트나 동적 콘텐츠가 제대로 렌더링되었는지 확인
-        const clonedElement = clonedDoc.querySelector(element.tagName.toLowerCase())
-        if (clonedElement) {
-          // 스타일 복사
-          const computedStyle = window.getComputedStyle(element)
-          clonedElement.style.width = computedStyle.width
-          clonedElement.style.height = computedStyle.height
-          clonedElement.style.backgroundColor = '#ffffff'
-        }
-      },
+      imageTimeout: 10000, // 이미지 타임아웃 10초
+              onclone: (clonedDoc) => {
+          // 복제된 문서에서 차트나 동적 콘텐츠가 제대로 렌더링되었는지 확인
+          const clonedElement = clonedDoc.querySelector(element.tagName.toLowerCase())
+          if (clonedElement) {
+            // 스타일 복사
+            const computedStyle = window.getComputedStyle(element)
+            clonedElement.style.width = computedStyle.width
+            clonedElement.style.height = computedStyle.height
+            clonedElement.style.backgroundColor = '#ffffff'
+          }
+
+          // PDF에서 숨길 요소들 제거 (차트 패널 설정 등)
+          const hideElements = clonedDoc.querySelectorAll('.hide-in-pdf')
+          hideElements.forEach(el => {
+            el.style.display = 'none'
+          })
+
+          // 차트 컨테이너 여백 추가 (PDF에서 짤리지 않도록)
+          const chartContainers = clonedDoc.querySelectorAll('.chart-container, .statistics-section')
+          chartContainers.forEach(container => {
+            container.style.margin = '20px 0'
+            container.style.padding = '15px'
+            container.style.boxSizing = 'border-box'
+            container.style.overflow = 'visible'
+          })
+
+          // 난이도별 통계 섹션 마진 추가 (차트와 표 겹침 방지)
+          const difficultySections = clonedDoc.querySelectorAll('.chart-section')
+          difficultySections.forEach(section => {
+            section.style.marginBottom = '60px'
+            section.style.paddingBottom = '30px'
+          })
+
+          // 난이도별 통계 표 마진 추가
+          const difficultyTables = clonedDoc.querySelectorAll('table')
+          difficultyTables.forEach(table => {
+            table.style.marginTop = '80px'
+            table.style.marginBottom = '40px'
+            table.style.paddingTop = '20px'
+          })
+
+          // 평가 영역별 통계 표 마진 추가
+          const evaluationTables = clonedDoc.querySelectorAll('.evaluation-table, table[data-evaluation]')
+          evaluationTables.forEach(table => {
+            table.style.marginTop = '80px'
+            table.style.marginBottom = '40px'
+            table.style.paddingTop = '20px'
+          })
+
+          // 난이도별 통계 제목과 차트 사이 간격 추가
+          const difficultyTitles = clonedDoc.querySelectorAll('h3, h4, .section-title')
+          difficultyTitles.forEach(title => {
+            title.style.marginBottom = '25px'
+            title.style.paddingBottom = '10px'
+          })
+
+          // 차트 강제 재렌더링 시도
+          const clonedCharts = clonedDoc.querySelectorAll('canvas')
+          if (clonedCharts.length > 0 && window.Chart) {
+            console.log('복제된 문서에서 차트 재렌더링 시도:', clonedCharts.length, '개')
+
+            // 원본 차트 데이터 복사
+            const originalCharts = element.querySelectorAll('canvas')
+            originalCharts.forEach((originalCanvas, index) => {
+              const clonedCanvas = clonedCharts[index]
+              if (clonedCanvas && originalCanvas.chart) {
+                try {
+                  console.log(`차트 ${index + 1} 재렌더링 시작:`, originalCanvas.chart.config.type)
+
+                  // 기존 차트 제거
+                  if (clonedCanvas.chart) {
+                    clonedCanvas.chart.destroy()
+                  }
+
+                  // 차트 크기 설정 (원본 비율 유지)
+                  const originalRatio = originalCanvas.width / originalCanvas.height
+                  clonedCanvas.width = originalCanvas.width
+                  clonedCanvas.height = originalCanvas.height
+                  clonedCanvas.style.width = originalCanvas.style.width
+                  clonedCanvas.style.height = originalCanvas.style.height
+                  clonedCanvas.style.margin = '10px 0'
+                  clonedCanvas.style.padding = '10px'
+                  clonedCanvas.style.boxSizing = 'border-box'
+                  clonedCanvas.style.aspectRatio = originalRatio
+                  clonedCanvas.style.maxWidth = '100%'
+
+                  // 원본 차트 설정 복사 (JSON으로 깊은 복사)
+                  const chartConfig = JSON.parse(JSON.stringify(originalCanvas.chart.config))
+
+                  // PDF용 옵션 설정
+                  chartConfig.options.responsive = false
+                  chartConfig.options.maintainAspectRatio = false
+                  chartConfig.options.animation = false
+                  if (chartConfig.options.plugins) {
+                    chartConfig.options.plugins.tooltip = { enabled: false }
+                  }
+
+                  // 새 차트 생성
+                  const newChart = new window.Chart(clonedCanvas.getContext('2d'), chartConfig)
+                  clonedCanvas.chart = newChart
+
+                  console.log(`차트 ${index + 1} 생성 완료:`, newChart)
+
+                                    // 차트 렌더링 완료 대기 (최적화)
+                  setTimeout(() => {
+                    if (newChart && newChart.update) {
+                      newChart.update('none')
+                      console.log(`차트 ${index + 1} 업데이트 완료`)
+                    }
+                  }, 300)
+                } catch (error) {
+                  console.error(`차트 ${index + 1} 재렌더링 중 오류:`, error)
+                }
+              } else {
+                console.warn(`차트 ${index + 1} 원본 인스턴스 없음:`, originalCanvas.chart)
+              }
+            })
+          } else {
+            console.warn('차트 재렌더링 조건 불충족:', {
+              clonedChartsLength: clonedCharts.length,
+              hasChart: !!window.Chart
+            })
+          }
+        },
     })
 
-    // 캔버스를 이미지로 변환
-    const imgData = canvas.toDataURL('image/png')
+    // 캔버스를 이미지로 변환 (용량 최적화)
+    const imgData = canvas.toDataURL('image/jpeg', 0.8)
 
     // 원본 HTML 크기를 픽셀 단위로 계산 (1mm = 약 3.78px)
     const mmToPx = 3.78
@@ -67,8 +182,9 @@ export const convertHtmlToPdf = async (element, filename = 'report.pdf') => {
     // PDF 생성 (원본 크기에 맞춤)
     const pdf = new jsPDF({
       orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
-      unit: 'mm',
+      unit: 'px',
       format: [pdfWidth, pdfHeight],
+      compress: true,
     })
 
     // 원본 크기 그대로 이미지 추가 (중앙 정렬)
@@ -189,10 +305,27 @@ export const convertDetailReportToPdf = async (filename = null) => {
       tempContainer.style.width = '100%'
       tempContainer.style.backgroundColor = '#ffffff'
 
-      // data-report-container 내용 복사
-      tempContainer.appendChild(reportContainer.cloneNode(true))
+      // 정오표 섹션 추가 (맨 위에 배치)
+      const errataSection = document.querySelector('.errata-section, [data-errata], .errata-container, .errata-table-container')
+      if (errataSection) {
+        const clonedErrataSection = errataSection.cloneNode(true)
+        tempContainer.appendChild(clonedErrataSection)
+      } else {
+        // 정오표 테이블 직접 찾기 (JavaScript로 텍스트 검색)
+        const allTables = document.querySelectorAll('table')
+        const errataTable = Array.from(allTables).find(table => {
+          const thElements = table.querySelectorAll('th')
+          return Array.from(thElements).some(th =>
+            th.textContent.includes('번호') || th.textContent.includes('평균 정답률')
+          )
+        })
+        if (errataTable) {
+          const clonedErrataTable = errataTable.cloneNode(true)
+          tempContainer.appendChild(clonedErrataTable)
+        }
+      }
 
-      // statistics-section들도 추가 (차트, 통계 등)
+      // statistics-section들만 추가 (차트, 통계 등)
       const statisticsSections = document.querySelectorAll('.statistics-section')
       statisticsSections.forEach((section) => {
         const clonedSection = section.cloneNode(true)
@@ -210,11 +343,20 @@ export const convertDetailReportToPdf = async (filename = null) => {
             if (chartImage && chartImage !== 'data:,' && chartImage.length > 100) {
               const img = document.createElement('img')
               img.src = chartImage
-              img.style.width = '900px'
-              img.style.height = '440px'
+
+              // 원본 비율 계산
+              const originalRatio = originalCanvas.width / originalCanvas.height
+              const maxWidth = 900
+              const calculatedHeight = maxWidth / originalRatio
+
+              img.style.width = maxWidth + 'px'
+              img.style.height = calculatedHeight + 'px'
               img.style.display = 'block'
               img.style.margin = '20px auto'
-              img.style.objectFit = 'contain'
+              img.style.objectFit = 'none'
+              img.style.aspectRatio = originalRatio
+              img.style.maxWidth = '100%'
+              img.style.maxHeight = '500px'
 
               // canvas를 img로 교체 (안전한 교체)
               if (clonedCanvas.parentNode) {
@@ -228,6 +370,13 @@ export const convertDetailReportToPdf = async (filename = null) => {
 
         tempContainer.appendChild(clonedSection)
       })
+
+      // 정오표 테이블 추가 (백업)
+      const backupErrataTable = document.querySelector('table[data-errata-table], .errata-table')
+      if (backupErrataTable && !errataSection) {
+        const clonedBackupErrataTable = backupErrataTable.cloneNode(true)
+        tempContainer.appendChild(clonedBackupErrataTable)
+      }
 
       document.body.appendChild(tempContainer)
       reportContainer = tempContainer
