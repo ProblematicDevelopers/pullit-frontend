@@ -96,101 +96,10 @@
 
               <div class="card-body">
                 <!-- 수식 도구 탭 -->
-                <div v-show="activeToolTab === 'math'" class="tab-content">
-                  <div class="row g-2">
-                    <!-- 수식 검색 -->
-                    <div class="col-12">
-                      <div class="math-search">
-                        <label class="form-label fw-semibold small">수식 검색:</label>
-                        <div class="input-group input-group-sm">
-                          <span class="input-group-text bg-light border-end-0">
-                            <i class="bi bi-search"></i>
-                          </span>
-                          <input
-                            v-model="searchQuery"
-                            placeholder="덧셈, 방정식, 분수..."
-                            class="form-control border-start-0"
-                            @input="filterMathTemplates"
-                          />
-                        </div>
-                        <div class="search-results mt-2" v-if="filteredTemplates.length > 0 && searchQuery">
-                          <div
-                            v-for="template in filteredTemplates"
-                            :key="template.id"
-                            @click="insertMath(template.latex)"
-                            class="search-result-item small p-2 border rounded mb-1 cursor-pointer"
-                          >
-                            <div class="template-name fw-semibold">{{ template.name }}</div>
-                            <div class="template-preview text-muted">{{ template.preview }}</div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- 수식 카테고리 -->
-                    <div class="col-12">
-                      <div class="math-categories">
-                        <label class="form-label fw-semibold small">수식 카테고리:</label>
-                        <ul class="nav nav-tabs nav-fill" role="tablist">
-                          <li class="nav-item" v-for="category in categories" :key="category.id">
-                            <button
-                              @click="activeCategory = category.id"
-                              :class="['nav-link', { active: activeCategory === category.id }]"
-                              type="button"
-                              role="tab"
-                              class="small"
-                            >
-                              {{ category.name }}
-                            </button>
-                          </li>
-                        </ul>
-
-                        <!-- 카테고리별 수식 버튼 -->
-                        <div class="tab-content mt-3">
-                          <div v-for="category in categories" :key="category.id" v-show="activeCategory === category.id">
-                            <div class="d-grid gap-2">
-                              <button
-                                v-for="template in category.templates"
-                                :key="template.id"
-                                @click="insertMath(template.latex)"
-                                class="btn btn-outline-primary btn-sm"
-                                :title="template.description"
-                              >
-                                {{ template.name }}
-                              </button>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <!-- 커스텀 수식 입력 -->
-                    <div class="col-12">
-                      <div class="custom-math">
-                        <label class="form-label fw-semibold small">커스텀 수식:</label>
-                        <div class="input-group input-group-sm">
-                          <input
-                            v-model="customMath"
-                            placeholder="LaTeX 수식 입력"
-                            class="form-control"
-                            @keyup.enter="insertCustomMath"
-                          />
-                          <button
-                            @click="insertCustomMath"
-                            class="btn btn-primary btn-sm"
-                            :disabled="!customMath.trim()"
-                          >
-                            삽입
-                          </button>
-                        </div>
-                        <div class="math-preview mt-2" v-if="customMath.trim()">
-                          <small class="text-muted">미리보기:</small>
-                          <div class="preview-content border rounded p-2 bg-light mt-1" v-html="previewMathContent"></div>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
+                <MathTools
+                  :active-tool-tab="activeToolTab"
+                  @insert-math="insertMath"
+                />
 
                 <!-- 도형 도구 탭 -->
                 <div v-show="activeToolTab === 'shapes'" class="tab-content">
@@ -269,6 +178,31 @@
                           <button @click="quickTest('rectangle')" class="btn btn-outline-secondary btn-sm">직사각형 + 수식</button>
                           <button @click="quickTest('triangle')" class="btn btn-outline-secondary btn-sm">삼각형 + 각도</button>
                         </div>
+
+                        <!-- 파일 히스토리 테스트 -->
+                        <div class="mt-3 p-3 bg-light rounded">
+                          <h6 class="fw-semibold text-dark mb-2 small">
+                            <i class="bi bi-file-earmark-text me-2"></i>파일 히스토리 테스트
+                          </h6>
+                          <div class="mb-2">
+                            <label class="form-label small">과목 ID:</label>
+                            <input
+                              v-model.number="currentSubjectId"
+                              type="number"
+                              placeholder="과목 ID를 입력하세요"
+                              class="form-control form-control-sm"
+                            />
+                          </div>
+                          <div class="d-grid">
+                            <button
+                              @click="testFileHistory"
+                              class="btn btn-outline-primary btn-sm"
+                              :disabled="!currentSubjectId"
+                            >
+                              파일 히스토리 생성 테스트
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
 
@@ -335,10 +269,12 @@ import katex from 'katex'
 import 'katex/dist/katex.min.css'
 import LivePreview from './LivePreview.vue'
 import MathEditModal from './MathEditModal.vue'
+import MathTools from './MathTools.vue'
+import { fileHistoryAPI } from '@/services/fileHistoryApi'
 
 export default {
   name: 'TinyMCETestComponent',
-  components: { Editor, LivePreview, MathEditModal },
+  components: { Editor, LivePreview, MathEditModal, MathTools },
   props: {
     modelValue: { type: String, default: '' },
     showMathTools: { type: Boolean, default: true },
@@ -366,9 +302,6 @@ export default {
       editingMathElement: null,
 
       // 수식 도구
-      customMath: '',
-      searchQuery: '',
-      activeCategory: 'basic',
       activeToolTab: 'math',
 
       // 도형 관련
@@ -387,6 +320,9 @@ export default {
 
       // 템플릿
       savedTemplates: [],
+
+      // 파일 히스토리 관련
+      currentSubjectId: null, // 현재 선택된 과목 ID
 
       finalApiKey: this.apiKey || import.meta.env.VITE_TINYMCE_KEY || '',
 
@@ -440,19 +376,34 @@ export default {
         extended_valid_elements: 'span[*],div[*],svg[*],circle[*],rect[*],polygon[*],line[*],text[*],*[*]',
         custom_elements: '~math-latex',
         images_upload_handler: (blobInfo) => {
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onload = () => resolve(reader.result);
-            reader.readAsDataURL(blobInfo.blob());
+          return new Promise((resolve, reject) => {
+            try {
+              // 파일을 base64로 변환
+              const reader = new FileReader();
+              reader.onload = () => {
+                const base64Data = reader.result;
+
+                // 파일 히스토리 생성 (과목 ID가 있는 경우에만)
+                if (this.currentSubjectId) {
+                  // 비동기로 파일 히스토리 생성
+                  this.createFileHistoryAfterUpload(Date.now()).catch(error => {
+                    console.error('파일 히스토리 생성 실패:', error);
+                  });
+                }
+
+                resolve(base64Data);
+              };
+              reader.readAsDataURL(blobInfo.blob());
+            } catch (error) {
+              reject(error);
+            }
           });
         },
 
         setup: (editor) => {
           this.editorInstance = editor;
 
-          // ---- 수식 편집 관리 ----
-          let editingMathId = null;
-
+                    // ---- 수식 편집 관리 ----
           const renderMathInEditor = () => {
             try {
               const body = editor.getBody();
@@ -476,31 +427,9 @@ export default {
           const enterMathEditMode = (mathElement) => {
             const mathId = 'math-' + Date.now();
             mathElement.setAttribute('data-math-id', mathId);
-            editingMathId = mathId;
 
             // 편집 UI 표시
             this.showMathEditUI(mathElement, mathId);
-          };
-
-          // 수식 편집 모드 종료
-          const exitMathEditMode = () => {
-            editingMathId = null;
-            this.hideMathEditUI();
-          };
-
-          // 수식 업데이트
-          const updateMath = (mathId, newLatex) => {
-            const mathElement = editor.getBody().querySelector(`[data-math-id="${mathId}"]`);
-            if (mathElement) {
-              mathElement.setAttribute('data-latex', newLatex);
-              try {
-                mathElement.innerHTML = katex.renderToString(newLatex, { throwOnError: false, displayMode: false });
-              } catch {
-                mathElement.textContent = `$${newLatex}$`;
-              }
-              mathElement.removeAttribute('data-math-id');
-            }
-            exitMathEditMode();
           };
 
           editor.on('init', () => {
@@ -521,7 +450,7 @@ export default {
                 mathElement = target.closest('span.math-latex');
               }
 
-              if (mathElement && !editingMathId) {
+              if (mathElement && !this.showMathEdit) {
                 e.preventDefault();
                 e.stopPropagation();
                 enterMathEditMode(mathElement);
@@ -549,46 +478,13 @@ export default {
 
           // 편집 함수들을 Vue 컴포넌트에 노출
           this.enterMathEditMode = enterMathEditMode;
-          this.exitMathEditMode = exitMathEditMode;
-          this.updateMath = updateMath;
         }
       },
 
-      categories: [
-        {
-          id: 'basic',
-          name: '기본',
-          templates: [
-            { id: 1, name: '덧셈', latex: 'a + b = c', description: '기본 덧셈', preview: 'a + b = c' },
-            { id: 2, name: '뺄셈', latex: 'a - b = c', description: '기본 뺄셈', preview: 'a - b = c' },
-            { id: 3, name: '곱셈', latex: 'a \\times b = c', description: '기본 곱셈', preview: 'a × b = c' },
-            { id: 4, name: '나눗셈', latex: '\\frac{a}{b} = c', description: '기본 나눗셈', preview: 'a/b = c' }
-          ]
-        },
-        {
-          id: 'advanced',
-          name: '고급',
-          templates: [
-            { id: 5, name: '제곱근', latex: '\\sqrt{a} = b', description: '제곱근', preview: '√a = b' },
-            { id: 6, name: '지수', latex: 'a^b = c', description: '지수', preview: 'a^b = c' },
-            { id: 7, name: '로그', latex: '\\log_a(b) = c', description: '로그', preview: 'log_a(b) = c' },
-            { id: 8, name: '적분', latex: '\\int_a^b f(x) dx', description: '적분', preview: '∫f(x)dx' }
-          ]
-        }
-      ],
-      filteredTemplates: []
+      // 수식 관련 데이터는 MathTools 컴포넌트로 이동
     }
   },
   computed: {
-    previewMathContent() {
-      if (!this.customMath.trim()) return ''
-      try {
-        return katex.renderToString(this.customMath, { throwOnError: false, displayMode: false })
-      } catch {
-        return `<span class="text-danger">LaTeX 오류: ${this.customMath}</span>`
-      }
-    },
-
     mathPreviewHtml() {
       if (!this.editingMathLatex.trim()) return ''
       try {
@@ -599,6 +495,42 @@ export default {
     }
   },
   watch: {
+    // 도형 관련 속성 변경 시 미리보기 자동 업데이트
+    shapeText() {
+      if (this.showShapePreview) {
+        this.previewShape()
+      }
+    },
+    shapeLatex() {
+      if (this.showShapePreview) {
+        this.previewShape()
+      }
+    },
+    textPosition() {
+      if (this.showShapePreview) {
+        this.previewShape()
+      }
+    },
+    textColor() {
+      if (this.showShapePreview) {
+        this.previewShape()
+      }
+    },
+    textSize() {
+      if (this.showShapePreview) {
+        this.previewShape()
+      }
+    },
+    shapeColor() {
+      if (this.showShapePreview) {
+        this.previewShape()
+      }
+    },
+    shapeStrokeWidth() {
+      if (this.showShapePreview) {
+        this.previewShape()
+      }
+    },
     modelValue(newVal) {
       if (newVal !== this.editorContent) {
         this.editorContent = newVal
@@ -614,38 +546,106 @@ export default {
     // 미리보기는 LivePreview 컴포넌트에서 처리
 
     /* ===== 수식/도형/템플릿 ===== */
-    filterMathTemplates() {
-      if (!this.searchQuery.trim()) { this.filteredTemplates = []; return }
-      const query = this.searchQuery.toLowerCase()
-      this.filteredTemplates = this.categories
-        .flatMap(category => category.templates)
-        .filter(t => t.name.toLowerCase().includes(query) || t.description.toLowerCase().includes(query))
-    },
+    // 수식 관련 메서드는 MathTools 컴포넌트로 이동
 
     quickTest(shapeType) {
       this.selectedShapeType = shapeType
       switch (shapeType) {
-        case 'circle': this.shapeText = 'O'; this.shapeLatex = ''; this.textPosition = 'center'; break
-        case 'rectangle': this.shapeText = ''; this.shapeLatex = '\\frac{a}{b}'; this.textPosition = 'top'; break
-        case 'triangle': this.shapeText = 'θ'; this.shapeLatex = '\\angle ABC'; this.textPosition = 'right'; break
+        case 'circle':
+          this.shapeText = 'O';
+          this.shapeLatex = '';
+          this.textPosition = 'center';
+          break
+        case 'rectangle':
+          this.shapeText = '';
+          this.shapeLatex = '\\frac{a}{b}';
+          this.textPosition = 'top';
+          break
+        case 'triangle':
+          this.shapeText = 'θ';
+          this.shapeLatex = '\\angle ABC';
+          this.textPosition = 'right';
+          break
       }
-      this.previewShape()
+      // 미리보기 강제 업데이트
+      this.$nextTick(() => {
+        this.previewShape()
+      })
     },
 
     previewShape() {
+      console.log('previewShape 호출됨:', {
+        selectedShapeType: this.selectedShapeType,
+        shapeText: this.shapeText,
+        shapeLatex: this.shapeLatex,
+        textPosition: this.textPosition
+      })
+
       this.shapePreviewHtml = this.generateShapeSVG()
       this.showShapePreview = true
+
+      console.log('미리보기 HTML 생성됨:', this.shapePreviewHtml)
+      console.log('showShapePreview:', this.showShapePreview)
     },
 
     generateShapeSVG() {
+      console.log('generateShapeSVG 호출됨:', {
+        selectedShapeType: this.selectedShapeType,
+        shapeSize: this.shapeSize,
+        shapeColor: this.shapeColor,
+        shapeStrokeWidth: this.shapeStrokeWidth
+      })
+
       const size = this.shapeSize
       const cx = size / 2
       const cy = size / 2
       const r = (size - 20) / 2
       let svg = ''
+
+      // 텍스트/수식 위치 계산
+      let textX = cx, textY = cy
+      let textAnchor = 'middle'
+      let dominantBaseline = 'middle'
+
+      // 위치에 따른 텍스트/수식 좌표 조정
+      switch (this.textPosition) {
+        case 'top':
+          textY = 15
+          dominantBaseline = 'hanging'
+          break
+        case 'bottom':
+          textY = size - 15
+          dominantBaseline = 'auto'
+          break
+        case 'left':
+          textX = 15
+          textAnchor = 'start'
+          dominantBaseline = 'middle'
+          break
+        case 'right':
+          textX = size - 15
+          textAnchor = 'end'
+          dominantBaseline = 'middle'
+          break
+        case 'center':
+        default:
+          textX = cx
+          textY = cy
+          textAnchor = 'middle'
+          dominantBaseline = 'middle'
+          break
+      }
+
+      // 텍스트 요소 생성
       const textEl = this.shapeText
-        ? `<text x="${cx}" y="${cy}" text-anchor="middle" dominant-baseline="middle"
+        ? `<text x="${textX}" y="${textY}" text-anchor="${textAnchor}" dominant-baseline="${dominantBaseline}"
                  fill="${this.textColor}" font-size="${this.textSize}">${this.shapeText}</text>`
+        : ''
+
+      // 수식 요소 생성 (LaTeX가 있는 경우)
+      const mathEl = this.shapeLatex && this.shapeLatex.trim()
+        ? `<text x="${textX}" y="${textY + (this.shapeText ? 20 : 0)}" text-anchor="${textAnchor}" dominant-baseline="${dominantBaseline}"
+                 fill="${this.textColor}" font-size="${this.textSize}">$${this.shapeLatex.trim()}$</text>`
         : ''
 
       switch (this.selectedShapeType) {
@@ -653,12 +653,14 @@ export default {
           svg = `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
             <circle cx="${cx}" cy="${cy}" r="${r}" stroke="${this.shapeColor}" stroke-width="${this.shapeStrokeWidth}" fill="none" />
             ${textEl}
+            ${mathEl}
           </svg>`; break
         case 'rectangle': {
           const w = size - 20, h = (size - 20) * 0.6, x = (size - w)/2, y = (size - h)/2
           svg = `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
             <rect x="${x}" y="${y}" width="${w}" height="${h}" stroke="${this.shapeColor}" stroke-width="${this.shapeStrokeWidth}" fill="none" />
             ${textEl}
+            ${mathEl}
           </svg>`; break
         }
         case 'triangle': {
@@ -667,6 +669,7 @@ export default {
             <polygon points="${x + w/2},${y} ${x},${y + h} ${x + w},${y + h}"
                      stroke="${this.shapeColor}" stroke-width="${this.shapeStrokeWidth}" fill="none" />
             ${textEl}
+            ${mathEl}
           </svg>`; break
         }
         case 'line':
@@ -674,18 +677,21 @@ export default {
             <line x1="10" y1="10" x2="${size - 10}" y2="10" stroke="${this.shapeColor}" stroke-width="${this.shapeStrokeWidth}" />
             ${this.shapeText ? `<text x="${size/2}" y="8" text-anchor="middle" dominant-baseline="central"
               fill="${this.textColor}" font-size="${this.textSize}">${this.shapeText}</text>` : ''}
+            ${mathEl}
           </svg>`; break
         case 'polygon': {
           const pts = this.generatePolygonPoints(r, cx, cy)
           svg = `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
             <polygon points="${pts}" stroke="${this.shapeColor}" stroke-width="${this.shapeStrokeWidth}" fill="none" />
             ${textEl}
+            ${mathEl}
           </svg>`; break
         }
         default:
           svg = `<svg width="${size}" height="${size}" xmlns="http://www.w3.org/2000/svg">
             <rect x="10" y="10" width="${size - 20}" height="${size - 20}" stroke="${this.shapeColor}" stroke-width="${this.shapeStrokeWidth}" fill="none" />
             ${textEl}
+            ${mathEl}
           </svg>`
       }
       return svg
@@ -710,11 +716,7 @@ export default {
               // 수식 삽입 완료
     },
 
-    insertCustomMath() {
-      if (!this.customMath.trim()) return
-      this.insertMath(this.customMath)
-      this.customMath = ''
-    },
+    // insertCustomMath는 MathTools 컴포넌트로 이동
 
     insertShape() {
       if (!this.editorInstance || !this.editorLoaded) { this.showEditorNotReadyMessage(); return }
@@ -811,17 +813,68 @@ export default {
 
     cancelMathEdit() {
       this.hideMathEditUI();
+    },
+
+    // 파일 히스토리 관련 메서드
+    async createFileHistoryAfterUpload(fileMetadataId) {
+      try {
+        if (!this.currentSubjectId) {
+          console.warn('과목 ID가 설정되지 않았습니다.');
+          return;
+        }
+
+        const response = await fileHistoryAPI.createFileHistory(fileMetadataId, this.currentSubjectId);
+        console.log('파일 히스토리 생성 완료:', response.data);
+        return response.data;
+      } catch (error) {
+        console.error('파일 히스토리 생성 실패:', error);
+        throw error;
+      }
+    },
+
+    // 과목 ID 설정 메서드
+    setCurrentSubjectId(subjectId) {
+      this.currentSubjectId = subjectId;
+      console.log('현재 과목 ID 설정됨:', subjectId);
+    },
+
+    // 파일 히스토리 테스트 메서드
+    async testFileHistory() {
+      try {
+        if (!this.currentSubjectId) {
+          alert('과목 ID를 먼저 입력해주세요.');
+          return;
+        }
+
+        const testFileMetadataId = Date.now(); // 테스트용 임시 ID
+        const result = await this.createFileHistoryAfterUpload(testFileMetadataId);
+
+        if (result) {
+          alert(`파일 히스토리 생성 성공!\n파일 히스토리 ID: ${result.data}`);
+        }
+      } catch (error) {
+        alert(`파일 히스토리 생성 실패: ${error.message}`);
+      }
     }
   },
   mounted() {
     if (this.finalApiKey && this.finalApiKey.endsWith('%')) {
       this.finalApiKey = this.finalApiKey.replace(/%$/, '')
     }
-    // 초기 미리보기는 LivePreview 컴포넌트에서 처리
+
+    // 초기 도형 미리보기 설정
+    this.$nextTick(() => {
+      console.log('컴포넌트 마운트됨, 초기 도형 미리보기 설정')
+      this.previewShape()
+    })
   },
   beforeUnmount() {
     if (this.editorInstance) {
-      try { this.editorInstance.destroy() } catch {}
+      try {
+        this.editorInstance.destroy()
+      } catch (error) {
+        console.warn('에디터 인스턴스 정리 중 오류 발생:', error);
+      }
     }
     // previewDebounceTimer는 LivePreview 컴포넌트에서 관리
   }
@@ -889,23 +942,7 @@ export default {
   min-height: 290px !important;
 }
 
-/* 검색 결과 */
-.search-results {
-  max-height: 200px;
-  overflow-y: auto;
-  border: 1px solid #dee2e6;
-  border-radius: 0.375rem;
-  background: white;
-}
-.search-result-item { padding: 0.5rem 1rem; cursor: pointer; border-bottom: 1px solid #f0f0f0; transition: background-color 0.2s ease; }
-.search-result-item:hover { background-color: #f8f9fa; }
-.search-result-item:last-child { border-bottom: none; }
-
-.template-name { display: block; font-weight: 500; color: #495057; }
-.template-preview { display: block; font-size: 0.875rem; color: #6c757d; }
-
-/* 도구 내 작은 미리보기 */
-.preview-content { min-height: 40px; display: flex; align-items: center; justify-content: center; }
+/* 수식 관련 스타일은 MathTools 컴포넌트로 이동 */
 
 /* 도형 미리보기 */
 .preview-container { min-height: 100px; display: flex; align-items: center; justify-content: center; }
