@@ -6,6 +6,8 @@
 
 import { defineStore } from 'pinia'
 import { itemProcessingAPI } from '../services/itemProcessApi.js'
+import { fileHistoryAPI } from '../services/fileHistoryApi.js'
+import { useSubjectStore } from './subjectStore.js'
 // 과목 정보 정의 (areaCode와 매칭)
 const SUBJECTS = {
   'KO': { name: '국어', color: '#ef4444' },
@@ -57,7 +59,11 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
     uploadedPdfInfo: null,
 
     // 원본 페이지 수 (추가)
-    originalPageCount: 0
+    originalPageCount: 0,
+
+    // 파일 히스토리 에러 상태 (추가)
+    showFileHistoryError: false,
+    fileHistoryErrorMessage: ''
   }),
 
   /**
@@ -559,54 +565,131 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
     },
 
     /**
-     * 편집된 PDF를 서버에 업로드
-     * @param {Function} progressCallback - PDF 생성 진행률 콜백 함수 (선택사항)
+     * 원본 PDF를 서버에 업로드 (새로 추가)
      * @returns {Promise<Object>} 업로드 결과
      */
-    async uploadProcessedPdf(progressCallback = null) {
+    async uploadOriginalPdf() {
       try {
-        // 최종 PDF가 없으면 생성
-        if (!this.finalPdf) {
-          await this.generateFinalPdf(progressCallback)
+        if (!this.pdfFile) {
+          throw new Error('업로드할 PDF 파일이 없습니다.')
         }
 
-        // 파일명 생성 (원본 파일명 + 편집됨 + 타임스탬프)
+        console.log('🚀 원본 PDF 업로드 시작...')
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
         const originalName = this.pdfFile.name.replace('.pdf', '')
-        const fileName = `${originalName}_편집됨_${timestamp}.pdf`
-
-        // 업로드 파일 크기만 간단히 로깅
-        console.log(`🚀 PDF 업로드: ${(this.finalPdf.size / 1024 / 1024).toFixed(2)}MB (원본: ${(this.pdfFile.size / 1024 / 1024).toFixed(2)}MB)`)
+        const fileName = `${originalName}_${timestamp}.pdf`
 
         const response = await itemProcessingAPI.uploadProcessedPdf(
-          this.finalPdf,          // file
-          fileName,               // fileName
-          "DOCUMENT",             // category
-          "file_history",         // entityType
-          0,                      // entityId
-          "편집된 PDF 파일"        // description
+          this.pdfFile,
+          fileName,
+          "DOCUMENT",
+          "file_history",
+          0,
+          "원본 PDF 파일"
         )
 
-        if (response.data.success) {
-          this.uploadedPdfInfo = response.data.data
-          return response.data.data
-        } else {
-          throw new Error(response.data.message || 'PDF 업로드에 실패했습니다.')
+        if (!response.data.success) {
+          throw new Error(response.data.message || '원본 PDF 업로드 실패')
         }
 
+        this.uploadedPdfInfo = response.data.data
+        console.log('✅ 원본 PDF 업로드 완료:', this.uploadedPdfInfo)
+
+        // 원본 PDF 업로드 후 파일 히스토리 생성
+        const fileMetadataId = response.data?.data?.id ?? response.data?.data?.fileMetadataId ?? response.data?.data?.fileId
+        if (fileMetadataId && this.selectedTextbook?.areaCode) {
+          const subjectId = await this.getSubjectIdFromAreaCode(this.selectedTextbook.areaCode)
+          if (subjectId) {
+            try {
+              console.log('🚀 원본 PDF 파일 히스토리 생성 시작...')
+              const fileHistoryResponse = await fileHistoryAPI.createFileHistoryWithRetry(fileMetadataId, subjectId)
+              this.uploadedPdfInfo.fileHistoryId = fileHistoryResponse.data.data
+              console.log('✅ 원본 PDF 파일 히스토리 생성 완료')
+            } catch (err) {
+              console.error('❌ 원본 PDF 파일 히스토리 생성 실패:', err)
+              this.showFileHistoryError = true
+              this.fileHistoryErrorMessage = '원본 PDF 파일 히스토리 생성 실패 (서버 문제일 수 있음).'
+            }
+          } else {
+            console.warn('⚠️ 과목 ID를 찾을 수 없어 파일 히스토리를 생성하지 않습니다.')
+          }
+        } else {
+          console.warn('⚠️ 파일 히스토리 생성 조건 미충족:', {
+            fileMetadataId: !!fileMetadataId,
+            selectedTextbook: !!this.selectedTextbook,
+            areaCode: this.selectedTextbook?.areaCode
+          })
+        }
+
+        return this.uploadedPdfInfo
       } catch (error) {
-        console.error('PDF 업로드 실패:', error)
+        console.error('❌ 원본 PDF 업로드 실패:', error)
         throw error
       }
     },
 
     /**
-     * 상태 초기화
+     * 편집된 PDF를 서버에 업로드
+     * @param {Function} progressCallback - PDF 생성 진행률 콜백 함수 (선택사항)
+     * @returns {Promise<Object>} 업로드 결과
      */
-    reset() {
-      // Blob URL들 먼저 정리
-      this.cleanupBlobUrls()
+    async uploadProcessedPdf(progressCallback) {
+      try {
+        if (!this.pdfPages || this.pdfPages.length === 0) {
+          console.log('📄 편집된 페이지 없음 → 원본 업로드로 대체')
+          return await this.uploadOriginalPdf()
+        }
 
+        if (!this.finalPdf) await this.generateFinalPdf(progressCallback)
+
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+        const originalName = this.pdfFile.name.replace('.pdf', '')
+        const fileName = `${originalName}_편집_${timestamp}.pdf`
+
+        const response = await itemProcessingAPI.uploadProcessedPdf(
+          this.finalPdf, fileName, "DOCUMENT", "file_history", 0, "편집된 PDF 파일"
+        )
+
+        if (!response.data.success) throw new Error(response.data.message || '편집된 PDF 업로드 실패')
+        this.uploadedPdfInfo = response.data.data
+
+        const fileMetadataId = response.data?.data?.id ?? response.data?.data?.fileMetadataId ?? response.data?.data?.fileId
+        if (!fileMetadataId) return this.uploadedPdfInfo
+
+        const subjectId = await this.getSubjectIdFromAreaCode(this.selectedTextbook?.areaCode)
+        if (!subjectId) return this.uploadedPdfInfo
+
+        try {
+          const fileHistoryResponse = await fileHistoryAPI.createFileHistoryWithRetry(fileMetadataId, subjectId)
+          this.uploadedPdfInfo.fileHistoryId = fileHistoryResponse.data.data
+        } catch (err) {
+          console.error('❌ 파일 히스토리 생성 실패:', err)
+          this.showFileHistoryError = true
+          this.fileHistoryErrorMessage = '파일 히스토리 생성 실패 (서버 문제일 수 있음).'
+        }
+
+        return this.uploadedPdfInfo
+      } catch (error) {
+        console.error('❌ PDF 업로드 실패:', error)
+        throw error
+      }
+    },
+
+    async getSubjectIdFromAreaCode(areaCode) {
+      try {
+        const subjectStore = useSubjectStore()
+        if (subjectStore.list.length === 0) await subjectStore.fetchSubjects()
+        const subject = subjectStore.list.find(s => s.areaCode === areaCode)
+        return subject ? subject.subjectId : null
+      } catch (error) {
+        console.error('❌ 과목 정보 조회 실패:', error)
+        const fallbackMapping = { 'KO': 1, 'EN': 2, 'MA': 3, 'SO': 4, 'SC': 5, 'HS': 6, 'MO': 7 }
+        return fallbackMapping[areaCode] || null
+      }
+    },
+
+    reset() {
+      this.cleanupBlobUrls()
       this.textbooks = []
       this.selectedTextbook = null
       this.pdfFile = null
@@ -619,3 +702,4 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
     }
   }
 })
+

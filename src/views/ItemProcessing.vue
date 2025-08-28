@@ -8,6 +8,24 @@
       </div>
     </div>
 
+    <!-- 파일 히스토리 에러 알림 -->
+    <div v-if="showFileHistoryError" class="alert alert-warning alert-dismissible fade show mx-3 mt-3" role="alert">
+      <div class="d-flex align-items-center">
+        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+        <div>
+          <strong>파일 히스토리 생성 실패</strong>
+          <p class="mb-0 mt-1 small">{{ fileHistoryErrorMessage }}</p>
+          <p class="mb-0 mt-1 small text-muted">PDF 업로드는 성공했지만, 파일 히스토리 생성에 실패했습니다. 이는 서버 측 문제일 수 있습니다.</p>
+        </div>
+      </div>
+      <button
+        type="button"
+        class="btn-close"
+        @click="hideFileHistoryError"
+        aria-label="Close"
+      ></button>
+    </div>
+
     <!-- 단계별 진행 표시기 -->
     <div class="progress-stepper-container bg-white border-bottom py-4 mb-4">
       <div class="container">
@@ -24,7 +42,7 @@
             <div class="step-connector ms-3" v-if="pdfFile"></div>
           </div>
 
-          <div class="step-item d-flex align-items-center" :class="{ active: pdfFile && !isConvertingPdf, completed: showOcrEditor }">
+          <div class="step-item d-flex align-items-center" :class="{ active: pdfFile, completed: showOcrEditor }">
             <div class="step-number rounded-circle d-flex align-items-center justify-content-center fw-bold">3</div>
             <span class="step-label ms-2 fw-medium">PDF 편집</span>
             <div class="step-connector ms-3" v-if="showOcrEditor"></div>
@@ -61,35 +79,27 @@
           @file-selected="handlePdfFile"
         />
 
-        <!-- PDF 변환 로딩 상태 -->
-        <div v-else-if="isConvertingPdf" class="conversion-loading d-flex justify-content-center align-items-center bg-white rounded-4 border p-5" style="min-height: 400px;">
+        <!-- PDF 업로드 로딩 상태 -->
+        <div v-else-if="loading" class="conversion-loading d-flex justify-content-center align-items-center bg-white rounded-4 border p-5" style="min-height: 400px;">
           <div class="loading-content text-center">
-            <div class="loading-icon fs-1 mb-3">🔄</div>
-            <h3 class="fw-semibold text-dark mb-4">PDF 변환 중...</h3>
+            <div class="loading-icon fs-1 mb-3">📤</div>
+            <h3 class="fw-semibold text-dark mb-4">PDF 업로드 중...</h3>
             <div class="progress-info bg-light rounded-3 p-4 border">
               <div class="progress mb-3" style="height: 12px;">
-                <div
-                  class="progress-bar bg-primary"
-                  :style="{ width: `${(convertedPdfPages / totalPdfPages) * 100}%` }"
-                  role="progressbar"
-                  :aria-valuenow="convertedPdfPages"
-                  :aria-valuemin="0"
-                  :aria-valuemax="totalPdfPages"
-                ></div>
+                <div class="progress-bar bg-primary progress-bar-striped progress-bar-animated" style="width: 100%"></div>
               </div>
-              <div class="progress-text d-flex justify-content-between text-muted small mb-3">
-                <span>{{ convertedPdfPages }}/{{ totalPdfPages }} 페이지</span>
-              </div>
-              <div class="progress-details d-flex justify-content-between text-muted small">
-                <span>현재 페이지: {{ currentPdfPage }}</span> <div>  </div>
+              <div class="progress-text text-muted small mb-3">
+                <span>서버에 PDF 파일을 업로드하고 있습니다...</span>
               </div>
             </div>
           </div>
         </div>
 
+        <!-- PDF 변환 로딩 상태는 제거 (서버에서 이미지 변환) -->
+
         <!-- 3단계: PDF 편집 -->
         <PdfEditor
-          v-else-if="!showOcrEditor && !isGeneratingPdf"
+          v-else-if="!showOcrEditor && !isGeneratingPdf && !loading"
           :pdf-pages="pdfPages"
           @page-removed="removePage"
           @page-moved="movePage"
@@ -190,12 +200,12 @@ export default {
     const presignedUrl = ref('')
     const fileId = ref(null)
 
-    // PDF 변환 로딩 상태
-    const isConvertingPdf = ref(false)
-    const convertedPdfPages = ref(0)
-    const totalPdfPages = ref(0)
-    const currentPdfPage = ref(0)
-    const pdfConversionStartTime = ref(null)
+    // PDF 변환 관련 변수들은 제거 (서버에서 이미지 변환)
+    // const isConvertingPdf = ref(false)
+    // const convertedPdfPages = ref(0)
+    // const totalPdfPages = ref(0)
+    // const currentPdfPage = ref(0)
+    // const pdfConversionStartTime = ref(null)
 
     // PDF 생성 로딩 상태
     const isGeneratingPdf = ref(false)
@@ -208,6 +218,10 @@ export default {
     const textbooks = computed(() => itemProcessingStore.textbooks)
     const groupedTextbooks = computed(() => itemProcessingStore.groupedTextbooks)
     const subjects = computed(() => itemProcessingStore.subjects)
+
+    // 파일 히스토리 에러 관련 computed 속성
+    const showFileHistoryError = computed(() => itemProcessingStore.showFileHistoryError)
+    const fileHistoryErrorMessage = computed(() => itemProcessingStore.fileHistoryErrorMessage)
 
 
     // Composable 초기화
@@ -274,12 +288,31 @@ export default {
         pdfFile.value = file
         itemProcessingStore.setPdfFile(file)
 
-        // presigned URL 설정 (실제 구현에서는 서버에서 받아와야 함)
-        presignedUrl.value = 'https://example.com/temp-pdf-url'
+        // PDF 파일을 서버에 즉시 업로드 (원본 PDF)
+        try {
+          console.log('🚀 PDF 파일 선택됨, 원본 PDF 서버 업로드 시작...')
 
-        // fileId 설정 (실제 구현에서는 서버 응답에서 받아와야 함)
-        fileId.value = Date.now() // 임시 ID
+          // 로딩 상태 시작
+          itemProcessingStore.loading = true
 
+          const uploadResponse = await itemProcessingStore.uploadOriginalPdf()
+          console.log('✅ 원본 PDF 서버 업로드 완료:', uploadResponse)
+
+          // 업로드 성공 후 PDF 편집 단계로 진행
+          console.log('📝 PDF 편집 단계로 진행...')
+
+        } catch (uploadError) {
+          console.error('❌ 원본 PDF 서버 업로드 실패:', uploadError)
+          itemProcessingStore.loading = false
+          throw new Error(`PDF 업로드 실패: ${uploadError.message}`)
+        } finally {
+          // 로딩 상태 종료
+          itemProcessingStore.loading = false
+        }
+
+        // 클라이언트에서 PDF를 이미지로 변환하는 기능은 주석 처리
+        // 서버에서 이미지 변환 후 전송받을 예정
+        /*
         // images가 비어있으면 PDF를 이미지로 변환
         if (!images || images.length === 0) {
           // 로딩 상태 시작
@@ -295,12 +328,12 @@ export default {
           const pdfjsWorker = await import('pdfjs-dist/build/pdf.worker.entry')
           pdfjsLib.GlobalWorkerOptions.workerSrc = pdfjsWorker
 
-                  // PDF 파일을 ArrayBuffer로 읽기
-        const arrayBuffer = await file.arrayBuffer()
+          // PDF 파일을 ArrayBuffer로 읽기
+          const arrayBuffer = await file.arrayBuffer()
 
-        // PDF 문서 로드
-        const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
-        totalPdfPages.value = pdfDoc.numPages
+          // PDF 문서 로드
+          const pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+          totalPdfPages.value = pdfDoc.numPages
 
           // 각 페이지를 이미지로 변환
           for (let pageNum = 1; pageNum <= totalPdfPages.value; pageNum++) {
@@ -318,8 +351,6 @@ export default {
             canvas.width = viewport.width
             canvas.height = viewport.height
 
-
-
             // Canvas 렌더링 품질을 극한으로 설정
             context.imageSmoothingEnabled = true
             context.imageSmoothingQuality = 'high'
@@ -334,8 +365,6 @@ export default {
             // PNG: 무손실이지만 파일 크기가 큼, JPEG: 손실 압축이지만 파일 크기가 작음
             const imageDataUrl = canvas.toDataURL('image/png', 0.9)
             // JPEG 테스트용 (파일 크기 절약): const imageDataUrl = canvas.toDataURL('image/jpeg', 0.9)
-
-
 
             pages.push({
               index: pageNum - 1,
@@ -372,6 +401,11 @@ export default {
             height: img.height
           })))
         }
+        */
+
+        // 서버에서 이미지 변환 후 전송받을 예정이므로 임시로 빈 배열 설정
+        console.log('📤 PDF 업로드 완료, 서버에서 이미지 변환 후 전송받을 예정')
+        pages.length = 0
 
         pdfPages.value = pages
         itemProcessingStore.setPdfPages(pages)
@@ -539,47 +573,16 @@ export default {
         // 로딩 상태 즉시 시작
         isGeneratingPdf.value = true
         pdfGenerationProgress.value = 0
-        currentPdfStage.value = 'PDF 변환 시작'
+        currentPdfStage.value = 'OCR 편집 준비 중'
 
-        // 단계별 진행률 시뮬레이션 (실제 진행률이 없는 경우)
-        const simulateProgress = () => {
-          const stages = [
-            { stage: 'PDF 변환 시작', progress: 10 },
-            { stage: '페이지 처리 중', progress: 30 },
-            { stage: '이미지 최적화', progress: 50 },
-            { stage: 'PDF 생성 중', progress: 80 },
-            { stage: '최종 검증', progress: 95 }
-          ]
-
-          let currentStageIndex = 0
-
-          const progressInterval = setInterval(() => {
-            if (currentStageIndex < stages.length) {
-              const stage = stages[currentStageIndex]
-              currentPdfStage.value = stage.stage
-              pdfGenerationProgress.value = stage.progress
-              currentStageIndex++
-            } else {
-              clearInterval(progressInterval)
-            }
-          }, 1000) // 1초마다 단계 변경
-
-          return progressInterval
-        }
-
-        // 진행률 시뮬레이션 시작
-        const progressInterval = simulateProgress()
-
-        // PDF 생성 진행률 콜백 (실제 구현에서 사용)
-        const progressCallback = (progress) => {
-          if (progress && typeof progress.percentage === 'number') {
-            pdfGenerationProgress.value = Math.min(progress.percentage, 100)
-            currentPdfStage.value = progress.stage || currentPdfStage.value
+        // 간단한 진행률 시뮬레이션
+        const progressInterval = setInterval(() => {
+          if (pdfGenerationProgress.value < 100) {
+            pdfGenerationProgress.value += 20
+          } else {
+            clearInterval(progressInterval)
           }
-        }
-
-        // 실제 PDF 업로드 (진행률 콜백이 작동하지 않는 경우를 대비)
-        await itemProcessingStore.uploadProcessedPdf(progressCallback)
+        }, 500)
 
         // 진행률을 100%로 설정
         pdfGenerationProgress.value = 100
@@ -590,7 +593,6 @@ export default {
 
         // 잠시 완료 상태를 보여준 후 다음 단계로
         setTimeout(() => {
-          alert('편집된 PDF가 성공적으로 업로드되었습니다.')
           // 로딩 상태 종료 후 OCR 편집 화면으로 이동
           isGeneratingPdf.value = false
           showOcrEditor.value = true
@@ -611,6 +613,13 @@ export default {
       showOcrEditor.value = false
     }
 
+    /**
+     * 파일 히스토리 에러 숨기기
+     */
+    const hideFileHistoryError = () => {
+      itemProcessingStore.showFileHistoryError = false
+    }
+
 
     return {
       // 상태
@@ -627,13 +636,15 @@ export default {
       presignedUrl,
       fileId,
       errorHandler,
-      isConvertingPdf,
-      convertedPdfPages,
-      totalPdfPages,
-      currentPdfPage,
+      // isConvertingPdf,
+      // convertedPdfPages,
+      // totalPdfPages,
+      // currentPdfPage,
       isGeneratingPdf,
       pdfGenerationProgress,
       currentPdfStage,
+      showFileHistoryError,
+      fileHistoryErrorMessage,
 
       // 메서드
       selectSubject,
@@ -647,6 +658,7 @@ export default {
       goToPdfEdit,
       goToOcrEditor,
       goBackFromOcr,
+      hideFileHistoryError,
     }
   },
 }
