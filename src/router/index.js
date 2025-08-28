@@ -24,6 +24,9 @@ import LiveExamManagement from '@/components/student/class-room/liveExamManageme
 import ItemProcessing from '@/views/ItemProcessing.vue'
 import ItemProcessingTextbook from '@/views/ItemProcessingTextbook.vue'
 
+// TinyMCE 테스트 페이지 import
+import TinyMCETestView from '@/views/TinyMCETestView.vue'
+
 // 라우트 가드 import
 import { requireAuth, preventAuthenticated } from './guards'
 import SignUp from '@/views/SignUp.vue'
@@ -166,6 +169,15 @@ const routes = [
     name: 'PdfTest',
     component: () => import('@/views/PdfTest.vue'),
   },
+  {
+    path: '/tinymce-test',
+    name: 'TinyMCETest',
+    component: TinyMCETestView,
+    meta: {
+      requiresAuth: false, // 인증 없이 접근 가능
+    },
+  },
+
   {
     path: '/signup',
     name: 'SignUp',

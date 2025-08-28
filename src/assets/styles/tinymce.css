@@ -1,0 +1,323 @@
+/**
+ * TinyMCE 에디터 커스텀 스타일
+ * CKEditor에서 TinyMCE로의 마이그레이션을 위한 스타일
+ */
+
+/* TinyMCE 에디터 컨테이너 스타일 */
+.tinymce-editor {
+  border: 1px solid #ddd;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.tinymce-editor .tox-tinymce {
+  border: none !important;
+  border-radius: 8px !important;
+}
+
+/* TinyMCE 툴바 스타일 */
+.tinymce-editor .tox-toolbar {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+  border-bottom: 1px solid #dee2e6 !important;
+}
+
+.tinymce-editor .tox-toolbar__group {
+  border-right: 1px solid #dee2e6 !important;
+}
+
+.tinymce-editor .tox-tbtn {
+  border-radius: 4px !important;
+  margin: 2px !important;
+  transition: all 0.2s ease !important;
+}
+
+.tinymce-editor .tox-tbtn:hover {
+  background-color: #007cba !important;
+  color: white !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2) !important;
+}
+
+.tinymce-editor .tox-tbtn--enabled {
+  background-color: #007cba !important;
+  color: white !important;
+}
+
+/* TinyMCE 메뉴바 스타일 */
+.tinymce-editor .tox-menubar {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%) !important;
+  border-bottom: 1px solid #dee2e6 !important;
+}
+
+.tinymce-editor .tox-menu {
+  border: 1px solid #dee2e6 !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15) !important;
+}
+
+.tinymce-editor .tox-collection__item {
+  padding: 8px 16px !important;
+  transition: background-color 0.2s ease !important;
+}
+
+.tinymce-editor .tox-collection__item:hover {
+  background-color: #007cba !important;
+  color: white !important;
+}
+
+/* TinyMCE 에디터 영역 스타일 */
+.tinymce-editor .tox-edit-area {
+  background-color: #ffffff !important;
+}
+
+.tinymce-editor .tox-edit-area__iframe {
+  border: none !important;
+}
+
+/* TinyMCE 상태바 스타일 */
+.tinymce-editor .tox-statusbar {
+  background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%) !important;
+  border-top: 1px solid #dee2e6 !important;
+  color: #6c757d !important;
+  font-size: 12px !important;
+}
+
+/* TinyMCE 다이얼로그 스타일 */
+.tinymce-editor .tox-dialog {
+  border-radius: 8px !important;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2) !important;
+}
+
+.tinymce-editor .tox-dialog__header {
+  background: linear-gradient(135deg, #007cba 0%, #005a8b 100%) !important;
+  color: white !important;
+  border-radius: 8px 8px 0 0 !important;
+}
+
+.tinymce-editor .tox-dialog__body {
+  padding: 20px !important;
+}
+
+.tinymce-editor .tox-dialog__footer {
+  background-color: #f8f9fa !important;
+  border-top: 1px solid #dee2e6 !important;
+  border-radius: 0 0 8px 8px !important;
+}
+
+/* TinyMCE 버튼 스타일 */
+.tinymce-editor .tox-button {
+  border-radius: 6px !important;
+  padding: 8px 16px !important;
+  font-weight: 500 !important;
+  transition: all 0.2s ease !important;
+}
+
+.tinymce-editor .tox-button--primary {
+  background-color: #007cba !important;
+  color: white !important;
+  border: none !important;
+}
+
+.tinymce-editor .tox-button--primary:hover {
+  background-color: #005a8b !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+.tinymce-editor .tox-button--secondary {
+  background-color: #6c757d !important;
+  color: white !important;
+  border: none !important;
+}
+
+.tinymce-editor .tox-button--secondary:hover {
+  background-color: #545b62 !important;
+  transform: translateY(-1px) !important;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2) !important;
+}
+
+/* TinyMCE 입력 필드 스타일 */
+.tinymce-editor .tox-textfield,
+.tinymce-editor .tox-textarea {
+  border: 1px solid #ced4da !important;
+  border-radius: 4px !important;
+  padding: 8px 12px !important;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease !important;
+}
+
+.tinymce-editor .tox-textfield:focus,
+.tinymce-editor .tox-textarea:focus {
+  border-color: #007cba !important;
+  box-shadow: 0 0 0 3px rgba(0, 124, 186, 0.1) !important;
+  outline: none !important;
+}
+
+/* TinyMCE 체크박스 및 라디오 버튼 스타일 */
+.tinymce-editor .tox-checkbox,
+.tinymce-editor .tox-radio {
+  accent-color: #007cba !important;
+}
+
+/* TinyMCE 드롭다운 스타일 */
+.tinymce-editor .tox-listbox {
+  border: 1px solid #ced4da !important;
+  border-radius: 4px !important;
+  padding: 6px 10px !important;
+  background-color: white !important;
+}
+
+.tinymce-editor .tox-listbox:focus {
+  border-color: #007cba !important;
+  box-shadow: 0 0 0 3px rgba(0, 124, 186, 0.1) !important;
+  outline: none !important;
+}
+
+/* TinyMCE 테이블 스타일 */
+.tinymce-editor .tox-table {
+  border-collapse: collapse !important;
+  width: 100% !important;
+}
+
+.tinymce-editor .tox-table th,
+.tinymce-editor .tox-table td {
+  border: 1px solid #dee2e6 !important;
+  padding: 8px 12px !important;
+  text-align: left !important;
+}
+
+.tinymce-editor .tox-table th {
+  background-color: #f8f9fa !important;
+  font-weight: 600 !important;
+}
+
+/* TinyMCE 이미지 스타일 */
+.tinymce-editor .tox-image {
+  max-width: 100% !important;
+  height: auto !important;
+  border-radius: 4px !important;
+}
+
+/* TinyMCE 링크 스타일 */
+.tinymce-editor .tox-link {
+  color: #007cba !important;
+  text-decoration: underline !important;
+}
+
+.tinymce-editor .tox-link:hover {
+  color: #005a8b !important;
+  text-decoration: none !important;
+}
+
+/* TinyMCE 코드 블록 스타일 */
+.tinymce-editor .tox-code {
+  background-color: #f8f9fa !important;
+  border: 1px solid #e9ecef !important;
+  border-radius: 4px !important;
+  padding: 12px !important;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+  overflow-x: auto !important;
+}
+
+/* TinyMCE 인용구 스타일 */
+.tinymce-editor .tox-blockquote {
+  border-left: 4px solid #007cba !important;
+  margin: 16px 0 !important;
+  padding: 12px 20px !important;
+  background-color: #f8f9fa !important;
+  font-style: italic !important;
+  color: #495057 !important;
+}
+
+/* TinyMCE 경고 메시지 스타일 */
+.tinymce-editor .tox-notification {
+  border-radius: 6px !important;
+  margin: 8px 0 !important;
+  padding: 12px 16px !important;
+}
+
+.tinymce-editor .tox-notification--error {
+  background-color: #f8d7da !important;
+  color: #721c24 !important;
+  border: 1px solid #f5c6cb !important;
+}
+
+.tinymce-editor .tox-notification--warning {
+  background-color: #fff3cd !important;
+  color: #856404 !important;
+  border: 1px solid #ffeaa7 !important;
+}
+
+.tinymce-editor .tox-notification--success {
+  background-color: #d4edda !important;
+  color: #155724 !important;
+  border: 1px solid #c3e6cb !important;
+}
+
+/* TinyMCE 로딩 상태 스타일 */
+.tinymce-editor .tox-loading {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 40px !important;
+  color: #6c757d !important;
+}
+
+.tinymce-editor .tox-loading::before {
+  content: '' !important;
+  width: 20px !important;
+  height: 20px !important;
+  border: 2px solid #f3f3f3 !important;
+  border-top: 2px solid #007cba !important;
+  border-radius: 50% !important;
+  animation: spin 1s linear infinite !important;
+  margin-right: 12px !important;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* TinyMCE 반응형 스타일 */
+@media (max-width: 768px) {
+  .tinymce-editor .tox-toolbar {
+    flex-wrap: wrap !important;
+  }
+
+  .tinymce-editor .tox-toolbar__group {
+    margin-bottom: 4px !important;
+  }
+
+  .tinymce-editor .tox-dialog {
+    width: 95% !important;
+    max-width: none !important;
+    margin: 20px auto !important;
+  }
+}
+
+/* TinyMCE 다크 모드 지원 */
+@media (prefers-color-scheme: dark) {
+  .tinymce-editor .tox-tinymce {
+    background-color: #2d3748 !important;
+    color: #e2e8f0 !important;
+  }
+
+  .tinymce-editor .tox-toolbar {
+    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%) !important;
+    border-bottom-color: #4a5568 !important;
+  }
+
+  .tinymce-editor .tox-menubar {
+    background: linear-gradient(135deg, #2d3748 0%, #4a5568 100%) !important;
+    border-bottom-color: #4a5568 !important;
+  }
+
+  .tinymce-editor .tox-statusbar {
+    background: linear-gradient(135deg, #4a5568 0%, #2d3748 100%) !important;
+    border-top-color: #4a5568 !important;
+    color: #a0aec0 !important;
+  }
+}
