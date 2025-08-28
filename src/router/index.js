@@ -18,6 +18,8 @@ import CBTExam from '@/components/student/cbt/CBTExam.vue'
 
 import MyClass from '@/components/student/class-room/myClass.vue'
 import LiveExam from '@/components/student/class-room/liveExam.vue'
+import StudentScore from '@/components/student/class-room/StudentScore.vue'
+import LiveExamManagement from '@/components/student/class-room/liveExamManagement.vue'
 
 import ItemProcessing from '@/views/ItemProcessing.vue'
 import ItemProcessingTextbook from '@/views/ItemProcessingTextbook.vue'
@@ -28,6 +30,7 @@ import TinyMCETestView from '@/views/TinyMCETestView.vue'
 // 라우트 가드 import
 import { requireAuth, preventAuthenticated } from './guards'
 import SignUp from '@/views/SignUp.vue'
+import SignUpModern from '@/views/SignUpModern.vue'
 
 // OAuth2 관련 컴포넌트 import
 import OAuth2Callback from '@/components/oauth2/OAuth2Callback.vue'
@@ -103,9 +106,19 @@ const routes = [
           { path: 'live-exam/:examId', name: 'student.classRoom.liveExam', component: LiveExam },
         ],
       },
-
+      { path: 'scores', name: 'student.scores', component: StudentScore}
       // { path: 'result/:id', name: 'student.result', component: StudentResult },
     ],
+  },
+  {
+    path: '/teacher/class-room/live-exam-management/:examId',
+    name: 'teacher.classRoom.liveExamManagement',
+    component: LiveExamManagement,
+    beforeEnter: requireAuth,
+    meta: {
+      requiresAuth: true,
+      role: 'teacher',
+    },
   },
 
   // 학급관리 페이지 (대시보드)
@@ -168,14 +181,24 @@ const routes = [
   {
     path: '/signup',
     name: 'SignUp',
-    component: SignUp,
+    component: SignUp, // 기존 회원가입 페이지 사용
     beforeEnter: preventAuthenticated,
     meta: {
       hideHeader: true, // 헤더 숨김
       hideFooter: true, // 푸터 숨김
     },
   },
-  
+  {
+    path: '/signup-modern',
+    name: 'SignUpModern',
+    component: SignUpModern, // 모던 회원가입 페이지 (백업용)
+    beforeEnter: preventAuthenticated,
+    meta: {
+      hideHeader: true,
+      hideFooter: true,
+    },
+  },
+
   // MathJax 테스트 페이지
   {
     path: '/mathjax-test',

@@ -14,10 +14,11 @@ export const useMathJax = (options = {}) => {
   const {
     immediate = true,           // 마운트 시 즉시 렌더링
     watchContent = true,         // 컨텐츠 변경 감지
-    debounceDelay = 200,        // 디바운스 지연 시간
+    debounceDelay = 100,        // 디바운스 지연 시간 단축
     containerSelector = null,   // 특정 컨테이너 선택자
     hideBeforeRender = true,     // 렌더링 전 수식 숨김
-    clearFirst = true           // 렌더링 전 기존 수식 정리
+    clearFirst = false,         // 렌더링 전 기존 수식 정리 (false로 변경)
+    waitForContent = true       // 컨텐츠 준비 대기 옵션 추가
   } = options
   
   // 상태 관리
@@ -31,7 +32,7 @@ export const useMathJax = (options = {}) => {
   let observerInstance = null
   
   /**
-   * 단일 요소 렌더링
+   * 단일 요소 렌더링 (FOUC 방지 강화)
    * @param {HTMLElement|string} target - 렌더링 대상 요소 또는 선택자
    */
   const render = async (target = null) => {
@@ -39,6 +40,7 @@ export const useMathJax = (options = {}) => {
       isRendering.value = true
       lastError.value = null
       
+      // Vue 렌더링 완료 대기
       await nextTick()
       
       let element = target
@@ -53,10 +55,21 @@ export const useMathJax = (options = {}) => {
         element = document.querySelector(containerSelector)
       }
       
-      // 렌더링 수행
+      // 컨텐츠 준비 대기 (v-html이 완전히 적용되기를 기다림)
+      if (waitForContent && element) {
+        await new Promise(resolve => {
+          // 이중 requestAnimationFrame으로 확실한 DOM 업데이트 대기
+          requestAnimationFrame(() => {
+            requestAnimationFrame(resolve)
+          })
+        })
+      }
+      
+      // 렌더링 수행 (typesetPromise 사용)
       await renderMathJax(element, {
         hideBeforeRender,
         clearFirst,
+        forceHide: true,  // 강제 숨김 활성화
         debounceTime: 0 // 컴포저블 레벨에서 디바운스 처리
       })
       
@@ -85,7 +98,7 @@ export const useMathJax = (options = {}) => {
   }
   
   /**
-   * 여러 요소 일괄 렌더링
+   * 여러 요소 일괄 렌더링 (Promise 기반)
    * @param {Array<HTMLElement>|string} targets - 렌더링 대상 요소들 또는 선택자
    */
   const renderBatch = async (targets) => {
@@ -100,6 +113,15 @@ export const useMathJax = (options = {}) => {
       // 문자열 선택자인 경우 요소들 찾기
       if (typeof targets === 'string') {
         elements = Array.from(document.querySelectorAll(targets))
+      }
+      
+      // 컨텐츠 준비 대기
+      if (waitForContent) {
+        await new Promise(resolve => {
+          requestAnimationFrame(() => {
+            requestAnimationFrame(resolve)
+          })
+        })
       }
       
       // 렌더링 수행

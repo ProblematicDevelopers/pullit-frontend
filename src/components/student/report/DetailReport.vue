@@ -17,12 +17,16 @@ const selectedQuestion = ref(null)
 const props = defineProps({
   examId: { type: Number, default: -1 },
   questionId: { type: Number, default: -1 },
+  examName: { type: String, default: '' },
 })
 
 // detail errata
 const errataData = ref([])
 const errataLoading = ref(false)
 const errataError = ref(null)
+
+// PDF 다운로드 상태
+const isDownloading = ref(false)
 
 // 차트 관련 변수
 const chartCanvas = ref(null)
@@ -73,6 +77,10 @@ function createChart() {
     chart.destroy()
   }
 
+  // Canvas 크기 명시적 설정
+  chartCanvas.value.width = 900
+  chartCanvas.value.height = 400
+
   // 문제 번호와 평균 정답률 데이터 추출
   const labels = errataData.value.map((question) => `문제 ${question.itemOrder}`)
   const accuracyData = errataData.value.map((question) => Math.round(question.accuracy * 100))
@@ -102,26 +110,17 @@ function createChart() {
       ],
     },
     options: {
-      responsive: true,
+      responsive: false, // PDF에서는 반응형 비활성화
       maintainAspectRatio: false,
+      // 차트 크기 명시적 설정 (PDF에서도 유지)
+      width: 900,
+      height: 400,
       plugins: {
         legend: {
           display: false,
         },
         title: {
-          display: true,
-          text: '평균 정답률 분석',
-          font: {
-            size: 18,
-            weight: 'bold',
-            family: 'Inter, sans-serif',
-            style: 'normal',
-          },
-          color: '#1f2937',
-          padding: {
-            top: 10,
-            bottom: 20,
-          },
+          display: false,
         },
         tooltip: {
           backgroundColor: 'rgba(0, 0, 0, 0.8)',
@@ -182,6 +181,9 @@ function createChart() {
           },
         },
       },
+      // 막대 두께 조절
+      barThickness: 'flex',
+      maxBarThickness: 50,
       elements: {
         bar: {
           hoverBackgroundColor: function (context) {
@@ -190,8 +192,14 @@ function createChart() {
           },
         },
       },
-    },
+        },
   })
+
+  // 차트 인스턴스를 canvas에 저장 (PDF 변환 시 참조용)
+  if (chartCanvas.value) {
+    chartCanvas.value.chart = chart
+    console.log('DetailReport 차트 인스턴스 저장됨:', chart)
+  }
 }
 
 // 차트 데이터 업데이트 함수
@@ -529,26 +537,99 @@ onMounted(() => {
 })
 
 // 리포트 다운로드 함수
-function downloadReport() {
-  // 현재 날짜와 시간을 파일명에 포함
-  const now = new Date()
-  const dateStr = now.toISOString().slice(0, 10) // YYYY-MM-DD
-  const timeStr = now.toTimeString().slice(0, 8).replace(/:/g, '-') // HH-MM-SS
+async function downloadReport() {
+  try {
+    console.log('PDF 다운로드 시작')
+    // 다운로드 상태 초기화
+    isDownloading.value = true
 
-  // 파일명 생성
-  const fileName = `상세리포트_${dateStr}_${timeStr}.pdf`
+                    // 차트 렌더링을 위한 충분한 대기 시간
+    console.log('차트 렌더링 대기 중...')
+    await new Promise(resolve => setTimeout(resolve, 3000))
 
-  // PDF 다운로드 로직 (실제 구현은 백엔드 API 필요)
-  console.log('다운로드 시작:', fileName)
+    // 차트 강제 업데이트 (안전한 방법)
+    if (chart) {
+      console.log('DetailReport 차트 강제 업데이트')
+      try {
+        chart.update('none')
+        await new Promise(resolve => setTimeout(resolve, 500))
+      } catch (error) {
+        console.warn('차트 업데이트 중 오류:', error)
+      }
+    }
 
-  // 임시로 alert 표시 (실제로는 PDF 생성 및 다운로드 로직 구현)
-  alert('다운로드 기능은 현재 개발 중입니다.')
+    // DetailReport 차트 canvas에서도 확인
+    if (chartCanvas.value && chartCanvas.value.chart) {
+      console.log('DetailReport canvas 차트 강제 업데이트')
+      try {
+        chartCanvas.value.chart.update('none')
+        await new Promise(resolve => setTimeout(resolve, 300))
+      } catch (error) {
+        console.warn('canvas 차트 업데이트 중 오류:', error)
+      }
+    }
+
+    // MultiDatasetChart 컴포넌트들 강제 업데이트 (안전한 방법)
+    const chartContainers = document.querySelectorAll('.chart-container')
+    for (const container of chartContainers) {
+      const canvas = container.querySelector('canvas')
+      if (canvas && canvas.chart) {
+        console.log('MultiDatasetChart 강제 업데이트')
+        try {
+          canvas.chart.update('none')
+          await new Promise(resolve => setTimeout(resolve, 300))
+        } catch (error) {
+          console.warn('MultiDatasetChart 업데이트 중 오류:', error)
+        }
+      }
+    }
+
+    // HTML을 PDF로 변환하는 서비스 사용
+    const { convertDetailReportToPdf } = await import('@/services/htmlToPdfService.js')
+
+    // examName이 있으면 파일명에 포함, 없으면 자동 생성
+    let fileName = null
+    if (props.examName) {
+      const now = new Date()
+      const dateStr = now.toISOString().slice(0, 10) // YYYY-MM-DD
+
+      // 사용자 정보 가져오기
+      let userName = '사용자'
+      const userInfo = localStorage.getItem('userInfo')
+      if (userInfo) {
+        try {
+          const user = JSON.parse(userInfo)
+          if (user.fullName) {
+            userName = user.fullName.replace(/[^\w\s가-힣]/g, '_')
+          } else if (user.name) {
+            userName = user.name.replace(/[^\w\s가-힣]/g, '_')
+          } else if (user.username) {
+            userName = user.username.replace(/[^\w\s가-힣]/g, '_')
+          }
+        } catch (error) {
+          console.warn('사용자 정보 파싱 오류:', error)
+        }
+      }
+
+      fileName = `${props.examName}_${userName}_${dateStr}.pdf`
+    }
+
+    console.log('convertDetailReportToPdf 호출:', fileName)
+    await convertDetailReportToPdf(fileName)
+    console.log('PDF 다운로드 완료')
+  } catch (error) {
+    console.error('상세리포트 PDF 다운로드 실패:', error)
+    alert('PDF 생성 중 오류가 발생했습니다. 다시 시도해주세요.')
+  } finally {
+    // 다운로드 상태 초기화
+    isDownloading.value = false
+  }
 }
 </script>
 
 <template>
-  <!-- 상세 정오표 -->
-  <div>
+  <!-- 전체 리포트 컨테이너 -->
+  <div class="report-wrap" data-report-container>
     <!-- 로딩 상태 -->
     <div v-if="errataLoading" class="loading-container">
       <div class="loading-spinner"></div>
@@ -562,6 +643,7 @@ function downloadReport() {
         <button @click="getDetailErrata" class="retry-btn">다시 시도</button>
       </div>
     </div>
+
     <!-- 정오표 -->
     <table v-else class="errata table table-bordered">
       <thead>
@@ -574,12 +656,12 @@ function downloadReport() {
           <th>획득 점수</th>
           <th>정답 여부</th>
           <th>평균 정답율</th>
-          <th>문제 보기</th>
+          <th class="hide-in-pdf">문제 보기</th>
         </tr>
       </thead>
       <tbody>
         <tr v-if="errataData.length === 0">
-          <td colspan="9">조회된 결과가 없습니다.</td>
+          <td colspan="8">조회된 결과가 없습니다.</td>
         </tr>
         <tr v-else v-for="(question, index) in errataData" :key="`${question}_${index}`">
           <td>{{ question.itemOrder }}</td>
@@ -596,7 +678,7 @@ function downloadReport() {
           <td>{{ Math.round(question.accuracy * 10000) / 100 }} %</td>
           <td>
             <button
-              class="view-btn"
+              class="view-btn hide-in-pdf"
               @click="viewQuestionDetail(question, index)"
               :disabled="!question.itemId"
             >
@@ -619,281 +701,276 @@ function downloadReport() {
               ) / 100
             }}%
           </td>
-          <td>-</td>
         </tr>
       </tbody>
     </table>
+
+    <!-- 평균 정답률 차트 -->
+    <div class="statistics-section">
+      <h2 class="section-title">📊 평균 정답률 분석</h2>
+      <div class="chart-section">
+        <div class="chart-container">
+          <canvas ref="chartCanvas"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- 난이도별 통계 -->
+    <div class="statistics-section">
+      <h2 class="section-title">📊 난이도별 통계</h2>
+
+      <!-- 로딩 상태 -->
+      <div v-if="difficultyLoading" class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>시험 데이터를 불러오는 중...</p>
+      </div>
+
+      <!-- 에러 상태 -->
+      <div v-else-if="difficultyError" class="error-container">
+        <div class="error-message">
+          <p>{{ error }}</p>
+          <button @click="getDetailDifficulty" class="retry-btn">다시 시도</button>
+        </div>
+      </div>
+
+      <!-- 난이도별 차트 -->
+      <MultiDatasetChartComponent
+        v-if="difficultyData.length > 0"
+        :chartData="difficultyChartData"
+        :datasetLabels="difficultyDisplayLabels"
+        title="난이도별 통계"
+        :normalize="difficultyNormalize"
+        :maxValues="difficultyMaxValues"
+        :chartType="difficultyChartType"
+      />
+
+      <!-- 차트 설정 패널 -->
+      <div class="chart-controls hide-in-pdf">
+        <div class="controls-panel">
+          <h3 class="controls-title">📊 차트 설정</h3>
+
+          <div class="controls-grid">
+            <div class="control-group">
+              <label class="control-label">데이터 표시 방식</label>
+              <select class="control-select" v-model="difficultyNormalize">
+                <option :value="false">📊 원본 데이터 (실제 값)</option>
+                <option :value="true">📈 정규화 데이터 (0-100%)</option>
+              </select>
+              <p class="control-description">
+                {{
+                  difficultyNormalize
+                    ? '각 영역별 최대값 기준으로 백분율 표시'
+                    : '실제 점수, 시간, 문항수 그대로 표시'
+                }}
+              </p>
+            </div>
+
+            <div class="control-group">
+              <label class="control-label">차트 타입</label>
+              <select class="control-select" v-model="difficultyChartType">
+                <option value="bar">📊 막대 차트 (Bar Chart)</option>
+                <option value="line">📈 선 차트 (Line Chart)</option>
+                <option value="radar">🎯 레이더 차트 (Radar Chart)</option>
+              </select>
+              <p class="control-description">
+                {{ difficultyChartTypeDescription }}
+              </p>
+            </div>
+          </div>
+
+          <div class="control-status">
+            <div>
+              <span class="status-badge">
+                {{ difficultyNormalize ? '정규화 데이터' : '원본 데이터' }}
+              </span>
+              <span class="status-divider">|</span>
+              <span class="status-badge">{{ difficultyChartTypeLabel }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 난이도별 통계표 -->
+      <table v-if="!difficultyLoading && !difficultyError" class="errata table table-bordered">
+        <thead>
+          <tr>
+            <th>난이도</th>
+            <th>총 문항수</th>
+            <th>정답 문항수</th>
+            <th>정답 문항수 평균</th>
+            <th>총 배점</th>
+            <th>획득 점수</th>
+            <th>획득 점수 평균</th>
+            <th>소요시간</th>
+            <th>소요시간 평균</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-for="data in difficultyData" :key="data">
+            <td>{{ difficultyCodeConverter(data.difficultyCode) }}</td>
+            <td>{{ data.itemCount }}개</td>
+            <template v-if="data.itemCount === 0">
+              <td>-</td>
+              <td>-</td>
+              <td>-</td>
+              <td>-</td>
+              <td>-</td>
+              <td>-</td>
+              <td>-</td>
+            </template>
+            <template v-else>
+              <td>{{ data.userCount }}개</td>
+              <td>{{ Math.round(data.avgCount * 10) / 10 }}개</td>
+              <td>{{ data.totalPoints }}점</td>
+              <td>{{ Math.round(data.userPoints * 100) / 100 }}점</td>
+              <td>{{ Math.round(data.avgPoints * 100) / 100 }}점</td>
+              <td>{{ Math.round(data.userDuration * 100) / 100 }}초</td>
+              <td>{{ Math.round(data.avgDuration * 100) / 100 }}초</td>
+            </template>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- 평가 영역별 통계 -->
+    <div class="statistics-section">
+      <h2 class="section-title">📊 평가 영역별 통계</h2>
+
+      <!-- 로딩 상태 -->
+      <div v-if="evaluationLoading" class="loading-container">
+        <div class="loading-spinner"></div>
+        <p>시험 데이터를 불러오는 중...</p>
+      </div>
+
+      <!-- 에러 상태 -->
+      <div v-else-if="evaluationError" class="error-container">
+        <div class="error-message">
+          <p>{{ error }}</p>
+          <button @click="getDetailEvaluation" class="retry-btn">다시 시도</button>
+        </div>
+      </div>
+
+      <MultiDatasetChartComponent
+        v-if="evaluationData.length > 0"
+        :chartData="evaluationChartData"
+        :datasetLabels="evaluationDatasetLabels"
+        title="평가 영역별 통계"
+        :normalize="evaluationNormalize"
+        :maxValues="evaluationMaxValues"
+        :chartType="evaluationChartType"
+      />
+
+      <!-- 차트 컨트롤 패널 -->
+      <div class="chart-controls hide-in-pdf">
+        <div class="controls-panel">
+          <h3 class="controls-title">📊 차트 설정</h3>
+
+          <div class="controls-grid">
+            <div class="control-group">
+              <label class="control-label">데이터 표시 방식</label>
+              <select class="control-select" v-model="evaluationNormalize">
+                <option :value="false">📊 원본 데이터 (실제 값)</option>
+                <option :value="true">📈 정규화 데이터 (0-100%)</option>
+              </select>
+              <p class="control-description">
+                {{
+                  evaluationNormalize
+                    ? '각 영역별 최대값 기준으로 백분율 표시'
+                    : '실제 점수, 시간, 문항수 그대로 표시'
+                }}
+              </p>
+            </div>
+
+            <div class="control-group">
+              <label class="control-label">차트 타입</label>
+              <select class="control-select" v-model="evaluationChartType">
+                <option value="bar">📊 막대 차트 (Bar Chart)</option>
+                <option value="line">📈 선 차트 (Line Chart)</option>
+                <option value="radar">🎯 레이더 차트 (Radar Chart)</option>
+              </select>
+              <p class="control-description">
+                {{ evaluationChartTypeDescription }}
+              </p>
+            </div>
+          </div>
+
+          <div class="control-status">
+            <div>
+              <span class="status-badge">
+                {{ evaluationNormalize ? '정규화 데이터' : '원본 데이터' }}
+              </span>
+              <span class="status-divider">|</span>
+              <span class="status-badge">{{ evaluationChartTypeLabel }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 평가 영역별 통계표 -->
+      <table v-if="!evaluationLoading && !evaluationError" class="errata table table-bordered">
+        <thead>
+          <tr>
+            <th>평가 영역</th>
+            <th>총 문항수</th>
+            <th>정답 문항수</th>
+            <th>정답 문항수 평균</th>
+            <th>총 배점</th>
+            <th>획득 점수 평균</th>
+            <th>획득 점수 평균</th>
+            <th>소요시간</th>
+            <th>소요시간 평균</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr v-if="evaluationData.length === 0">
+            <td colspan="8">조회된 결과가 없습니다.</td>
+          </tr>
+          <tr v-else v-for="evaluation in evaluationData" :key="`${evaluation}`">
+            <td>{{ evaluation.domainName }}</td>
+            <td>{{ evaluation.totalCount }}개</td>
+            <td>{{ evaluation.userCount }}개</td>
+            <td>{{ Math.round(evaluation.avgCount * 10) / 10 }}개</td>
+            <td>{{ evaluation.totalPoints }}점</td>
+            <td>{{ Math.round(evaluation.userPoints * 100) / 100 }}점</td>
+            <td>{{ Math.round(evaluation.avgPoints * 100) / 100 }}점</td>
+            <td>{{ Math.round(evaluation.userDuration * 100) / 100 }}초</td>
+            <td>{{ Math.round(evaluation.avgDuration * 100) / 100 }}초</td>
+          </tr>
+          <tr v-if="evaluationData.length !== 0">
+            <td>전체</td>
+            <td>{{ evaluationData.reduce((sum, item) => sum + (item.totalCount || 0), 0) }}개</td>
+            <td>{{ evaluationData.reduce((sum, item) => sum + (item.userCount || 0), 0) }}개</td>
+            <td>{{ evaluationData.reduce((sum, item) => sum + (item.avgCount || 0), 0) }}개</td>
+            <td>{{ evaluationData.reduce((sum, item) => sum + (item.totalPoints || 0), 0) }}점</td>
+            <td>{{ evaluationData.reduce((sum, item) => sum + (item.userPoints || 0), 0) }}점</td>
+            <td>{{ evaluationData.reduce((sum, item) => sum + (item.avgPoints || 0), 0) }}점</td>
+            <td colspan="2">-</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+
+
+    <!-- 다운로드 버튼 -->
+    <div class="download-section hide-in-pdf">
+      <button
+        class="download-btn"
+        @click="downloadReport"
+        :disabled="isDownloading"
+        :class="{ 'loading': isDownloading }"
+      >
+        <span v-if="!isDownloading">📄 상세 리포트 다운로드</span>
+        <span v-else class="loading-content">
+          <div class="spinner"></div>
+          PDF 생성 중...
+        </span>
+      </button>
+    </div>
   </div>
+
   <!-- 문항 모달 -->
   <QuestionHtmlModal :is-visible="showModal" :question="selectedQuestion" @close="closeModal" />
-
-  <!-- 평균 정답률 차트 -->
-  <div class="statistics-section">
-    <h2 class="section-title">📊 평균 정답률 분석</h2>
-    <div class="chart-section">
-      <div class="chart-container">
-        <canvas ref="chartCanvas"></canvas>
-      </div>
-    </div>
-  </div>
-
-  <!-- 난이도별 통계 -->
-  <div class="statistics-section">
-    <h2 class="section-title">📊 난이도별 통계</h2>
-
-    <!-- 로딩 상태 -->
-    <div v-if="difficultyLoading" class="loading-container">
-      <div class="loading-spinner"></div>
-      <p>시험 데이터를 불러오는 중...</p>
-    </div>
-
-    <!-- 에러 상태 -->
-    <div v-else-if="difficultyError" class="error-container">
-      <div class="error-message">
-        <p>{{ error }}</p>
-        <button @click="getDetailDifficulty" class="retry-btn">다시 시도</button>
-      </div>
-    </div>
-
-    <!-- 난이도별 차트 -->
-    <MultiDatasetChartComponent
-      v-if="difficultyData.length > 0"
-      :chartData="difficultyChartData"
-      :datasetLabels="difficultyDisplayLabels"
-      title="난이도별 통계"
-      :normalize="difficultyNormalize"
-      :maxValues="difficultyMaxValues"
-      :chartType="difficultyChartType"
-    />
-    <!-- 차트 설정 패널 -->
-    <div class="chart-controls">
-      <div class="controls-panel">
-        <h3 class="controls-title">📊 차트 설정</h3>
-
-        <div class="controls-grid">
-          <div class="control-group">
-            <label class="control-label">데이터 표시 방식</label>
-            <select class="control-select" v-model="difficultyNormalize">
-              <option :value="false">📊 원본 데이터 (실제 값)</option>
-              <option :value="true">📈 정규화 데이터 (0-100%)</option>
-            </select>
-            <p class="control-description">
-              {{
-                difficultyNormalize
-                  ? '각 영역별 최대값 기준으로 백분율 표시'
-                  : '실제 점수, 시간, 문항수 그대로 표시'
-              }}
-            </p>
-          </div>
-
-          <div class="control-group">
-            <label class="control-label">차트 타입</label>
-            <select class="control-select" v-model="difficultyChartType">
-              <option value="bar">📊 막대 차트 (Bar Chart)</option>
-              <option value="line">📈 선 차트 (Line Chart)</option>
-              <option value="radar">🎯 레이더 차트 (Radar Chart)</option>
-            </select>
-            <p class="control-description">
-              {{ difficultyChartTypeDescription }}
-            </p>
-          </div>
-        </div>
-
-        <div class="control-status">
-          <div>
-            <span class="status-badge">
-              {{ difficultyNormalize ? '정규화 데이터' : '원본 데이터' }}
-            </span>
-            <span class="status-divider">|</span>
-            <span class="status-badge">{{ difficultyChartTypeLabel }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- 난이도별 통계표 -->
-    <table v-if="!difficultyLoading && !difficultyError" class="errata table table-bordered">
-      <thead>
-        <tr>
-          <th>난이도</th>
-          <th>총 문항수</th>
-          <th>정답 문항수</th>
-          <th>정답 문항수 평균</th>
-          <th>총 배점</th>
-          <th>획득 점수</th>
-          <th>획득 점수 평균</th>
-          <th>소요시간</th>
-          <th>소요시간 평균</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="data in difficultyData" :key="data">
-          <td>{{ difficultyCodeConverter(data.difficultyCode) }}</td>
-          <td>{{ data.itemCount }}개</td>
-          <template v-if="data.itemCount === 0">
-            <td>-</td>
-            <td>-</td>
-            <td>-</td>
-            <td>-</td>
-            <td>-</td>
-            <td>-</td>
-            <td>-</td>
-          </template>
-          <template v-else>
-            <td>{{ data.userCount }}개</td>
-            <td>{{ Math.round(data.avgCount * 10) / 10 }}개</td>
-            <td>{{ data.totalPoints }}점</td>
-            <td>{{ Math.round(data.userPoints * 100) / 100 }}점</td>
-            <td>{{ Math.round(data.avgPoints * 100) / 100 }}점</td>
-            <td>{{ Math.round(data.userDuration * 100) / 100 }}초</td>
-            <td>{{ Math.round(data.avgDuration * 100) / 100 }}초</td>
-          </template>
-        </tr>
-        <tr>
-          <td>전체</td>
-          <td>{{ difficultyData.reduce((sum, item) => sum + (item.itemCount || 0), 0) }}개</td>
-          <td>{{ difficultyData.reduce((sum, item) => sum + (item.userCount || 0), 0) }}개</td>
-          <td>
-            {{
-              Math.round(difficultyData.reduce((sum, item) => sum + (item.avgCount || 0), 0) * 10) /
-              10
-            }}개
-          </td>
-          <td>{{ difficultyData.reduce((sum, item) => sum + (item.totalPoints || 0), 0) }}점</td>
-          <td>{{ difficultyData.reduce((sum, item) => sum + (item.userPoints || 0), 0) }}점</td>
-          <td>
-            {{
-              Math.round(
-                difficultyData.reduce((sum, item) => sum + (item.avgPoints || 0), 0) * 100,
-              ) / 100
-            }}점
-          </td>
-          <td colspan="2">-</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- 평가영역별 통계 -->
-  <div class="statistics-section">
-    <h2 class="section-title">📈 평가 영역별 통계</h2>
-
-    <!-- 로딩 상태 -->
-    <div v-if="evaluationLoading" class="loading-container">
-      <div class="loading-spinner"></div>
-      <p>시험 데이터를 불러오는 중...</p>
-    </div>
-
-    <!-- 에러 상태 -->
-    <div v-else-if="evaluationError" class="error-container">
-      <div class="error-message">
-        <p>{{ error }}</p>
-        <button @click="getDetailEvaluation" class="retry-btn">다시 시도</button>
-      </div>
-    </div>
-
-    <MultiDatasetChartComponent
-      v-if="evaluationData.length > 0"
-      :chartData="evaluationChartData"
-      :datasetLabels="evaluationDatasetLabels"
-      title="평가 영역별 통계"
-      :normalize="evaluationNormalize"
-      :maxValues="evaluationMaxValues"
-      :chartType="evaluationChartType"
-    />
-    <!-- 차트 컨트롤 패널 -->
-    <div class="chart-controls">
-      <div class="controls-panel">
-        <h3 class="controls-title">📊 차트 설정</h3>
-
-        <div class="controls-grid">
-          <div class="control-group">
-            <label class="control-label">데이터 표시 방식</label>
-            <select class="control-select" v-model="evaluationNormalize">
-              <option :value="false">📊 원본 데이터 (실제 값)</option>
-              <option :value="true">📈 정규화 데이터 (0-100%)</option>
-            </select>
-            <p class="control-description">
-              {{
-                evaluationNormalize
-                  ? '각 영역별 최대값 기준으로 백분율 표시'
-                  : '실제 점수, 시간, 문항수 그대로 표시'
-              }}
-            </p>
-          </div>
-
-          <div class="control-group">
-            <label class="control-label">차트 타입</label>
-            <select class="control-select" v-model="evaluationChartType">
-              <option value="bar">📊 막대 차트 (Bar Chart)</option>
-              <option value="line">📈 선 차트 (Line Chart)</option>
-              <option value="radar">🎯 레이더 차트 (Radar Chart)</option>
-            </select>
-            <p class="control-description">
-              {{ evaluationChartTypeDescription }}
-            </p>
-          </div>
-        </div>
-
-        <div class="control-status">
-          <div>
-            <span class="status-badge">
-              {{ evaluationNormalize ? '정규화 데이터' : '원본 데이터' }}
-            </span>
-            <span class="status-divider">|</span>
-            <span class="status-badge">{{ evaluationChartTypeLabel }}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    <!-- 평가 영역별 통계표 -->
-    <table v-if="!evaluationLoading && !evaluationError" class="errata table table-bordered">
-      <thead>
-        <tr>
-          <th>평가 영역</th>
-          <th>총 문항수</th>
-          <th>정답 문항수</th>
-          <th>정답 문항수 평균</th>
-          <th>총 배점</th>
-          <th>획득 점수 평균</th>
-          <th>획득 점수 평균</th>
-          <th>소요시간</th>
-          <th>소요시간 평균</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-if="evaluationData.length === 0">
-          <td colspan="8">조회된 결과가 없습니다.</td>
-        </tr>
-        <tr v-else v-for="evaluation in evaluationData" :key="`${evaluation}`">
-          <td>{{ evaluation.domainName }}</td>
-          <td>{{ evaluation.totalCount }}개</td>
-          <td>{{ evaluation.userCount }}개</td>
-          <td>{{ Math.round(evaluation.avgCount * 10) / 10 }}개</td>
-          <td>{{ evaluation.totalPoints }}점</td>
-          <td>{{ Math.round(evaluation.userPoints * 100) / 100 }}점</td>
-          <td>{{ Math.round(evaluation.avgPoints * 100) / 100 }}점</td>
-          <td>{{ Math.round(evaluation.userDuration * 100) / 100 }}초</td>
-          <td>{{ Math.round(evaluation.avgDuration * 100) / 100 }}초</td>
-        </tr>
-        <tr v-if="evaluationData.length !== 0">
-          <td>전체</td>
-          <td>{{ evaluationData.reduce((sum, item) => sum + (item.totalCount || 0), 0) }}개</td>
-          <td>{{ evaluationData.reduce((sum, item) => sum + (item.userCount || 0), 0) }}개</td>
-          <td>{{ evaluationData.reduce((sum, item) => sum + (item.avgCount || 0), 0) }}개</td>
-          <td>{{ evaluationData.reduce((sum, item) => sum + (item.totalPoints || 0), 0) }}점</td>
-          <td>{{ evaluationData.reduce((sum, item) => sum + (item.userPoints || 0), 0) }}점</td>
-          <td>{{ evaluationData.reduce((sum, item) => sum + (item.avgPoints || 0), 0) }}점</td>
-          <td colspan="2">-</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- 다운로드 버튼 -->
-  <div class="download-section">
-    <button class="download-btn" @click="downloadReport">📄 상세 리포트 다운로드</button>
-  </div>
 </template>
 
 <style scoped>
@@ -1192,9 +1269,20 @@ function downloadReport() {
 
 .chart-container {
   height: 500px;
+  width: 100%;
   position: relative;
   border-radius: 16px;
   overflow: hidden;
+}
+
+/* 평균 정답률 차트 전용 스타일 */
+.statistics-section .chart-container {
+  height: 400px !important;
+}
+
+.statistics-section .chart-container canvas {
+  width: 900px !important;
+  max-width: 100%;
 }
 
 /* 통계 섹션 스타일 */
@@ -1257,5 +1345,48 @@ function downloadReport() {
 
 .download-btn:active {
   transform: translateY(0);
+}
+
+.download-btn:disabled {
+  background: linear-gradient(135deg, #9ca3af 0%, #6b7280 100%);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 2px 4px rgba(156, 163, 175, 0.3);
+}
+
+/* 로딩 상태 스타일 */
+.download-btn.loading {
+  background: linear-gradient(135deg, #3b82f6 0%, #1d4ed8 100%);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+}
+
+.loading-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top: 2px solid white;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* PDF에서 숨길 요소들 */
+@media print {
+  .hide-in-pdf {
+    display: none !important;
+  }
 }
 </style>
