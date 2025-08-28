@@ -152,6 +152,34 @@
                     [{{ group.questionNumbers }}] 다음 글을 읽고 물음에 답하시오.
                   </div>
                   <div class="passage-content mathjax-content" v-html="sanitizeHtml(group.passageHtml)" data-mathjax-pending="true"></div>
+                  <!-- Split indicator if this is a split passage -->
+                  <div v-if="group.isSplit" class="passage-continuation-indicator">
+                    {{ group.splitPart < group.totalSplits ? '(다음 페이지에서 계속)' : '' }}
+                  </div>
+                </div>
+                
+                <!-- 그룹의 문제들 -->
+                <div v-for="item in group.questions" :key="item.id" class="question-item">
+                  <div class="question-header">
+                    <span class="question-number">{{ item.displayNumber }}.</span>
+                    <span class="question-points">({{ item.points || 5 }}점)</span>
+                  </div>
+                  <div class="question-text mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
+                  
+                  <!-- 선택지 -->
+                  <div v-if="item.choices && item.choices.length" class="choices">
+                    <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
+                      <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
+                      <span class="choice-text mathjax-content" v-html="sanitizeHtml(choice)" data-mathjax-pending="true"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 지문 연속 그룹 (이어지는 문제들) -->
+              <div v-else-if="group.type === 'passage-group-continuation'" class="passage-group continuation">
+                <div class="continuation-header">
+                  (앞 페이지 지문에서 이어지는 문제)
                 </div>
                 
                 <!-- 그룹의 문제들 -->
@@ -203,6 +231,34 @@
                     [{{ group.questionNumbers }}] 다음 글을 읽고 물음에 답하시오.
                   </div>
                   <div class="passage-content mathjax-content" v-html="sanitizeHtml(group.passageHtml)" data-mathjax-pending="true"></div>
+                  <!-- Split indicator if this is a split passage -->
+                  <div v-if="group.isSplit" class="passage-continuation-indicator">
+                    {{ group.splitPart < group.totalSplits ? '(다음 페이지에서 계속)' : '' }}
+                  </div>
+                </div>
+                
+                <!-- 그룹의 문제들 -->
+                <div v-for="item in group.questions" :key="item.id" class="question-item">
+                  <div class="question-header">
+                    <span class="question-number">{{ item.displayNumber }}.</span>
+                    <span class="question-points">({{ item.points || 5 }}점)</span>
+                  </div>
+                  <div class="question-text mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
+                  
+                  <!-- 선택지 -->
+                  <div v-if="item.choices && item.choices.length" class="choices">
+                    <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
+                      <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
+                      <span class="choice-text mathjax-content" v-html="sanitizeHtml(choice)" data-mathjax-pending="true"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 지문 연속 그룹 (이어지는 문제들) -->
+              <div v-else-if="group.type === 'passage-group-continuation'" class="passage-group continuation">
+                <div class="continuation-header">
+                  (앞 페이지 지문에서 이어지는 문제)
                 </div>
                 
                 <!-- 그룹의 문제들 -->
@@ -436,6 +492,14 @@ import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useItemSelectionStore } from '@/stores/itemSelection'
 import { renderMathJaxSmartHybrid, renderMathJaxParallelHybrid } from '@/utils/mathjax-hybrid'
 import { generateEnhancedPDF, generateEnhancedPDFAsBlob } from '@/utils/pdf-generator-enhanced'
+import { 
+  calculateOptimalPageBreaks,
+  measureContentHeight,
+  splitHtmlContent,
+  createContinuationIndicator,
+  A4_CONSTANTS,
+  USABLE_HEIGHT
+} from '@/utils/pdf-content-paginator'
 
 // Props
 const props = defineProps({
@@ -608,97 +672,91 @@ const itemsPerPage = computed(() => {
 // Dynamic page content storage - 2D structure for two-column layout
 const pageContents = ref([])
 
-// Calculate dynamic pagination with proper two-column flow
-const calculateDynamicPagination = () => {
+// Calculate dynamic pagination with smart page breaks
+const calculateDynamicPagination = async () => {
   if (!allQuestions.value.length) {
-    pageContents.value = [[]]
+    pageContents.value = [{ column1: [], column2: [] }]
     return
   }
 
+  try {
+    // Create all groups first
+    const allGroups = createAllGroups()
+    
+    // Use the optimized page break calculation
+    const pages = await calculateOptimalPageBreaks(allGroups, layoutMode.value)
+    
+    console.log('Smart pagination complete:', {
+      totalPages: pages.length,
+      layoutMode: layoutMode.value,
+      totalGroups: allGroups.length,
+      questionsTotal: allQuestions.value.length
+    })
+    
+    // Validate pages structure
+    if (pages && pages.length > 0) {
+      pageContents.value = pages
+    } else {
+      // If no pages created, use fallback
+      console.warn('No pages created, using fallback')
+      calculateBasicPagination()
+    }
+  } catch (error) {
+    console.error('Error in smart pagination, using fallback:', error)
+    // Fallback to basic pagination
+    calculateBasicPagination()
+  }
+}
+
+// Fallback basic pagination (without measurements)
+const calculateBasicPagination = () => {
   const pages = []
-  
-  // 실제 A4 사용 가능 높이 - 더 보수적으로 설정
-  const MM_TO_PX = 3.78
-  const USABLE_HEIGHT_MM = 220 // 297mm - 여백 고려 (더 보수적으로 설정)
-  const PAGE_HEIGHT = USABLE_HEIGHT_MM * MM_TO_PX // ≈ 831px
-  
-  const HEADER_HEIGHT = 120 // 첫 페이지 헤더 (더 여유있게)
-  const FOOTER_HEIGHT = 40
-  
-  // 높이 추정 상수 - 더 보수적인 값
-  const PASSAGE_HEADER_HEIGHT = 45
-  const PASSAGE_LINE_HEIGHT = 26
-  const QUESTION_HEIGHT = 100
-  const CHOICE_HEIGHT = 35
-  const GROUP_MARGIN = 40
-  
-  // 모든 그룹 생성
   const allGroups = createAllGroups()
   
+  // Use simplified height estimation for fallback
+  const PAGE_HEIGHT = USABLE_HEIGHT.REGULAR_PAGE
+  const HEADER_HEIGHT = A4_CONSTANTS.HEADER_HEIGHT_PX
+  const FOOTER_HEIGHT = A4_CONSTANTS.FOOTER_HEIGHT_PX
+  
   if (layoutMode.value === 'double') {
-    // 2단 레이아웃: 완전히 새로운 알고리즘
+    // 2단 레이아웃 fallback
     let currentPage = { column1: [], column2: [] }
     let column1Height = 0
     let column2Height = 0
     let pageNum = 1
     
-    allGroups.forEach((group, index) => {
-      console.log(`Processing group ${index}:`, group.type, group.questions?.length || 0, 'questions')
+    allGroups.forEach((group) => {
+      const groupHeight = estimateGroupHeight(group)
+      const availableHeight = pageNum === 1 
+        ? USABLE_HEIGHT.FIRST_PAGE
+        : USABLE_HEIGHT.REGULAR_PAGE
       
-      // 그룹 높이 계산
-      let groupHeight = calculateGroupHeight(group)
-      console.log(`Group height: ${groupHeight}px`)
-      
-      // 현재 페이지의 사용 가능한 높이
-      let availableHeight = pageNum === 1 
-        ? PAGE_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT
-        : PAGE_HEIGHT - FOOTER_HEIGHT
-      
-      console.log(`Page ${pageNum} - Available: ${availableHeight}, Col1: ${column1Height}, Col2: ${column2Height}`)
-      
-      // 컬럼 선택 로직
       let placed = false
       
-      // 1. 더 짧은 컬럼에 먼저 시도
       if (column1Height <= column2Height) {
-        // 첫 번째 컬럼 시도
         if (column1Height + groupHeight <= availableHeight) {
           currentPage.column1.push(group)
           column1Height += groupHeight
           placed = true
-          console.log(`Placed in column 1`)
-        } 
-        // 첫 번째가 안되면 두 번째 컬럼 시도
-        else if (column2Height + groupHeight <= availableHeight) {
+        } else if (column2Height + groupHeight <= availableHeight) {
           currentPage.column2.push(group)
           column2Height += groupHeight
           placed = true
-          console.log(`Placed in column 2`)
         }
       } else {
-        // 두 번째 컬럼 먼저 시도
         if (column2Height + groupHeight <= availableHeight) {
           currentPage.column2.push(group)
           column2Height += groupHeight
           placed = true
-          console.log(`Placed in column 2`)
-        }
-        // 두 번째가 안되면 첫 번째 컬럼 시도
-        else if (column1Height + groupHeight <= availableHeight) {
+        } else if (column1Height + groupHeight <= availableHeight) {
           currentPage.column1.push(group)
           column1Height += groupHeight
           placed = true
-          console.log(`Placed in column 1`)
         }
       }
       
-      // 2. 두 컬럼 모두 공간이 없으면 새 페이지
       if (!placed) {
-        console.log(`Creating new page`)
-        // 현재 페이지 저장
         pages.push(currentPage)
-        
-        // 새 페이지 시작
         currentPage = { column1: [group], column2: [] }
         column1Height = groupHeight
         column2Height = 0
@@ -706,30 +764,24 @@ const calculateDynamicPagination = () => {
       }
     })
     
-    // 마지막 페이지 추가
     if (currentPage.column1.length > 0 || currentPage.column2.length > 0) {
       pages.push(currentPage)
     }
   } else {
-    // 1단 레이아웃
+    // 1단 레이아웃 fallback
     let currentPageGroups = []
     let currentPageHeight = 0
     let isFirstPage = true
-    let availableHeight = PAGE_HEIGHT - FOOTER_HEIGHT
     
     allGroups.forEach((group) => {
-      let groupHeight = calculateGroupHeight(group)
-      
-      if (isFirstPage) {
-        availableHeight = PAGE_HEIGHT - HEADER_HEIGHT - FOOTER_HEIGHT
-      }
+      const groupHeight = estimateGroupHeight(group)
+      const availableHeight = isFirstPage ? USABLE_HEIGHT.FIRST_PAGE : USABLE_HEIGHT.REGULAR_PAGE
       
       if (currentPageHeight + groupHeight > availableHeight && currentPageGroups.length > 0) {
         pages.push({ column1: currentPageGroups, column2: [] })
         currentPageGroups = []
         currentPageHeight = 0
         isFirstPage = false
-        availableHeight = PAGE_HEIGHT - FOOTER_HEIGHT
       }
       
       currentPageGroups.push(group)
@@ -741,57 +793,44 @@ const calculateDynamicPagination = () => {
     }
   }
   
-  console.log('Pagination complete:', {
-    totalPages: pages.length,
-    layoutMode: layoutMode.value,
-    pagesStructure: pages,
-    totalGroups: allGroups.length
-  })
-  
-  // 각 페이지의 컬럼 내용 확인
-  pages.forEach((page, idx) => {
-    console.log(`Page ${idx + 1}:`, {
-      column1Items: page.column1.length,
-      column2Items: page.column2.length
-    })
-  })
-  
   pageContents.value = pages.length > 0 ? pages : [{ column1: [], column2: [] }]
 }
 
-// Helper function to calculate group height - 더 보수적이고 정확한 계산
-const calculateGroupHeight = (group) => {
-  let height = 40 // GROUP_MARGIN (더 여유있게)
+// Helper function to estimate group height for fallback
+const estimateGroupHeight = (group) => {
+  let height = A4_CONSTANTS.GROUP_MARGIN_PX
   
-  if (group.type === 'passage-group') {
-    height += 45 // PASSAGE_HEADER_HEIGHT
+  if (group.type === 'passage-group' || group.type === 'passage-group-continuation') {
+    if (group.type === 'passage-group') {
+      height += A4_CONSTANTS.PASSAGE_HEADER_HEIGHT_PX
+      
+      // Estimate passage height
+      const passageLength = (group.passageHtml || '').replace(/<[^>]*>/g, '').length
+      const charsPerLine = layoutMode.value === 'double' ? 30 : 60
+      const lines = Math.ceil(passageLength / charsPerLine)
+      height += Math.min(lines * A4_CONSTANTS.LINE_HEIGHT_PX, 300)
+    }
     
-    // 지문 높이 - 보수적으로 계산
-    const passageLength = (group.passageHtml || '').replace(/<[^>]*>/g, '').length
-    const charsPerLine = layoutMode.value === 'double' ? 25 : 50 // 더 적은 글자수로 계산
-    const lines = Math.ceil(passageLength / charsPerLine)
-    height += Math.min(lines * 24, 250) // 최대 250px로 증가
-    
-    // 각 문제 (더 넉넉하게)
+    // Add question heights
     group.questions.forEach(q => {
-      height += 100 // 기본 문제 높이 증가
+      height += A4_CONSTANTS.QUESTION_BASE_HEIGHT_PX
       const choices = [q.choice1Html, q.choice2Html, q.choice3Html, q.choice4Html, q.choice5Html]
         .filter(c => c)
-      height += choices.length * 30 // 각 선택지 높이 증가
+      height += choices.length * A4_CONSTANTS.CHOICE_HEIGHT_PX
     })
   } else {
-    // 독립 문제 (더 넉넉하게)
+    // Independent questions
     group.questions.forEach(q => {
-      height += 100 // 기본 문제 높이 증가
+      height += A4_CONSTANTS.QUESTION_BASE_HEIGHT_PX
       const choices = [q.choice1Html, q.choice2Html, q.choice3Html, q.choice4Html, q.choice5Html]
         .filter(c => c)
-      height += choices.length * 30 // 각 선택지 높이 증가
+      height += choices.length * A4_CONSTANTS.CHOICE_HEIGHT_PX
     })
   }
   
-  // 2단 레이아웃에서는 더 많은 여유 추가
+  // Add extra margin for two-column layout
   if (layoutMode.value === 'double') {
-    height = Math.ceil(height * 1.2) // 1.1에서 1.2로 증가
+    height = Math.ceil(height * 1.15)
   }
   
   return height
@@ -839,8 +878,8 @@ const createAllGroups = () => {
 }
 
 // Watch for changes and recalculate
-watch([allQuestions, layoutMode], () => {
-  calculateDynamicPagination()
+watch([allQuestions, layoutMode], async () => {
+  await calculateDynamicPagination()
 }, { immediate: true })
 
 // Total pages from dynamic calculation
@@ -1863,6 +1902,32 @@ img[src*="chunjae-platform"] {
 
 .passage-content mjx-container {
   font-size: 0.95em;
+}
+
+/* Continuation Indicators for Split Content */
+.passage-continuation-indicator,
+.passage-continue-indicator,
+.passage-continue,
+p.passage-continue,
+.continuation-header {
+  color: #606f7b;
+  font-style: italic;
+  font-size: 0.875rem;
+  margin: 0.75rem 0;
+  padding: 0.375rem 0.75rem;
+  background: #f8f9fa;
+  border-left: 3px solid #cbd5e0;
+  display: block;
+  clear: both;
+}
+
+.passage-group.continuation {
+  margin-top: 1.5rem;
+}
+
+.continuation-header {
+  margin-bottom: 1rem;
+  font-weight: 500;
 }
 
 /* PDF Page Break Control */
