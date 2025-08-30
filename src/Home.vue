@@ -594,7 +594,7 @@ onUnmounted(() => {
 .hero-section {
   position: relative;
   background: linear-gradient(135deg, #0053ed 0%, #003db8 100%);
-  min-height: 60vh;
+  min-height: 100vh;
   width: 100%;
   display: flex;
   align-items: center;

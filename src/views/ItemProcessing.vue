@@ -665,8 +665,90 @@ export default {
 </script>
 
 <style scoped>
-/* 단계별 진행 표시기 스타일 */
+/* 공통 페이지 헤더 스타일 */
+.page-header {
+  background: white !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  padding: 3rem 0 !important;
+}
+
+.page-header .page-title {
+  font-size: 1.875rem !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+  margin: 0 !important;
+}
+
+.page-header .page-subtitle {
+  font-size: 1rem !important;
+  color: #64748b !important;
+  margin: 0 !important;
+}
+
+/* 공통 메인 컨테이너 스타일 */
+.main-content {
+  padding: 3rem 0;
+}
+
+.content-wrapper {
+  max-width: 100%;
+}
+
+/* 공통 컨테이너 스타일 */
+.page-header .container,
+.page-header > .container {
+  width: 100% !important;
+  max-width: 1300px !important;
+  margin: 0 auto !important;
+  padding: 0 2px !important;
+  box-sizing: border-box !important;
+}
+
+/* 반응형 컨테이너 */
+@media (max-width: 1200px) {
+  .page-header .container,
+  .page-header > .container {
+    width: 100% !important;
+    max-width: 960px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header .container,
+  .page-header > .container {
+    width: 100% !important;
+    max-width: 720px !important;
+    padding: 0 2px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header .container,
+  .page-header > .container {
+    width: 100% !important;
+    max-width: 540px !important;
+    padding: 0 3px !important;
+  }
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .page-header {
+    padding: 2rem 0;
+  }
+
+  .main-content {
+    padding: 2rem 0;
+  }
+}
+
+/* 기존 ItemProcessing 스타일들 */
+.item-processing-container {
+  background-color: #f8fafc;
+}
+
 .progress-stepper-container {
+  background: white;
   border-bottom: 1px solid #e2e8f0;
 }
 
@@ -676,53 +758,51 @@ export default {
 
 .step-item {
   position: relative;
-  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
 }
 
-.step-number {
-  width: 40px;
-  height: 40px;
-  background-color: #e2e8f0;
-  color: #64748b;
-  border: 2px solid #e2e8f0;
-  transition: all 0.3s ease;
-}
-
-.step-label {
-  color: #64748b;
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
-}
-
-.step-connector {
-  width: 60px;
-  height: 2px;
-  background-color: #e2e8f0;
-  transition: all 0.3s ease;
-}
-
-/* 활성 상태 */
 .step-item.active .step-number {
   background-color: #3b82f6;
   color: white;
-  border-color: #3b82f6;
 }
 
-.step-item.active .step-label {
-  color: #1e293b;
-  font-weight: 600;
+.step-item:not(.active) .step-number {
+  background-color: #e2e8f0;
+  color: #64748b;
 }
 
-/* 완료 상태 */
 .step-item.completed .step-number {
   background-color: #10b981;
   color: white;
-  border-color: #10b981;
+}
+
+.step-number {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1rem;
+  border: 2px solid transparent;
+}
+
+.step-label {
+  color: #1e293b;
+  font-size: 0.875rem;
+}
+
+.step-item.active .step-label {
+  color: #3b82f6;
+  font-weight: 600;
 }
 
 .step-item.completed .step-label {
   color: #10b981;
   font-weight: 600;
+}
+
+.step-connector {
+  width: 3rem;
+  height: 2px;
+  background-color: #e2e8f0;
 }
 
 .step-item.completed .step-connector {
@@ -751,7 +831,7 @@ export default {
 }
 
 /* 부트스트랩으로 대체할 수 없는 일부 커스텀 스타일 */
-/* 페이지 헤더 스타일은 common.css에서 관리 */
+/* 페이지 헤더 스타일은 이제 이 컴포넌트 내부에서 관리 */
 
 /* 로딩 상태 스타일 - TextbookSelection과 일관성 */
 .conversion-loading,
