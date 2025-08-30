@@ -426,51 +426,7 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
       }
     },
 
-    /**
-     * OCR 결과를 PDF 페이지로 변환
-     * @param {Object} ocrResult - OCR 처리 결과
-     * @returns {Promise<Object>}
-     */
-    async convertOcrToPdfPages(ocrResult) {
-      try {
-        console.log('OCR 결과를 PDF 페이지로 변환 시작:', ocrResult)
 
-        if (!ocrResult || !ocrResult.selectedAreas) {
-          throw new Error('OCR 결과 데이터가 유효하지 않습니다.')
-        }
-
-        const { selectedAreas } = ocrResult
-
-        // 필수 영역 확인
-        if (!selectedAreas.question || !selectedAreas.options) {
-          throw new Error('지문과 보기 영역이 모두 선택되어야 합니다.')
-        }
-
-        // 새로운 PDF 페이지 생성
-        const newPage = {
-          id: Date.now(), // 고유 ID
-          index: this.pdfPages.length, // 페이지 인덱스
-          preview: selectedAreas.question.imageData, // 지문 이미지를 메인으로 사용
-          width: selectedAreas.question.width,
-          height: selectedAreas.question.height,
-          selectedAreas: selectedAreas, // 선택된 영역 정보 저장
-          ocrData: ocrResult.ocrResults || [], // OCR 결과 데이터
-          createdAt: new Date().toISOString()
-        }
-
-        // PDF 페이지 목록에 추가
-        this.pdfPages.push(newPage)
-
-        console.log('새로운 PDF 페이지 추가됨:', newPage)
-        console.log('현재 PDF 페이지 수:', this.pdfPages.length)
-
-        return newPage
-
-      } catch (error) {
-        console.error('OCR 결과를 PDF 페이지로 변환 실패:', error)
-        throw error
-      }
-    },
 
     /**
      * 최종 PDF 생성
