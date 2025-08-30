@@ -1,11 +1,28 @@
 <template>
   <div class="pdf-ocr-editor">
-    <div class="editor-header">
-      <h3>문제 추출 & 편집 </h3>
-      <div class="header-actions">
-        <button @click="handleGoBack" class="btn btn-secondary">뒤로가기</button>
+    <!-- PDF 페이지가 없을 때 표시할 메시지 -->
+    <div v-if="!pdfPages || pdfPages.length === 0" class="no-pages-message">
+      <div class="no-pages-content text-center">
+        <div class="no-pages-icon">📄</div>
+        <h3>편집할 PDF 페이지가 없습니다</h3>
+        <p class="no-pages-description">
+          PDF 파일을 업로드하고 이미지 변환이 완료된 후<br>
+          이 페이지에 접근할 수 있습니다.
+        </p>
+        <button @click="handleGoBack" class="btn btn-primary">
+          뒤로가기
+        </button>
       </div>
     </div>
+
+    <!-- PDF 페이지가 있을 때만 편집기 표시 -->
+    <div v-else>
+      <div class="editor-header">
+        <h3>문제 추출 & 편집 </h3>
+        <div class="header-actions">
+          <button @click="handleGoBack" class="btn btn-secondary">뒤로가기</button>
+        </div>
+      </div>
 
     <!-- 페이지 네비게이션 -->
     <div class="page-navigation">
@@ -199,6 +216,7 @@
       @close="closeOcrModal"
       @save="saveOcrResults"
     />
+      </div> <!-- v-else 블록 닫기 -->
   </div>
 </template>
 
@@ -2134,6 +2152,38 @@ export default {
   border-radius: 4px;
   font-family: 'Courier New', monospace;
   font-size: 0.75rem;
+}
+
+/* PDF 페이지가 없을 때 메시지 스타일 */
+.no-pages-message {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 500px;
+  padding: 2rem;
+}
+
+.no-pages-content {
+  max-width: 500px;
+}
+
+.no-pages-icon {
+  font-size: 4rem;
+  color: #94a3b8;
+  margin-bottom: 1.5rem;
+}
+
+.no-pages-content h3 {
+  font-size: 1.5rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 1rem;
+}
+
+.no-pages-description {
+  color: #64748b;
+  line-height: 1.6;
+  margin-bottom: 2rem;
 }
 
 /* KaTeX 스타일 오버라이드 */

@@ -50,7 +50,7 @@
 
           <div class="step-item d-flex align-items-center" :class="{ active: showOcrEditor }">
             <div class="step-number rounded-circle d-flex align-items-center justify-content-center fw-bold">4</div>
-            <span class="step-label ms-2 fw-medium">OCR 편집</span>
+            <span class="step-label ms-2 fw-medium">문제 추출</span>
           </div>
         </div>
       </div>
@@ -135,7 +135,7 @@
 
         <!-- 4단계: OCR 편집 -->
         <PdfOcrEditor
-          v-else
+          v-else-if="showOcrEditor && pdfPages && pdfPages.length > 0"
           :pdf-pages="pdfPages"
           :presigned-url="presignedUrl"
           :file-id="fileId"
@@ -278,8 +278,8 @@ export default {
       const pages = []
 
       try {
-        // fileData에서 file과 images 추출
-        const { file, images } = fileData
+        // fileData에서 file 추출
+        const { file } = fileData
 
         if (!file) {
           throw new Error('파일 데이터가 누락되었습니다.')
@@ -290,16 +290,12 @@ export default {
 
         // PDF 파일을 서버에 즉시 업로드 (원본 PDF)
         try {
-          console.log('🚀 PDF 파일 선택됨, 원본 PDF 서버 업로드 시작...')
-
           // 로딩 상태 시작
           itemProcessingStore.loading = true
 
-          const uploadResponse = await itemProcessingStore.uploadOriginalPdf()
-          console.log('✅ 원본 PDF 서버 업로드 완료:', uploadResponse)
+          await itemProcessingStore.uploadOriginalPdf()
 
           // 업로드 성공 후 PDF 편집 단계로 진행
-          console.log('📝 PDF 편집 단계로 진행...')
 
         } catch (uploadError) {
           console.error('❌ 원본 PDF 서버 업로드 실패:', uploadError)
@@ -313,8 +309,8 @@ export default {
         // 클라이언트에서 PDF를 이미지로 변환하는 기능은 주석 처리
         // 서버에서 이미지 변환 후 전송받을 예정
         /*
-        // images가 비어있으면 PDF를 이미지로 변환
-        if (!images || images.length === 0) {
+        // PDF를 이미지로 변환
+        if (!pages || pages.length === 0) {
           // 로딩 상태 시작
           isConvertingPdf.value = true
           convertedPdfPages.value = 0
@@ -386,7 +382,7 @@ export default {
             return total
           }, 0)
 
-          console.log(`📊 PDF 변환 완료: ${pages.length}페이지, 총 ${(totalImageSizeKB / 1024).toFixed(2)}MB`)
+
 
           // 로딩 상태 종료
           isConvertingPdf.value = false
@@ -404,11 +400,24 @@ export default {
         */
 
         // 서버에서 이미지 변환 후 전송받을 예정이므로 임시로 빈 배열 설정
-        console.log('📤 PDF 업로드 완료, 서버에서 이미지 변환 후 전송받을 예정')
-        pages.length = 0
 
-        pdfPages.value = pages
-        itemProcessingStore.setPdfPages(pages)
+
+        // PDF 업로드 후 서버에서 이미지 변환을 기다림
+        try {
+          // Store의 processPdfToImages 메서드 호출하여 서버에서 이미지 변환
+          await itemProcessingStore.processPdfToImages()
+
+          // 변환된 이미지들을 pdfPages에 설정
+          pdfPages.value = itemProcessingStore.pdfPages
+
+
+          // 이미지 변환이 완료되면 자동으로 PDF 편집 단계로 진행
+          // (v-else-if 조건으로 자동 처리됨)
+        } catch (error) {
+          console.error('❌ 서버 이미지 변환 실패:', error)
+          errorHandler.handleError('PDF 이미지 변환에 실패했습니다.', '서버 이미지 변환 오류')
+          return
+        }
 
       } catch (error) {
         // 에러 발생 시 생성된 Blob URL들 정리
@@ -434,12 +443,19 @@ export default {
      * 페이지 이동 처리
      * @param {Object} moveInfo - 이동 정보 { fromIndex: number, toIndex: number }
      */
-    const movePage = (moveInfo) => {
+    const movePage = async (moveInfo) => {
+      console.log('🚀 ItemProcessing.movePage 호출됨:', moveInfo)
       const { fromIndex, toIndex } = moveInfo
 
-      // Store에 페이지 이동 알림
+      // Store에 페이지 이동 알림 (async 처리)
       if (itemProcessingStore.movePage) {
-        itemProcessingStore.movePage(fromIndex, toIndex)
+        try {
+          await itemProcessingStore.movePage(fromIndex, toIndex)
+        } catch (error) {
+          console.error('❌ 페이지 이동 실패:', error)
+        }
+      } else {
+        console.error('❌ itemProcessingStore.movePage 메서드가 없습니다')
       }
     }
 
@@ -447,18 +463,26 @@ export default {
      * 단일 페이지 삭제
      * @param {number} pageIndex - 삭제할 페이지 인덱스
      */
-    const removePage = (pageIndex) => {
-      itemProcessingStore.removePage(pageIndex)
+    const removePage = async (pageIndex) => {
+      try {
+        await itemProcessingStore.removePage(pageIndex)
+      } catch (error) {
+        console.error('❌ 페이지 삭제 실패:', error)
+      }
     }
 
     /**
      * 여러 페이지 일괄 삭제
      * @param {Array<number>} pageIndexes - 삭제할 페이지 인덱스 배열
      */
-    const removeMultiplePages = (pageIndexes) => {
-      // Store의 일괄 삭제 메서드만 사용 (로컬 상태는 Store 변경 감지로 자동 업데이트)
+    const removeMultiplePages = async (pageIndexes) => {
+      // Store의 일괄 삭제 메서드 사용 (async 처리)
       if (itemProcessingStore.removeMultiplePages) {
-        itemProcessingStore.removeMultiplePages(pageIndexes)
+        try {
+          await itemProcessingStore.removeMultiplePages(pageIndexes)
+        } catch (error) {
+          console.error('❌ 다중 페이지 삭제 실패:', error)
+        }
       } else {
         // Store에 메서드가 없는 경우에만 로컬 상태 직접 업데이트
         const sortedIndexes = [...pageIndexes].sort((a, b) => b - a)
