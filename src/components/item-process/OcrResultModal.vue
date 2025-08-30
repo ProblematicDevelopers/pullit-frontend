@@ -970,36 +970,41 @@ export default {
       selectionCanvasEl.width = imageCanvasEl.width
       selectionCanvasEl.height = imageCanvasEl.height
 
-      // CSS 스타일 크기 설정 - 줌 레벨을 고려한 크기 조정
-      const displayWidth = imageCanvasEl.width * zoomLevel.value
-      const displayHeight = imageCanvasEl.height * zoomLevel.value
+      // image-canvas의 실제 CSS 스타일 크기 값을 직접 사용
+      const imageWidth = computedStyle.width
+      const imageHeight = computedStyle.height
 
-      // 컨테이너 크기를 벗어나지 않도록 제한
-      const maxWidth = Math.min(displayWidth, containerRect.width - 32)
-      const maxHeight = Math.min(displayHeight, containerRect.height - 32)
+      // selection-canvas 크기를 image-canvas와 정확히 동일하게 설정
+      selectionCanvasEl.style.width = imageWidth
+      selectionCanvasEl.style.height = imageHeight
 
-      selectionCanvasEl.style.width = `${maxWidth}px`
-      selectionCanvasEl.style.height = `${maxHeight}px`
+      // image-canvas의 실제 CSS 스타일 값을 직접 사용
+      const computedStyle = window.getComputedStyle(imageCanvasEl)
+      const imageTop = computedStyle.top
+      const imageLeft = computedStyle.left
+      const imagePosition = computedStyle.position
 
       // image-canvas와 동일한 위치에 오버레이
-      const relativeTop = imageRect.top - containerRect.top
-      const relativeLeft = imageRect.left - containerRect.left
-
-      selectionCanvasEl.style.position = 'absolute'
-      selectionCanvasEl.style.top = `${relativeTop}px`
-      selectionCanvasEl.style.left = `${relativeLeft}px`
+      selectionCanvasEl.style.position = imagePosition
+      selectionCanvasEl.style.top = imageTop
+      selectionCanvasEl.style.left = imageLeft
 
       console.log('Selection Canvas 위치 업데이트 완료:', {
         zoomLevel: zoomLevel.value,
         imageCanvas: {
+          computedStyle: { top: imageTop, left: imageLeft, position: imagePosition },
           displayWidth: imageRect.width,
-          displayHeight: imageRect.height
+          displayHeight: imageRect.height,
+          rect: { top: imageRect.top, left: imageRect.left }
+        },
+        container: {
+          rect: { top: containerRect.top, left: containerRect.left }
         },
         selectionCanvas: {
-          styleWidth: maxWidth,
-          styleHeight: maxHeight
-        },
-        position: { top: relativeTop, left: relativeLeft }
+          styleWidth: imageWidth,
+          styleHeight: imageHeight,
+          style: { top: imageTop, left: imageLeft, position: imagePosition }
+        }
       })
     }
 
