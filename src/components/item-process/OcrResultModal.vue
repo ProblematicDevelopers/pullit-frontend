@@ -415,11 +415,11 @@ export default {
     }
 
     const zoomIn = () => {
-      zoomLevel.value = Math.min(zoomLevel.value + 0.2, 4)
+      zoomLevel.value = Math.min(zoomLevel.value + 0.1, 4)  // 10%씩 증가, 최대 400%
     }
 
     const zoomOut = () => {
-      zoomLevel.value = Math.max(zoomLevel.value - 0.2, 0.3)
+      zoomLevel.value = Math.max(zoomLevel.value - 0.1, 0.1)  // 10%씩 감소, 최소 10%
     }
 
     const startCapture = () => {
@@ -970,22 +970,18 @@ export default {
       selectionCanvasEl.width = imageCanvasEl.width
       selectionCanvasEl.height = imageCanvasEl.height
 
-      // image-canvas의 실제 CSS 스타일 크기 값을 직접 사용
-      const imageWidth = computedStyle.width
-      const imageHeight = computedStyle.height
-
-      // selection-canvas 크기를 image-canvas와 정확히 동일하게 설정
-      selectionCanvasEl.style.width = imageWidth
-      selectionCanvasEl.style.height = imageHeight
-
       // image-canvas의 실제 CSS 스타일 값을 직접 사용
       const computedStyle = window.getComputedStyle(imageCanvasEl)
       const imageTop = computedStyle.top
       const imageLeft = computedStyle.left
       const imagePosition = computedStyle.position
+      const imageWidth = computedStyle.width
+      const imageHeight = computedStyle.height
 
-      // image-canvas와 동일한 위치에 오버레이
-      selectionCanvasEl.style.position = imagePosition
+      // selection-canvas를 image-canvas와 정확히 같은 크기와 위치로 설정
+      selectionCanvasEl.style.position = 'absolute'
+      selectionCanvasEl.style.width = imageWidth
+      selectionCanvasEl.style.height = imageHeight
       selectionCanvasEl.style.top = imageTop
       selectionCanvasEl.style.left = imageLeft
 
@@ -1215,7 +1211,6 @@ export default {
   pointer-events: auto;
   cursor: crosshair;
   background: transparent;
-  border: 1px solid rgba(59, 130, 246, 0.3);
   /* top과 left는 JavaScript에서 동적으로 설정 */
 }
 
