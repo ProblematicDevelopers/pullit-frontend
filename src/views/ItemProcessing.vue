@@ -61,20 +61,75 @@
       <div class="content-wrapper">
         <!-- 단계별 컴포넌트 렌더링 -->
 
-        <!-- 1단계: 교과서 선택 -->
+        <!-- 0단계: 방식 선택 -->
+        <ProcessingMethodSelection
+          v-if="!processingMethod"
+          @method-selected="selectProcessingMethod"
+        />
+
+        <!-- 1-1단계: 교과서 선택 (새 파일 업로드) -->
         <TextbookSelection
-          v-if="!selectedTextbook"
+          v-else-if="processingMethod === 'new' && !selectedTextbook"
           :loading="loading"
-          :subjects="subjects"
+          :subjects="subjectCategories"
           :grouped-textbooks="groupedTextbooks"
           :selected-subject="selectedSubject"
           @select-subject="selectSubject"
           @select-textbook="selectTextbook"
+          @go-back="goBackToMethodSelection"
         />
 
-        <!-- 2단계: PDF 업로드 -->
+        <!-- 1-2단계: 기존 파일 선택 -->
+        <ExistingFileSelection
+          v-else-if="processingMethod === 'existing' && !selectedFile"
+          :loading="loadingFileHistory"
+          :file-histories="fileHistories"
+          :subjects="subjectOptions"
+          @go-back="goBackToMethodSelection"
+          @method-selected="selectProcessingMethod"
+          @file-selected="selectExistingFile"
+        />
+
+        <!-- 서버 에러 발생 시 대안 제시 -->
+        <div v-else-if="processingMethod === 'existing' && errorHandler.hasError() && errorHandler.isServerError()" class="server-error-fallback bg-light border rounded p-4 text-center">
+          <div class="mb-3">
+            <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size: 2rem;"></i>
+          </div>
+          <h4 class="text-warning mb-3">서버 연결 문제</h4>
+          <p class="text-muted mb-4">
+            기존 파일 목록을 불러올 수 없습니다. 서버에 일시적인 문제가 있을 수 있습니다.
+            <br><small class="text-muted">에러 코드: {{ getErrorStatusCode() }}</small>
+          </p>
+
+          <!-- 에러 상세 정보 (개발 모드에서만 표시) -->
+          <div v-if="isDevelopment" class="alert alert-info text-start mb-3">
+            <small>
+              <strong>에러 상세:</strong><br>
+              {{ errorHandler.getErrorMessage() }}<br>
+              <strong>상태 코드:</strong> {{ getErrorStatusCode() }}<br>
+              <strong>시간:</strong> {{ new Date().toLocaleString('ko-KR') }}
+              <span v-if="retryCount > 0">
+                <br><strong>재시도 횟수:</strong> {{ retryCount }}회
+                <br><strong>마지막 재시도:</strong> {{ lastRetryTime ? lastRetryTime.toLocaleString('ko-KR') : 'N/A' }}
+              </span>
+            </small>
+          </div>
+
+          <div class="d-flex gap-2 justify-content-center">
+            <button @click="retryFileHistoryLoad" class="btn btn-warning" :disabled="loadingFileHistory">
+              <i class="bi bi-arrow-clockwise me-2"></i>
+              {{ loadingFileHistory ? '재시도 중...' : '다시 시도' }}
+            </button>
+            <button @click="switchToNewFileUpload" class="btn btn-primary">
+              <i class="bi bi-upload me-2"></i>
+              새 파일 업로드
+            </button>
+          </div>
+        </div>
+
+        <!-- 2단계: PDF 업로드 (새 파일 업로드 방식만) -->
         <PdfUpload
-          v-else-if="selectedTextbook && !pdfFile"
+          v-else-if="processingMethod === 'new' && selectedTextbook && !pdfFile"
           :selected-textbook="selectedTextbook"
           @file-selected="handlePdfFile"
         />
@@ -99,7 +154,7 @@
 
         <!-- 3단계: PDF 편집 -->
         <PdfEditor
-          v-else-if="!showOcrEditor && !isGeneratingPdf && !loading"
+          v-else-if="!showOcrEditor && !isGeneratingPdf && !loading && (pdfFile || selectedFile)"
           :pdf-pages="pdfPages"
           @page-removed="removePage"
           @page-moved="movePage"
@@ -156,7 +211,17 @@
           <p class="text-dark mb-2">{{ errorHandler.getErrorMessage() }}</p>
           <p class="error-context text-muted small fst-italic mb-0">{{ errorHandler.getErrorContext() }}</p>
         </div>
-        <div class="error-actions d-flex justify-content-end">
+        <div class="error-actions d-flex justify-content-end gap-2">
+          <!-- 서버 에러인 경우 재시도 버튼 표시 -->
+          <button
+            v-if="errorHandler.isServerError()"
+            @click="retryFileHistoryLoad"
+            class="btn btn-warning"
+            :disabled="loadingFileHistory"
+          >
+            <i class="bi bi-arrow-clockwise me-2"></i>
+            {{ loadingFileHistory ? '재시도 중...' : '재시도' }}
+          </button>
           <button @click="errorHandler.clearError()" class="btn btn-primary">확인</button>
         </div>
       </div>
@@ -168,8 +233,11 @@
 import { onMounted, ref, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useItemProcessingStore } from '@/store/itemProcessingStore.js'
+import { useSubjectStore } from '@/store/subjectStore.js'
 
 // 새로 분리된 컴포넌트들 import
+import ProcessingMethodSelection from '@/components/item-process/ProcessingMethodSelection.vue'
+import ExistingFileSelection from '@/components/item-process/ExistingFileSelection.vue'
 import TextbookSelection from '@/components/item-process/TextbookSelection.vue'
 import PdfUpload from '@/components/item-process/PdfUpload.vue'
 import PdfEditor from '@/components/item-process/PdfEditor.vue'
@@ -181,6 +249,8 @@ import { useItemProcessingError } from '@/composables/item-process/useItemProces
 export default {
   name: 'ItemProcessing',
   components: {
+    ProcessingMethodSelection,
+    ExistingFileSelection,
     TextbookSelection,
     PdfUpload,
     PdfEditor,
@@ -189,7 +259,14 @@ export default {
   setup() {
     // Store 및 Router 초기화
     const itemProcessingStore = useItemProcessingStore()
+    const subjectStore = useSubjectStore()
     const router = useRouter()
+
+    // 처리 방식 관련 상태
+    const processingMethod = ref(null) // 'new' | 'existing'
+    const selectedFile = ref(null) // 기존 파일 선택 시
+    const fileHistories = ref([])
+    const loadingFileHistory = ref(false)
 
     // 기존 방식으로 복원 (문제 해결 후 다시 개선)
     const selectedTextbook = ref(null)
@@ -217,20 +294,64 @@ export default {
     const error = computed(() => itemProcessingStore.error)
     const textbooks = computed(() => itemProcessingStore.textbooks)
     const groupedTextbooks = computed(() => itemProcessingStore.groupedTextbooks)
-    const subjects = computed(() => itemProcessingStore.subjects)
+    const subjects = computed(() => subjectStore.list)
+
+    // 과목 옵션 (기존 파일 선택에서 사용)
+    const subjectOptions = computed(() => {
+      return subjects.value?.map(subject => ({
+        code: subject.areaCode,
+        name: subject.areaName
+      })) || []
+    })
+
+    // itemProcessingStore의 SUBJECTS 객체 사용
+    const subjectCategories = computed(() => {
+      if (!groupedTextbooks.value) return {}
+
+      const categories = {}
+      Object.keys(groupedTextbooks.value).forEach(areaCode => {
+        if (groupedTextbooks.value[areaCode]?.length > 0) {
+          // 과목별 이름과 색상 설정
+          let name = '기타'
+          let color = '#6b7280'
+
+          if (areaCode === 'MA') { name = '수학'; color = '#3b82f6' }
+          else if (areaCode === 'KO') { name = '국어'; color = '#ef4444' }
+          else if (areaCode === 'EN') { name = '영어'; color = '#10b981' }
+          else if (areaCode === 'SO') { name = '사회'; color = '#f59e0b' }
+          else if (areaCode === 'SC') { name = '과학'; color = '#84cc16' }
+          else if (areaCode === 'HS') { name = '역사'; color = '#8b5cf6' }
+          else if (areaCode === 'MO') { name = '도덕'; color = '#06b6d4' }
+
+          categories[areaCode] = { name, color }
+        }
+      })
+
+      return categories
+    })
 
     // 파일 히스토리 에러 관련 computed 속성
     const showFileHistoryError = computed(() => itemProcessingStore.showFileHistoryError)
     const fileHistoryErrorMessage = computed(() => itemProcessingStore.fileHistoryErrorMessage)
 
+    // 재시도 관련 상태
+    const retryCount = ref(0)
+    const lastRetryTime = ref(null)
+
 
     // Composable 초기화
     const errorHandler = useItemProcessingError()
 
+    // 개발 모드 확인
+    const isDevelopment = computed(() => import.meta.env.DEV)
+
     // 컴포넌트 마운트 시 실행
     onMounted(async () => {
       try {
-        await itemProcessingStore.fetchTextbooks()
+        await Promise.all([
+          itemProcessingStore.fetchTextbooks(),
+          subjectStore.fetchSubjects()
+        ])
       } catch (error) {
         errorHandler.handleGeneralError(error, '교과서 목록 로드')
       }
@@ -243,6 +364,149 @@ export default {
         itemProcessingStore.cleanupBlobUrls()
       }
     })
+
+    // ===== 처리 방식 선택 관련 메서드 =====
+
+    /**
+     * 처리 방식 선택
+     * @param {string} method - 'new' 또는 'existing'
+     */
+    const selectProcessingMethod = async (method) => {
+      processingMethod.value = method
+
+      if (method === 'existing') {
+        await loadFileHistories()
+      }
+    }
+
+    /**
+     * 방식 선택으로 돌아가기
+     */
+    const goBackToMethodSelection = () => {
+      processingMethod.value = null
+      selectedTextbook.value = null
+      selectedFile.value = null
+      pdfFile.value = null
+      pdfPages.value = []
+      selectedSubject.value = null
+      itemProcessingStore.selectTextbook(null)
+    }
+
+        /**
+     * 파일 히스토리 목록 로드
+     */
+    const loadFileHistories = async () => {
+      try {
+        loadingFileHistory.value = true
+        const response = await itemProcessingStore.fetchFileHistories()
+        fileHistories.value = response || []
+      } catch (error) {
+        console.error('파일 히스토리 로드 실패:', error)
+
+        // 서버 에러인 경우 더 구체적인 메시지 표시
+        if (error.response && error.response.status === 500) {
+          errorHandler.setError(
+            '서버 내부 오류가 발생했습니다.',
+            '파일 목록을 불러오는 중 서버에서 문제가 발생했습니다. 잠시 후 다시 시도해주세요.',
+            error
+          )
+        } else if (error.response && error.response.status === 401) {
+          errorHandler.setError(
+            '인증이 필요합니다.',
+            '로그인이 필요하거나 세션이 만료되었습니다. 다시 로그인해주세요.',
+            error
+          )
+        } else if (error.response && error.response.status === 403) {
+          errorHandler.setError(
+            '접근 권한이 없습니다.',
+            '이 기능에 접근할 권한이 없습니다.',
+            error
+          )
+        } else if (error.response && error.response.status >= 500) {
+          errorHandler.setError(
+            '서버 오류가 발생했습니다.',
+            '일시적인 서버 문제로 파일 목록을 불러올 수 없습니다. 잠시 후 다시 시도해주세요.',
+            error
+          )
+        } else {
+          errorHandler.handleGeneralError(error, '파일 목록 로드')
+        }
+
+        fileHistories.value = []
+      } finally {
+        loadingFileHistory.value = false
+      }
+    }
+
+    /**
+     * 파일 히스토리 재시도
+     */
+    const retryFileHistoryLoad = async () => {
+      try {
+        retryCount.value++
+        lastRetryTime.value = new Date()
+
+        await loadFileHistories()
+        errorHandler.clearError()
+
+        // 성공 시 재시도 카운트 초기화
+        retryCount.value = 0
+        lastRetryTime.value = null
+      } catch (error) {
+        console.error('파일 히스토리 재시도 실패:', error)
+      }
+    }
+
+    /**
+     * 새 파일 업로드 방식으로 전환
+     */
+    const switchToNewFileUpload = () => {
+      errorHandler.clearError()
+      processingMethod.value = 'new'
+      selectedFile.value = null
+      fileHistories.value = []
+    }
+
+    /**
+     * 에러 상태 코드 가져오기
+     */
+    const getErrorStatusCode = () => {
+      if (errorHandler.currentError.value && errorHandler.currentError.value.response) {
+        return errorHandler.currentError.value.response.status
+      }
+      return 'N/A'
+    }
+
+    /**
+     * 기존 파일 선택
+     * @param {Object} fileHistory - 선택된 파일 히스토리
+     */
+    const selectExistingFile = async (fileHistory) => {
+      try {
+        selectedFile.value = fileHistory
+        selectedSubject.value = fileHistory.areaCode
+
+        // 선택된 파일의 이미지들을 pdfPages로 설정
+        if (fileHistory.pdfImages && fileHistory.pdfImages.length > 0) {
+          pdfPages.value = fileHistory.pdfImages.map((image, index) => ({
+            index: index,
+            pageNumber: index + 1,
+            preview: image.imageUrl,
+            originalPage: index,
+            width: image.imageWidth,
+            height: image.imageHeight,
+            fileHistoryId: fileHistory.id,
+            pdfImageId: image.id
+          }))
+        }
+
+        // 바로 편집 모드로 진행
+        console.log('기존 파일 선택 완료:', fileHistory)
+      } catch (error) {
+        console.error('기존 파일 선택 처리 실패:', error)
+        errorHandler.handleGeneralError(error, '파일 선택 처리')
+      }
+    }
 
     // ===== 교과서 선택 관련 메서드 =====
 
@@ -652,6 +916,8 @@ export default {
       textbooks,
       groupedTextbooks,
       subjects,
+      subjectCategories,
+      subjectOptions,
       selectedSubject,
       selectedTextbook,
       pdfFile,
@@ -660,15 +926,19 @@ export default {
       presignedUrl,
       fileId,
       errorHandler,
-      // isConvertingPdf,
-      // convertedPdfPages,
-      // totalPdfPages,
-      // currentPdfPage,
       isGeneratingPdf,
       pdfGenerationProgress,
       currentPdfStage,
       showFileHistoryError,
       fileHistoryErrorMessage,
+
+      // 새로운 상태
+      processingMethod,
+      selectedFile,
+      fileHistories,
+      loadingFileHistory,
+      retryCount,
+      lastRetryTime,
 
       // 메서드
       selectSubject,
@@ -683,6 +953,18 @@ export default {
       goToOcrEditor,
       goBackFromOcr,
       hideFileHistoryError,
+
+      // 새로운 메서드
+      selectProcessingMethod,
+      goBackToMethodSelection,
+      loadFileHistories,
+      selectExistingFile,
+      retryFileHistoryLoad,
+      switchToNewFileUpload,
+      getErrorStatusCode,
+
+      // 개발 모드
+      isDevelopment,
     }
   },
 }
@@ -906,6 +1188,21 @@ export default {
 
 .error-header h3 {
   color: #dc2626;
+}
+
+/* 서버 에러 대안 UI 스타일 */
+.server-error-fallback {
+  max-width: 600px;
+  margin: 2rem auto;
+}
+
+.server-error-fallback .bi-exclamation-triangle-fill {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 /* 커스텀 그림자 효과 */

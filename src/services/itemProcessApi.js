@@ -31,6 +31,20 @@ export const itemProcessingAPI = {
     return api.get('/subject', { params })
   },
 
+  // 기존 파일 히스토리 목록 조회
+  getFileHistories: (page = 0, size = 20, subject = null) => {
+    const params = { page, size }
+    if (subject) {
+      params.areaCode = subject
+    }
+    return api.get('/file-history', { params })
+  },
+
+  // 특정 파일 히스토리의 PDF 이미지 목록 조회
+  getFileHistoryImages: (fileHistoryId) => {
+    return api.get(`/file-history/${fileHistoryId}/images`)
+  },
+
   // 편집된 PDF 업로드 및 정보 저장 (통합 API)
   uploadProcessedPdf: (file, fileName, category, entityType, entityId, description) => {
     const formData = new FormData()

@@ -797,6 +797,55 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
       return true
     },
 
+    /**
+     * 기존 파일 히스토리 목록 조회
+     * @param {number} page - 페이지 번호
+     * @param {number} size - 페이지 크기
+     * @param {string} subject - 과목 코드 필터
+     * @returns {Promise<Array>} 파일 히스토리 목록
+     */
+    async fetchFileHistories(page = 0, size = 50, subject = null) {
+      try {
+        this.loading = true
+        this.error = null
+
+        const response = await itemProcessingAPI.getFileHistories(page, size, subject)
+        
+        if (response.data && response.data.success) {
+          const fileHistories = response.data.data.content || response.data.data
+          
+          // 각 파일 히스토리의 PDF 이미지들을 함께 조회
+          const enrichedFileHistories = await Promise.all(
+            fileHistories.map(async (fileHistory) => {
+              try {
+                const imagesResponse = await itemProcessingAPI.getFileHistoryImages(fileHistory.id)
+                if (imagesResponse.data && imagesResponse.data.success) {
+                  fileHistory.pdfImages = imagesResponse.data.data || []
+                } else {
+                  fileHistory.pdfImages = []
+                }
+              } catch (error) {
+                console.warn(`파일 히스토리 ${fileHistory.id}의 이미지 조회 실패:`, error)
+                fileHistory.pdfImages = []
+              }
+              return fileHistory
+            })
+          )
+          
+          return enrichedFileHistories
+        } else {
+          console.warn('파일 히스토리 조회 실패:', response.data)
+          return []
+        }
+      } catch (error) {
+        console.error('파일 히스토리 조회 중 오류:', error)
+        this.error = '파일 목록을 불러오는데 실패했습니다.'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
     reset() {
       this.cleanupBlobUrls()
       this.textbooks = []
