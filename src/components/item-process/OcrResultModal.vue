@@ -3,271 +3,91 @@
     <div class="modal-overlay" @click="closeModal"></div>
     <div class="modal-container">
       <!-- 모달 헤더 -->
-      <div class="modal-header">
-        <h2 class="section-title">문제 가공 진행</h2>
-        <button @click="closeModal" class="btn-close">
-          <span>&times;</span>
-        </button>
-      </div>
+      <OcrResultHeader
+        :current-step="currentStep"
+        :total-steps="steps.length"
+        @close="closeModal"
+      />
 
       <!-- 모달 내용 -->
       <div class="modal-content">
-        <div class="content-layout">
-          <!-- 왼쪽 컬럼: 캡처한 문제 -->
-          <div class="left-column">
-            <div class="section-header">
-              <h3 class="section-subtitle">캡처한 문제</h3>
-              <div class="zoom-controls">
-                <button @click="zoomOut" class="btn btn-outline-secondary btn-sm">
-                  <i class="bi bi-zoom-out"></i>
-                </button>
-                <span class="zoom-level">{{ Math.round(zoomLevel * 100) }}%</span>
-                <button @click="zoomIn" class="btn btn-outline-secondary btn-sm">
-                  <i class="bi bi-zoom-in"></i>
-                </button>
-              </div>
-            </div>
+        <!-- 1단계: 영역 선택 -->
+        <Step1AreaSelection
+          v-if="currentStep === 1"
+          :captured-image="capturedImage"
+          :selected-areas="selectedAreas"
+          :active-selection-type="activeSelectionType"
+          :capture-mode="captureMode"
+          :zoom-level="zoomLevel"
+          :is-processing="isProcessing"
+          @update:selected-areas="selectedAreas = $event"
+          @update:active-selection-type="activeSelectionType = $event"
+          @update:capture-mode="captureMode = $event"
+          @update:zoom-level="zoomLevel = $event"
+          @next-step="nextStep"
+        />
 
-            <div class="image-container">
-              <!-- 디버깅 정보 -->
-              <div v-if="!capturedImage" class="no-image">
-                <div class="text-center">
-                  <i class="bi bi-image display-4 text-muted"></i>
-                  <p class="mt-3">캡처된 이미지가 없습니다.</p>
-                  <p class="text-muted small">이미지 데이터 길이: {{ capturedImage ? capturedImage.length : 0 }}</p>
-                </div>
-              </div>
+        <!-- 2단계: 텍스트 편집 -->
+        <Step2TextEditing
+          v-if="currentStep === 2"
+          :selected-areas="selectedAreas"
+          :ocr-results="ocrResults"
+          :edited-texts="editedTexts"
+          :current-editing-area="currentEditingArea"
+          @update:edited-texts="editedTexts = $event"
+          @update:current-editing-area="currentEditingArea = $event"
+          @prev-step="prevStep"
+          @next-step="nextStep"
+        />
 
-              <!-- Canvas 기반 이미지 표시 및 영역 선택 -->
-              <div class="canvas-container" v-if="capturedImage">
-                <canvas
-                  ref="imageCanvas"
-                  class="image-canvas"
-                  :style="{ transform: `scale(${zoomLevel})` }"
-                ></canvas>
+        <!-- 3단계: 문제 정보 입력 -->
+        <Step3ItemInfo
+          v-if="currentStep === 3"
+          :item-info="itemInfo"
+          @update:item-info="itemInfo = $event"
+          @prev-step="prevStep"
+          @next-step="nextStep"
+        />
 
-                <!-- 영역 선택을 위한 Canvas 오버레이 -->
-                <canvas
-                  ref="selectionCanvas"
-                  class="selection-canvas"
-                  @click="handleCanvasClick"
-                ></canvas>
 
-                <!-- 선택 영역 표시 -->
-                <div
-                  v-if="currentSelection.active"
-                  class="selection-area"
-                  :style="currentSelectionStyle"
-                >
-                  <span class="selection-type-label">{{ getSelectionTypeLabel(activeSelectionType) }}</span>
-                </div>
-
-                <!-- 첫 번째 클릭 후 대기 중인 상태 표시 -->
-                <div
-                  v-if="currentSelection.waitingForSecondClick"
-                  class="waiting-selection-point"
-                  :style="waitingSelectionStyle"
-                >
-                  <div class="waiting-indicator">
-                    <i class="bi bi-mouse"></i>
-                    <span class="waiting-text">두 번째 클릭</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div class="image-controls">
-              <div v-if="!captureMode" class="text-center">
-                <button
-                  @click="startCapture"
-                  class="btn btn-primary"
-                >
-                  <i class="bi bi-cursor"></i> 영역 선택 시작
-                </button>
-              </div>
-
-              <div v-if="captureMode" class="capture-info">
-                <div class="alert alert-info mb-0">
-                  <i class="bi bi-info-circle me-2"></i>
-                  <strong>영역 선택 모드가 활성화되었습니다.</strong>
-                  <br><small>오른쪽에서 지문, 이미지, 보기 영역을 선택하세요.</small>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <!-- 오른쪽 컬럼: 영역 선택 -->
-          <div class="right-column">
-            <div class="section-header">
-              <h3 class="section-subtitle">영역 선택</h3>
-              <button @click="resetCapture" class="btn btn-outline-secondary btn-sm">
-                <i class="bi bi-arrow-clockwise"></i> 초기화
-              </button>
-            </div>
-
-            <!-- 영역 선택 안내 -->
-            <div class="area-selection-guide">
-              <div class="alert alert-light">
-                <h6 class="alert-heading">
-                  <i class="bi bi-lightbulb me-2"></i>영역 선택 가이드
-                </h6>
-                <p class="mb-2">아래 영역들을 클릭하여 해당 부분을 선택하세요.</p>
-                <p class="mb-0 text-warning">
-                  <i class="bi bi-exclamation-triangle me-1"></i>
-                  지문과 보기는 필수, 이미지는 선택사항입니다.
-                </p>
-              </div>
-
-              <div v-if="captureMode && activeSelectionType" class="selection-status">
-                <div class="alert alert-primary">
-                  <div class="d-flex align-items-center">
-                    <i class="bi bi-cursor-fill me-2"></i>
-                    <div>
-                      <strong>{{ getSelectionTypeLabel(activeSelectionType) }}</strong> 영역 선택 중...
-                      <br><small class="text-muted">이미지에서 클릭하여 영역을 선택하세요</small>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 영역 선택 공간들 -->
-            <div class="area-selection-container">
-              <!-- 지문 영역 -->
-              <div class="area-selection-item">
-                <h4 class="area-title">
-                  <i class="bi bi-file-text me-2"></i>지문
-                  <span class="badge bg-primary ms-2">필수</span>
-                </h4>
-                <div
-                  class="area-selection-box question-box"
-                  :class="{ selected: selectedAreas.question }"
-                  @click="selectArea('question')"
-                >
-                  <div v-if="!selectedAreas.question" class="area-placeholder">
-                    <i class="bi bi-plus-circle display-6 text-muted"></i>
-                    <span class="placeholder-text">지문 선택 공간</span>
-                  </div>
-                  <div v-else class="selected-area-content">
-                    <img
-                      :src="selectedAreas.question.imageData"
-                      :alt="'선택된 지문 영역'"
-                      class="selected-area-image"
-                    />
-                    <span class="area-badge bg-primary">지문</span>
-                    <span class="area-check">
-                      <i class="bi bi-check-circle-fill"></i>
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 이미지 영역 -->
-              <div class="area-selection-item">
-                <h4 class="area-title">
-                  <i class="bi bi-image me-2"></i>이미지
-                  <span class="badge bg-warning ms-2">선택사항</span>
-                </h4>
-                <div
-                  class="area-selection-box image-box"
-                  :class="{ selected: selectedAreas.image }"
-                  @click="selectArea('image')"
-                >
-                  <div v-if="!selectedAreas.image" class="area-placeholder">
-                    <i class="bi bi-plus-circle display-6 text-muted"></i>
-                    <span class="placeholder-text">이미지 선택 공간</span>
-                  </div>
-                  <div v-else class="selected-area-content">
-                    <img
-                      :src="selectedAreas.image.imageData"
-                      :alt="'선택된 이미지 영역'"
-                      class="selected-area-image"
-                    />
-                    <span class="area-badge bg-success">이미지</span>
-                    <span class="area-check">
-                      <i class="bi bi-check-circle-fill"></i>
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 보기 영역 -->
-              <div class="area-selection-item">
-                <h4 class="area-title">
-                  <i class="bi bi-list-check me-2"></i>보기
-                  <span class="badge bg-primary ms-2">필수</span>
-                </h4>
-                <div
-                  class="area-selection-box options-box"
-                  :class="{ selected: selectedAreas.options }"
-                  @click="selectArea('options')"
-                >
-                  <div v-if="!selectedAreas.options" class="area-placeholder">
-                    <i class="bi bi-plus-circle display-6 text-muted"></i>
-                    <span class="placeholder-text">보기 선택 공간</span>
-                  </div>
-                  <div v-else class="selected-area-content">
-                    <img
-                      :src="selectedAreas.options.imageData"
-                      :alt="'선택된 보기 영역'"
-                      class="selected-area-image"
-                    />
-                    <span class="area-badge bg-warning">보기</span>
-                    <span class="area-check">
-                      <i class="bi bi-check-circle-fill"></i>
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- 처리 버튼 -->
-            <div class="processing-section">
-              <div class="processing-status mb-3">
-                <div class="row g-2">
-                  <div class="col-4">
-                    <div class="status-item" :class="{ completed: selectedAreas.question }">
-                      <i class="bi" :class="selectedAreas.question ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'"></i>
-                      <span class="ms-2">지문</span>
-                    </div>
-                  </div>
-                  <div class="col-4">
-                    <div class="status-item" :class="{ completed: selectedAreas.image }">
-                      <i class="bi" :class="selectedAreas.image ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'"></i>
-                      <span class="ms-2">이미지</span>
-                    </div>
-                  </div>
-                  <div class="col-4">
-                    <div class="status-item" :class="{ completed: selectedAreas.options }">
-                      <i class="bi" :class="selectedAreas.options ? 'bi-check-circle-fill text-success' : 'bi-circle text-muted'"></i>
-                      <span class="ms-2">보기</span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <button
-                @click="processAreas"
-                :disabled="!canConvert || isProcessing"
-                class="btn btn-success w-100"
-                :class="{ 'btn-lg': canConvert }"
-              >
-                <i class="bi bi-arrow-right-circle me-2"></i>
-                {{ isProcessing ? '처리 중...' : (canConvert ? '처리 시작' : '필수 영역을 선택해주세요') }}
-              </button>
-            </div>
-          </div>
-        </div>
+        <!-- 4단계: 문제 저장 -->
+        <Step4ItemSave
+          v-if="currentStep === 4"
+          :selected-areas="selectedAreas"
+          :edited-texts="editedTexts"
+          :item-info="itemInfo"
+          @prev-step="prevStep"
+          @save-complete="handleSaveComplete"
+        />
       </div>
 
       <!-- 모달 액션 -->
       <div class="modal-actions">
-        <button @click="saveProblems" class="btn btn-primary">
-          <i class="bi bi-save me-2"></i>저장
-        </button>
-        <button @click="closeModal" class="btn btn-secondary">
-          <i class="bi bi-x-circle me-2"></i>닫기
-        </button>
+        <div class="action-left">
+          <button v-if="currentStep > 1" @click="prevStep" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-2"></i>이전 단계
+          </button>
+        </div>
+
+        <div class="action-right">
+          <button v-if="currentStep < steps.length"
+                  @click="nextStep"
+                  :disabled="!canProceedToNext"
+                  class="btn btn-primary">
+            다음 단계<i class="bi bi-arrow-right ms-2"></i>
+          </button>
+
+          <button v-if="currentStep === steps.length"
+                  @click="saveItem"
+                  :disabled="!canSaveItem"
+                  class="btn btn-success">
+            <i class="bi bi-save me-2"></i>문제 저장
+          </button>
+
+          <button @click="closeModal" class="btn btn-secondary">
+            <i class="bi bi-x-circle me-2"></i>닫기
+          </button>
+        </div>
       </div>
     </div>
   </div>
@@ -275,9 +95,27 @@
 
 <script>
 import { ref, computed, nextTick, watch } from 'vue'
+import { useItemProcessingError } from '@/composables/item-process/useItemProcessingError'
+import { ocrApi } from '@/services/ocrApi'
+
+// 분리된 컴포넌트들 import
+import OcrResultHeader from './ocr/OcrResultHeader.vue'
+
+// 단계별 컴포넌트들 import
+import Step1AreaSelection from './ocr/Step1AreaSelection.vue'
+import Step2TextEditing from './ocr/Step2TextEditing.vue'
+import Step3ItemInfo from './ocr/Step3ItemInfo.vue'
+import Step4ItemSave from './ocr/Step4ItemSave.vue'
 
 export default {
   name: 'OcrResultModal',
+  components: {
+    OcrResultHeader,
+    Step1AreaSelection,
+    Step2TextEditing,
+    Step3ItemInfo,
+    Step4ItemSave
+  },
   props: {
     isVisible: {
       type: Boolean,
@@ -287,6 +125,10 @@ export default {
       type: String,
       default: ''
     },
+    capturedImageInfo: {
+      type: Object,
+      default: () => ({})
+    },
     ocrResults: {
       type: Array,
       default: () => []
@@ -294,26 +136,54 @@ export default {
   },
   emits: ['close', 'save'],
   setup(props, { emit }) {
+    // 에러 처리 컴포지블
+    const { handleGeneralError } = useItemProcessingError()
 
+    // 단계 관리
+    const currentStep = ref(1)
+    const steps = ref([
+      { label: '추출', key: 'extract' },
+      { label: '편집', key: 'edit' },
+      { label: '정보입력', key: 'info' },
+      { label: '미리보기', key: 'preview' }
+    ])
 
     // 상태 관리
-    const zoomLevel = ref(1) // 기본 줌 레벨, 이미지 로드 시 자동으로 조정됨
+    const zoomLevel = ref(1)
     const selectedArea = ref(null)
     const selectedProblemIndex = ref(0)
     const captureMode = ref(false)
     const imageCanvas = ref(null)
     const selectionCanvas = ref(null)
-    const isProcessing = ref(false) // 처리 중 상태
+    const isProcessing = ref(false)
+    const processingOcr = ref(false)
 
-    // 선택된 영역들
+    // 선택된 영역들 (확장된 영역 타입)
     const selectedAreas = ref({
-      question: null,  // 지문 영역
-      image: null,     // 이미지 영역 (nullable)
-      options: null    // 보기 영역
+      question: null,   // 지문 영역
+      problem: null,    // 문제 영역
+      image: null,      // 이미지 영역
+      options: null     // 보기 영역
+    })
+
+
+
+    // 편집된 텍스트
+    const editedTexts = ref({
+      question: '',
+      problem: '',
+      image: '',
+      options: ''
     })
 
     // 현재 선택 중인 영역 타입
-    const activeSelectionType = ref(null)
+    const activeSelectionType = ref('problem')
+
+    // 2단계 편집에서 사용
+    const currentEditingArea = ref('question')
+    const availableAreaTypes = computed(() => {
+      return Object.keys(selectedAreas.value).filter(key => selectedAreas.value[key] !== null)
+    })
 
     // 현재 선택 중인 영역
     const currentSelection = ref({
@@ -327,47 +197,68 @@ export default {
       waitingForSecondClick: false
     })
 
-    const problems = ref([
-      {
-        title: 'Choose all correct statements from the following? (2 answers)',
-        content: '다음 중 옳은 것을 모두 고르시오. (2개)',
-        type: 'multiple',
-        ocrText: ''
-      },
-      {
-        title: 'Problem 2',
-        content: '두 번째 문제 내용',
-        type: 'multiple',
-        ocrText: ''
-      },
-      {
-        title: 'Problem 3',
-        content: '세 번째 문제 내용',
-        type: 'subjective',
-        ocrText: ''
-      }
-    ])
-
-    // 계산된 속성
-    const selectedProblem = computed(() => problems.value[selectedProblemIndex.value])
-
-    // 변환 가능 여부 (지문 + 보기 선택 완료 시)
-    const canConvert = computed(() => {
-      return selectedAreas.value.question && selectedAreas.value.options
+    // 지문 그룹 관리 (국어, 영어, 사회, 역사만)
+    const passageGroups = ref([])
+    const selectedPassageGroup = ref('')
+    const newPassageGroupTitle = ref('')
+    const showPassageGroupSection = computed(() => {
+      // 과목 코드에 따라 지문 그룹 섹션 표시 결정
+      // 추후 과목 정보를 props로 받아서 처리
+      return true // 임시로 true
     })
 
-    // 영역별 스타일 계산
-    const getAreaStyle = (areaType) => {
-      const area = selectedAreas.value[areaType]
-      if (!area) return {}
+    // 문제 정보
+    const itemInfo = ref({
+      type: 'multiple',
+      difficulty: 'medium',
+      answer: '',
+      score: 1,
+      majorChapter: '',
+      middleChapter: '',
+      minorChapter: '',
+      solution: '',
+      explanation: ''
+    })
 
-      return {
-        left: `${area.x}px`,
-        top: `${area.y}px`,
-        width: `${area.width}px`,
-        height: `${area.height}px`
+    // 단원 정보
+    const majorChapters = ref([
+      { id: 1, name: '대단원 1' },
+      { id: 2, name: '대단원 2' },
+      { id: 3, name: '대단원 3' }
+    ])
+    const middleChapters = ref([])
+    const minorChapters = ref([])
+
+    // 계산된 속성 제거 (더 이상 problems 배열 사용하지 않음)
+
+    // 변환 가능 여부 (문제 + 보기는 필수)
+    const canConvert = computed(() => {
+      return selectedAreas.value.problem && selectedAreas.value.options
+    })
+
+    // 다음 단계로 진행 가능 여부
+    const canProceedToNext = computed(() => {
+      switch (currentStep.value) {
+        case 1: // 추출 단계
+          return canConvert.value
+        case 2: // 편집 단계
+          return availableAreaTypes.value.every(areaType => editedTexts.value[areaType].trim())
+        case 3: // 정보입력 단계
+          return itemInfo.value.type && itemInfo.value.difficulty && itemInfo.value.answer &&
+                 itemInfo.value.score > 0 && itemInfo.value.majorChapter
+        case 4: // 미리보기 단계
+          return false // 마지막 단계이므로 다음 단계 없음
+        default:
+          return false
       }
-    }
+    })
+
+    // 문제 저장 가능 여부
+    const canSaveItem = computed(() => {
+      return canProceedToNext.value || currentStep.value === 4
+    })
+
+
 
     // 현재 선택 중인 영역 스타일
     const currentSelectionStyle = computed(() => {
@@ -399,17 +290,40 @@ export default {
       }
     })
 
-    // 선택 타입 라벨
-    const getSelectionTypeLabel = (type) => {
-      const labels = {
-        question: '지문',
-        image: '이미지',
-        options: '보기'
+
+
+    // 단계 네비게이션
+    const nextStep = async () => {
+      if (currentStep.value === 1) {
+        // 1단계에서 2단계로 이동 시 OCR 처리
+        await processAllSelectedAreas()
       }
-      return labels[type] || ''
+
+      if (currentStep.value < steps.value.length) {
+        currentStep.value++
+
+        // 2단계 진입 시 첫 번째 사용 가능한 영역으로 설정
+        if (currentStep.value === 2 && availableAreaTypes.value.length > 0) {
+          currentEditingArea.value = availableAreaTypes.value[0]
+        }
+      }
     }
 
-    // 메서드
+    const prevStep = () => {
+      if (currentStep.value > 1) {
+        currentStep.value--
+      }
+    }
+
+    // 문제 저장 완료 처리
+    const handleSaveComplete = () => {
+      console.log('문제 저장 완료')
+      // 성공 메시지 표시
+      showSuccessMessage('문제가 성공적으로 저장되었습니다!')
+      // 모달 닫기
+      closeModal()
+    }
+
     const closeModal = () => {
       emit('close')
     }
@@ -447,6 +361,12 @@ export default {
         console.log('첫 번째 클릭 - 시작 지점')
         firstClick(event)
       }
+    }
+
+    // 지문 그룹 변경 처리
+    const onPassageGroupChange = (newValue) => {
+      console.log('지문 그룹 변경:', newValue)
+      // 필요한 경우 추가 로직 구현
     }
 
     const selectArea = (areaType) => {
@@ -594,6 +514,19 @@ export default {
       console.log('✅', message)
     }
 
+        // 영역 타입 선택 함수 (탭 방식)
+    const selectAreaType = (areaType) => {
+      // 해당 영역 타입 활성화
+      activeSelectionType.value = areaType
+      // 선택 모드 활성화
+      captureMode.value = true
+      // 현재 선택 초기화
+      clearCurrentSelection()
+
+      // 사용자에게 명확한 안내 제공
+      console.log(`${areaType} 탭 선택됨 - 이미지에서 영역을 드래그하여 선택하세요`)
+    }
+
     // 현재 선택 초기화
     const clearCurrentSelection = () => {
       currentSelection.value = {
@@ -610,25 +543,69 @@ export default {
 
 
 
-    const processAreas = async () => {
+    // OCR 처리 메서드들
+    const processOcr = async (areaType) => {
+      if (processingOcr.value || !selectedAreas.value[areaType]) return
+
+      try {
+        processingOcr.value = true
+
+        const selectedArea = selectedAreas.value[areaType]
+
+        // 이미지 데이터 유효성 확인
+        if (!selectedArea.imageData) {
+          throw new Error(`${areaType} 영역의 이미지 데이터가 없습니다.`)
+        }
+
+        console.log(`${areaType} OCR 처리 시작:`, {
+          areaType,
+          hasImageData: !!selectedArea.imageData,
+          imageDataLength: selectedArea.imageData.length,
+          imageDataPrefix: selectedArea.imageData.substring(0, 50) + '...'
+        })
+
+        // 예시 과목 코드 (추후 props로 받아와야 함)
+        const areaCode = 'KO'
+
+        const result = await ocrApi.processImage(
+          selectedArea.imageData,
+          areaCode
+        )
+
+        // props의 ocrResults는 읽기 전용이므로 로컬 상태로 관리
+        // 실제로는 emit을 통해 부모 컴포넌트에 업데이트를 요청해야 함
+        console.log(`${areaType} OCR 결과:`, result.text || '')
+
+      } catch (error) {
+        console.error(`${areaType} OCR 처리 오류:`, error)
+        handleGeneralError(error, `${areaType} OCR 처리`)
+      } finally {
+        processingOcr.value = false
+      }
+    }
+
+    const processAllSelectedAreas = async () => {
       if (isProcessing.value) return
 
       try {
         isProcessing.value = true
-        console.log('영역 처리 시작:', selectedAreas.value)
+        console.log('전체 영역 OCR 처리 시작:', selectedAreas.value)
 
-        // 성공 메시지 표시
-        showSuccessMessage('영역이 성공적으로 처리되었습니다!')
+        // 선택된 모든 영역에 대해 OCR 처리
+        const ocrPromises = []
+        for (const areaType of availableAreaTypes.value) {
+          ocrPromises.push(processOcr(areaType))
+        }
 
-        // 처리 완료 후 상태 초기화
-        resetCapture()
+        await Promise.all(ocrPromises)
 
-        // 모달 닫기
-        closeModal()
+        // OCR 결과를 편집 텍스트에 초기값으로 설정
+        // props의 ocrResults는 읽기 전용이므로 로컬 상태로 관리
+        console.log('OCR 처리 완료, 편집 텍스트 초기화')
 
       } catch (error) {
-        console.error('영역 처리 실패:', error)
-        showSuccessMessage(`처리 실패: ${error.message}`)
+        console.error('전체 OCR 처리 실패:', error)
+        handleGeneralError(error, '전체 OCR 처리')
       } finally {
         isProcessing.value = false
       }
@@ -639,45 +616,124 @@ export default {
       activeSelectionType.value = null
       selectedAreas.value = {
         question: null,
+        problem: null,
         image: null,
         options: null
+      }
+
+      editedTexts.value = {
+        question: '',
+        problem: '',
+        image: '',
+        options: ''
       }
       clearCurrentSelection()
       console.log('영역 선택 초기화')
     }
 
-    const selectProblem = (index) => {
-      selectedProblemIndex.value = index
+    // 편집 관련 메서드
+    const selectEditingArea = (areaType) => {
+      currentEditingArea.value = areaType
     }
 
-    const resetProblems = () => {
-      problems.value.forEach(problem => {
-        problem.type = 'multiple'
-        problem.ocrText = ''
-      })
-      selectedProblemIndex.value = 0
+    const copyOcrToEditor = () => {
+      // props의 ocrResults는 읽기 전용이므로 로컬 상태로 관리
+      console.log('OCR 결과를 편집기에 복사')
     }
 
-    const performOcr = () => {
-      // OCR 실행 로직
-      console.log('OCR 실행')
+    const clearEditor = () => {
+      editedTexts.value[currentEditingArea.value] = ''
     }
 
-    const saveProblems = () => {
-      emit('save', problems.value)
+    // 단원 선택 관련 메서드
+    const onMajorChapterChange = () => {
+      itemInfo.value.middleChapter = ''
+      itemInfo.value.minorChapter = ''
+      // 중단원 목록 업데이트
+      middleChapters.value = [
+        { id: 1, name: '중단원 1-1' },
+        { id: 2, name: '중단원 1-2' }
+      ]
+    }
+
+    const onMiddleChapterChange = () => {
+      itemInfo.value.minorChapter = ''
+      // 소단원 목록 업데이트
+      minorChapters.value = [
+        { id: 1, name: '소단원 1-1-1' },
+        { id: 2, name: '소단원 1-1-2' }
+      ]
+    }
+
+    // 단원 경로 문자열 생성
+    const getChapterPath = () => {
+      const parts = []
+      if (itemInfo.value.majorChapter) {
+        const major = majorChapters.value.find(c => c.id === itemInfo.value.majorChapter)
+        if (major) parts.push(major.name)
+      }
+      if (itemInfo.value.middleChapter) {
+        const middle = middleChapters.value.find(c => c.id === itemInfo.value.middleChapter)
+        if (middle) parts.push(middle.name)
+      }
+      if (itemInfo.value.minorChapter) {
+        const minor = minorChapters.value.find(c => c.id === itemInfo.value.minorChapter)
+        if (minor) parts.push(minor.name)
+      }
+      return parts.join(' > ') || '단원 미선택'
+    }
+
+    // 최종 저장
+    const saveItem = () => {
+      const itemData = {
+        // 기본 정보
+        type: itemInfo.value.type,
+        difficulty: itemInfo.value.difficulty,
+        answer: itemInfo.value.answer,
+        score: itemInfo.value.score,
+        majorChapter: itemInfo.value.majorChapter,
+        middleChapter: itemInfo.value.middleChapter,
+        minorChapter: itemInfo.value.minorChapter,
+        solution: itemInfo.value.solution,
+        explanation: itemInfo.value.explanation,
+
+        // 선택된 영역 데이터
+        selectedAreas: selectedAreas.value,
+
+        // 편집된 텍스트
+        texts: editedTexts.value,
+
+        // 지문 그룹 (해당하는 경우)
+        passageGroup: selectedPassageGroup.value,
+        newPassageGroupTitle: newPassageGroupTitle.value
+      }
+
+      emit('save', itemData)
       closeModal()
     }
 
     // Canvas 설정 및 이미지 렌더링
     const setupCanvas = () => {
-      if (!props.capturedImage || !imageCanvas.value) return
+      if (!props.capturedImage || !imageCanvas.value) {
+        console.log('Canvas 설정 실패:', {
+          hasCapturedImage: !!props.capturedImage,
+          hasImageCanvas: !!imageCanvas.value,
+          capturedImage: props.capturedImage ? props.capturedImage.substring(0, 100) + '...' : 'null'
+        })
+        return
+      }
 
       try {
-        // capturedImage가 JSON 문자열인지 확인
+        // capturedImage가 base64 이미지 데이터인지 확인
         let imageData = props.capturedImage
 
-                // JSON 문자열인 경우 파싱
-        if (props.capturedImage.startsWith('{')) {
+        // base64 이미지 데이터인 경우 직접 사용
+        if (props.capturedImage.startsWith('data:image/')) {
+          console.log('base64 이미지 데이터 직접 사용')
+          imageData = props.capturedImage
+        }
+        // JSON 문자열인 경우 파싱
+        else if (props.capturedImage.startsWith('{')) {
           try {
             const areaInfo = JSON.parse(props.capturedImage)
             console.log('선택된 영역 정보:', areaInfo)
@@ -712,6 +768,9 @@ export default {
             console.error('JSON 파싱 실패:', parseError)
             return
           }
+        } else {
+          console.error('지원하지 않는 이미지 데이터 형식:', typeof props.capturedImage)
+          return
         }
 
         const canvas = imageCanvas.value
@@ -939,10 +998,21 @@ export default {
 
     // capturedImage 변경 감지하여 Canvas 설정
     watch(() => props.capturedImage, (newImage) => {
+      console.log('=== capturedImage 변경 감지 ===')
+      console.log('새로운 이미지:', {
+        hasImage: !!newImage,
+        imageType: typeof newImage,
+        imageLength: newImage ? newImage.length : 0,
+        imagePrefix: newImage ? newImage.substring(0, 100) + '...' : 'null'
+      })
+
       if (newImage) {
         nextTick(() => {
+          console.log('nextTick 실행 - setupCanvas 호출')
           setupCanvas()
         })
+      } else {
+        console.log('capturedImage가 null이거나 빈 값')
       }
     }, { immediate: true })
 
@@ -1005,11 +1075,18 @@ export default {
     }
 
     return {
+      // 단계 관리
+      currentStep,
+      steps,
+      nextStep,
+      prevStep,
+      canProceedToNext,
+      canSaveItem,
+
+      // 상태 관리
       zoomLevel,
       selectedArea,
       selectedProblemIndex,
-      problems,
-      selectedProblem,
       captureMode,
       imageCanvas,
       selectionCanvas,
@@ -1017,18 +1094,47 @@ export default {
       activeSelectionType,
       currentSelection,
       canConvert,
-      getAreaStyle,
-      currentSelectionStyle,
-      waitingSelectionStyle,
-      getSelectionTypeLabel,
+      isProcessing,
+      processingOcr,
+
+      // 편집 관리
+      currentEditingArea,
+      availableAreaTypes,
+      editedTexts,
+      selectEditingArea,
+      copyOcrToEditor,
+      clearEditor,
+      processOcr,
+
+      // 문제 정보
+      itemInfo,
+      passageGroups,
+      selectedPassageGroup,
+      newPassageGroupTitle,
+      showPassageGroupSection,
+
+      // 단원 정보
+      majorChapters,
+      middleChapters,
+      minorChapters,
+      onMajorChapterChange,
+      onMiddleChapterChange,
+      getChapterPath,
+
+
+
+      // 이벤트 핸들러
       closeModal,
       zoomIn,
       zoomOut,
       startCapture,
-      selectProblem,
-      resetProblems,
-      performOcr,
-      saveProblems,
+      saveItem,
+      onPassageGroupChange,
+      handleSaveComplete,
+
+      // Canvas 관리
+      currentSelectionStyle,
+      waitingSelectionStyle,
       setupCanvas,
       setupCanvasOverlay,
       updateSelectionCanvasPosition,
@@ -1039,11 +1145,10 @@ export default {
       firstClick,
       secondClick,
       clearCurrentSelection,
-
-      processAreas,
+      processAllSelectedAreas,
       resetCapture,
       showSuccessMessage,
-      isProcessing
+      selectAreaType
     }
   }
 }
@@ -1074,9 +1179,9 @@ export default {
 
 .modal-container {
   position: relative;
-  width: 90vw;
+  width: 95vw;
   max-width: 1400px;
-  height: 90vh;
+  height: 95vh;
   max-height: 800px;
   background: white;
   border-radius: 12px;
@@ -1094,6 +1199,69 @@ export default {
   padding: 1.5rem;
   border-bottom: 1px solid #e2e8f0;
   background-color: #f8fafc;
+}
+
+.header-left {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* 단계 진행 표시 */
+.step-progress {
+  margin-top: 0.5rem;
+}
+
+.step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.step-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #6b7280;
+  font-size: 0.875rem;
+}
+
+.step-item.active {
+  color: #3b82f6;
+  font-weight: 600;
+}
+
+.step-item.completed {
+  color: #10b981;
+}
+
+.step-circle {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  border: 2px solid currentColor;
+  background-color: white;
+}
+
+.step-item.active .step-circle {
+  background-color: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.step-item.completed .step-circle {
+  background-color: #10b981;
+  color: white;
+  border-color: #10b981;
+}
+
+.step-label {
+  font-weight: inherit;
 }
 
 .section-title {
@@ -1380,6 +1548,10 @@ export default {
   border-color: #3b82f6;
 }
 
+.problem-box {
+  border-color: #8b5cf6;
+}
+
 .image-box {
   border-color: #10b981;
 }
@@ -1480,14 +1652,369 @@ export default {
   border-color: #10b981;
 }
 
+/* 단계별 컨텐츠 스타일 */
+.step-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.step-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 1rem 0;
+}
+
+/* 2단계: 편집 레이아웃 */
+.editing-layout {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.editing-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+  background-color: #f8fafc;
+}
+
+.area-tabs {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.area-tab {
+  padding: 0.5rem 1rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: white;
+  color: #6b7280;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s;
+}
+
+.area-tab:hover:not(:disabled) {
+  border-color: #3b82f6;
+  color: #3b82f6;
+}
+
+.area-tab.active {
+  background: #3b82f6;
+  color: white;
+  border-color: #3b82f6;
+}
+
+.area-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.editing-content {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+  padding: 1.5rem;
+  flex: 1;
+}
+
+.editing-left {
+  display: flex;
+  flex-direction: column;
+}
+
+.selected-image {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  min-height: 300px;
+}
+
+.area-preview-image {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+}
+
+.editing-right {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.ocr-result-section,
+.text-editor-section {
+  flex: 1;
+}
+
+.ocr-result-section h4,
+.text-editor-section h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 0.75rem 0;
+  color: #1e293b;
+}
+
+.ocr-result-box {
+  margin-bottom: 0.75rem;
+}
+
+.ocr-textarea,
+.editor-textarea {
+  width: 100%;
+  min-height: 120px;
+  padding: 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.ocr-textarea {
+  background-color: #f8fafc;
+}
+
+.ocr-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.editor-toolbar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* 3단계: 정보 입력 레이아웃 */
+.info-input-layout {
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.form-sections {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.form-section {
+  margin-bottom: 2rem;
+  padding: 1.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+}
+
+.section-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 1rem 0;
+  border-bottom: 1px solid #e2e8f0;
+  padding-bottom: 0.5rem;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.form-group label {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #374151;
+}
+
+.form-control,
+.form-select {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.form-control:focus,
+.form-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.passage-group-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.chapter-selection {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+}
+
+.solution-textarea {
+  min-height: 100px;
+  resize: vertical;
+}
+
+/* 4단계: 미리보기 레이아웃 */
+.preview-layout {
+  padding: 1.5rem;
+  overflow-y: auto;
+}
+
+.preview-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.preview-info {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.preview-content {
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.preview-item-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+  overflow: hidden;
+}
+
+.item-header {
+  padding: 1rem;
+  background: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.item-meta {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.item-type,
+.item-difficulty,
+.item-score {
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.item-type {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
+.item-difficulty {
+  background: #fef3c7;
+  color: #92400e;
+}
+
+.item-score {
+  background: #d1fae5;
+  color: #065f46;
+}
+
+.item-chapter {
+  font-size: 0.875rem;
+  color: #6b7280;
+}
+
+.item-content {
+  padding: 1.5rem;
+}
+
+.item-passage,
+.item-problem,
+.item-image,
+.item-options,
+.item-answer,
+.item-solution,
+.item-explanation {
+  margin-bottom: 1.5rem;
+}
+
+.item-passage h5,
+.item-problem h5,
+.item-image h5,
+.item-options h5,
+.item-answer h5,
+.item-solution h5,
+.item-explanation h5 {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 0.5rem 0;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.content-text {
+  color: #374151;
+  line-height: 1.6;
+  white-space: pre-wrap;
+}
+
+.preview-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  margin-bottom: 0.5rem;
+}
+
+.image-caption {
+  font-size: 0.875rem;
+  color: #6b7280;
+  font-style: italic;
+}
+
+.answer-text {
+  font-weight: 600;
+  color: #059669;
+}
+
 /* 모달 액션 */
 .modal-actions {
   display: flex;
-  justify-content: flex-end;
-  gap: 1rem;
+  justify-content: space-between;
+  align-items: center;
   padding: 1.5rem;
   border-top: 1px solid #e2e8f0;
   background-color: #f8fafc;
+}
+
+.action-left,
+.action-right {
+  display: flex;
+  gap: 1rem;
 }
 
 /* 반응형 디자인 */
@@ -1526,5 +2053,378 @@ export default {
   .right-column {
     order: 1;
   }
+}
+
+/* 지문 그룹 관리 섹션 */
+.passage-group-section {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  padding: 1rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.passage-group-section .section-subtitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+}
+
+.passage-group-controls .form-group {
+  margin-bottom: 0;
+}
+
+.passage-group-controls .form-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.passage-group-controls .form-select {
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: white;
+}
+
+/* 영역 타입 선택 섹션 */
+.area-type-selection {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.area-type-selection .section-subtitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+}
+
+.area-type-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.area-type-btn {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: white;
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.area-type-btn:hover {
+  border-color: #3b82f6;
+  background-color: #f0f9ff;
+  color: #1e40af;
+}
+
+.area-type-btn.active {
+  border-color: #3b82f6;
+  background-color: #3b82f6;
+  color: white;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.area-type-btn i {
+  font-size: 0.75rem;
+}
+
+/* 지문 그룹 관리 섹션 */
+.passage-group-section {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.passage-group-section .section-subtitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+}
+
+.passage-group-controls .form-group {
+  margin-bottom: 0;
+}
+
+.passage-group-controls .form-label {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+}
+
+.passage-group-controls .form-select {
+  font-size: 0.875rem;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: white;
+}
+
+/* 영역 타입 선택 섹션 */
+.area-type-selection {
+  margin-bottom: 1.5rem;
+  padding: 1rem;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+}
+
+.area-type-selection .section-subtitle {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 0.75rem 0;
+  display: flex;
+  align-items: center;
+}
+
+.area-type-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.area-type-btn {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: white;
+  color: #64748b;
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.area-type-btn:hover {
+  border-color: #3b82f6;
+  background-color: #f0f9ff;
+  color: #1e40af;
+}
+
+.area-type-btn.active {
+  border-color: #3b82f6;
+  background-color: #3b82f6;
+  color: white;
+  box-shadow: 0 2px 4px rgba(59, 130, 246, 0.2);
+}
+
+.area-type-btn i {
+  font-size: 0.75rem;
+}
+
+/* 영역 선택 컨테이너 개선 */
+.area-selection-container {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+  margin-bottom: 2rem;
+  max-height: 800px;
+  overflow-y: auto;
+  padding: 1.5rem;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+  min-height: 600px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.area-selection-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.area-selection-container::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+.area-selection-container::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+.area-selection-container::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+.area-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0 0 1rem 0;
+  display: flex;
+  align-items: center;
+}
+
+.area-selection-box {
+  min-height: 160px;
+  height: auto;
+  border: 2px dashed #d1d5db;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  background-color: white;
+  padding: 1.5rem;
+}
+
+.area-selection-box:hover {
+  border-color: #3b82f6;
+  background-color: #f0f9ff;
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+}
+
+.area-selection-box.selected {
+  border-style: solid;
+  border-width: 3px;
+  background-color: #f0f9ff;
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
+  transform: scale(1.02);
+}
+
+.area-selection-box.active-type {
+  border-color: #f59e0b;
+  border-width: 3px;
+  background-color: #fffbeb;
+  box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);
+  transform: scale(1.01);
+  animation: pulse-glow 2s infinite;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    box-shadow: 0 4px 20px rgba(245, 158, 11, 0.5);
+  }
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .area-selection-container {
+    max-height: 600px;
+    padding: 1rem;
+    gap: 1.5rem;
+  }
+
+  .area-selection-box {
+    min-height: 140px;
+    padding: 1rem;
+  }
+
+  .area-title {
+    margin: 0 0 0.75rem 0;
+  }
+
+  .area-type-buttons {
+    flex-direction: column;
+  }
+
+  .area-type-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+/* 영역 타입 선택 탭 스타일 */
+.area-type-tabs {
+  margin-bottom: 1.5rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background-color: white;
+  overflow: hidden;
+}
+
+.tab-header {
+  display: flex;
+  background-color: #f8fafc;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  padding: 1rem 1.5rem;
+  border: none;
+  background-color: transparent;
+  color: #64748b;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-width: 100px;
+  justify-content: center;
+  position: relative;
+  border-right: 1px solid #e2e8f0;
+}
+
+.tab-btn:last-child {
+  border-right: none;
+}
+
+.tab-btn:hover {
+  background-color: #f1f5f9;
+  color: #1e293b;
+}
+
+.tab-btn.active {
+  background-color: white;
+  color: #1e293b;
+  font-weight: 600;
+  border-bottom: 2px solid #3b82f6;
+}
+
+.tab-btn.active::after {
+  content: '';
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background-color: #3b82f6;
+}
+
+.tab-btn i {
+  font-size: 0.875rem;
+  margin-right: 0.5rem;
+}
+
+.tab-content {
+  padding: 1rem;
+  background-color: white;
 }
 </style>

@@ -211,8 +211,10 @@
     <!-- OCR 결과 모달 -->
     <OcrResultModal
       :is-visible="showOcrModal"
-      :captured-image="capturedImageData"
+      :captured-image="capturedImageBase64"
+      :captured-image-info="capturedImageInfo"
       :ocr-results="ocrResults"
+      :subject-code="subjectCode"
       @close="closeOcrModal"
       @save="saveOcrResults"
     />
@@ -297,6 +299,8 @@ export default {
     const ocrResults = ref([])
     const showOcrModal = ref(false)
     const capturedImageData = ref('')
+    const capturedImageBase64 = ref('')
+    const capturedImageInfo = ref({})
 
     // CKEditor 편집 관련
     const showEditor = ref(false)
@@ -931,25 +935,53 @@ export default {
         // 선택된 영역을 이미지로 캡처
         const capturedImage = await captureSelectedArea(canvas, selection.value)
 
-        // 캡처된 이미지와 영역 정보를 함께 저장
+        // 캡처된 이미지와 영역 정보를 분리하여 저장
         const selectedAreaInfo = {
           x: selection.value.x,
           y: selection.value.y,
           width: selection.value.width,
           height: selection.value.height,
           pageIndex: currentPage.value,
-          timestamp: new Date().toISOString(),
-          imageData: capturedImage
+          timestamp: new Date().toISOString()
         }
 
-        // 선택된 영역 정보를 OCR 모달에 전달
-        capturedImageData.value = JSON.stringify(selectedAreaInfo)
+        // 이미지 데이터와 영역 정보를 분리하여 저장
+        capturedImageBase64.value = capturedImage
+        capturedImageInfo.value = selectedAreaInfo
+        capturedImageData.value = JSON.stringify(selectedAreaInfo) // 이미지 데이터 제외
+
+        // 이미지 데이터 유효성 검증
+        if (!capturedImage || capturedImage.length === 0) {
+          throw new Error('캡처된 이미지 데이터가 비어있습니다.')
+        }
+
+        // base64 데이터 형식 검증
+        if (!capturedImage.startsWith('data:image/')) {
+          throw new Error('캡처된 이미지가 올바른 형식이 아닙니다.')
+        }
+
+        // 이미지 데이터 크기 검증 (최소 1KB 이상)
+        const base64Data = capturedImage.split(',')[1]
+        const dataSize = Math.ceil((base64Data.length * 3) / 4)
+        if (dataSize < 1024) {
+          throw new Error(`캡처된 이미지가 너무 작습니다. (${dataSize} bytes)`)
+        }
 
         // 디버깅 로그
         console.log('=== 영역 선택 및 캡처 완료 ===')
         console.log('선택된 영역 정보:', selectedAreaInfo)
         console.log('캡처된 이미지 데이터 길이:', capturedImage ? capturedImage.length : 0)
+        console.log('이미지 데이터 크기 (bytes):', dataSize)
+        console.log('이미지 데이터 형식:', capturedImage.substring(0, 50) + '...')
         console.log('capturedImageData.value 설정됨:', !!capturedImageData.value)
+        console.log('capturedImageBase64.value 설정됨:', !!capturedImageBase64.value)
+        console.log('capturedImageBase64.value 길이:', capturedImageBase64.value ? capturedImageBase64.value.length : 0)
+        console.log('capturedImageBase64.value 형식:', capturedImageBase64.value ? capturedImageBase64.value.substring(0, 50) + '...' : 'null')
+
+        // OCR 모달에 전달될 데이터 검증
+        console.log('=== OCR 모달 전달 데이터 검증 ===')
+        console.log('capturedImage prop으로 전달될 값:', capturedImageBase64.value ? capturedImageBase64.value.substring(0, 100) + '...' : 'null')
+        console.log('capturedImageInfo prop으로 전달될 값:', capturedImageInfo.value)
 
         // OCR 모달 표시
         showOcrModal.value = true
@@ -1267,6 +1299,8 @@ export default {
       ocrResults,
       showOcrModal,
       capturedImageData,
+      capturedImageBase64,
+      capturedImageInfo,
 
       // CKEditor 관련
       showEditor,
