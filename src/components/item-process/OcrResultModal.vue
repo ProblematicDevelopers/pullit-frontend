@@ -221,9 +221,9 @@
               </div>
             </div>
 
-            <!-- 변환 버튼 -->
-            <div class="conversion-section">
-              <div class="conversion-status mb-3">
+            <!-- 처리 버튼 -->
+            <div class="processing-section">
+              <div class="processing-status mb-3">
                 <div class="row g-2">
                   <div class="col-4">
                     <div class="status-item" :class="{ completed: selectedAreas.question }">
@@ -247,13 +247,13 @@
               </div>
 
               <button
-                @click="convertAreas"
-                :disabled="!canConvert || isConverting"
+                @click="processAreas"
+                :disabled="!canConvert || isProcessing"
                 class="btn btn-success w-100"
                 :class="{ 'btn-lg': canConvert }"
               >
                 <i class="bi bi-arrow-right-circle me-2"></i>
-                {{ isConverting ? '변환 중...' : (canConvert ? '변환 시작' : '필수 영역을 선택해주세요') }}
+                {{ isProcessing ? '처리 중...' : (canConvert ? '처리 시작' : '필수 영역을 선택해주세요') }}
               </button>
             </div>
           </div>
@@ -275,7 +275,6 @@
 
 <script>
 import { ref, computed, nextTick, watch } from 'vue'
-import { useItemProcessingStore } from '../../store/itemProcessingStore.js'
 
 export default {
   name: 'OcrResultModal',
@@ -295,8 +294,7 @@ export default {
   },
   emits: ['close', 'save'],
   setup(props, { emit }) {
-    // Store 사용
-    const itemProcessingStore = useItemProcessingStore()
+
 
     // 상태 관리
     const zoomLevel = ref(1) // 기본 줌 레벨, 이미지 로드 시 자동으로 조정됨
@@ -305,7 +303,7 @@ export default {
     const captureMode = ref(false)
     const imageCanvas = ref(null)
     const selectionCanvas = ref(null)
-    const isConverting = ref(false) // 변환 중 상태
+    const isProcessing = ref(false) // 처리 중 상태
 
     // 선택된 영역들
     const selectedAreas = ref({
@@ -610,72 +608,29 @@ export default {
       }
     }
 
-    // Canvas가 컨테이너에 전체 보이도록 자동 줌 조정
-    const autoAdjustZoom = () => {
-      const container = imageCanvas.value?.parentElement
-      if (!container) return
 
-      const containerWidth = container.clientWidth - 32 // padding 제외
-      const containerHeight = container.clientHeight - 32 // padding 제외
 
-      // Canvas 크기 가져오기
-      const canvas = imageCanvas.value
-      if (!canvas) return
-
-      const imgWidth = canvas.width
-      const imgHeight = canvas.height
-
-      // 컨테이너에 맞는 줌 레벨 계산
-      const scaleX = containerWidth / imgWidth
-      const scaleY = containerHeight / imgHeight
-
-      // 더 작은 스케일을 사용하여 이미지가 잘리지 않도록
-      const optimalScale = Math.min(scaleX, scaleY, 1) // 1보다 크게 확대하지 않음
-
-      zoomLevel.value = optimalScale
-
-      console.log('자동 줌 조정:', {
-        containerSize: { width: containerWidth, height: containerHeight },
-        canvasSize: { width: imgWidth, height: imgHeight },
-        optimalScale,
-        finalZoom: zoomLevel.value
-      })
-    }
-
-    const convertAreas = async () => {
-      if (isConverting.value) return
+    const processAreas = async () => {
+      if (isProcessing.value) return
 
       try {
-        isConverting.value = true
-        console.log('영역 변환 시작:', selectedAreas.value)
-
-        // OCR 결과 데이터 구성
-        const ocrResult = {
-          selectedAreas: selectedAreas.value,
-          ocrResults: props.ocrResults || [],
-          capturedImage: props.capturedImage,
-          timestamp: new Date().toISOString()
-        }
-
-        // Store를 통해 PDF 페이지로 변환
-        const newPage = await itemProcessingStore.convertOcrToPdfPages(ocrResult)
-
-        console.log('PDF 페이지 변환 완료:', newPage)
+        isProcessing.value = true
+        console.log('영역 처리 시작:', selectedAreas.value)
 
         // 성공 메시지 표시
-        showSuccessMessage('영역이 성공적으로 PDF 페이지로 변환되었습니다!')
+        showSuccessMessage('영역이 성공적으로 처리되었습니다!')
 
-        // 변환 완료 후 상태 초기화
+        // 처리 완료 후 상태 초기화
         resetCapture()
 
         // 모달 닫기
         closeModal()
 
       } catch (error) {
-        console.error('영역 변환 실패:', error)
-        showSuccessMessage(`변환 실패: ${error.message}`)
+        console.error('영역 처리 실패:', error)
+        showSuccessMessage(`처리 실패: ${error.message}`)
       } finally {
-        isConverting.value = false
+        isProcessing.value = false
       }
     }
 
@@ -717,63 +672,182 @@ export default {
     const setupCanvas = () => {
       if (!props.capturedImage || !imageCanvas.value) return
 
-      const canvas = imageCanvas.value
-      const ctx = canvas.getContext('2d')
+      try {
+        // capturedImage가 JSON 문자열인지 확인
+        let imageData = props.capturedImage
 
-      const img = new Image()
-      img.onload = () => {
-        // Canvas 크기를 이미지 크기로 설정
-        canvas.width = img.naturalWidth
-        canvas.height = img.naturalHeight
+                // JSON 문자열인 경우 파싱
+        if (props.capturedImage.startsWith('{')) {
+          try {
+            const areaInfo = JSON.parse(props.capturedImage)
+            console.log('선택된 영역 정보:', areaInfo)
 
-        // 이미지를 Canvas에 그리기
-        ctx.drawImage(img, 0, 0)
+            // 캡처된 이미지가 있으면 사용, 없으면 더미 이미지 생성
+            if (areaInfo.imageData) {
+              console.log('캡처된 이미지 데이터 사용')
+              imageData = areaInfo.imageData
+            } else {
+              console.log('더미 이미지 생성')
+              // 더미 이미지 생성 (실제 이미지 대신)
+              const dummyCanvas = document.createElement('canvas')
+              dummyCanvas.width = areaInfo.width || 400
+              dummyCanvas.height = areaInfo.height || 300
+              const dummyCtx = dummyCanvas.getContext('2d')
 
-        console.log('Canvas 설정 완료:', {
-          canvasSize: { width: canvas.width, height: canvas.height },
-          imageSize: { width: img.naturalWidth, height: img.naturalHeight }
-        })
+              // 더미 이미지 그리기
+              dummyCtx.fillStyle = '#f0f8ff'
+              dummyCtx.fillRect(0, 0, dummyCanvas.width, dummyCanvas.height)
+              dummyCtx.fillStyle = '#333'
+              dummyCtx.font = '16px Arial'
+              dummyCtx.fillText('선택된 영역', 20, 30)
+              dummyCtx.fillText(`위치: (${areaInfo.x}, ${areaInfo.y})`, 20, 50)
+              dummyCtx.fillText(`크기: ${areaInfo.width} x ${areaInfo.height}`, 20, 70)
+              dummyCtx.fillText(`페이지: ${areaInfo.pageIndex + 1}`, 20, 90)
 
-        // Canvas 오버레이 설정
-        nextTick(() => {
-          setupCanvasOverlay()
-          autoAdjustZoom()
-        })
+              // 더미 이미지를 data URL로 변환
+              imageData = dummyCanvas.toDataURL('image/png')
+            }
+
+          } catch (parseError) {
+            console.error('JSON 파싱 실패:', parseError)
+            return
+          }
+        }
+
+        const canvas = imageCanvas.value
+        const ctx = canvas.getContext('2d')
+
+        const img = new Image()
+        img.onload = () => {
+          // 컨테이너 크기 가져오기
+          const container = imageCanvas.value?.parentElement
+          if (!container) return
+
+          const containerRect = container.getBoundingClientRect()
+          const maxContainerWidth = containerRect.width - 32 // padding 제외
+          const maxContainerHeight = containerRect.height - 32 // padding 제외
+
+          // 이미지 크기를 컨테이너에 맞게 조정
+          let displayWidth = img.naturalWidth
+          let displayHeight = img.naturalHeight
+
+          // 컨테이너보다 큰 경우 비율을 유지하면서 크기 조정
+          if (displayWidth > maxContainerWidth || displayHeight > maxContainerHeight) {
+            const scaleX = maxContainerWidth / displayWidth
+            const scaleY = maxContainerHeight / displayHeight
+            const scale = Math.min(scaleX, scaleY, 1) // 1보다 크게 확대하지 않음
+
+            displayWidth = displayWidth * scale
+            displayHeight = displayHeight * scale
+          }
+
+          // Canvas 크기를 조정된 크기로 설정
+          canvas.width = displayWidth
+          canvas.height = displayHeight
+
+          // 이미지를 Canvas에 그리기 (조정된 크기로)
+          ctx.drawImage(img, 0, 0, displayWidth, displayHeight)
+
+          console.log('Canvas 설정 완료:', {
+            originalSize: { width: img.naturalWidth, height: img.naturalHeight },
+            adjustedSize: { width: displayWidth, height: displayHeight },
+            containerSize: { width: maxContainerWidth, height: maxContainerHeight },
+            scale: displayWidth / img.naturalWidth
+          })
+
+          // Canvas 오버레이 설정
+          nextTick(() => {
+            setupCanvasOverlay()
+          })
+        }
+
+        img.onerror = (error) => {
+          console.error('이미지 로드 실패:', error)
+        }
+
+        img.src = imageData
+      } catch (error) {
+        console.error('Canvas 설정 오류:', error)
       }
-
-      img.onerror = (error) => {
-        console.error('이미지 로드 실패:', error)
-      }
-
-      img.src = props.capturedImage
     }
 
-    // Canvas 오버레이 설정
+            // Canvas 오버레이 설정
     const setupCanvasOverlay = () => {
       if (!imageCanvas.value || !selectionCanvas.value) return
 
       const imageCanvasEl = imageCanvas.value
       const selectionCanvasEl = selectionCanvas.value
 
-      // 선택 Canvas를 이미지 Canvas와 동일한 크기로 설정
+      // image-canvas의 실제 화면 크기 가져오기
+      const imageRect = imageCanvasEl.getBoundingClientRect()
+      const containerRect = imageCanvasEl.parentElement.getBoundingClientRect()
+
+      // 컨테이너 기준으로 상대 위치 계산
+      const relativeTop = imageRect.top - containerRect.top
+      const relativeLeft = imageRect.left - containerRect.left
+
+      // selection-canvas를 image-canvas와 정확히 같은 크기와 위치로 설정
+      // 1. 픽셀 크기 설정 (실제 Canvas 크기)
       selectionCanvasEl.width = imageCanvasEl.width
       selectionCanvasEl.height = imageCanvasEl.height
 
-      // CSS 스타일 설정 - 줌 레벨을 고려한 크기 조정
-      const displayWidth = imageCanvasEl.width * zoomLevel.value
-      const displayHeight = imageCanvasEl.height * zoomLevel.value
+      // 2. CSS 스타일 크기 설정 (화면 표시 크기)
+      // 줌 레벨이 100% 이상일 때도 컨테이너 영역을 벗어나지 않도록 제한
+      const maxWidth = Math.min(imageRect.width, containerRect.width - 32) // padding 고려
+      const maxHeight = Math.min(imageRect.height, containerRect.height - 32) // padding 고려
 
-      selectionCanvasEl.style.width = `${displayWidth}px`
-      selectionCanvasEl.style.height = `${displayHeight}px`
+      // image-canvas의 CSS 크기도 제한
+      imageCanvasEl.style.width = `${maxWidth}px`
+      imageCanvasEl.style.height = `${maxHeight}px`
+
+      // selection-canvas 크기 설정
+      selectionCanvasEl.style.width = `${maxWidth}px`
+      selectionCanvasEl.style.height = `${maxHeight}px`
+
+      // 3. 위치 설정 - 컨테이너 중앙에 맞춤
       selectionCanvasEl.style.position = 'absolute'
-      selectionCanvasEl.style.top = '0px'
-      selectionCanvasEl.style.left = '0px'
+
+      // image-canvas가 컨테이너보다 클 때 중앙 정렬
+      if (imageRect.width > containerRect.width - 32 || imageRect.height > containerRect.height - 32) {
+        // 컨테이너 중앙에 맞춰서 위치 조정
+        const centerTop = (containerRect.height - maxHeight) / 2
+        const centerLeft = (containerRect.width - maxWidth) / 2
+
+        // image-canvas도 중앙 정렬
+        imageCanvasEl.style.position = 'absolute'
+        imageCanvasEl.style.top = `${centerTop}px`
+        imageCanvasEl.style.left = `${centerLeft}px`
+
+        // selection-canvas도 같은 위치에
+        selectionCanvasEl.style.top = `${centerTop}px`
+        selectionCanvasEl.style.left = `${centerLeft}px`
+      } else {
+        // image-canvas와 동일한 위치
+        selectionCanvasEl.style.top = `${relativeTop}px`
+        selectionCanvasEl.style.left = `${relativeLeft}px`
+      }
 
       console.log('Canvas 오버레이 설정 완료:', {
-        imageCanvas: { width: imageCanvasEl.width, height: imageCanvasEl.height },
-        selectionCanvas: { width: selectionCanvasEl.width, height: selectionCanvasEl.height },
-        displaySize: { width: displayWidth, height: displayHeight },
-        zoomLevel: zoomLevel.value
+        imageCanvas: {
+          pixelWidth: imageCanvasEl.width,
+          pixelHeight: imageCanvasEl.height,
+          displayWidth: maxWidth,
+          displayHeight: maxHeight
+        },
+        selectionCanvas: {
+          pixelWidth: selectionCanvasEl.width,
+          pixelHeight: selectionCanvasEl.height,
+          styleWidth: maxWidth,
+          styleHeight: maxHeight
+        },
+        container: {
+          width: containerRect.width - 32,
+          height: containerRect.height - 32
+        },
+        position: {
+          top: selectionCanvasEl.style.top,
+          left: selectionCanvasEl.style.left
+        }
       })
     }
 
@@ -876,10 +950,58 @@ export default {
     watch(zoomLevel, () => {
       if (imageCanvas.value && selectionCanvas.value) {
         nextTick(() => {
-          setupCanvasOverlay()
+          updateSelectionCanvasPosition()
         })
       }
     })
+
+    // 줌 레벨 변경 시 selection-canvas 위치만 업데이트
+    const updateSelectionCanvasPosition = () => {
+      if (!imageCanvas.value || !selectionCanvas.value) return
+
+      const imageCanvasEl = imageCanvas.value
+      const selectionCanvasEl = selectionCanvas.value
+
+      // image-canvas의 현재 화면 크기 가져오기
+      const imageRect = imageCanvasEl.getBoundingClientRect()
+      const containerRect = imageCanvasEl.parentElement.getBoundingClientRect()
+
+      // selection-canvas를 image-canvas와 정확히 같은 크기와 위치로 설정
+      selectionCanvasEl.width = imageCanvasEl.width
+      selectionCanvasEl.height = imageCanvasEl.height
+
+      // CSS 스타일 크기 설정 - 줌 레벨을 고려한 크기 조정
+      const displayWidth = imageCanvasEl.width * zoomLevel.value
+      const displayHeight = imageCanvasEl.height * zoomLevel.value
+
+      // 컨테이너 크기를 벗어나지 않도록 제한
+      const maxWidth = Math.min(displayWidth, containerRect.width - 32)
+      const maxHeight = Math.min(displayHeight, containerRect.height - 32)
+
+      selectionCanvasEl.style.width = `${maxWidth}px`
+      selectionCanvasEl.style.height = `${maxHeight}px`
+
+      // image-canvas와 동일한 위치에 오버레이
+      const relativeTop = imageRect.top - containerRect.top
+      const relativeLeft = imageRect.left - containerRect.left
+
+      selectionCanvasEl.style.position = 'absolute'
+      selectionCanvasEl.style.top = `${relativeTop}px`
+      selectionCanvasEl.style.left = `${relativeLeft}px`
+
+      console.log('Selection Canvas 위치 업데이트 완료:', {
+        zoomLevel: zoomLevel.value,
+        imageCanvas: {
+          displayWidth: imageRect.width,
+          displayHeight: imageRect.height
+        },
+        selectionCanvas: {
+          styleWidth: maxWidth,
+          styleHeight: maxHeight
+        },
+        position: { top: relativeTop, left: relativeLeft }
+      })
+    }
 
     return {
       zoomLevel,
@@ -908,6 +1030,7 @@ export default {
       saveProblems,
       setupCanvas,
       setupCanvasOverlay,
+      updateSelectionCanvasPosition,
       convertScreenToPixelCoordinates,
       captureSelectedArea,
       handleCanvasClick,
@@ -915,11 +1038,11 @@ export default {
       firstClick,
       secondClick,
       clearCurrentSelection,
-      autoAdjustZoom,
-      convertAreas,
+
+      processAreas,
       resetCapture,
       showSuccessMessage,
-      isConverting
+      isProcessing
     }
   }
 }
@@ -1070,6 +1193,7 @@ export default {
   justify-content: center;
   width: 100%;
   height: 100%;
+  overflow: hidden; /* selection-canvas가 밖으로 튀어나가지 않도록 제한 */
 }
 
 .image-canvas {
@@ -1083,12 +1207,11 @@ export default {
 
 .selection-canvas {
   position: absolute;
-  top: 0;
-  left: 0;
   pointer-events: auto;
   cursor: crosshair;
   background: transparent;
   border: 1px solid rgba(59, 130, 246, 0.3);
+  /* top과 left는 JavaScript에서 동적으로 설정 */
 }
 
 .no-image {
@@ -1327,15 +1450,15 @@ export default {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-/* 변환 섹션 */
-.conversion-section {
+/* 처리 섹션 */
+.processing-section {
   padding: 1.5rem;
   background-color: #f8fafc;
   border: 1px solid #e2e8f0;
   border-radius: 0 0 12px 12px;
 }
 
-.conversion-status {
+.processing-status {
   margin-bottom: 1rem;
 }
 
