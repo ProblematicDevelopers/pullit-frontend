@@ -17,9 +17,11 @@ import CBTStep02 from '@/components/student/cbt/CBTStep02.vue'
 import CBTExam from '@/components/student/cbt/CBTExam.vue'
 
 import MyClass from '@/components/student/class-room/myClass.vue'
-import LiveExam from '@/components/student/class-room/liveExam.vue'
+import LiveExamRoom from '@/components/student/class-room/LiveExamRoom.vue'
+import LiveExam from '@/components/student/class-room/LiveExam.vue'
+import LiveExamManagement from '@/components/student/class-room/LiveExamManagement.vue'
 import StudentScore from '@/components/student/class-room/StudentScore.vue'
-import LiveExamManagement from '@/components/student/class-room/liveExamManagement.vue'
+
 
 import ItemProcessing from '@/views/ItemProcessing.vue'
 import ItemProcessingTextbook from '@/views/ItemProcessingTextbook.vue'
@@ -103,7 +105,20 @@ const routes = [
         path: 'class-room',
         children: [
           { path: 'my-class', name: 'student.classRoom.myClass', component: MyClass },
-          { path: 'live-exam/:examId', name: 'student.classRoom.liveExam', component: LiveExam },
+          {
+            path: 'live-exam-room/:examId',
+            name: 'student.classRoom.liveExamRoom',
+            component: LiveExamRoom,
+          },
+          {
+            path: 'live-exam/:examId',
+            name: 'student.classRoom.liveExam',
+            component: LiveExam,
+            meta: {
+              hideHeader: true, // 헤더 숨김
+              hideFooter: true, // 푸터 숨김
+            },
+          },
         ],
       },
       { path: 'scores', name: 'student.scores', component: StudentScore}
