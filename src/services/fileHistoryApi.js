@@ -62,6 +62,46 @@ export const fileHistoryAPI = {
     }
 
     throw lastError
+  },
+
+  // PDF를 이미지로 변환
+  processPdfToImages: (pdfFile, fileHistoryId) => {
+    const formData = new FormData()
+    formData.append('file', pdfFile)
+    formData.append('fileHistoryId', fileHistoryId)
+
+    return api.post('/file-history/process-pdf', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data'
+      }
+    })
+  },
+
+  // 페이지 순서 변경
+  updateImageOrder: (fileHistoryId, imageOrder) => {
+    const params = new URLSearchParams()
+    params.append('fileHistoryId', fileHistoryId)
+    params.append('imageOrder', imageOrder)
+
+    return api.put('/file-history/update-order', params, {
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    })
+  },
+
+  // 페이지 삭제
+  removePage: (fileHistoryId, pageIndex) => {
+    const params = new URLSearchParams()
+    params.append('fileHistoryId', fileHistoryId)
+    params.append('pageIndex', pageIndex)
+
+    return api.delete('/file-history/remove-page', {
+      data: params,
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded'
+      }
+    })
   }
 }
 

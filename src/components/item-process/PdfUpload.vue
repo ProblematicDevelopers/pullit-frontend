@@ -62,21 +62,27 @@
             </div>
           </div>
 
-          <!-- 진행 상태 표시 -->
-          <div class="upload-progress mt-3">
-            <div class="progress" style="height: 8px;">
-              <div class="progress-bar bg-success" style="width: 100%"></div>
+                  <!-- 진행 상태 표시 -->
+        <div class="upload-progress mt-3">
+          <div v-if="isProcessing" class="processing-status">
+            <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
+              <span class="visually-hidden">처리 중...</span>
             </div>
-            <small class="text-success mt-2 d-block">업로드 완료</small>
+            <span class="text-primary">서버에서 이미지 변환 중...</span>
           </div>
+          <div v-else class="progress" style="height: 8px;">
+            <div class="progress-bar bg-success" style="width: 100%"></div>
+          </div>
+          <small v-if="!isProcessing" class="text-success mt-2 d-block">업로드 완료</small>
+        </div>
         </div>
 
         <div class="file-actions d-flex justify-content-center gap-3">
-          <button @click.stop="removeFile" class="btn btn-outline-danger">
+          <button @click.stop="removeFile" class="btn btn-outline-danger" :disabled="isProcessing">
             <span class="btn-icon">🗑️</span>
             파일 제거
           </button>
-          <button @click.stop="triggerFileInput" class="btn btn-outline-primary">
+          <button @click.stop="triggerFileInput" class="btn btn-outline-primary" :disabled="isProcessing">
             <span class="btn-icon">🔄</span>
             다른 파일 선택
           </button>
@@ -92,6 +98,7 @@ import { useItemProcessingStore } from '../../store/itemProcessingStore.js'
 
 // 파일 상태
 const pdfFile = ref(null)
+const isProcessing = ref(false)
 
 // 파일 입력 참조
 const fileInput = ref(null)
@@ -107,47 +114,58 @@ const props = defineProps({
 const emit = defineEmits(['file-selected'])
 const itemProcessingStore = useItemProcessingStore()
 
-// pdfFile 변경 감지하여 자동으로 다음 단계로 진행
+// pdfFile 변경 감지 (자동 emit 제거 - 중복 호출 방지)
 watch(pdfFile, (newFile) => {
   if (newFile) {
-    console.log('PDF 파일이 설정됨, 다음 단계로 진행')
-    // 부모 컴포넌트에 파일 설정 완료 알림
-    emit('file-selected', {
-      file: newFile,
-      images: [] // 아직 변환되지 않음
-    })
+    // emit은 handleFileSelect나 handleDrop에서만 호출
   }
 })
 
 // 파일 선택 처리
-const handleFileSelect = (event) => {
+const handleFileSelect = async (event) => {
   const file = event.target.files[0]
   if (file && file.type === 'application/pdf') {
     pdfFile.value = file
     itemProcessingStore.setPdfFile(file)
+    isProcessing.value = true
 
-    // 파일 선택 즉시 다음 단계로 진행
-    emit('file-selected', {
-      file: file,
-      images: [] // 아직 변환되지 않음
-    })
+    try {
+      // 파일 선택 후 서버에서 이미지 변환 완료까지 기다림
+      await emit('file-selected', {
+        file: file,
+        images: [] // 아직 변환되지 않음
+      })
+
+      // 이미지 변환 완료
+    } catch (error) {
+      console.error('❌ 이미지 변환 실패:', error)
+      isProcessing.value = false
+    }
   }
 }
 
 // 파일 드래그 앤 드롭 처리
-const handleDrop = (event) => {
+const handleDrop = async (event) => {
   event.preventDefault()
   const files = event.dataTransfer.files
   if (files.length > 0 && files[0].type === 'application/pdf') {
     const file = files[0]
     pdfFile.value = file
     itemProcessingStore.setPdfFile(file)
+    isProcessing.value = true
 
-    // 파일 드롭 즉시 다음 단계로 진행
-    emit('file-selected', {
-      file: file,
-      images: [] // 아직 변환되지 않음
-    })
+    try {
+      // 파일 드롭 후 서버에서 이미지 변환 완료까지 기다림
+      await emit('file-selected', {
+        file: file,
+        images: [] // 아직 변환되지 않음
+      })
+
+      // 이미지 변환 완료
+    } catch (error) {
+      console.error('❌ 이미지 변환 실패:', error)
+      isProcessing.value = false
+    }
   }
 }
 
@@ -488,6 +506,25 @@ const formatFileSize = (bytes) => {
     opacity: 1;
     transform: scale(1);
   }
+}
+
+/* 처리 중 상태 스타일 */
+.processing-status {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+  border-radius: 12px;
+  border: 1px solid #bae6fd;
+  color: #0369a1;
+  font-weight: 500;
+}
+
+.processing-status .spinner-border {
+  width: 1rem;
+  height: 1rem;
 }
 
 /* 반응형 디자인 */

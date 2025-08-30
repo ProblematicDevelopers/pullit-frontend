@@ -99,20 +99,18 @@ export default {
 
     // 클릭 기반 순서 변경 로직
     const handlePageClick = (index) => {
-      console.log('📋 페이지 클릭:', index)
-
       if (selectedForMove.value === null) {
         // 첫 번째 클릭: 이동할 페이지 선택
         selectedForMove.value = index
-        console.log('이동할 페이지 선택:', index)
       } else if (selectedForMove.value === index) {
         // 같은 페이지 클릭: 선택 해제
         selectedForMove.value = null
-        console.log('페이지 선택 해제')
       } else {
-        // 두 번째 클릭: 순서 변경 - PdfThumbnailGrid에서 page-moved 이벤트를 발생시킴
-        console.log('순서 변경:', selectedForMove.value, '→', index)
-        // emit('page-moved') 호출 제거 - PdfThumbnailGrid에서 처리됨
+        // 두 번째 클릭: 순서 변경
+        emit('page-moved', {
+          fromIndex: selectedForMove.value,
+          toIndex: index
+        })
         selectedForMove.value = null // 선택 상태 초기화
       }
     }
@@ -124,8 +122,6 @@ export default {
 
     // 다음 단계
     const nextStep = () => {
-      console.log('📋 PdfEditor: nextStep 함수 호출됨')
-      console.log('📋 PdfEditor: next-step 이벤트 발생')
       emit('next-step')
     }
 
