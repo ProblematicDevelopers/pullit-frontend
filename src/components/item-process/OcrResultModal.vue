@@ -1099,17 +1099,43 @@ export default {
       }
     }
 
-    // 편집 관련 메서드
+    // 편집 관련 메서드 (DOM 안정성 강화)
     const selectEditingArea = async (areaType) => {
       try {
-        currentEditingArea.value = areaType
+        // 1단계: 현재 상태 백업
+        const previousArea = currentEditingArea.value
 
-        // DOM 업데이트를 기다린 후 추가 작업 수행
+        // 2단계: 새 영역으로 전환 (안전하게)
+        if (areaType && typeof areaType === 'string') {
+          currentEditingArea.value = areaType
+          console.log('편집 영역 전환 요청:', { from: previousArea, to: areaType })
+        } else {
+          console.warn('유효하지 않은 영역 타입:', areaType)
+          return
+        }
+
+        // 3단계: DOM 업데이트 완료 대기
         await nextTick()
 
-        console.log('편집 영역 변경 완료:', areaType)
+        // 4단계: 상태 검증
+        if (currentEditingArea.value === areaType) {
+          console.log('편집 영역 변경 완료:', {
+            area: areaType,
+            timestamp: new Date().toISOString()
+          })
+        } else {
+          console.warn('편집 영역 변경 실패:', { expected: areaType, actual: currentEditingArea.value })
+        }
+
       } catch (error) {
-        console.error('편집 영역 변경 중 오류:', error)
+        console.error('편집 영역 변경 중 치명적 오류:', error)
+        // 에러 발생 시 기본 상태로 복구 시도
+        try {
+          currentEditingArea.value = 'problem'
+          console.log('복구: 기본 영역으로 설정')
+        } catch (recoveryError) {
+          console.error('복구 시도 실패:', recoveryError)
+        }
       }
     }
 

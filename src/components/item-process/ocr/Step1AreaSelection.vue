@@ -283,10 +283,10 @@ export default {
 
     // 영역 타입 정의
     const areaTypes = ref([
-      { key: 'question', label: '지문', icon: 'bi bi-file-text', required: false },
-      { key: 'options', label: '보기', icon: 'bi bi-list-ul', required: true },
       { key: 'problem', label: '문제', icon: 'bi bi-question-circle', required: true },
-      { key: 'image', label: '이미지', icon: 'bi bi-image', required: false }
+      { key: 'options', label: '보기', icon: 'bi bi-list-ul', required: true },
+      { key: 'image', label: '이미지', icon: 'bi bi-image', required: false },
+      { key: 'question', label: '지문', icon: 'bi bi-file-text', required: false },
     ])
 
     // 계산된 속성
