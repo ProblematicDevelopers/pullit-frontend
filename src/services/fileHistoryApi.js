@@ -139,6 +139,25 @@ export const fileHistoryAPI = {
         console.error('❌ [fileHistoryAPI] getFileHistories 실패:', error)
         throw error
       })
+  },
+
+  // filehistory 상세 조회 → subjectId 뽑아오기
+  getSubjectIdByFileHistoryId: async (fileHistoryId) => {
+    console.log('📤 [fileHistoryAPI] getSubjectIdByFileHistoryId 호출:', { fileHistoryId })
+    try {
+      const res = await api.get(`/file-history/${fileHistoryId}`)
+      const d = res.data?.data
+
+      // 백엔드 응답 포맷 대응: subjectId 혹은 subject.id 혹은 areaCode
+      const sid = d?.subjectId ?? d?.subject?.id ?? null
+      const area = d?.areaCode ?? d?.subject?.areaCode ?? null
+
+      console.log('✅ [fileHistoryAPI] getSubjectIdByFileHistoryId 성공:', { subjectId: sid, areaCode: area })
+      return { subjectId: sid, areaCode: area }
+    } catch (error) {
+      console.error('❌ [fileHistoryAPI] getSubjectIdByFileHistoryId 실패:', error)
+      throw error
+    }
   }
 }
 
