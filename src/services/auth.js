@@ -282,6 +282,89 @@ const authService = {
    */
   isAuthenticated() {
     return !!tokenManager.getAccessToken()
+  },
+
+  /**
+   * 현재 사용자의 학급 정보 가져오기
+   * @returns {Promise} 학급 정보
+   */
+  async getClassInfo() {
+    try {
+      // API 기본 URL 설정
+      const baseURL = isProduction ? `${API_BASE_URL}/classes` : `${API_BASE_URL}/api/classes`
+
+      const response = await axios.get(`${baseURL}/myclass`, {
+        headers: {
+          Authorization: `Bearer ${tokenManager.getAccessToken()}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.data.success) {
+        return response.data.data
+      }
+      throw new Error(response.data.message || '학급 정보를 가져오는데 실패했습니다')
+    } catch (error) {
+      console.error('Get class info error:', error)
+      throw error
+    }
+  },
+  
+  /**
+   * 선생님의 담당 학급 정보 가져오기 (초대 코드 포함)
+   * @returns {Promise} 학급 정보
+   */
+  async getTeacherClass() {
+    try {
+      // API 기본 URL 설정
+      const baseURL = isProduction ? `${API_BASE_URL}/classes` : `${API_BASE_URL}/api/classes`
+
+      const response = await axios.get(`${baseURL}/teacher/my-class`, {
+        headers: {
+          Authorization: `Bearer ${tokenManager.getAccessToken()}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.data.success) {
+        return response.data.data
+      }
+      return null // 학급이 없는 경우
+    } catch (error) {
+      console.error('Get teacher class error:', error)
+      if (error.response?.status === 404) {
+        return null // 학급이 없는 경우
+      }
+      throw error
+    }
+  },
+  
+  /**
+   * 학급 정보 수정
+   * @param {number} classId - 학급 ID
+   * @param {object} data - 수정할 학급 정보 (className, classGrade, classSubject)
+   * @returns {Promise} 수정된 학급 정보
+   */
+  async updateClass(classId, data) {
+    try {
+      // API 기본 URL 설정
+      const baseURL = isProduction ? `${API_BASE_URL}/classes` : `${API_BASE_URL}/api/classes`
+
+      const response = await axios.put(`${baseURL}/${classId}`, data, {
+        headers: {
+          Authorization: `Bearer ${tokenManager.getAccessToken()}`,
+          'Content-Type': 'application/json'
+        }
+      })
+
+      if (response.data.success) {
+        return response.data.data
+      }
+      throw new Error(response.data.message || '학급 정보 수정에 실패했습니다')
+    } catch (error) {
+      console.error('Update class error:', error)
+      throw error
+    }
   }
 }
 
