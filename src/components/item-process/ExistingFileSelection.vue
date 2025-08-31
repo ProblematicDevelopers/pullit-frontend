@@ -50,7 +50,7 @@
           <div class="col-md-3">
             <select class="form-select" v-model="selectedSubject">
               <option value="">전체 과목</option>
-              <option v-for="subject in subjects" :key="subject.code" :value="subject.code">
+              <option v-for="subject in uniqueSubjects" :key="subject.code" :value="subject.code">
                 {{ subject.name }}
               </option>
             </select>
@@ -162,6 +162,18 @@ export default {
     const searchQuery = ref('')
     const selectedSubject = ref('')
     const sortBy = ref('latest')
+
+    // 중복 제거된 과목 목록
+    const uniqueSubjects = computed(() => {
+      const seen = new Set()
+      return props.subjects.filter(subject => {
+        if (seen.has(subject.code)) {
+          return false
+        }
+        seen.add(subject.code)
+        return true
+      }).sort((a, b) => a.name.localeCompare(b.name))
+    })
 
     // 필터링된 파일 목록
     const filteredFiles = computed(() => {
@@ -290,6 +302,7 @@ export default {
       searchQuery,
       selectedSubject,
       sortBy,
+      uniqueSubjects,
       filteredFiles,
       selectFile,
       confirmSelection,
