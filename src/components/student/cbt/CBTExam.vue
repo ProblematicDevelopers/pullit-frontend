@@ -245,6 +245,16 @@ onMounted(async () => {
 
     // 1. Attempt 생성 또는 기존 Attempt 확인
     const attemptResponse = await cbtAPI.createOrGetAttempt(examId)
+    if (attemptResponse.data.data.status === 'DONE') {
+      alert('이미 완료된 시험입니다.')
+      if (window.opener) {
+        window.opener.location.href = `/student/report/${attemptResponse.data.data.attemptId}`
+        window.close()
+      } else {
+        router.push(`/student/report/${attemptResponse.data.data.attemptId}`)
+      }
+      return
+    }
     attemptId.value = attemptResponse.data.data.attemptId
 
     // 2. 시험 문제 데이터 로드
@@ -254,28 +264,21 @@ onMounted(async () => {
     const answersResponse = await cbtAPI.getAttemptAnswers(attemptResponse.data.data.attemptId)
     savedAnswers.value = answersResponse.data?.data?.answers || []
 
-    // 4. Redis에서 실시간 데이터 로드
-    await loadRedisData()
-
-    // 5. 데이터 설정
+    // 4. 데이터 설정
     if (examDataResponse.data) {
       examData.value = examDataResponse.data.data
       examItems.value = examDataResponse.data.data.examItems || []
       examTitle.value = examDataResponse.data.data.examName || 'CBT 시험'
       totalQuestions.value = examDataResponse.data.data.totalItems || examItems.value.length
       remainingTime.value = attemptResponse.data.data.remainTime
-
-      // 첫 번째 문제 설정
-      if (examItems.value.length > 0) {
-        setCurrentQuestion(1)
-      }
     }
-    // 6. 기존 답안 복원
-    if (savedAnswers.value.length > 0) {
-      answeredQuestions.value = savedAnswers.value
-        .filter((answer) => answer.userAnswer !== null && answer.userAnswer !== '')
-        .map((answer) => answer.itemOrder)
 
+    // 5. Redis에서 실시간 데이터 로드 (시험 데이터 설정 후)
+    await loadRedisData()
+
+    // 6. 기존 답안 복원 (Redis 데이터 로드 후)
+    // 6. 기존 답안 복원 (Redis 데이터 로드 후)
+    if (savedAnswers.value.length > 0) {
       savedAnswers.value.forEach((answer) => {
         let num = parseInt(answer.itemOrder)
         let userAnswer = answer.userAnswer
@@ -296,38 +299,12 @@ onMounted(async () => {
       })
     }
 
-    // Redis에서도 답안이 있는 문제들 추가
-    Object.keys(questionAnswers.value).forEach((questionNum) => {
-      const num = parseInt(questionNum)
-      if (
-        questionAnswers.value[num] !== null &&
-        questionAnswers.value[num] !== '' &&
-        !answeredQuestions.value.includes(num)
-      ) {
-        answeredQuestions.value.push(num)
-      }
-    })
-
-    // 7. 현재 문제의 답안 상태 업데이트 (첫 번째 문제 로드 후)
-    if (currentQuestionData.value) {
-      const currentQuestionType = currentQuestionData.value.questionType
-      const savedAnswer = questionAnswers.value[currentQuestion.value]
-
-      if (savedAnswer !== undefined && savedAnswer !== null) {
-        if (
-          currentQuestionType === 'SHORT_ANSWER_ORDERED' ||
-          currentQuestionType === 'SHORT_ANSWER_UNORDERED'
-        ) {
-          shortAnswer.value = savedAnswer
-        } else if (currentQuestionType === 'FREE_CHOICE') {
-          selectedAnswers.value = Array.isArray(savedAnswer) ? savedAnswer : [savedAnswer]
-        } else {
-          selectedAnswer.value = savedAnswer
-        }
-      }
+    // 7. 현재 문제 설정 (모든 데이터 로드 후)
+    if (examItems.value.length > 0) {
+      setCurrentQuestion(currentQuestion.value)
     }
 
-    // 7. 현재 문제 시작 시간 설정
+    // 8. 현재 문제 시작 시간 설정
     questionStartTime.value = Date.now()
     await updateRedisCurrentQuestion()
   } catch (error) {
@@ -500,7 +477,7 @@ function setCurrentQuestion(questionNumber) {
     } else {
       // Redis에 없으면 API 응답에서 찾기
       const apiAnswer = savedAnswers.value.find(
-        (answer) => answer.questionNumber === questionNumber,
+        (answer) => answer.itemOrder === questionNumber.toString(),
       )
       if (apiAnswer && apiAnswer.userAnswer) {
         if (
@@ -635,12 +612,84 @@ async function loadRedisData() {
   try {
     // Redis에서 실시간 데이터 로드
     const redisData = await cbtAPI.getRedisData(attemptId.value)
-    if (redisData.data) {
-      questionTimes.value = redisData.data.questionTimes || {}
-      questionVisits.value = redisData.data.questionVisits || {}
-      questionAnswers.value = redisData.data.questionAnswers || {}
-      remainingTime.value = redisData.data.remainingTime || remainingTime.value
-      currentQuestion.value = redisData.data.currentQuestion || 1
+    console.log('redisData', redisData)
+
+    // 실제 Redis 데이터는 redisData.data.data.data에 있음
+    const actualRedisData = redisData.data?.data?.data
+    if (actualRedisData) {
+      console.log('실제 Redis 데이터:', actualRedisData)
+
+      // 기존 데이터와 병합 (덮어쓰지 않고 병합)
+      questionTimes.value = {
+        ...questionTimes.value,
+        ...(actualRedisData.hash_questionTimes || {}),
+      }
+      questionVisits.value = {
+        ...questionVisits.value,
+        ...(actualRedisData.hash_questionVisits || {}),
+      }
+
+      // questionAnswers는 기존 답안 유지하면서 새로운 답안만 추가
+      const redisAnswers = actualRedisData.hash_questionAnswers || {}
+      Object.keys(redisAnswers).forEach((questionNum) => {
+        const num = parseInt(questionNum)
+        // 기존에 답안이 없거나 null/undefined인 경우에만 Redis 데이터로 덮어쓰기
+        if (
+          questionAnswers.value[num] === null ||
+          questionAnswers.value[num] === undefined ||
+          questionAnswers.value[num] === ''
+        ) {
+          questionAnswers.value[num] = redisAnswers[questionNum]
+        }
+      })
+
+      // Redis에서 로드한 답안이 있는 문제들을 answeredQuestions에 추가
+      Object.keys(redisAnswers).forEach((questionNum) => {
+        const num = parseInt(questionNum)
+        const answer = redisAnswers[questionNum]
+        // 답안이 있고, 빈 값이 아니며, 이미 answeredQuestions에 없는 경우에만 추가
+        if (
+          answer !== null &&
+          answer !== undefined &&
+          answer !== '' &&
+          !answeredQuestions.value.includes(num)
+        ) {
+          answeredQuestions.value.push(num)
+          console.log(`Redis에서 로드한 답안으로 문제 ${num}을 완료 목록에 추가`)
+        }
+      })
+
+      console.log('Redis 로드 후 answeredQuestions:', answeredQuestions.value)
+
+      // remainingTime은 Redis 값이 더 작은 경우에만 업데이트 (시간이 더 적게 남은 경우)
+      const redisRemainingTime = actualRedisData.hash_remainingTime
+      if (redisRemainingTime !== undefined && redisRemainingTime !== null) {
+        if (
+          remainingTime.value === undefined ||
+          remainingTime.value === null ||
+          redisRemainingTime < remainingTime.value
+        ) {
+          remainingTime.value = redisRemainingTime
+        }
+      }
+
+      // currentQuestion은 Redis 값이 유효한 경우에만 업데이트
+      const redisCurrentQuestion = actualRedisData.hash_currentQuestion
+      if (
+        redisCurrentQuestion !== undefined &&
+        redisCurrentQuestion !== null &&
+        redisCurrentQuestion > 0
+      ) {
+        currentQuestion.value = redisCurrentQuestion
+      }
+
+      console.log('Redis 데이터 병합 완료:', {
+        questionTimes: questionTimes.value,
+        questionVisits: questionVisits.value,
+        questionAnswers: questionAnswers.value,
+        remainingTime: remainingTime.value,
+        currentQuestion: currentQuestion.value,
+      })
     }
   } catch (error) {
     console.error('Redis 데이터 로드 실패:', error)
@@ -660,7 +709,31 @@ async function updateRedisCurrentQuestion() {
 
 async function saveAnswerToRedis(answerValue) {
   try {
-    questionAnswers.value[currentQuestion.value] = answerValue
+    // 주관식이고 빈 답안인 경우 저장하지 않음
+    const currentQuestionType = currentQuestionData.value?.questionType
+    if (
+      (currentQuestionType === 'SHORT_ANSWER_ORDERED' ||
+        currentQuestionType === 'SHORT_ANSWER_UNORDERED') &&
+      (answerValue === '' || answerValue === null || answerValue === undefined)
+    ) {
+      // 빈 답안인 경우 해당 문제의 답안을 삭제
+      delete questionAnswers.value[currentQuestion.value]
+
+      // answeredQuestions에서도 제거
+      const index = answeredQuestions.value.indexOf(currentQuestion.value)
+      if (index > -1) {
+        answeredQuestions.value.splice(index, 1)
+      }
+    } else {
+      // 답안이 있는 경우 저장
+      questionAnswers.value[currentQuestion.value] = answerValue
+
+      // answeredQuestions에 추가 (없는 경우만)
+      if (!answeredQuestions.value.includes(currentQuestion.value)) {
+        answeredQuestions.value.push(currentQuestion.value)
+      }
+    }
+
     await cbtAPI.updateRedisData(attemptId.value, {
       questionAnswers: questionAnswers.value,
     })
@@ -758,14 +831,6 @@ async function temporarySave() {
   try {
     await saveExamToDatabase('IN_PROGRESS')
     alert('임시 저장되었습니다.')
-    // 팝업창 닫고 부모 창에서 결과 페이지로 이동
-    if (window.opener) {
-      window.opener.location.href = `/student/report/${attemptId.value}`
-      window.close()
-    } else {
-      // 팝업이 아닌 경우 직접 이동
-      router.push(`/student/report`)
-    }
   } catch (error) {
     console.error('임시 저장 실패:', error)
     alert('임시 저장에 실패했습니다. 다시 시도해주세요.')
