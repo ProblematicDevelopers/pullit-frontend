@@ -61,6 +61,9 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
     // 원본 페이지 수 (추가)
     originalPageCount: 0,
 
+    // 삭제된 페이지 인덱스 추적 (추가)
+    deletedPageIndexes: [],
+
     // 파일 히스토리 에러 상태 (추가)
     showFileHistoryError: false,
     fileHistoryErrorMessage: ''
@@ -234,62 +237,161 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
       this.blobUrls = []
     },
 
-    /**
-     * PDF 페이지 순서 변경
+            /**
+     * PDF 페이지 순서 변경 (실시간 서버 연동)
      * @param {number} fromIndex - 이동할 페이지의 현재 인덱스
      * @param {number} toIndex - 이동할 페이지의 목표 인덱스
      */
-    movePage(fromIndex, toIndex) {
-      if (fromIndex >= 0 && toIndex >= 0 && fromIndex < this.pdfPages.length && toIndex < this.pdfPages.length) {
-        const page = this.pdfPages.splice(fromIndex, 1)[0]
-        this.pdfPages.splice(toIndex, 0, page)
-      } else {
-        console.warn('유효하지 않은 인덱스:', { fromIndex, toIndex, pdfPagesLength: this.pdfPages.length })
+    async movePage(fromIndex, toIndex) {
+      try {
+        console.log('🔄 movePage 호출됨:', { fromIndex, toIndex, pdfPagesLength: this.pdfPages.length })
+        
+        if (fromIndex >= 0 && toIndex >= 0 && fromIndex < this.pdfPages.length && toIndex < this.pdfPages.length) {
+          // 로컬에서 먼저 변경
+          const page = this.pdfPages.splice(fromIndex, 1)[0]
+          this.pdfPages.splice(toIndex, 0, page)
+          console.log('✅ 로컬 페이지 이동 완료:', { from: fromIndex, to: toIndex })
+
+          // 서버에 즉시 변경된 순서 전달
+          if (this.uploadedPdfInfo?.fileHistoryId) {
+            // 현재 남아있는 페이지들의 원본 인덱스를 순서대로 imgOrder 생성
+            const imageOrder = this.pdfPages.map(page => page.originalPage || 0).join(',')
+            console.log('📤 서버에 이미지 순서 업데이트 요청:', { 
+              fileHistoryId: this.uploadedPdfInfo.fileHistoryId, 
+              imageOrder 
+            })
+            
+            const response = await fileHistoryAPI.updateImageOrder(
+              this.uploadedPdfInfo.fileHistoryId,
+              imageOrder
+            )
+
+            console.log('📥 서버 응답:', response.data)
+
+            if (response.data.success) {
+              console.log('✅ 서버 페이지 순서 업데이트 완료')
+            } else {
+              console.warn('⚠️ 서버 페이지 순서 업데이트 실패:', response.data.message)
+            }
+          } else {
+            console.log('⚠️ fileHistoryId가 없어서 로컬에서만 처리')
+          }
+        } else {
+          console.warn('⚠️ 유효하지 않은 인덱스:', { fromIndex, toIndex, pdfPagesLength: this.pdfPages.length })
+        }
+      } catch (error) {
+        console.error('❌ 페이지 순서 변경 실패:', error)
+        // 에러 시 UI는 그대로 두고 경고만 표시
       }
     },
 
-    /**
-     * PDF 페이지 삭제
+        /**
+     * PDF 페이지 삭제 (실시간 서버 연동)
      * @param {number} pageIndex - 삭제할 페이지의 인덱스
      */
-    removePage(pageIndex) {
-      if (pageIndex >= 0 && pageIndex < this.pdfPages.length) {
-        // Blob URL도 함께 정리
-        const page = this.pdfPages[pageIndex]
-        if (page && page.preview) {
-          this.removeBlobUrl(page.preview)
+    async removePage(pageIndex) {
+      try {
+        if (pageIndex >= 0 && pageIndex < this.pdfPages.length) {
+          const page = this.pdfPages[pageIndex]
+          const originalIndex = page.originalPage || pageIndex
+
+          // 서버에서 페이지 삭제 (fileHistoryId가 있는 경우)
+          if (this.uploadedPdfInfo?.fileHistoryId) {
+            try {
+              const response = await fileHistoryAPI.removePage(this.uploadedPdfInfo.fileHistoryId, originalIndex)
+
+              if (response.data.success) {
+                // 서버에서 반환된 새로운 이미지 목록으로 업데이트
+                const remainingUrls = response.data.data
+                this.pdfPages = remainingUrls.map((imageUrl, index) => {
+                  // 기존 정보는 가능한 유지하되 새로운 URL로 업데이트
+                  const existingPage = this.pdfPages[index] || {}
+                  // 기존 페이지의 originalPage를 유지하거나, 없으면 현재 인덱스 사용
+                  const originalPageValue = existingPage.originalPage !== undefined ? existingPage.originalPage : index
+                  return {
+                    index: index,
+                    pageNumber: index + 1,
+                    preview: imageUrl,
+                    originalPage: originalPageValue,
+                    width: existingPage.width,
+                    height: existingPage.height,
+                    fileSize: existingPage.fileSize,
+                    pdfImageId: existingPage.pdfImageId
+                  }
+                })
+
+                // 서버 페이지 삭제 완료
+              } else {
+                throw new Error(response.data.message || '서버 페이지 삭제 실패')
+              }
+            } catch (serverError) {
+              console.error('❌ 서버 페이지 삭제 실패:', serverError)
+              // 서버 삭제 실패 시 로컬에서만 삭제
+              if (page && page.preview) {
+                this.removeBlobUrl(page.preview)
+              }
+              this.pdfPages.splice(pageIndex, 1)
+                              // 로컬 페이지 삭제로 대체
+              }
+            } else {
+              // 서버 연동이 없는 경우 로컬에서만 삭제
+              if (page && page.preview) {
+                this.removeBlobUrl(page.preview)
+              }
+              this.pdfPages.splice(pageIndex, 1)
+              // 로컬 페이지 삭제 완료
+            }
+        } else {
+          // 유효하지 않은 페이지 인덱스
         }
-        this.pdfPages.splice(pageIndex, 1)
-      } else {
-        console.warn('유효하지 않은 페이지 인덱스:', pageIndex)
+      } catch (error) {
+        console.error('❌ 페이지 삭제 실패:', error)
+        this.error = error.message || '페이지 삭제 중 오류가 발생했습니다.'
       }
     },
 
     /**
-     * 여러 PDF 페이지 일괄 삭제
+     * 여러 PDF 페이지 일괄 삭제 (실시간 서버 연동)
      * @param {Array<number>} pageIndexes - 삭제할 페이지 인덱스 배열
      */
-    removeMultiplePages(pageIndexes) {
-      if (!Array.isArray(pageIndexes) || pageIndexes.length === 0) {
-        console.warn('유효하지 않은 페이지 인덱스 배열:', pageIndexes)
-        return
-      }
-
-      // 인덱스를 내림차순으로 정렬하여 뒤에서부터 삭제 (인덱스 변화 방지)
-      const sortedIndexes = [...pageIndexes].sort((a, b) => b - a)
-
-      sortedIndexes.forEach(index => {
-        if (index >= 0 && index < this.pdfPages.length) {
-          // Blob URL도 함께 정리
-          const page = this.pdfPages[index]
-          if (page && page.preview) {
-            this.removeBlobUrl(page.preview)
-          }
-          this.pdfPages.splice(index, 1)
-        } else {
-          console.warn(`유효하지 않은 인덱스 ${index} 건너뜀`)
+    async removeMultiplePages(pageIndexes) {
+              if (!Array.isArray(pageIndexes) || pageIndexes.length === 0) {
+          // 유효하지 않은 페이지 인덱스 배열
+          return
         }
-      })
+
+      try {
+        // 서버 연동이 있는 경우 하나씩 삭제 (백엔드에 일괄 삭제 API가 없을 경우)
+        if (this.uploadedPdfInfo?.fileHistoryId) {
+          // 인덱스를 내림차순으로 정렬하여 뒤에서부터 삭제 (인덱스 변화 방지)
+          const sortedIndexes = [...pageIndexes].sort((a, b) => b - a)
+
+          for (const index of sortedIndexes) {
+            await this.removePage(index)
+          }
+        } else {
+          // 서버 연동이 없는 경우 로컬에서만 삭제
+          const sortedIndexes = [...pageIndexes].sort((a, b) => b - a)
+
+          sortedIndexes.forEach(index => {
+            if (index >= 0 && index < this.pdfPages.length) {
+              // Blob URL도 함께 정리
+              const page = this.pdfPages[index]
+              if (page && page.preview) {
+                this.removeBlobUrl(page.preview)
+              }
+              this.pdfPages.splice(index, 1)
+            } else {
+              console.warn(`유효하지 않은 인덱스 ${index} 건너뜀`)
+            }
+          })
+        }
+
+        console.log(`✅ 다중 페이지 삭제 완료: ${pageIndexes.length}개 페이지`)
+      } catch (error) {
+        console.error('❌ 다중 페이지 삭제 실패:', error)
+        this.error = error.message || '다중 페이지 삭제 중 오류가 발생했습니다.'
+      }
     },
 
     /**
@@ -335,51 +437,7 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
       }
     },
 
-    /**
-     * OCR 결과를 PDF 페이지로 변환
-     * @param {Object} ocrResult - OCR 처리 결과
-     * @returns {Promise<Object>}
-     */
-    async convertOcrToPdfPages(ocrResult) {
-      try {
-        console.log('OCR 결과를 PDF 페이지로 변환 시작:', ocrResult)
 
-        if (!ocrResult || !ocrResult.selectedAreas) {
-          throw new Error('OCR 결과 데이터가 유효하지 않습니다.')
-        }
-
-        const { selectedAreas } = ocrResult
-
-        // 필수 영역 확인
-        if (!selectedAreas.question || !selectedAreas.options) {
-          throw new Error('지문과 보기 영역이 모두 선택되어야 합니다.')
-        }
-
-        // 새로운 PDF 페이지 생성
-        const newPage = {
-          id: Date.now(), // 고유 ID
-          index: this.pdfPages.length, // 페이지 인덱스
-          preview: selectedAreas.question.imageData, // 지문 이미지를 메인으로 사용
-          width: selectedAreas.question.width,
-          height: selectedAreas.question.height,
-          selectedAreas: selectedAreas, // 선택된 영역 정보 저장
-          ocrData: ocrResult.ocrResults || [], // OCR 결과 데이터
-          createdAt: new Date().toISOString()
-        }
-
-        // PDF 페이지 목록에 추가
-        this.pdfPages.push(newPage)
-
-        console.log('새로운 PDF 페이지 추가됨:', newPage)
-        console.log('현재 PDF 페이지 수:', this.pdfPages.length)
-
-        return newPage
-
-      } catch (error) {
-        console.error('OCR 결과를 PDF 페이지로 변환 실패:', error)
-        throw error
-      }
-    },
 
     /**
      * 최종 PDF 생성
@@ -540,8 +598,7 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
         const pdfBytes = await pdfDoc.save()
         const pdfBlob = new Blob([pdfBytes], { type: 'application/pdf' })
 
-        // 최종 PDF 크기만 간단히 로깅
-        console.log(`📄 최종 PDF 생성: ${(pdfBlob.size / 1024 / 1024).toFixed(2)}MB`)
+
 
         if (progressCallback) {
           progressCallback({
@@ -574,7 +631,6 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
           throw new Error('업로드할 PDF 파일이 없습니다.')
         }
 
-        console.log('🚀 원본 PDF 업로드 시작...')
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
         const originalName = this.pdfFile.name.replace('.pdf', '')
         const fileName = `${originalName}_${timestamp}.pdf`
@@ -593,7 +649,6 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
         }
 
         this.uploadedPdfInfo = response.data.data
-        console.log('✅ 원본 PDF 업로드 완료:', this.uploadedPdfInfo)
 
         // 원본 PDF 업로드 후 파일 히스토리 생성
         const fileMetadataId = response.data?.data?.id ?? response.data?.data?.fileMetadataId ?? response.data?.data?.fileId
@@ -601,10 +656,8 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
           const subjectId = await this.getSubjectIdFromAreaCode(this.selectedTextbook.areaCode)
           if (subjectId) {
             try {
-              console.log('🚀 원본 PDF 파일 히스토리 생성 시작...')
               const fileHistoryResponse = await fileHistoryAPI.createFileHistoryWithRetry(fileMetadataId, subjectId)
               this.uploadedPdfInfo.fileHistoryId = fileHistoryResponse.data.data
-              console.log('✅ 원본 PDF 파일 히스토리 생성 완료')
             } catch (err) {
               console.error('❌ 원본 PDF 파일 히스토리 생성 실패:', err)
               this.showFileHistoryError = true
@@ -621,10 +674,67 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
           })
         }
 
+        // PDF를 서버에서 이미지로 변환은 handlePdfFile에서 처리
+        // (중복 호출 방지)
+        console.log('📝 이미지 변환은 handlePdfFile에서 처리됩니다.')
+
         return this.uploadedPdfInfo
       } catch (error) {
         console.error('❌ 원본 PDF 업로드 실패:', error)
         throw error
+      }
+    },
+
+    /**
+     * PDF를 서버에서 이미지로 변환
+     * 새로운 백엔드 API를 사용하여 PDF를 고품질 이미지로 변환
+     * @returns {Promise<void>}
+     */
+    async processPdfToImages() {
+      try {
+        if (!this.pdfFile || !this.uploadedPdfInfo?.fileHistoryId) {
+          throw new Error('PDF 파일 또는 파일 히스토리 ID가 없습니다.')
+        }
+
+        this.loading = true
+
+        const response = await fileHistoryAPI.processPdfToImages(
+          this.pdfFile,
+          this.uploadedPdfInfo.fileHistoryId
+        )
+
+        if (!response.data.success) {
+          throw new Error(response.data.message || 'PDF 이미지 변환 실패')
+        }
+
+        const processingResult = response.data.data
+
+        // 변환된 이미지들을 페이지 데이터로 설정
+        this.pdfPages = processingResult.images.map((imageInfo, index) => ({
+          index: index,
+          pageNumber: imageInfo.pageNumber,
+          preview: imageInfo.imageUrl,
+          originalPage: (imageInfo.pageNumber || (index + 1)) - 1, // 실제 페이지 번호에서 1을 뺀 0-based 인덱스
+          width: imageInfo.width,
+          height: imageInfo.height,
+          fileSize: imageInfo.fileSize,
+          pdfImageId: imageInfo.pdfImageId
+        }))
+
+
+
+        // 원본 페이지 수 설정
+        this.originalPageCount = processingResult.totalPages
+
+        // 삭제된 페이지 인덱스 초기화 (새로운 PDF 처리 시)
+        this.deletedPageIndexes = []
+
+      } catch (error) {
+        console.error('❌ PDF 이미지 변환 실패:', error)
+        this.error = error.message || 'PDF 이미지 변환 중 오류가 발생했습니다.'
+        throw error
+      } finally {
+        this.loading = false
       }
     },
 
@@ -688,6 +798,74 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
       }
     },
 
+    /**
+     * "다음" 버튼 클릭 시 변경사항을 서버에 저장 (더 이상 사용하지 않음)
+     * 현재는 편집할 때마다 실시간으로 API를 호출하므로 이 메서드는 deprecated
+     * @returns {Promise<boolean>} 저장 성공 여부
+     */
+    async saveChangesToServer() {
+      console.log('⚠️ saveChangesToServer는 더 이상 사용하지 않습니다. 편집할 때마다 실시간으로 API를 호출합니다.')
+      return true
+    },
+
+    /**
+     * 기존 파일 히스토리 목록 조회
+     * @param {number} page - 페이지 번호
+     * @param {number} size - 페이지 크기
+     * @param {string} subject - 과목 코드 필터
+     * @returns {Promise<Array>} 파일 히스토리 목록
+     */
+    async fetchFileHistories(page = 0, size = 50, subject = null) {
+      try {
+        this.loading = true
+        this.error = null
+
+        const response = await itemProcessingAPI.getFileHistories(page, size, subject)
+        
+        if (response.data && response.data.success) {
+          const fileHistories = response.data.data.content || response.data.data
+          
+          // 각 파일 히스토리의 PDF 이미지들을 함께 조회
+          const enrichedFileHistories = await Promise.all(
+            fileHistories.map(async (fileHistory) => {
+              try {
+                const imagesResponse = await itemProcessingAPI.getFileHistoryImages(fileHistory.id)
+                if (imagesResponse.data && imagesResponse.data.success) {
+                  fileHistory.pdfImages = imagesResponse.data.data || []
+                } else {
+                  fileHistory.pdfImages = []
+                }
+              } catch (error) {
+                console.warn(`파일 히스토리 ${fileHistory.id}의 이미지 조회 실패:`, error)
+                fileHistory.pdfImages = []
+              }
+              return fileHistory
+            })
+          )
+          
+          return enrichedFileHistories
+        } else {
+          console.warn('파일 히스토리 조회 실패:', response.data)
+          return []
+        }
+      } catch (error) {
+        console.error('파일 히스토리 조회 중 오류:', error)
+        this.error = '파일 목록을 불러오는데 실패했습니다.'
+        throw error
+      } finally {
+        this.loading = false
+      }
+    },
+
+    /**
+     * 파일 히스토리 정보 설정 (기존 파일 선택 시 사용)
+     * @param {Object} pdfInfo - 파일 정보 (fileHistoryId 포함)
+     */
+    async setUploadedPdfInfo(pdfInfo) {
+      this.uploadedPdfInfo = pdfInfo
+      console.log('📝 uploadedPdfInfo 설정 완료:', this.uploadedPdfInfo)
+    },
+
     reset() {
       this.cleanupBlobUrls()
       this.textbooks = []
@@ -699,6 +877,8 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
       this.finalPdf = null
       this.finalPdfGeneratedAt = null
       this.uploadedPdfInfo = null
+      this.originalPageCount = 0
+      this.deletedPageIndexes = []
     }
   }
 })

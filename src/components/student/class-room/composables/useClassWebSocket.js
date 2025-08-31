@@ -77,6 +77,16 @@ export function useClassWebSocket(
               callbacks.onOnlineStatus(status)
             }
           },
+          onExamStatus: (examStatus) => {
+            if (callbacks.onExamStatus) {
+              callbacks.onExamStatus(examStatus)
+            }
+          },
+          onExamProgress: (examProgress) => {
+            if (callbacks.onExamProgress) {
+              callbacks.onExamProgress(examProgress)
+            }
+          },
         },
       )
 
@@ -176,6 +186,29 @@ export function useClassWebSocket(
     }
   }
 
+  const sendStatusMessage = (content) => {
+    if (channelName.value && currentUserId) {
+      WebSocketService.sendExamStatus(channelName.value, content)
+    } else {
+      console.warn('channelName 또는 currentUserId가 설정되지 않았습니다.')
+    }
+  }
+
+  const getExamStatus = () => {
+    if (channelName.value) {
+      WebSocketService.getExamStatus(channelName.value)
+    } else {
+      console.warn('channelName이 설정되지 않았습니다.')
+    }
+  }
+
+  const sendExamProgressMessage = (content) => {
+    if (channelName.value && currentUserId) {
+      WebSocketService.sendExamProgress(channelName.value, content)
+    } else {
+      console.warn('channelName 또는 currentUserId가 설정되지 않았습니다.')
+    }
+  }
   // 초기 온라인 상태 강제 조회
   const refreshOnlineStatus = () => {
     if (isWebSocketConnected.value) {
@@ -221,8 +254,11 @@ export function useClassWebSocket(
     disconnectWebSocket,
     sendChatMessage,
     sendNoticeMessage,
+    sendStatusMessage,
+    sendExamProgressMessage,
     updateOnlineStatus,
     getOnlineStatus,
+    getExamStatus,
     refreshOnlineStatus,
     updateClassmatesStatus,
   }

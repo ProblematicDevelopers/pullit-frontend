@@ -93,9 +93,7 @@ export default {
   setup(props, { emit }) {
 
     // 클릭 기반 순서 변경 로직
-    const handlePageClick = (index) => {
-      console.log('📋 페이지 클릭:', index)
-
+        const handlePageClick = (index) => {
       if (props.selectedForMove === null) {
         // 첫 번째 클릭: 이동할 페이지 선택
         emit('page-click', index)
@@ -104,11 +102,8 @@ export default {
         emit('page-click', null)
       } else {
         // 두 번째 클릭: 순서 변경
-        emit('page-moved', {
-          fromIndex: props.selectedForMove,
-          toIndex: index
-        })
-        emit('page-click', null) // 선택 상태 초기화
+        // PdfEditor에서 page-moved 이벤트를 발생시키기 위해 page-click 이벤트 전달
+        emit('page-click', index)
       }
     }
 

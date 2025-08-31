@@ -9,6 +9,8 @@
           :src="currentPage.preview"
           :alt="`페이지 ${currentPageIndex + 1}`"
           class="pdf-preview-image"
+          @error="handleImageError"
+          @load="handleImageLoad"
         />
         <!-- 페이지 번호 오버레이 -->
         <div class="page-number-overlay">
@@ -25,7 +27,7 @@
 </template>
 
 <script>
-import { computed } from 'vue'
+import { computed, ref, watch } from 'vue'
 
 export default {
   name: 'PdfMainPreview',
@@ -39,14 +41,80 @@ export default {
       required: true
     }
   },
-  setup(props) {
+  emits: ['image-error', 'image-load'],
+  setup(props, { emit }) {
+    const imageLoadError = ref(false)
+    const currentImageUrl = ref('')
+
     // 현재 페이지 정보
     const currentPage = computed(() => {
       return props.pdfPages[props.currentPageIndex] || null
     })
 
+    // 이미지 로드 에러 처리
+    const handleImageError = (event) => {
+      const img = event.target
+      console.warn('이미지 로드 실패:', img.src)
+      
+      // 프록시 URL에서 실패한 경우 S3 URL로 fallback 시도
+      if (currentPage.value && 
+          currentPage.value.originalUrl && 
+          currentPage.value.useProxy &&
+          img.src.includes('/api/image/proxy')) {
+        
+        console.log('프록시 실패, S3 URL로 fallback 시도:', currentPage.value.originalUrl)
+        
+        // 부모 컴포넌트에 에러 알림
+        emit('image-error', {
+          pageIndex: props.currentPageIndex,
+          originalUrl: currentPage.value.originalUrl,
+          proxyUrl: img.src,
+          error: '프록시 이미지 로드 실패'
+        })
+        
+        // S3 URL로 직접 시도
+        img.src = currentPage.value.originalUrl
+        imageLoadError.value = true
+      } else {
+        imageLoadError.value = true
+        emit('image-error', {
+          pageIndex: props.currentPageIndex,
+          url: img.src,
+          error: '이미지 로드 실패'
+        })
+      }
+    }
+
+    // 이미지 로드 성공 처리
+    const handleImageLoad = (event) => {
+      const img = event.target
+      console.log('이미지 로드 성공:', img.src)
+      imageLoadError.value = false
+      
+      emit('image-load', {
+        pageIndex: props.currentPageIndex,
+        url: img.src,
+        dimensions: {
+          naturalWidth: img.naturalWidth,
+          naturalHeight: img.naturalHeight
+        }
+      })
+    }
+
+    // 현재 페이지 변경 시 이미지 상태 초기화
+    watch(() => props.currentPageIndex, () => {
+      imageLoadError.value = false
+      if (currentPage.value) {
+        currentImageUrl.value = currentPage.value.preview
+      }
+    })
+
     return {
-      currentPage
+      currentPage,
+      imageLoadError,
+      currentImageUrl,
+      handleImageError,
+      handleImageLoad
     }
   }
 }

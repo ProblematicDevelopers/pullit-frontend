@@ -69,10 +69,8 @@ const isApiKeyValid = ref(false)
 
 // API 키 계산 (props에서 받거나 환경 변수에서 가져오기)
 const finalApiKey = computed(() => {
-  // TinyMCE 공식 문서에 따라 환경 변수 이름 확인
-  const envApiKey = import.meta.env.VITE_TINYMCE_KEY ||
-                   import.meta.env.VITE_TINYMCE_API_KEY ||
-                   import.meta.env.VUE_APP_TINYMCE_API_KEY || ''
+  // props에서 받거나 환경 변수에서 가져오기
+  const envApiKey = import.meta.env.VITE_TINYMCE_KEY || ''
 
   // API 키 정리 (끝의 % 문자 제거)
   const cleanEnvApiKey = envApiKey ? envApiKey.replace(/%$/, '') : ''

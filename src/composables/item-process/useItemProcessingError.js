@@ -13,16 +13,24 @@ export function useItemProcessingError() {
    * 에러 설정
    * @param {Error|string} error - 에러 객체 또는 메시지
    * @param {string} context - 에러 발생 컨텍스트
+   * @param {Error} originalError - 원본 에러 객체 (선택사항)
    */
-  const setError = (error, context = '') => {
+  const setError = (error, context = '', originalError = null) => {
     const errorMessage = error instanceof Error ? error.message : error
-    currentError.value = errorMessage
+    currentError.value = originalError || error
     errorContext.value = context
 
-    console.error(`[${context}] 에러 발생:`, errorMessage)
+    // 중복 로깅 방지
+    if (context) {
+      console.error(`[${context}] 에러 발생:`, errorMessage)
+    } else {
+      console.error('에러 발생:', errorMessage)
+    }
 
     // 에러가 Error 객체인 경우 스택 트레이스도 로깅
-    if (error instanceof Error) {
+    if (originalError instanceof Error) {
+      console.error('에러 스택:', originalError.stack)
+    } else if (error instanceof Error) {
       console.error('에러 스택:', error.stack)
     }
   }
@@ -104,6 +112,24 @@ export function useItemProcessingError() {
    */
   const getErrorContext = () => errorContext.value
 
+  /**
+   * 서버 에러인지 확인 (500 에러 등)
+   */
+  const isServerError = () => {
+    if (!currentError.value) return false
+
+    // Error 객체이고 response 속성이 있는 경우 (Axios 에러)
+    if (currentError.value instanceof Error && currentError.value.response) {
+      return currentError.value.response.status >= 500
+    }
+
+    // 에러 메시지에 서버 관련 키워드가 포함된 경우
+    const serverErrorKeywords = ['서버', '500', 'Internal Server Error', 'Request failed with status code 500']
+    return serverErrorKeywords.some(keyword =>
+      currentError.value.toString().includes(keyword)
+    )
+  }
+
   return {
     // 상태
     currentError,
@@ -117,6 +143,7 @@ export function useItemProcessingError() {
     handleGeneralError,
     hasError,
     getErrorMessage,
-    getErrorContext
+    getErrorContext,
+    isServerError
   }
 }

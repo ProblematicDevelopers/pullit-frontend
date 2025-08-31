@@ -237,7 +237,7 @@
                 <div class="list-group list-group-flush">
                   <div class="list-group-item border-0" v-for="exam in examSchedule" :key="exam.id">
                     <router-link
-                      :to="`/student/class-room/live-exam/${exam.id}?classId=${classInfo.classId}`"
+                      :to="`/student/class-room/live-exam-room/${exam.id}?classId=${classInfo.classId}`"
                     >
                       <div class="d-flex align-items-center">
                         <div class="text-center me-3" style="min-width: 60px">
