@@ -306,8 +306,21 @@ export default {
 
     // 단원 경로 문자열 생성
     const getChapterPath = () => {
-      // 실제 구현에서는 props.itemInfo에서 단원 정보를 가져와야 함
-      return '수학 I > 중단원 1-1 > 소단원 1-1-1' // 임시 데이터
+      // 실제 단원 정보에서 경로 생성
+      if (props.itemInfo?.chapter) {
+        const chapter = props.itemInfo.chapter
+        let path = ''
+        
+        if (chapter.subject) path += chapter.subject
+        if (chapter.mainChapter) path += ` > ${chapter.mainChapter}`
+        if (chapter.subChapter) path += ` > ${chapter.subChapter}`
+        if (chapter.section) path += ` > ${chapter.section}`
+        
+        return path || '단원 정보 없음'
+      }
+      
+      // 단원 정보가 없는 경우 기본값
+      return props.itemInfo?.subject || '과목 정보 없음'
     }
 
     // 텍스트 미리보기 생성
@@ -357,18 +370,44 @@ export default {
       try {
         isSaving.value = true
 
-        // 저장 로직 구현 (API 호출 등)
-        console.log('문제 저장 시작:', {
-          selectedAreas: props.selectedAreas,
-          editedTexts: props.editedTexts,
-          itemInfo: props.itemInfo,
-          saveOptions: saveOptions.value
-        })
+        // 백엔드 ProcessedItem 구조에 맞춘 데이터 준비
+        const processedItemData = {
+          // 백엔드 enum에 맞춘 문항 정보
+          type: props.itemInfo.itemType === 'multiple_choice' ? 'multiple' : 
+                props.itemInfo.itemType === 'subjective' ? 'subjective' :
+                props.itemInfo.itemType === 'short_answer' ? 'shortAnswer' :
+                props.itemInfo.itemType === 'essay' ? 'essay' : 'multiple',
+          
+          difficulty: props.itemInfo.difficulty === 'easy' ? 'easy' :
+                     props.itemInfo.difficulty === 'medium' ? 'medium' :
+                     props.itemInfo.difficulty === 'hard' ? 'hard' : 'medium',
+          
+          score: props.itemInfo.score || 1,
+          
+          // 백엔드 필드명에 맞춤
+          answer: props.editedTexts.problem || '',
+          solution: props.editedTexts.options || '',
+          explanation: props.editedTexts.explanation || '',
+          
+          // 단원 정보 (Step3에서 설정된 값 사용)
+          majorChapterId: props.itemInfo.majorChapterId || null,
+          middleChapterId: props.itemInfo.middleChapterId || null,
+          minorChapterId: props.itemInfo.minorChapterId || null,
+          
+          // 지문 그룹 정보
+          passageId: props.itemInfo.passageId || null,
+          
+          // OCR 히스토리는 이미 저장된 상태이므로 빈 배열
+          ocrHistories: []
+        }
 
-        // 임시 지연 (실제로는 API 호출)
-        await new Promise(resolve => setTimeout(resolve, 2000))
+        console.log('문제 저장 시작:', processedItemData)
 
-        console.log('문제 저장 완료')
+        // OCR API를 통해 문제 저장
+        const { ocrApi } = await import('@/services/ocrApi')
+        const result = await ocrApi.saveProcessedItem(processedItemData)
+
+        console.log('문제 저장 완료:', result)
 
         // 저장 완료 이벤트 발생
         emit('save-complete')

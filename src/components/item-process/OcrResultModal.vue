@@ -361,10 +361,14 @@ export default {
           if (currentStep.value === 2 && availableAreaTypes?.value?.length > 0) {
             currentEditingArea.value = availableAreaTypes.value[0]
           }
+
+          // 추가 DOM 업데이트 대기
+          await nextTick()
         }
       } catch (error) {
         console.error('nextStep 실행 중 오류:', error)
         // 오류 발생 시 현재 단계 유지
+        console.error('오류 상세 정보:', error.stack)
       }
     }
 

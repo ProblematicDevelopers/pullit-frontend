@@ -140,8 +140,8 @@ export const ocrApi = {
   },
 
   /**
-   * 처리된 문항 정보 저장
-   * @param {Object} processedItemData - 문항 데이터
+   * 처리된 문항 정보 저장 (OCR 히스토리 포함)
+   * @param {Object} processedItemData - ProcessedItemSaveRequest 형식의 문항 데이터
    * @returns {Promise<Object>} 저장된 문항 정보
    */
   async saveProcessedItem(processedItemData) {
@@ -155,7 +155,11 @@ export const ocrApi = {
       return response.data
     } catch (error) {
       console.error('문항 저장 API 오류:', error)
-      throw new Error('문항 저장에 실패했습니다.')
+      if (error.response) {
+        console.error('서버 응답 상태:', error.response.status)
+        console.error('서버 응답 데이터:', error.response.data)
+      }
+      throw new Error('문항 저장에 실패했습니다: ' + (error.response?.data?.message || error.message))
     }
   }
 }
