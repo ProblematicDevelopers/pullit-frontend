@@ -103,11 +103,9 @@
               <label class="form-label">난이도</label>
               <select v-model="problemInfo.difficulty" class="form-select">
                 <option value="">선택 값</option>
-                <option value="highest">최상</option>
-                <option value="high">상</option>
-                <option value="medium">중</option>
-                <option value="low">하</option>
-                <option value="lowest">최하</option>
+                <option value="easy">쉬움</option>
+                <option value="medium">보통</option>
+                <option value="hard">어려움</option>
               </select>
             </div>
 

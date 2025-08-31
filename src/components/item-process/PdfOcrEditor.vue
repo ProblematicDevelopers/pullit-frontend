@@ -222,8 +222,8 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useToast } from '@/composables/useToast'
 
 import { ocrApi } from '@/services/ocrApi'
-import katex from 'katex'
-import 'katex/dist/katex.min.css'
+import { renderMathJax, waitForMathJax } from '@/utils/mathjax'
+
 import OcrResultModal from './OcrResultModal.vue'
 
 export default {
@@ -304,9 +304,9 @@ export default {
 
 
     // 텍스트 변경 시 수식 렌더링 업데이트
-    const updateMathRendering = () => {
+    const updateMathRendering = async () => {
       if (currentEditingText.value) {
-        renderedMath.value = renderMathWithKaTeX(currentEditingText.value)
+        renderedMath.value = await renderMathWithMathJax(currentEditingText.value)
       } else {
         renderedMath.value = ''
       }
@@ -324,28 +324,29 @@ export default {
 
 
 
-    // KaTeX를 사용한 수식 렌더링 함수
-    const renderMathWithKaTeX = (text) => {
-      const mathRegex = /\$\$(.*?)\$\$/g
-      let result = text
-      let match
+    // MathJax를 사용한 수식 렌더링 함수 (기존 시스템 사용)
+    const renderMathWithMathJax = async (text) => {
+      try {
+        // 임시 div에 수식 렌더링
+        const tempDiv = document.createElement('div')
+        tempDiv.innerHTML = text
+        tempDiv.style.position = 'absolute'
+        tempDiv.style.left = '-9999px'
+        tempDiv.style.visibility = 'hidden'
+        document.body.appendChild(tempDiv)
 
-      while ((match = mathRegex.exec(text)) !== null) {
-        try {
-          const rendered = katex.renderToString(match[1], {
-            throwOnError: false,
-            displayMode: true,
-            strict: false,
-            trust: true
-          })
-          result = result.replace(match[0], rendered)
-        } catch (error) {
-          console.error('수식 렌더링 오류:', error)
-          result = result.replace(match[0], `<div class="math-error"><code>${match[1]}</code><br><small>수식 렌더링 오류</small></div>`)
-        }
+        // MathJax로 렌더링
+        await renderMathJax(tempDiv)
+        const result = tempDiv.innerHTML
+
+        // 임시 div 제거
+        document.body.removeChild(tempDiv)
+        return result
+
+      } catch (error) {
+        console.error('MathJax 렌더링 오류:', error)
+        return text
       }
-
-      return result
     }
 
     // MathJax 초기화
@@ -375,92 +376,11 @@ export default {
       }
     }
 
-    // MathJax 로드 확인
-    const checkMathJaxLoaded = () => {
-      if (window.MathJax && window.MathJax.typesetPromise) {
-        console.log('MathJax가 로드되었습니다.')
-        return true
-      } else {
-        console.log('MathJax가 아직 로드되지 않았습니다.')
-        return false
-      }
-    }
 
-    // KaTeX 스크립트 로드
-    const loadKaTeX = () => {
-      if (window.katex) return Promise.resolve()
 
-      return new Promise((resolve) => {
-        const katexScript = document.createElement('script')
-        katexScript.src = 'https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.js'
-        katexScript.onload = () => {
-          // KaTeX CSS도 로드
-          const katexCSS = document.createElement('link')
-          katexCSS.rel = 'stylesheet'
-          katexCSS.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.22/dist/katex.min.css'
-          document.head.appendChild(katexCSS)
-          console.log('KaTeX 스크립트 로드 완료')
-          resolve()
-        }
-        katexScript.onerror = () => {
-          console.error('KaTeX 스크립트 로드 실패')
-          resolve()
-        }
-        document.head.appendChild(katexScript)
-      })
-    }
 
-    // MathJax 스크립트 동적 로드
-    const loadMathJax = () => {
-      return new Promise((resolve) => {
-        if (checkMathJaxLoaded()) {
-          resolve()
-          return
-        }
 
-        // MathJax 설정 먼저 로드
-        const mathJaxConfig = document.createElement('script')
-        mathJaxConfig.type = 'text/javascript'
-        mathJaxConfig.innerHTML = `
-          window.MathJax = {
-            tex: {
-              inlineMath: [['$', '$'], ['\\\\(', '\\\\)']],
-              displayMath: [['$$', '$$'], ['\\\\[', '\\\\]']],
-              processEscapes: true,
-              processEnvironments: true
-            },
-            options: {
-              skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
-            }
-          };
-        `
-        document.head.appendChild(mathJaxConfig)
 
-        // MathJax 메인 스크립트 로드 (v3 사용 - 더 안정적)
-        const mathJaxScript = document.createElement('script')
-        mathJaxScript.id = 'MathJax-script'
-        mathJaxScript.async = true
-        mathJaxScript.src = 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js'
-        mathJaxScript.onload = () => {
-          console.log('MathJax 스크립트 로드 완료')
-          // MathJax 초기화 대기
-          setTimeout(() => {
-            if (window.MathJax && window.MathJax.typesetPromise) {
-              console.log('MathJax 초기화 완료')
-              resolve()
-            } else {
-              console.warn('MathJax 초기화 대기 중...')
-              resolve()
-            }
-          }, 1000)
-        }
-        mathJaxScript.onerror = () => {
-          console.error('MathJax 스크립트 로드 실패')
-          resolve()
-        }
-        document.head.appendChild(mathJaxScript)
-      })
-    }
 
     // KaTeX로 수식 렌더링 (MathJax 대안)
     const renderWithKaTeX = (text) => {
@@ -520,9 +440,9 @@ export default {
       if (currentEditingText.value.includes('$$') || currentEditingText.value.includes('$')) {
         try {
           // MathJax 먼저 시도
-          await loadMathJax()
+          await waitForMathJax()
 
-          if (window.MathJax && window.MathJax.typesetPromise) {
+          if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
             console.log('MathJax로 수식 렌더링 시작:', currentEditingText.value)
 
             // 임시 div에 수식 렌더링
@@ -535,7 +455,7 @@ export default {
 
             // MathJax 렌더링
             try {
-              await window.MathJax.typesetPromise([tempDiv])
+              await renderMathJax(tempDiv)
               console.log('MathJax 렌더링 완료')
 
               // 렌더링된 HTML 가져오기
@@ -550,24 +470,24 @@ export default {
               console.warn('MathJax 렌더링 실패, KaTeX로 대체:', renderError)
               document.body.removeChild(tempDiv)
 
-              // KaTeX로 fallback
-              await loadKaTeX()
-              renderedMath.value = renderWithKaTeX(currentEditingText.value)
+              // MathJax로 fallback
+              await waitForMathJax()
+              renderedMath.value = await renderMathWithMathJax(currentEditingText.value)
             }
           } else {
-            console.warn('MathJax가 로드되지 않음, KaTeX로 대체')
-            // KaTeX로 fallback
-            await loadKaTeX()
-            renderedMath.value = renderWithKaTeX(currentEditingText.value)
+            console.warn('MathJax가 로드되지 않음, MathJax로 대체')
+            // MathJax로 fallback
+            await waitForMathJax()
+            renderedMath.value = await renderMathWithMathJax(currentEditingText.value)
           }
         } catch (error) {
           console.error('수식 렌더링 중 오류:', error)
-          // 최종 fallback으로 KaTeX 시도
+          // 최종 fallback으로 MathJax 시도
           try {
-            await loadKaTeX()
-            renderedMath.value = renderWithKaTeX(currentEditingText.value)
-          } catch (katexError) {
-            console.error('KaTeX 렌더링도 실패:', katexError)
+            await waitForMathJax()
+            renderedMath.value = await renderMathWithMathJax(currentEditingText.value)
+          } catch (mathJaxError) {
+            console.error('MathJax 렌더링도 실패:', mathJaxError)
             renderedMath.value = currentEditingText.value
           }
         }
@@ -678,7 +598,7 @@ export default {
         img.onerror = (error) => {
           console.error('이미지 로드 실패:', error)
           console.error('이미지 URL:', pageData.preview)
-          
+
           const errorDiv = document.createElement('div')
           errorDiv.className = 'pdf-load-error'
           errorDiv.style.cssText = `
@@ -695,12 +615,12 @@ export default {
             max-width: 300px;
             box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
           `
-          
+
           errorDiv.innerHTML = `
             <div style="font-size: 18px; margin-bottom: 8px;">⚠️ 이미지 로드 실패</div>
             <small>페이지를 새로고침하거나 다시 시도해주세요</small>
           `
-          
+
           imageContainer.appendChild(errorDiv)
         }
 
@@ -724,16 +644,13 @@ export default {
     // 컴포넌트 마운트 시 첫 번째 페이지 렌더링
     onMounted(() => {
       nextTick(async () => {
-        // MathJax와 KaTeX 미리 로드
+        // MathJax 미리 로드 (기존 시스템 사용)
         try {
-          console.log('수학 라이브러리 로딩 시작...')
-          await Promise.all([
-            loadMathJax(),
-            loadKaTeX()
-          ])
-          console.log('수학 라이브러리 로딩 완료')
+          console.log('MathJax 로딩 시작...')
+          await waitForMathJax()
+          console.log('MathJax 로딩 완료')
         } catch (error) {
-          console.warn('수학 라이브러리 로딩 중 일부 실패:', error)
+          console.warn('MathJax 로딩 실패:', error)
         }
 
         if (props.pdfPages && props.pdfPages.length > 0) {
@@ -1188,30 +1105,30 @@ export default {
         // 백엔드 ProcessedItem 엔티티 구조에 맞춘 데이터 준비
         const processedItemData = {
           // 기본 문항 정보 (백엔드 enum에 맞춤)
-          type: itemData.itemType === 'multiple_choice' ? 'multiple' : 
+          type: itemData.itemType === 'multiple_choice' ? 'multiple' :
                 itemData.itemType === 'subjective' ? 'subjective' :
                 itemData.itemType === 'short_answer' ? 'shortAnswer' :
                 itemData.itemType === 'essay' ? 'essay' : 'multiple',
-          
+
           difficulty: itemData.difficulty === 'easy' ? 'easy' :
                      itemData.difficulty === 'medium' ? 'medium' :
                      itemData.difficulty === 'hard' ? 'hard' : 'medium',
-          
+
           score: itemData.score || 1,
-          
+
           // 백엔드 필드명에 맞춤 (questionText -> answer, optionsText -> solution)
           answer: itemData.editedTexts?.problem || itemData.ocrResults?.problemText || '',
           solution: itemData.editedTexts?.options || itemData.ocrResults?.optionsText || '',
           explanation: itemData.editedTexts?.explanation || itemData.explanation || '',
-          
+
           // 단원 정보 (현재는 null, 추후 Step3에서 설정)
           majorChapterId: null,
           middleChapterId: null,
           minorChapterId: null,
-          
+
           // 지문 그룹 (해당하는 경우)
           passageId: itemData.passageGroup ? parseInt(itemData.passageGroup) : null,
-          
+
           // OCR 히스토리 데이터 (백엔드 AreaType enum에 맞춤)
           ocrHistories: Object.entries(itemData.selectedAreas || {}).map(([areaType, areaInfo]) => ({
             pdfImageId: capturedImageInfo.value?.pdfImageId || null,
@@ -1233,7 +1150,7 @@ export default {
 
         // API를 통해 processed_items 테이블에 저장 (OCR 히스토리 포함)
         const result = await ocrApi.saveProcessedItem(processedItemData)
-        
+
         console.log('문항 저장 성공:', result)
 
         success('문항이 성공적으로 저장되었습니다.')
@@ -1429,7 +1346,7 @@ export default {
 
       insertMath,
 
-      renderMathWithKaTeX,
+      renderMathWithMathJax,
       closeOcrModal,
       saveOcrResults
     }
