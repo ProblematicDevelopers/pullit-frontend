@@ -210,6 +210,9 @@
       :captured-image-info="capturedImageInfo"
       :ocr-results="ocrResults"
       :subject-code="subjectCode"
+      :selected-textbook="{ subjectId: subjectCode, name: `과목 ${subjectCode}` }"
+      :is-new-file="true"
+      :selected-file="null"
       @close="closeOcrModal"
       @save="saveOcrResults"
     />
