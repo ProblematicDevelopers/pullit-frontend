@@ -36,23 +36,7 @@
         <h6 class="panel-subtitle">OCR 텍스트 변환</h6>
         <div class="ocr-content">
           <div v-if="editedTexts[currentEditingArea]" class="ocr-text">
-            <!-- LaTeX 렌더링된 미리보기 -->
-            <div class="latex-preview-content" v-html="currentLatexPreview"></div>
-            
-            <!-- 원본 텍스트 토글 -->
-            <div class="text-toggle">
-              <button 
-                @click="showRawText = !showRawText" 
-                class="btn btn-sm btn-outline-secondary"
-              >
-                {{ showRawText ? '렌더링 보기' : '원본 텍스트 보기' }}
-              </button>
-            </div>
-            
-            <!-- 원본 텍스트 (토글 가능) -->
-            <div v-if="showRawText" class="raw-text">
-              <pre>{{ editedTexts[currentEditingArea] }}</pre>
-            </div>
+            {{ editedTexts[currentEditingArea] }}
           </div>
           <div v-else class="no-ocr">
             OCR 결과가 없습니다.
@@ -82,7 +66,7 @@
 
           <div class="editor-content">
             <Editor
-              :key="`editor-${currentEditingArea}-${editorKey}`"
+              :key="`editor-fixed`"
               :api-key="tinymceApiKey"
               :model-value="editedTexts[currentEditingArea] || ''"
               @update:model-value="updateEditedText"
@@ -280,7 +264,6 @@ export default {
   ],
   setup(props, { emit }) {
     const showPreview = ref(true)
-    const showRawText = ref(false)
     const editorKey = ref(0)
     const activeToolTab = ref('math')
 
@@ -450,61 +433,8 @@ export default {
       }
     })
 
-    // OCR 텍스트를 LaTeX 렌더링된 HTML로 변환
-    const renderLatexPreview = (text) => {
-      if (!text) return ''
-      
-      try {
-        // LaTeX 수식을 찾아서 렌더링
-        let renderedText = text
-        
-        // LaTeX 수식 패턴 찾기 ($$...$$ 또는 \(...\))
-        const mathPatterns = [
-          { pattern: /\$\$([^$]+)\$\$/g, displayMode: true },  // 블록 수식
-          { pattern: /\\\(([^)]+)\\\)/g, displayMode: false }, // 인라인 수식
-          { pattern: /\$([^$]+)\$/g, displayMode: false }      // 인라인 수식 (간단한 형태)
-        ]
-        
-        mathPatterns.forEach(({ pattern, displayMode }) => {
-          renderedText = renderedText.replace(pattern, (match, latex) => {
-            try {
-              if (window.MathJax) {
-                // MathJax가 있는 경우
-                return `<span class="math-render" data-latex="${latex}" data-display="${displayMode}">${match}</span>`
-              } else if (window.katex) {
-                // KaTeX가 있는 경우
-                return window.katex.renderToString(latex, { 
-                  throwOnError: false, 
-                  displayMode: displayMode,
-                  output: 'html'
-                })
-              } else {
-                // 수식 렌더링 라이브러리가 없는 경우
-                return `<span class="latex-code" title="LaTeX: ${latex}">${match}</span>`
-              }
-            } catch (error) {
-              console.warn('LaTeX 렌더링 실패:', error)
-              return `<span class="latex-error" title="렌더링 실패: ${latex}">${match}</span>`
-            }
-          })
-        })
-        
-        return renderedText
-      } catch (error) {
-        console.error('LaTeX 렌더링 중 오류:', error)
-        return text
-      }
-    }
-
-    // 현재 편집 영역의 LaTeX 렌더링된 미리보기
-    const currentLatexPreview = computed(() => {
-      const currentText = props.editedTexts[props.currentEditingArea] || ''
-      return renderLatexPreview(currentText)
-    })
-
     return {
       showPreview,
-      showRawText,
       editorKey,
       activeToolTab,
       mathSearch,
@@ -521,7 +451,6 @@ export default {
       editorConfig,
       availableAreaTypes,
       mathPreviewHtml,
-      currentLatexPreview,
       getAreaTypeLabel,
       getCurrentAreaImage,
       selectEditingArea,
@@ -646,61 +575,6 @@ export default {
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
-}
-
-/* LaTeX 렌더링 미리보기 */
-.latex-preview-content {
-  margin-bottom: 1rem;
-  line-height: 1.6;
-  font-size: 0.9rem;
-}
-
-.latex-preview-content .math-render {
-  display: inline-block;
-  margin: 0.25rem 0;
-  padding: 0.25rem;
-  background: #f8f9fa;
-  border-radius: 4px;
-  border: 1px solid #e9ecef;
-}
-
-.latex-preview-content .latex-code {
-  display: inline-block;
-  background: #fff3cd;
-  color: #856404;
-  padding: 0.125rem 0.25rem;
-  border-radius: 3px;
-  font-family: monospace;
-  font-size: 0.8rem;
-}
-
-.latex-preview-content .latex-error {
-  display: inline-block;
-  background: #f8d7da;
-  color: #721c24;
-  padding: 0.125rem 0.25rem;
-  border-radius: 3px;
-  font-family: monospace;
-  font-size: 0.8rem;
-}
-
-/* 텍스트 토글 */
-.text-toggle {
-  margin: 1rem 0;
-  text-align: center;
-}
-
-.raw-text {
-  margin-top: 1rem;
-  padding: 1rem;
-  background: #f8f9fa;
-  border: 1px solid #e9ecef;
-  border-radius: 4px;
-  font-family: monospace;
-  font-size: 0.8rem;
-  white-space: pre-wrap;
-  max-height: 200px;
-  overflow-y: auto;
 }
 
 .ocr-actions {

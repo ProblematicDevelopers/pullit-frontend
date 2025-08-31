@@ -490,15 +490,20 @@ export default {
         if (fileHistory.pdfImages && fileHistory.pdfImages.length > 0) {
           pdfPages.value = fileHistory.pdfImages.map((image, index) => ({
             index: index,
-            pageNumber: index + 1,
+            pageNumber: image.pageNumber || (index + 1),
             preview: image.imageUrl,
-            originalPage: index,
+            originalPage: (image.pageNumber || (index + 1)) - 1, // 실제 페이지 번호에서 1을 뺀 0-based 인덱스
             width: image.imageWidth,
             height: image.imageHeight,
             fileHistoryId: fileHistory.id,
             pdfImageId: image.id
           }))
         }
+
+        // Store에 파일 히스토리 정보 설정 (이미지 순서 업데이트를 위해 필요)
+        await itemProcessingStore.setUploadedPdfInfo({
+          fileHistoryId: fileHistory.id
+        })
 
         // 바로 편집 모드로 진행
         console.log('기존 파일 선택 완료:', fileHistory)
