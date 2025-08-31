@@ -76,9 +76,44 @@ class WebSocketService {
             },
           )
 
+          // 시험 상태 구독
+          const examStatusSubscription = this.stompClient.subscribe(
+            `/topic/${channelName}/exam-status`,
+            (message) => {
+              try {
+                const examStatusResponse = JSON.parse(message.body)
+                console.log('📋 시험 상태 응답 수신:', examStatusResponse)
+
+                if (callbacks.onExamStatus) {
+                  callbacks.onExamStatus(examStatusResponse)
+                }
+              } catch (error) {
+                console.error('Error parsing exam status:', error)
+              }
+            },
+          )
+
+          const examProgressSubscription = this.stompClient.subscribe(
+            `/topic/${channelName}/exam-progress`,
+
+            (message) => {
+              try {
+                const examProgressResponse = JSON.parse(message.body)
+                console.log('📋 시험 상태 응답 수신:', examProgressResponse)
+                if (callbacks.onExamProgress) {
+                  callbacks.onExamProgress(examProgressResponse)
+                }
+              } catch (error) {
+                console.error('Error parsing exam progress:', error)
+              }
+            },
+          )
+
           // 구독 저장
           this.subscriptions.set('class', classSubscription)
           this.subscriptions.set('online', onlineSubscription)
+          this.subscriptions.set('exam-status', examStatusSubscription)
+          this.subscriptions.set('exam-progress', examProgressSubscription)
 
           // 사용자 입장 메시지 전송
           this.addUser(channelName, userId, senderName, senderRole)
@@ -233,6 +268,63 @@ class WebSocketService {
     }
   }
 
+  sendExamStatus(channelName, message) {
+    if (this.connected && this.stompClient) {
+      try {
+        const messageData = {
+          content: message,
+          channelName: channelName,
+        }
+        console.log(messageData)
+        this.stompClient.publish({
+          destination: `/app/exam.sendStatus`,
+          body: JSON.stringify(messageData),
+        })
+      } catch (error) {
+        console.error('Error sending status:', error)
+      }
+    } else {
+      console.warn('WebSocket not connected')
+    }
+  }
+
+  getExamStatus(channelName) {
+    if (this.connected && this.stompClient) {
+      try {
+        const requestData = {
+          channelName: channelName,
+          timestamp: new Date().toISOString(),
+        }
+
+        this.stompClient.publish({
+          destination: `/app/exam.getStatus`,
+          body: JSON.stringify(requestData),
+        })
+      } catch (error) {
+        console.error('Error requesting exam status:', error)
+      }
+    } else {
+      console.warn('WebSocket not connected')
+    }
+  }
+  sendExamProgress(channelName, message) {
+    if (this.connected && this.stompClient) {
+      try {
+        const messageData = {
+          content: message,
+          channelName: channelName,
+        }
+        this.stompClient.publish({
+          destination: `/app/exam.sendProgress`,
+          body: JSON.stringify(messageData),
+        })
+      } catch (error) {
+        console.error('Error sending progress:', error)
+      }
+    } else {
+      console.warn('WebSocket not connected')
+    }
+  }
   addUser(channelName, userId, senderName, senderRole) {
     if (this.connected && this.stompClient) {
       try {
