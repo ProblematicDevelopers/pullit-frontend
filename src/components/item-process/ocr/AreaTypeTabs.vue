@@ -51,7 +51,7 @@ const selectAreaType = (areaType) => {
 <style scoped>
 /* 영역 타입 선택 탭 스타일 */
 .area-type-tabs {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background-color: white;

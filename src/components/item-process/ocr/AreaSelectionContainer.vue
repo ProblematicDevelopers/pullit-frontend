@@ -5,6 +5,7 @@
       v-if="activeSelectionType === 'question'"
       area-type="question"
       :selected-areas="selectedAreas"
+      @area-clicked="handleAreaClicked"
     />
 
     <!-- 문제 영역 -->
@@ -12,6 +13,7 @@
       v-if="activeSelectionType === 'problem'"
       area-type="problem"
       :selected-areas="selectedAreas"
+      @area-clicked="handleAreaClicked"
     />
 
     <!-- 이미지 영역 -->
@@ -19,6 +21,7 @@
       v-if="activeSelectionType === 'image'"
       area-type="image"
       :selected-areas="selectedAreas"
+      @area-clicked="handleAreaClicked"
     />
 
     <!-- 보기 영역 -->
@@ -26,6 +29,7 @@
       v-if="activeSelectionType === 'options'"
       area-type="options"
       :selected-areas="selectedAreas"
+      @area-clicked="handleAreaClicked"
     />
   </div>
 </template>

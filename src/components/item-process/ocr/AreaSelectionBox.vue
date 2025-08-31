@@ -10,6 +10,7 @@
 
     <div
       :class="['area-selection-box', `${areaType}-box`, { selected: selectedAreas[areaType] }]"
+      @click="handleAreaClick"
     >
       <div v-if="!selectedAreas[areaType]" class="area-placeholder">
         <i class="bi bi-plus-circle display-6 text-muted"></i>
@@ -47,6 +48,14 @@ const props = defineProps({
     required: true
   }
 })
+
+const emit = defineEmits(['area-clicked'])
+
+const handleAreaClick = () => {
+  if (!props.selectedAreas[props.areaType]) {
+    emit('area-clicked', props.areaType)
+  }
+}
 
 const getAreaIcon = (type) => {
   const icons = {

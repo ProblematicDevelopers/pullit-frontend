@@ -1,5 +1,5 @@
 <template>
-  <div class="ocr-result-modal" v-if="isVisible">
+  <div class="ocr-result-modal" v-if="isVisible && capturedImage && capturedImageInfo">
     <div class="modal-overlay" @click="closeModal"></div>
     <div class="modal-container">
       <!-- 모달 헤더 -->
@@ -7,29 +7,35 @@
         :current-step="currentStep"
         :total-steps="steps.length"
         @close="closeModal"
+        class="ocr-result-header"
       />
 
       <!-- 모달 내용 -->
       <div class="modal-content">
         <!-- 1단계: 영역 선택 -->
         <Step1AreaSelection
-          v-if="currentStep === 1"
+          v-if="currentStep === 1 && capturedImage && capturedImageInfo"
           :captured-image="capturedImage"
+          :captured-image-info="capturedImageInfo"
           :selected-areas="selectedAreas"
-          :active-selection-type="activeSelectionType"
+          :active-selection-type="safeActiveSelectionType"
           :capture-mode="captureMode"
           :zoom-level="zoomLevel"
           :is-processing="isProcessing"
+          :selection-canvas="selectionCanvas"
           @update:selected-areas="selectedAreas = $event"
           @update:active-selection-type="activeSelectionType = $event"
           @update:capture-mode="captureMode = $event"
           @update:zoom-level="zoomLevel = $event"
           @next-step="nextStep"
+          @process-ocr="handleOcrProcessing"
         />
+
+
 
         <!-- 2단계: 텍스트 편집 -->
         <Step2TextEditing
-          v-if="currentStep === 2"
+          v-if="currentStep === 2 && hasValidSelectedAreas"
           :selected-areas="selectedAreas"
           :ocr-results="ocrResults"
           :edited-texts="editedTexts"
@@ -42,7 +48,9 @@
 
         <!-- 3단계: 문제 정보 입력 -->
         <Step3ItemInfo
-          v-if="currentStep === 3"
+          v-if="currentStep === 3 && hasValidSelectedAreas"
+          :selected-areas="selectedAreas"
+          :edited-texts="editedTexts"
           :item-info="itemInfo"
           @update:item-info="itemInfo = $event"
           @prev-step="prevStep"
@@ -52,7 +60,7 @@
 
         <!-- 4단계: 문제 저장 -->
         <Step4ItemSave
-          v-if="currentStep === 4"
+          v-if="currentStep === 4 && hasValidSelectedAreas"
           :selected-areas="selectedAreas"
           :edited-texts="editedTexts"
           :item-info="itemInfo"
@@ -104,7 +112,7 @@ import OcrResultHeader from './ocr/OcrResultHeader.vue'
 // 단계별 컴포넌트들 import
 import Step1AreaSelection from './ocr/Step1AreaSelection.vue'
 import Step2TextEditing from './ocr/Step2TextEditing.vue'
-import Step3ItemInfo from './ocr/Step3ItemInfo.vue'
+import Step3ItemInfo from './ocr/Step3InfoInput.vue'
 import Step4ItemSave from './ocr/Step4ItemSave.vue'
 
 export default {
@@ -132,6 +140,10 @@ export default {
     ocrResults: {
       type: Array,
       default: () => []
+    },
+    subjectCode: {
+      type: String,
+      default: ''
     }
   },
   emits: ['close', 'save'],
@@ -152,7 +164,7 @@ export default {
     const zoomLevel = ref(1)
     const selectedArea = ref(null)
     const selectedProblemIndex = ref(0)
-    const captureMode = ref(false)
+    const captureMode = ref(true) // true로 초기화하여 Canvas 클릭이 바로 작동하도록 함
     const imageCanvas = ref(null)
     const selectionCanvas = ref(null)
     const isProcessing = ref(false)
@@ -164,6 +176,13 @@ export default {
       problem: null,    // 문제 영역
       image: null,      // 이미지 영역
       options: null     // 보기 영역
+    })
+
+    // selectedAreas가 유효한지 확인하는 computed
+    const hasValidSelectedAreas = computed(() => {
+      return selectedAreas?.value &&
+             typeof selectedAreas.value === 'object' &&
+             Object.keys(selectedAreas.value).length > 0
     })
 
 
@@ -179,10 +198,21 @@ export default {
     // 현재 선택 중인 영역 타입
     const activeSelectionType = ref('problem')
 
+    // activeSelectionType이 null이 되지 않도록 보호하는 computed
+    const safeActiveSelectionType = computed(() => {
+      return activeSelectionType.value || 'problem'
+    })
+
     // 2단계 편집에서 사용
     const currentEditingArea = ref('question')
     const availableAreaTypes = computed(() => {
-      return Object.keys(selectedAreas.value).filter(key => selectedAreas.value[key] !== null)
+      // null-safe 처리: selectedAreas.value가 undefined/null인 경우 빈 배열 반환
+      if (!selectedAreas?.value || typeof selectedAreas.value !== 'object') {
+        console.warn('availableAreaTypes: selectedAreas.value가 유효하지 않음:', selectedAreas.value)
+        return []
+      }
+
+      return Object.keys(selectedAreas.value).filter(key => selectedAreas.value?.[key] !== null)
     })
 
     // 현재 선택 중인 영역
@@ -233,7 +263,13 @@ export default {
 
     // 변환 가능 여부 (문제 + 보기는 필수)
     const canConvert = computed(() => {
-      return selectedAreas.value.problem && selectedAreas.value.options
+      // null-safe 처리: selectedAreas.value가 undefined/null인 경우 false 반환
+      if (!selectedAreas?.value || typeof selectedAreas.value !== 'object') {
+        console.warn('canConvert: selectedAreas.value가 유효하지 않음:', selectedAreas.value)
+        return false
+      }
+
+      return selectedAreas.value?.problem && selectedAreas.value?.options
     })
 
     // 다음 단계로 진행 가능 여부
@@ -242,7 +278,12 @@ export default {
         case 1: // 추출 단계
           return canConvert.value
         case 2: // 편집 단계
-          return availableAreaTypes.value.every(areaType => editedTexts.value[areaType].trim())
+          // null-safe 처리: editedTexts.value가 undefined/null인 경우 false 반환
+          if (!editedTexts?.value || typeof editedTexts.value !== 'object') {
+            console.warn('canProceedToNext case 2: editedTexts.value가 유효하지 않음:', editedTexts.value)
+            return false
+          }
+          return availableAreaTypes.value.every(areaType => editedTexts.value?.[areaType]?.trim())
         case 3: // 정보입력 단계
           return itemInfo.value.type && itemInfo.value.difficulty && itemInfo.value.answer &&
                  itemInfo.value.score > 0 && itemInfo.value.majorChapter
@@ -270,11 +311,17 @@ export default {
       const width = currentSelection.value.width
       const height = currentSelection.value.height
 
+      // 줌 레벨을 고려한 스케일링 적용
+      const scaledX = x / zoomLevel.value
+      const scaledY = y / zoomLevel.value
+      const scaledWidth = width / zoomLevel.value
+      const scaledHeight = height / zoomLevel.value
+
       return {
-        left: `${x}px`,
-        top: `${y}px`,
-        width: `${width}px`,
-        height: `${height}px`
+        left: `${scaledX}px`,
+        top: `${scaledY}px`,
+        width: `${scaledWidth}px`,
+        height: `${scaledHeight}px`
       }
     })
 
@@ -282,11 +329,15 @@ export default {
     const waitingSelectionStyle = computed(() => {
       if (!currentSelection.value.waitingForSecondClick) return {}
 
+      // 줌 레벨을 고려한 스케일링 적용
+      const scaledX = currentSelection.value.startX / zoomLevel.value
+      const scaledY = currentSelection.value.startY / zoomLevel.value
+
       return {
-        left: `${currentSelection.value.startX}px`,
-        top: `${currentSelection.value.startY}px`,
-        width: '4px',
-        height: '4px'
+        left: `${scaledX}px`,
+        top: `${scaledY}px`,
+        width: `${4 / zoomLevel.value}px`,
+        height: `${4 / zoomLevel.value}px`
       }
     })
 
@@ -294,24 +345,74 @@ export default {
 
     // 단계 네비게이션
     const nextStep = async () => {
-      if (currentStep.value === 1) {
-        // 1단계에서 2단계로 이동 시 OCR 처리
-        await processAllSelectedAreas()
-      }
-
-      if (currentStep.value < steps.value.length) {
-        currentStep.value++
-
-        // 2단계 진입 시 첫 번째 사용 가능한 영역으로 설정
-        if (currentStep.value === 2 && availableAreaTypes.value.length > 0) {
-          currentEditingArea.value = availableAreaTypes.value[0]
+      try {
+        if (currentStep.value === 1) {
+          // 1단계에서 2단계로 이동 시 OCR 처리
+          await processAllSelectedAreas()
         }
+
+        if (currentStep.value < steps.value.length) {
+          currentStep.value++
+
+          // DOM 업데이트를 기다린 후 추가 작업 수행
+          await nextTick()
+
+          // 2단계 진입 시 첫 번째 사용 가능한 영역으로 설정
+          if (currentStep.value === 2 && availableAreaTypes?.value?.length > 0) {
+            currentEditingArea.value = availableAreaTypes.value[0]
+          }
+        }
+      } catch (error) {
+        console.error('nextStep 실행 중 오류:', error)
+        // 오류 발생 시 현재 단계 유지
       }
     }
 
-    const prevStep = () => {
-      if (currentStep.value > 1) {
-        currentStep.value--
+    const prevStep = async () => {
+      try {
+        if (currentStep.value > 1) {
+          currentStep.value--
+
+          // DOM 업데이트를 기다린 후 추가 작업 수행
+          await nextTick()
+        }
+      } catch (error) {
+        console.error('prevStep 실행 중 오류:', error)
+        // 오류 발생 시 현재 단계 유지
+      }
+    }
+
+    // 상태 초기화 함수
+    const resetState = async () => {
+      try {
+        // 모든 상태를 초기값으로 리셋
+        selectedAreas.value = {
+          question: null,
+          problem: null,
+          image: null,
+          options: null
+        }
+
+        editedTexts.value = {
+          question: '',
+          problem: '',
+          image: '',
+          options: ''
+        }
+
+        currentEditingArea.value = 'question'
+        activeSelectionType.value = 'problem'
+        captureMode.value = true
+        zoomLevel.value = 1
+        currentStep.value = 1
+
+        // DOM 업데이트를 기다린 후 추가 작업 수행
+        await nextTick()
+
+        clearCurrentSelection()
+        console.log('모든 상태 초기화 완료')
+      } catch (error) {
+        console.error('상태 초기화 중 오류:', error)
       }
     }
 
@@ -320,6 +421,8 @@ export default {
       console.log('문제 저장 완료')
       // 성공 메시지 표시
       showSuccessMessage('문제가 성공적으로 저장되었습니다!')
+      // 상태 초기화
+      resetState()
       // 모달 닫기
       closeModal()
     }
@@ -394,9 +497,10 @@ export default {
       event.preventDefault()
       event.stopPropagation()
 
-      const canvas = selectionCanvas.value
+      // imageCanvas를 직접 사용하여 더 정확한 좌표 계산
+      const canvas = imageCanvas.value
       if (!canvas) {
-        console.log('선택 Canvas가 준비되지 않음')
+        console.log('이미지 Canvas가 준비되지 않음')
         return
       }
 
@@ -404,7 +508,12 @@ export default {
       const x = event.clientX - rect.left
       const y = event.clientY - rect.top
 
-      console.log('클릭 좌표:', { clientX: event.clientX, clientY: event.clientY, rect, x, y })
+      console.log('첫 번째 클릭 좌표:', {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        calculated: { x, y }
+      })
 
       // 좌표 범위 검증
       if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
@@ -441,9 +550,10 @@ export default {
       event.preventDefault()
       event.stopPropagation()
 
-      const canvas = selectionCanvas.value
+      // imageCanvas를 직접 사용하여 더 정확한 좌표 계산
+      const canvas = imageCanvas.value
       if (!canvas) {
-        console.log('선택 Canvas가 준비되지 않음')
+        console.log('이미지 Canvas가 준비되지 않음')
         return
       }
 
@@ -451,7 +561,12 @@ export default {
       const endX = event.clientX - rect.left
       const endY = event.clientY - rect.top
 
-      console.log('두 번째 클릭 좌표:', { clientX: event.clientX, clientY: event.clientY, rect, endX, endY })
+      console.log('두 번째 클릭 좌표:', {
+        clientX: event.clientX,
+        clientY: event.clientY,
+        rect: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        calculated: { endX, endY }
+      })
 
       // 좌표 범위 검증
       if (endX < 0 || endX > rect.width || endY < 0 || endY > rect.height) {
@@ -487,6 +602,12 @@ export default {
       // 선택된 영역을 이미지로 캡처 (픽셀 좌표 사용)
       const capturedImageData = captureSelectedArea(pixelCoordinates)
 
+      // activeSelectionType이 null인 경우 처리하지 않음
+      if (!activeSelectionType.value) {
+        console.warn('선택할 영역 타입이 지정되지 않았습니다')
+        return
+      }
+
       // 화면 좌표와 이미지 데이터를 함께 저장
       selectedAreas.value[activeSelectionType.value] = {
         ...selectedArea, // 화면 좌표 (UI 표시용)
@@ -496,8 +617,8 @@ export default {
 
       console.log(`${activeSelectionType.value} 영역 선택 완료:`, selectedArea)
 
-      // 선택 모드 종료
-      activeSelectionType.value = null
+      // 선택 모드 종료 (activeSelectionType을 null로 설정하지 않음)
+      // activeSelectionType.value = null
       clearCurrentSelection()
 
       // 모든 필수 영역이 선택되었는지 확인
@@ -516,6 +637,12 @@ export default {
 
         // 영역 타입 선택 함수 (탭 방식)
     const selectAreaType = (areaType) => {
+      // areaType이 유효한지 확인
+      if (!areaType || typeof areaType !== 'string') {
+        console.warn('유효하지 않은 영역 타입:', areaType)
+        return
+      }
+
       // 해당 영역 타입 활성화
       activeSelectionType.value = areaType
       // 선택 모드 활성화
@@ -543,97 +670,447 @@ export default {
 
 
 
-    // OCR 처리 메서드들
+    // OCR 처리 메서드들 - 개별 영역 처리
     const processOcr = async (areaType) => {
-      if (processingOcr.value || !selectedAreas.value[areaType]) return
+      if (!selectedAreas.value[areaType]) {
+        throw new Error(`${areaType} 영역이 선택되지 않았습니다.`)
+      }
 
-      try {
-        processingOcr.value = true
+      const selectedArea = selectedAreas.value[areaType]
 
-        const selectedArea = selectedAreas.value[areaType]
+      // 이미지 데이터 유효성 확인
+      if (!selectedArea.imageData) {
+        throw new Error(`${areaType} 영역의 이미지 데이터가 없습니다.`)
+      }
 
-        // 이미지 데이터 유효성 확인
-        if (!selectedArea.imageData) {
-          throw new Error(`${areaType} 영역의 이미지 데이터가 없습니다.`)
-        }
+      console.log(`${areaType} OCR 처리 시작:`, {
+        areaType,
+        hasImageData: !!selectedArea.imageData,
+        imageDataLength: selectedArea.imageData.length,
+        imageDataPrefix: selectedArea.imageData.substring(0, 50) + '...'
+      })
 
-        console.log(`${areaType} OCR 처리 시작:`, {
-          areaType,
-          hasImageData: !!selectedArea.imageData,
-          imageDataLength: selectedArea.imageData.length,
-          imageDataPrefix: selectedArea.imageData.substring(0, 50) + '...'
-        })
+      // props에서 과목 코드를 받아오거나 기본값 사용
+      const areaCode = props.subjectCode || 'KO'
+      console.log(`${areaType} 영역에 대한 과목 코드: ${areaCode} (props: ${props.subjectCode})`)
 
-        // 예시 과목 코드 (추후 props로 받아와야 함)
-        const areaCode = 'KO'
+      const result = await ocrApi.processImage(
+        selectedArea.imageData,
+        areaCode
+      )
 
-        const result = await ocrApi.processImage(
-          selectedArea.imageData,
-          areaCode
-        )
+      console.log(`${areaType} OCR API 응답:`, result)
 
-        // props의 ocrResults는 읽기 전용이므로 로컬 상태로 관리
-        // 실제로는 emit을 통해 부모 컴포넌트에 업데이트를 요청해야 함
-        console.log(`${areaType} OCR 결과:`, result.text || '')
+      // OCR 결과에서 텍스트 추출 (message 필드 사용)
+      const extractedText = result.message || result.text || result.data || ''
+      console.log(`${areaType} 추출된 텍스트:`, extractedText)
 
-      } catch (error) {
-        console.error(`${areaType} OCR 처리 오류:`, error)
-        handleGeneralError(error, `${areaType} OCR 처리`)
-      } finally {
-        processingOcr.value = false
+      // 결과 반환
+      return {
+        areaType,
+        text: extractedText,
+        confidence: result.confidence || 0,
+        processingTime: Date.now(),
+        success: true
       }
     }
 
+    // 병렬 OCR 처리 - Promise.all 방식
     const processAllSelectedAreas = async () => {
       if (isProcessing.value) return
 
       try {
         isProcessing.value = true
-        console.log('전체 영역 OCR 처리 시작:', selectedAreas.value)
+        console.log('전체 영역 OCR 처리 시작 (병렬 방식):', selectedAreas.value)
 
-        // 선택된 모든 영역에 대해 OCR 처리
-        const ocrPromises = []
-        for (const areaType of availableAreaTypes.value) {
-          ocrPromises.push(processOcr(areaType))
+        // 선택된 영역 타입들 가져오기
+        const selectedAreaTypes = availableAreaTypes.value.filter(areaType =>
+          selectedAreas.value[areaType] && selectedAreas.value[areaType].imageData
+        )
+
+        if (selectedAreaTypes.length === 0) {
+          throw new Error('처리할 영역이 없습니다.')
         }
 
-        await Promise.all(ocrPromises)
+        console.log(`선택된 영역 타입: ${selectedAreaTypes.join(', ')}`)
 
-        // OCR 결과를 편집 텍스트에 초기값으로 설정
-        // props의 ocrResults는 읽기 전용이므로 로컬 상태로 관리
-        console.log('OCR 처리 완료, 편집 텍스트 초기화')
+        // 병렬 OCR 요청 생성
+        const ocrPromises = selectedAreaTypes.map(areaType =>
+          processOcr(areaType).catch(error => ({
+            areaType,
+            text: '',
+            confidence: 0,
+            processingTime: Date.now(),
+            success: false,
+            error: error.message
+          }))
+        )
+
+        // 병렬 처리 실행
+        const ocrResults = await Promise.all(ocrPromises)
+        console.log('OCR 처리 완료:', ocrResults)
+
+        // 성공한 결과만 필터링
+        const successfulResults = ocrResults.filter(result => result.success)
+        const failedResults = ocrResults.filter(result => !result.success)
+
+        if (failedResults.length > 0) {
+          console.warn('일부 OCR 처리 실패:', failedResults)
+        }
+
+        // areaType에 따라 결과를 분기 처리하여 저장
+        const resultMap = {
+          question: '',
+          problem: '',
+          image: '',
+          options: ''
+        }
+
+        successfulResults.forEach((result) => {
+          const { areaType, text } = result
+          if (text && areaType && areaType in resultMap) {
+            resultMap[areaType] = text
+            editedTexts.value[areaType] = text
+            console.log(`${areaType} 영역 OCR 결과 저장:`, text)
+          }
+        })
+
+        console.log('최종 결과 맵:', resultMap)
+        console.log('편집 텍스트 상태:', editedTexts.value)
+
+        // DOM 업데이트를 기다린 후 상태 초기화
+        await nextTick()
+
+        console.log('OCR 결과를 편집 텍스트에 적용 완료:', editedTexts.value)
+
+        // OCR 결과를 itemInfo에 자동 매핑
+        if (resultMap.problem) {
+          itemInfo.value.solution = resultMap.problem
+          console.log('문제 내용을 solution에 설정:', resultMap.problem)
+        }
+
+        if (resultMap.question) {
+          // 지문이 있는 경우 explanation에 추가
+          if (itemInfo.value.explanation) {
+            itemInfo.value.explanation += '\n\n지문: ' + resultMap.question
+          } else {
+            itemInfo.value.explanation = '지문: ' + resultMap.question
+          }
+          console.log('지문을 explanation에 추가:', resultMap.question)
+        }
+
+        // 성공/실패 통계 표시
+        showSuccessMessage(
+          `OCR 처리 완료: ${successfulResults.length}개 성공, ${failedResults.length}개 실패`
+        )
 
       } catch (error) {
         console.error('전체 OCR 처리 실패:', error)
         handleGeneralError(error, '전체 OCR 처리')
+        showSuccessMessage('OCR 처리 중 오류가 발생했습니다.')
       } finally {
         isProcessing.value = false
       }
     }
 
-    const resetCapture = () => {
-      captureMode.value = false
-      activeSelectionType.value = null
-      selectedAreas.value = {
-        question: null,
-        problem: null,
-        image: null,
-        options: null
-      }
+    // 순차 OCR 처리 - for...of 방식 (에러 발생 시 중단)
+    const processAllSelectedAreasSequential = async () => {
+      if (isProcessing.value) return
 
-      editedTexts.value = {
-        question: '',
-        problem: '',
-        image: '',
-        options: ''
+      try {
+        isProcessing.value = true
+        console.log('전체 영역 OCR 처리 시작 (순차 방식):', selectedAreas.value)
+
+        // 선택된 영역 타입들 가져오기
+        const selectedAreaTypes = availableAreaTypes.value.filter(areaType =>
+          selectedAreas.value[areaType] && selectedAreas.value[areaType].imageData
+        )
+
+        if (selectedAreaTypes.length === 0) {
+          throw new Error('처리할 영역이 없습니다.')
+        }
+
+        console.log(`선택된 영역 타입: ${selectedAreaTypes.join(', ')}`)
+
+        const ocrResults = []
+        let successCount = 0
+        let failureCount = 0
+
+        // 순차 처리 (에러 발생 시 중단)
+        for (const areaType of selectedAreaTypes) {
+          try {
+            console.log(`${areaType} 영역 OCR 처리 중...`)
+            const result = await processOcr(areaType)
+            ocrResults.push(result)
+            successCount++
+
+            // 실시간 진행 상황 표시
+            showSuccessMessage(`${areaType} OCR 처리 완료`)
+
+          } catch (error) {
+            console.error(`${areaType} OCR 처리 실패:`, error)
+            failureCount++
+
+            // 에러 발생 시 중단 여부 선택
+            const shouldContinue = confirm(`${areaType} OCR 처리에 실패했습니다. 계속 진행하시겠습니까?`)
+            if (!shouldContinue) {
+              throw new Error(`${areaType} OCR 처리 실패로 인해 중단되었습니다.`)
+            }
+          }
+        }
+
+        console.log('순차 OCR 처리 완료:', ocrResults)
+
+        // areaType에 따라 결과를 분기 처리하여 저장
+        const resultMap = {
+          question: '',
+          problem: '',
+          image: '',
+          options: ''
+        }
+
+        ocrResults.forEach((result) => {
+          const { areaType, text } = result
+          if (text && areaType && areaType in resultMap) {
+            resultMap[areaType] = text
+            editedTexts.value[areaType] = text
+            console.log(`${areaType} 영역 OCR 결과 저장:`, text)
+          }
+        })
+
+        console.log('최종 결과 맵:', resultMap)
+        console.log('편집 텍스트 상태:', editedTexts.value)
+
+        // DOM 업데이트를 기다린 후 상태 초기화
+        await nextTick()
+
+        console.log('OCR 결과를 편집 텍스트에 적용 완료:', editedTexts.value)
+
+        // OCR 결과를 itemInfo에 자동 매핑
+        if (resultMap.problem) {
+          itemInfo.value.solution = resultMap.problem
+          console.log('문제 내용을 solution에 설정:', resultMap.problem)
+        }
+
+        if (resultMap.question) {
+          // 지문이 있는 경우 explanation에 추가
+          if (itemInfo.value.explanation) {
+            itemInfo.value.explanation += '\n\n지문: ' + resultMap.question
+          } else {
+            itemInfo.value.explanation = '지문: ' + resultMap.question
+          }
+          console.log('지문을 explanation에 추가:', resultMap.question)
+        }
+
+        // 성공/실패 통계 표시
+        showSuccessMessage(
+          `OCR 처리 완료: ${successCount}개 성공, ${failureCount}개 실패`
+        )
+
+      } catch (error) {
+        console.error('순차 OCR 처리 실패:', error)
+        handleGeneralError(error, '순차 OCR 처리')
+        showSuccessMessage('OCR 처리 중 오류가 발생했습니다.')
+      } finally {
+        isProcessing.value = false
       }
-      clearCurrentSelection()
-      console.log('영역 선택 초기화')
+    }
+
+    // OCR 처리 방식 선택 핸들러
+    const handleOcrProcessing = async (processingType) => {
+      try {
+        console.log(`선택된 OCR 처리 방식: ${processingType}`)
+
+        switch (processingType) {
+          case 'parallel':
+            await processAllSelectedAreas()
+            break
+          case 'sequential':
+            await processAllSelectedAreasSequential()
+            break
+          case 'batch':
+            await processAllSelectedAreasBatch()
+            break
+          default:
+            console.warn('알 수 없는 처리 방식:', processingType)
+            showSuccessMessage('올바른 처리 방식을 선택해주세요.')
+            return
+        }
+
+        // OCR 처리 완료 후 다음 단계로 자동 진행
+        if (currentStep.value === 1) {
+          await nextTick()
+          nextStep()
+        }
+
+      } catch (error) {
+        console.error('OCR 처리 방식 선택 오류:', error)
+        showSuccessMessage('OCR 처리 중 오류가 발생했습니다.')
+      }
+    }
+
+    // 하이브리드 OCR 처리 - 배치 방식 (그룹별 병렬 처리)
+    const processAllSelectedAreasBatch = async (batchSize = 2) => {
+      if (isProcessing.value) return
+
+      try {
+        isProcessing.value = true
+        console.log(`전체 영역 OCR 처리 시작 (배치 방식, 배치 크기: ${batchSize}):`, selectedAreas.value)
+
+        // 선택된 영역 타입들 가져오기
+        const selectedAreaTypes = availableAreaTypes.value.filter(areaType =>
+          selectedAreas.value[areaType] && selectedAreas.value[areaType].imageData
+        )
+
+        if (selectedAreaTypes.length === 0) {
+          throw new Error('처리할 영역이 없습니다.')
+        }
+
+        console.log(`선택된 영역 타입: ${selectedAreaTypes.join(', ')}`)
+
+        const allResults = []
+        let successCount = 0
+        let failureCount = 0
+
+        // 배치 단위로 처리
+        for (let i = 0; i < selectedAreaTypes.length; i += batchSize) {
+          const batch = selectedAreaTypes.slice(i, i + batchSize)
+          console.log(`배치 ${Math.floor(i / batchSize) + 1} 처리 중: ${batch.join(', ')}`)
+
+          try {
+            // 배치 내에서 병렬 처리
+            const batchPromises = batch.map(areaType =>
+              processOcr(areaType).catch(error => ({
+                areaType,
+                text: '',
+                confidence: 0,
+                processingTime: Date.now(),
+                success: false,
+                error: error.message
+              }))
+            )
+
+            const batchResults = await Promise.all(batchPromises)
+            allResults.push(...batchResults)
+
+            // 배치 결과 통계
+            const batchSuccess = batchResults.filter(r => r.success).length
+            const batchFailure = batchResults.filter(r => !r.success).length
+            successCount += batchSuccess
+            failureCount += batchFailure
+
+            console.log(`배치 ${Math.floor(i / batchSize) + 1} 완료: ${batchSuccess}개 성공, ${batchFailure}개 실패`)
+
+            // 배치 간 짧은 지연 (서버 부하 분산)
+            if (i + batchSize < selectedAreaTypes.length) {
+              await new Promise(resolve => setTimeout(resolve, 100))
+            }
+
+          } catch (error) {
+            console.error(`배치 ${Math.floor(i / batchSize) + 1} 처리 실패:`, error)
+            failureCount += batch.length
+          }
+        }
+
+        console.log('배치 OCR 처리 완료:', allResults)
+
+        // areaType에 따라 결과를 분기 처리하여 저장
+        const resultMap = {
+          question: '',
+          problem: '',
+          image: '',
+          options: ''
+        }
+
+        allResults.forEach((result) => {
+          const { areaType, text, success } = result
+          if (success && text && areaType && areaType in resultMap) {
+            resultMap[areaType] = text
+            editedTexts.value[areaType] = text
+            console.log(`${areaType} 영역 OCR 결과 저장:`, text)
+          }
+        })
+
+        console.log('최종 결과 맵:', resultMap)
+        console.log('편집 텍스트 상태:', editedTexts.value)
+
+        // DOM 업데이트를 기다린 후 상태 초기화
+        await nextTick()
+
+        console.log('OCR 결과를 편집 텍스트에 적용 완료:', editedTexts.value)
+
+        // OCR 결과를 itemInfo에 자동 매핑
+        if (resultMap.problem) {
+          itemInfo.value.solution = resultMap.problem
+          console.log('문제 내용을 solution에 설정:', resultMap.problem)
+        }
+
+        if (resultMap.question) {
+          // 지문이 있는 경우 explanation에 추가
+          if (itemInfo.value.explanation) {
+            itemInfo.value.explanation += '\n\n지문: ' + resultMap.question
+          } else {
+            itemInfo.value.explanation = '지문: ' + resultMap.question
+          }
+          console.log('지문을 explanation에 추가:', resultMap.question)
+        }
+
+        // 성공/실패 통계 표시
+        showSuccessMessage(
+          `OCR 처리 완료: ${successCount}개 성공, ${failureCount}개 실패 (배치 방식)`
+        )
+
+      } catch (error) {
+        console.error('배치 OCR 처리 실패:', error)
+        handleGeneralError(error, '배치 OCR 처리')
+        showSuccessMessage('OCR 처리 중 오류가 발생했습니다.')
+      } finally {
+        isProcessing.value = false
+      }
+    }
+
+    const resetCapture = async () => {
+      try {
+        captureMode.value = false
+
+        // 상태 초기화
+        selectedAreas.value = {
+          question: null,
+          problem: null,
+          image: null,
+          options: null
+        }
+
+        editedTexts.value = {
+          question: '',
+          problem: '',
+          image: '',
+          options: ''
+        }
+
+        clearCurrentSelection()
+
+        // DOM 업데이트를 기다린 후 추가 작업 수행
+        await nextTick()
+
+        console.log('영역 선택 초기화 완료')
+      } catch (error) {
+        console.error('resetCapture 실행 중 오류:', error)
+      }
     }
 
     // 편집 관련 메서드
-    const selectEditingArea = (areaType) => {
-      currentEditingArea.value = areaType
+    const selectEditingArea = async (areaType) => {
+      try {
+        currentEditingArea.value = areaType
+
+        // DOM 업데이트를 기다린 후 추가 작업 수행
+        await nextTick()
+
+        console.log('편집 영역 변경 완료:', areaType)
+      } catch (error) {
+        console.error('편집 영역 변경 중 오류:', error)
+      }
     }
 
     const copyOcrToEditor = () => {
@@ -921,11 +1398,11 @@ export default {
         const canvas = imageCanvas.value
         const rect = canvas.getBoundingClientRect()
 
-        // 화면 표시 크기와 실제 픽셀 크기의 비율 계산
+        // 화면 표시 크기와 실제 픽셀 크기의 비율 계산 (줌 레벨 고려)
         const scaleX = canvas.width / rect.width
         const scaleY = canvas.height / rect.height
 
-        // 화면 좌표를 픽셀 좌표로 변환
+        // 화면 좌표를 픽셀 좌표로 변환 (줌 레벨 고려)
         const pixelX = Math.round(screenSelection.x * scaleX)
         const pixelY = Math.round(screenSelection.y * scaleY)
         const pixelWidth = Math.round(screenSelection.width * scaleX)
@@ -935,6 +1412,7 @@ export default {
           화면좌표: screenSelection,
           픽셀좌표: { x: pixelX, y: pixelY, width: pixelWidth, height: pixelHeight },
           스케일: { scaleX, scaleY },
+          줌레벨: zoomLevel.value,
           Canvas크기: { width: canvas.width, height: canvas.height },
           화면크기: { width: rect.width, height: rect.height }
         })
@@ -1091,7 +1569,9 @@ export default {
       imageCanvas,
       selectionCanvas,
       selectedAreas,
+      hasValidSelectedAreas,
       activeSelectionType,
+      safeActiveSelectionType,
       currentSelection,
       canConvert,
       isProcessing,
@@ -1146,7 +1626,11 @@ export default {
       secondClick,
       clearCurrentSelection,
       processAllSelectedAreas,
+      processAllSelectedAreasSequential,
+      processAllSelectedAreasBatch,
+      handleOcrProcessing,
       resetCapture,
+      resetState,
       showSuccessMessage,
       selectAreaType
     }
@@ -1189,6 +1673,13 @@ export default {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+}
+
+/* OcrResultHeader 컴포넌트 스타일 */
+.ocr-result-header {
+  flex-shrink: 0;
+  z-index: 10;
+  border-radius: 12px 12px 0 0;
 }
 
 /* 모달 헤더 */
@@ -1298,7 +1789,7 @@ export default {
 .modal-content {
   flex: 1;
   padding: 1.5rem;
-  overflow: hidden;
+  overflow:auto;
 }
 
 .content-layout {
@@ -1622,35 +2113,7 @@ export default {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-/* 처리 섹션 */
-.processing-section {
-  padding: 1.5rem;
-  background-color: #f8fafc;
-  border: 1px solid #e2e8f0;
-  border-radius: 0 0 12px 12px;
-}
 
-.processing-status {
-  margin-bottom: 1rem;
-}
-
-.status-item {
-  display: flex;
-  align-items: center;
-  padding: 0.5rem;
-  background-color: #f3f4f6;
-  border-radius: 6px;
-  font-size: 0.875rem;
-  color: #6b7280;
-  border: 1px solid #d1d5db;
-  transition: all 0.2s ease;
-}
-
-.status-item.completed {
-  background-color: #d1fae5;
-  color: #065f46;
-  border-color: #10b981;
-}
 
 /* 단계별 컨텐츠 스타일 */
 .step-content {
@@ -2362,7 +2825,7 @@ export default {
 
 /* 영역 타입 선택 탭 스타일 */
 .area-type-tabs {
-  margin-bottom: 1.5rem;
+  margin-bottom: 1rem;
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background-color: white;
