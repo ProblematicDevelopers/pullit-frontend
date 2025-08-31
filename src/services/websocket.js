@@ -82,7 +82,6 @@ class WebSocketService {
             (message) => {
               try {
                 const examStatusResponse = JSON.parse(message.body)
-                console.log('📋 시험 상태 응답 수신:', examStatusResponse)
 
                 if (callbacks.onExamStatus) {
                   callbacks.onExamStatus(examStatusResponse)
@@ -99,7 +98,6 @@ class WebSocketService {
             (message) => {
               try {
                 const examProgressResponse = JSON.parse(message.body)
-                console.log('📋 시험 상태 응답 수신:', examProgressResponse)
                 if (callbacks.onExamProgress) {
                   callbacks.onExamProgress(examProgressResponse)
                 }
