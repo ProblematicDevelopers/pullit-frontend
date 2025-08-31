@@ -79,13 +79,14 @@ export default {
   },
   methods: {
     applyEdit() {
-      console.log('MathEditModal applyEdit 호출됨:', this.editingLatex);
-      this.$emit('apply', this.editingLatex)
+      this.$emit('apply', this.editingLatex);
+      this.closeModal();
     },
+
     cancelEdit() {
-      console.log('MathEditModal cancelEdit 호출됨');
-      this.$emit('cancel')
-    }
+      this.$emit('cancel');
+      this.closeModal();
+    },
   }
 }
 </script>
