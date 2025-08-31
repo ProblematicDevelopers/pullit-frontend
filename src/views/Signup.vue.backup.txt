@@ -1,0 +1,1101 @@
+<template>
+  <div class="container-fluid min-vh-100 d-flex align-items-center justify-content-center bg-light">
+    <div class="row w-100 justify-content-center">
+      <div class="col-12 col-md-8 col-lg-6 col-xl-5">
+        <div class="card shadow-lg border-0">
+          <div class="card-header bg-primary text-white text-center py-4">
+            <h3 class="mb-0 fw-bold">
+              <i class="fas fa-user-plus me-2"></i>
+              회원가입
+            </h3>
+          </div>
+          
+          <div class="card-body p-4 p-md-5">
+            <!-- 단계 표시 -->
+            <div class="step-indicator mb-4">
+              <div class="row">
+                <div class="col-4">
+                  <div class="step" :class="{ active: signupStep === 1, completed: signupStep > 1 }">
+                    <div class="step-number">1</div>
+                    <div class="step-text">약관동의<br/>유형선택</div>
+                  </div>
+                </div>
+                <div class="col-4">
+                  <div class="step" :class="{ active: signupStep === 2, completed: signupStep > 2 }">
+                    <div class="step-number">2</div>
+                    <div class="step-text">휴대폰 인증</div>
+                  </div>
+                </div>
+                <div class="col-4">
+                  <div class="step" :class="{ active: signupStep === 3 }">
+                    <div class="step-number">3</div>
+                    <div class="step-text">정보 입력</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Step 1: 약관동의 및 가입유형 선택 -->
+            <div v-if="signupStep === 1">
+              <h5 class="section-title mb-4">
+                <i class="fas fa-file-contract me-2"></i>
+                이용약관 동의
+              </h5>
+              
+              <!-- 전체 동의 -->
+              <div class="form-check mb-3">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="agreeAll"
+                  @change="toggleAllAgreements"
+                  v-model="agreements.all"
+                >
+                <label class="form-check-label fw-bold" for="agreeAll">
+                  전체 동의
+                </label>
+              </div>
+              
+              <hr class="my-4">
+              
+              <!-- 개별 약관 -->
+              <div class="form-check mb-3">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="agreeTerms"
+                  v-model="agreements.terms"
+                  @change="checkIndividualAgreements"
+                >
+                <label class="form-check-label" for="agreeTerms">
+                  [필수] 이용약관 동의
+                  <a href="#" class="text-decoration-none ms-2">보기</a>
+                </label>
+              </div>
+              
+              <div class="form-check mb-3">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="agreePrivacy"
+                  v-model="agreements.privacy"
+                  @change="checkIndividualAgreements"
+                >
+                <label class="form-check-label" for="agreePrivacy">
+                  [필수] 개인정보 수집 및 이용 동의
+                  <a href="#" class="text-decoration-none ms-2">보기</a>
+                </label>
+              </div>
+              
+              <div class="form-check mb-4">
+                <input
+                  class="form-check-input"
+                  type="checkbox"
+                  id="agreeMarketing"
+                  v-model="agreements.marketing"
+                  @change="checkIndividualAgreements"
+                >
+                <label class="form-check-label" for="agreeMarketing">
+                  [선택] 마케팅 정보 수신 동의
+                </label>
+              </div>
+
+              <!-- 사용자 유형 선택 -->
+              <h5 class="section-title mb-4">
+                <i class="fas fa-users me-2"></i>
+                가입 유형 선택
+              </h5>
+              
+              <div class="row g-3 mb-4">
+                <div class="col-6">
+                  <div
+                    class="user-type-card"
+                    :class="{ active: signupForm.userType === 'teacher' }"
+                    @click="signupForm.userType = 'teacher'"
+                  >
+                    <div class="user-type-icon">
+                      <i class="fas fa-chalkboard-teacher fa-2x"></i>
+                    </div>
+                    <h6 class="user-type-title">선생님</h6>
+                  </div>
+                </div>
+                <div class="col-6">
+                  <div
+                    class="user-type-card"
+                    :class="{ active: signupForm.userType === 'student' }"
+                    @click="signupForm.userType = 'student'"
+                  >
+                    <div class="user-type-icon">
+                      <i class="fas fa-graduation-cap fa-2x"></i>
+                    </div>
+                    <h6 class="user-type-title">학생</h6>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 다음 단계 버튼 -->
+              <div class="d-grid">
+                <button
+                  @click="nextStep"
+                  class="btn btn-primary btn-lg fw-bold"
+                  :disabled="!canProceedToStep2"
+                >
+                  다음 단계
+                  <i class="fas fa-arrow-right ms-2"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Step 2: 휴대폰 인증 -->
+            <div v-if="signupStep === 2">
+              <h5 class="section-title mb-4">
+                <i class="fas fa-mobile-alt me-2"></i>
+                휴대폰 인증
+              </h5>
+              
+              <!-- 휴대폰 번호 입력 -->
+              <div class="mb-3">
+                <label for="phone" class="form-label fw-bold">휴대폰 번호</label>
+                <div class="input-group">
+                  <input
+                    type="tel"
+                    class="form-control"
+                    id="phone"
+                    v-model="signupForm.phone"
+                    @input="formatPhone"
+                    placeholder="010-0000-0000"
+                    maxlength="13"
+                    :disabled="phoneVerified"
+                  >
+                  <button
+                    class="btn btn-outline-primary"
+                    type="button"
+                    @click="sendVerificationCode"
+                    :disabled="!isValidPhone || phoneVerified"
+                  >
+                    {{ phoneVerified ? '인증완료' : (verificationSent ? '재전송' : '인증번호 전송') }}
+                  </button>
+                </div>
+              </div>
+
+              <!-- 인증번호 입력 -->
+              <div v-if="verificationSent" class="mb-3">
+                <label for="verificationCode" class="form-label fw-bold">인증번호</label>
+                <div class="input-group">
+                  <input
+                    type="text"
+                    class="form-control"
+                    id="verificationCode"
+                    v-model="verificationCode"
+                    placeholder="인증번호 6자리"
+                    maxlength="6"
+                    :disabled="phoneVerified"
+                  >
+                  <button
+                    class="btn"
+                    :class="phoneVerified ? 'btn-success' : 'btn-outline-success'"
+                    type="button"
+                    @click="verifyPhone"
+                    :disabled="phoneVerified"
+                  >
+                    {{ phoneVerified ? '인증완료' : '확인' }}
+                  </button>
+                </div>
+                <div class="mt-2">
+                  <small v-if="!phoneVerified" class="text-muted">
+                    <i class="fas fa-clock me-1"></i>
+                    {{ verificationTimer }}초 남음
+                  </small>
+                  <small v-if="phoneVerified" class="text-success">
+                    <i class="fas fa-check-circle me-1"></i>
+                    휴대폰 인증이 완료되었습니다.
+                  </small>
+                </div>
+              </div>
+
+              <!-- 단계 이동 버튼 -->
+              <div class="d-flex gap-3">
+                <button @click="prevStep" class="btn btn-secondary flex-fill">
+                  <i class="fas fa-arrow-left me-2"></i>
+                  이전
+                </button>
+                <button
+                  @click="nextStep"
+                  class="btn btn-primary flex-fill"
+                  :disabled="!phoneVerified"
+                >
+                  다음 단계
+                  <i class="fas fa-arrow-right ms-2"></i>
+                </button>
+              </div>
+            </div>
+
+            <!-- Step 3: 정보 입력 -->
+            <div v-if="signupStep === 3">
+              <h5 class="section-title mb-4">
+                <i class="fas fa-edit me-2"></i>
+                회원 정보 입력
+              </h5>
+              
+              <form @submit.prevent="handleSignup">
+                <!-- 아이디 입력 -->
+                <div class="mb-3">
+                  <label for="username" class="form-label fw-bold">아이디</label>
+                  <div class="input-group">
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="username"
+                      v-model="signupForm.username"
+                      @input="checkUsernameAvailability"
+                      placeholder="영문, 숫자 조합 4-20자"
+                      required
+                      minlength="4"
+                      maxlength="20"
+                    >
+                    <button
+                      type="button"
+                      class="btn"
+                      :class="usernameAvailable ? 'btn-success' : 'btn-outline-primary'"
+                      @click="checkUsernameAvailability"
+                      :disabled="usernameAvailable"
+                    >
+                      {{ usernameAvailable ? '확인완료' : '중복확인' }}
+                    </button>
+                  </div>
+                  <div v-if="usernameCheckMessage" class="form-text" :class="usernameAvailable ? 'text-success' : 'text-danger'">
+                    {{ usernameCheckMessage }}
+                  </div>
+                </div>
+
+                <!-- 비밀번호 입력 -->
+                <div class="mb-3">
+                  <label for="password" class="form-label fw-bold">비밀번호</label>
+                  <div class="input-group">
+                    <input
+                      :type="showPassword ? 'text' : 'password'"
+                      class="form-control"
+                      id="password"
+                      v-model="signupForm.password"
+                      @input="checkPasswordStrength"
+                      placeholder="영문(대+소), 숫자, 특수문자 조합 9-20자"
+                      required
+                      minlength="9"
+                      maxlength="20"
+                    >
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      @click="togglePasswordVisibility"
+                      title="비밀번호 보기/숨기기"
+                    >
+                      <i :class="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                    </button>
+                  </div>
+                  <div v-if="passwordStrength" class="mt-2">
+                    <div class="d-flex align-items-center">
+                      <span class="me-2">보안도:</span>
+                      <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                        <div 
+                          class="progress-bar" 
+                          :class="passwordStrengthClass"
+                          :style="{ width: passwordStrengthWidth }"
+                        ></div>
+                      </div>
+                      <small class="text-muted">{{ passwordStrengthText }}</small>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- 비밀번호 확인 -->
+                <div class="mb-3">
+                  <label for="passwordConfirm" class="form-label fw-bold">비밀번호 확인</label>
+                  <div class="input-group">
+                    <input
+                      :type="showPasswordConfirm ? 'text' : 'password'"
+                      class="form-control"
+                      id="passwordConfirm"
+                      v-model="signupForm.passwordConfirm"
+                      placeholder="비밀번호를 다시 입력하세요"
+                      required
+                    >
+                    <button
+                      type="button"
+                      class="btn btn-outline-secondary"
+                      @click="togglePasswordConfirmVisibility"
+                      title="비밀번호 보기/숨기기"
+                    >
+                      <i :class="showPasswordConfirm ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
+                    </button>
+                  </div>
+                  <div v-if="signupForm.passwordConfirm" class="form-text" :class="passwordsMatch ? 'text-success' : 'text-danger'">
+                    {{ passwordsMatch ? '비밀번호가 일치합니다' : '비밀번호가 일치하지 않습니다' }}
+                  </div>
+                </div>
+
+                <!-- 이메일 입력 -->
+                <div class="mb-3">
+                  <label for="email" class="form-label fw-bold">이메일</label>
+                  <input
+                    type="email"
+                    class="form-control"
+                    :class="{'is-invalid': !emailValid && emailErrorMessage, 'is-valid': emailValid}"
+                    id="email"
+                    v-model="signupForm.email"
+                    @blur="checkEmailFormat"
+                    @input="checkEmailFormat"
+                    placeholder="example@email.com"
+                    required
+                  >
+                  <div v-if="emailErrorMessage" class="invalid-feedback">{{ emailErrorMessage }}</div>
+                  <div v-else-if="emailValid" class="valid-feedback">올바른 이메일 형식입니다.</div>
+                </div>
+
+                <!-- 생년월일 입력 -->
+                <div class="mb-3">
+                  <label for="birthDate" class="form-label fw-bold">생년월일</label>
+                  <input
+                    type="date"
+                    class="form-control"
+                    id="birthDate"
+                    v-model="signupForm.birthDate"
+                    required
+                  >
+                </div>
+
+                <!-- 학교 검색 -->
+                <div class="mb-4">
+                  <label for="school" class="form-label fw-bold">학교 정보</label>
+                  <div class="input-group">
+                    <input
+                      type="text"
+                      class="form-control"
+                      id="school"
+                      v-model="signupForm.school"
+                      placeholder="학교명을 입력하세요"
+                      readonly
+                      required
+                    >
+                    <button
+                      class="btn btn-outline-primary"
+                      type="button"
+                      @click="openSchoolSearchModal"
+                    >
+                      <i class="fas fa-search me-1"></i>
+                      학교 검색
+                    </button>
+                  </div>
+                  <small v-if="schoolSearchResults.length > 0" class="text-muted">
+                    검색 결과: {{ schoolSearchResults.length }}개 학교
+                  </small>
+                </div>
+
+                <!-- 가입완료 버튼 -->
+                <div class="d-flex gap-3">
+                  <button type="button" @click="prevStep" class="btn btn-secondary flex-fill">
+                    <i class="fas fa-arrow-left me-2"></i>
+                    이전
+                  </button>
+                  <button type="submit" class="btn btn-primary flex-fill">
+                    <i class="fas fa-check me-2"></i>
+                    가입완료
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            <!-- 로그인 링크 -->
+            <div class="text-center mt-4">
+              <p class="mb-0">
+                이미 계정이 있으신가요? 
+                <router-link to="/login" class="text-decoration-none fw-bold">로그인</router-link>
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 학교 검색 모달 -->
+  <div v-if="showSchoolModal" class="modal-overlay" @click="closeSchoolModal">
+    <div class="modal-content" @click.stop>
+      <div class="modal-header">
+        <h5 class="modal-title">
+          <i class="fas fa-school me-2"></i>
+          학교 검색
+        </h5>
+        <button type="button" class="btn-close" @click="closeSchoolModal" aria-label="Close"></button>
+      </div>
+      <div class="modal-body">
+        <!-- 검색 입력 -->
+        <div class="mb-3">
+          <div class="input-group">
+            <input 
+              type="text" 
+              class="form-control" 
+              v-model="schoolSearchKeyword"
+              @keyup.enter="searchSchools"
+              placeholder="학교명을 입력하세요"
+            >
+            <button 
+              class="btn btn-primary" 
+              @click="searchSchools"
+              :disabled="!schoolSearchKeyword.trim() || isSchoolSearching"
+            >
+              <span v-if="isSchoolSearching" class="spinner-border spinner-border-sm me-2" role="status"></span>
+              {{ isSchoolSearching ? '검색 중...' : '검색' }}
+            </button>
+          </div>
+        </div>
+
+        <!-- 검색 결과 -->
+        <div v-if="schoolSearchResults.length > 0" class="mb-3">
+          <h6 class="fw-bold mb-2">검색 결과 ({{ schoolSearchResults.length }}건)</h6>
+          <div class="list-group">
+            <button 
+              v-for="school in schoolSearchResults" 
+              :key="school.id"
+              type="button"
+              class="list-group-item list-group-item-action"
+              @click="selectSchool(school)"
+            >
+              <div class="d-flex justify-content-between align-items-start">
+                <div>
+                  <h6 class="mb-1 fw-bold">{{ school.schoolName }}</h6>
+                  <p class="mb-1 text-muted small">
+                    {{ school.addressRoad || school.addressJibun }}
+                  </p>
+                  <small class="text-muted">
+                    {{ school.sidoOffice }} | {{ school.eduOffice }}
+                  </small>
+                </div>
+                <i class="fas fa-chevron-right text-muted"></i>
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <!-- 검색 결과 없음 -->
+        <div v-else-if="schoolSearchKeyword && !isSchoolSearching" class="text-center py-4">
+          <i class="fas fa-search fa-2x text-muted mb-3"></i>
+          <p class="text-muted mb-0">검색 결과가 없습니다.</p>
+        </div>
+
+        <!-- 초기 상태 -->
+        <div v-else-if="!schoolSearchKeyword" class="text-center py-4">
+          <i class="fas fa-school fa-2x text-muted mb-3"></i>
+          <p class="text-muted mb-0">학교명을 입력하여 검색해주세요.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</template>
+
+<script setup>
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
+import { useRouter } from 'vue-router'
+import axios from 'axios'
+
+const router = useRouter()
+
+// 반응형 데이터
+const signupStep = ref(1)
+
+// 회원가입 폼
+const signupForm = ref({
+  userType: '',
+  username: '',
+  password: '',
+  passwordConfirm: '',
+  email: '',
+  phone: '',
+  birthDate: '',
+  school: ''
+})
+
+// 약관 동의
+const agreements = ref({
+  all: false,
+  terms: false,
+  privacy: false,
+  marketing: false
+})
+
+// 휴대폰 인증
+const verificationSent = ref(false)
+const verificationCode = ref('')
+const phoneVerified = ref(false)
+const verificationTimer = ref(180)
+let timerInterval = null
+
+// 아이디 중복 확인
+const usernameCheckMessage = ref('')
+const usernameAvailable = ref(false)
+
+// 비밀번호 강도
+const passwordStrength = ref('')
+const passwordStrengthClass = ref('')
+const passwordStrengthText = ref('')
+
+// 비밀번호 표시/숨김 상태
+const showPassword = ref(false)
+const showPasswordConfirm = ref(false)
+
+// 이메일 유효성 검사
+const emailValid = ref(false)
+const emailErrorMessage = ref('')
+
+// 학교 검색
+const showSchoolModal = ref(false)
+const schoolSearchKeyword = ref('')
+const schoolSearchResults = ref([])
+const isSchoolSearching = ref(false)
+
+// API 설정
+const apiBaseUrl = 'http://localhost:8080/api'
+
+// computed properties
+const canProceedToStep2 = computed(() => {
+  return agreements.value.terms && agreements.value.privacy && signupForm.value.userType
+})
+
+const isValidPhone = computed(() => {
+  const phoneRegex = /^010-\d{4}-\d{4}$/
+  return phoneRegex.test(signupForm.value.phone)
+})
+
+const passwordsMatch = computed(() => {
+  return signupForm.value.password === signupForm.value.passwordConfirm
+})
+
+const passwordStrengthWidth = computed(() => {
+  if (!passwordStrength.value) return '0%'
+  const strength = passwordStrength.value
+  if (strength <= 2) return '33%'
+  if (strength <= 3) return '66%'
+  return '100%'
+})
+
+// 메서드들
+const toggleAllAgreements = () => {
+  agreements.value.terms = agreements.value.all
+  agreements.value.privacy = agreements.value.all
+  agreements.value.marketing = agreements.value.all
+}
+
+const checkIndividualAgreements = () => {
+  if (agreements.value.terms && agreements.value.privacy && agreements.value.marketing) {
+    agreements.value.all = true
+  } else {
+    agreements.value.all = false
+  }
+}
+
+const formatPhone = () => {
+  let phone = signupForm.value.phone.replace(/[^0-9]/g, '')
+  if (phone.length > 3 && phone.length <= 7) {
+    phone = phone.slice(0, 3) + '-' + phone.slice(3)
+  } else if (phone.length > 7) {
+    phone = phone.slice(0, 3) + '-' + phone.slice(3, 7) + '-' + phone.slice(7, 11)
+  }
+  signupForm.value.phone = phone
+}
+
+const sendVerificationCode = async () => {
+  // 테스트용 번호 체크
+  if (signupForm.value.phone === '010-1111-1111') {
+    verificationSent.value = true
+    startTimer()
+    alert('(테스트) 인증번호가 전송되었습니다. 인증번호: 000000')
+    return
+  }
+
+  try {
+    const response = await axios.post(`${apiBaseUrl}/auth/phone/send`, {
+      phone: signupForm.value.phone
+    })
+
+    if (response.data.success) {
+      verificationSent.value = true
+      startTimer()
+      alert('인증번호가 전송되었습니다.')
+    }
+  } catch (error) {
+    alert('인증번호 전송 실패: ' + (error.response?.data?.message || '알 수 없는 오류'))
+  }
+}
+
+const startTimer = () => {
+  verificationTimer.value = 180
+  timerInterval = setInterval(() => {
+    verificationTimer.value--
+    if (verificationTimer.value <= 0) {
+      clearInterval(timerInterval)
+      verificationSent.value = false
+    }
+  }, 1000)
+}
+
+const verifyPhone = async () => {
+  // 테스트용 인증 체크
+  if (signupForm.value.phone === '010-1111-1111' && verificationCode.value === '000000') {
+    phoneVerified.value = true
+    clearInterval(timerInterval)
+    alert('(테스트) 휴대폰 인증이 완료되었습니다.')
+    return
+  }
+
+  try {
+    const response = await axios.post(`${apiBaseUrl}/auth/phone/verify`, {
+      phone: signupForm.value.phone,
+      code: verificationCode.value
+    })
+
+    if (response.data.success) {
+      phoneVerified.value = true
+      clearInterval(timerInterval)
+      alert('휴대폰 인증이 완료되었습니다.')
+    }
+  } catch (error) {
+    alert('인증 실패: ' + (error.response?.data?.message || '잘못된 인증번호입니다.'))
+  }
+}
+
+const checkUsernameAvailability = async () => {
+  if (!signupForm.value.username) {
+    usernameCheckMessage.value = '아이디를 입력해주세요.'
+    usernameAvailable.value = false
+    return
+  }
+
+  try {
+    const response = await axios.get(`${apiBaseUrl}/users/check/username/${signupForm.value.username}`)
+
+    if (response.data.success) {
+      usernameCheckMessage.value = '사용 가능한 아이디입니다.'
+      usernameAvailable.value = true
+    } else {
+      usernameCheckMessage.value = '이미 사용중인 아이디입니다.'
+      usernameAvailable.value = false
+    }
+  } catch {
+    usernameCheckMessage.value = '중복 확인 실패'
+    usernameAvailable.value = false
+  }
+}
+
+const togglePasswordVisibility = () => {
+  showPassword.value = !showPassword.value
+}
+
+const togglePasswordConfirmVisibility = () => {
+  showPasswordConfirm.value = !showPasswordConfirm.value
+}
+
+const validateEmail = (email) => {
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
+}
+
+const checkEmailFormat = () => {
+  const email = signupForm.value.email
+
+  if (!email) {
+    emailValid.value = false
+    emailErrorMessage.value = ''
+    return
+  }
+
+  if (!validateEmail(email)) {
+    emailValid.value = false
+    emailErrorMessage.value = '올바른 이메일 형식을 입력해주세요.'
+  } else {
+    emailValid.value = true
+    emailErrorMessage.value = ''
+  }
+}
+
+const checkPasswordStrength = () => {
+  const password = signupForm.value.password
+
+  if (!password) {
+    passwordStrength.value = ''
+    return
+  }
+
+  const hasLower = /[a-z]/.test(password)
+  const hasUpper = /[A-Z]/.test(password)
+  const hasNumber = /[0-9]/.test(password)
+  const hasSpecial = /[!@#$%^&*(),.?":{}|<>]/.test(password)
+  const isLongEnough = password.length >= 9 && password.length <= 20
+
+  let strength = 0
+  if (hasLower) strength++
+  if (hasUpper) strength++
+  if (hasNumber) strength++
+  if (hasSpecial) strength++
+  if (isLongEnough) strength++
+
+  if (strength >= 5) {
+    passwordStrengthClass.value = 'bg-success'
+    passwordStrengthText.value = '보안 우수'
+  } else if (strength >= 3) {
+    passwordStrengthClass.value = 'bg-warning'
+    passwordStrengthText.value = '보안 양호'
+  } else {
+    passwordStrengthClass.value = 'bg-danger'
+    passwordStrengthText.value = '보안 취약'
+  }
+
+  passwordStrength.value = true
+}
+
+const openSchoolSearchModal = () => {
+  console.log('🔍 openSchoolSearchModal 함수 실행 시작')
+  showSchoolModal.value = true
+  schoolSearchKeyword.value = ''
+  schoolSearchResults.value = []
+  console.log('🔍 openSchoolSearchModal 함수 실행 완료')
+}
+
+const closeSchoolModal = () => {
+  showSchoolModal.value = false
+  schoolSearchKeyword.value = ''
+  schoolSearchResults.value = []
+}
+
+const searchSchools = async () => {
+  console.log('🚀 searchSchools 함수 실행 시작')
+  console.log('🚀 schoolSearchKeyword.value:', schoolSearchKeyword.value)
+  
+  if (!schoolSearchKeyword.value.trim()) {
+    console.log('🚀 검색어가 없어서 함수 종료')
+    return
+  }
+
+  isSchoolSearching.value = true
+
+  try {
+    console.log('학교 검색 시작 (실제 API):', schoolSearchKeyword.value.trim())
+
+    // 실제 API로 학교 검색
+    const keyword = schoolSearchKeyword.value.trim()
+    console.log('검색 키워드:', keyword)
+    console.log('검색 키워드 길이:', keyword.length)
+    console.log('검색 키워드 바이트:', new TextEncoder().encode(keyword))
+    
+    const response = await axios.get(`http://localhost:8080/api/schools/search?keyword=${encodeURIComponent(keyword)}`)
+    console.log('검색 결과:', response.data)
+    schoolSearchResults.value = response.data
+  } catch (error) {
+    console.error('학교 검색 실패:', error)
+    console.error('에러 상세:', error.response?.data)
+    console.error('에러 상태:', error.response?.status)
+    schoolSearchResults.value = []
+    alert('학교 검색 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+  } finally {
+    isSchoolSearching.value = false
+  }
+}
+
+const selectSchool = (school) => {
+  signupForm.value.school = school.schoolName
+  closeSchoolModal()
+}
+
+const nextStep = () => {
+  if (signupStep.value < 3) {
+    signupStep.value++
+  }
+}
+
+const prevStep = () => {
+  if (signupStep.value > 1) {
+    signupStep.value--
+  }
+}
+
+const handleSignup = async () => {
+  if (signupForm.value.password !== signupForm.value.passwordConfirm) {
+    alert('비밀번호가 일치하지 않습니다.')
+    return
+  }
+
+  if (!usernameAvailable.value) {
+    alert('아이디 중복 확인을 해주세요.')
+    return
+  }
+
+  if (!emailValid.value) {
+    alert('올바른 이메일 형식을 입력해주세요.')
+    return
+  }
+
+  if (!signupForm.value.school.trim()) {
+    alert('학교 정보를 입력해주세요.')
+    return
+  }
+
+  try {
+    const signupData = {
+      username: signupForm.value.username,
+      password: signupForm.value.password,
+      email: signupForm.value.email,
+      phone: signupForm.value.phone,
+      birthDate: signupForm.value.birthDate,
+      fullName: signupForm.value.username,
+      role: signupForm.value.userType.toUpperCase(),
+      school: signupForm.value.school,
+      marketingAgree: agreements.value.marketing
+    }
+
+    const response = await axios.post(`${apiBaseUrl}/auth/register`, signupData)
+
+    if (response.data.success) {
+      alert('회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.')
+      router.push('/login')
+    } else {
+      alert('회원가입에 실패했습니다: ' + response.data.message)
+    }
+  } catch (error) {
+    alert('회원가입 실패: ' + (error.response?.data?.message || '알 수 없는 오류'))
+  }
+}
+
+// 감시자
+watch(() => signupForm.value.phone, () => {
+  formatPhone()
+})
+
+// 생명주기 훅
+onMounted(() => {
+  console.log('Signup 컴포넌트 마운트 완료')
+})
+
+onUnmounted(() => {
+  if (timerInterval) {
+    clearInterval(timerInterval)
+  }
+})
+</script>
+
+<style scoped>
+.card {
+  border-radius: 1rem;
+}
+
+.card-header {
+  border-radius: 1rem 1rem 0 0 !important;
+}
+
+.section-title {
+  color: #495057;
+  font-weight: 600;
+  border-bottom: 2px solid #e9ecef;
+  padding-bottom: 0.5rem;
+}
+
+/* 단계 표시 스타일 */
+.step-indicator {
+  margin-bottom: 2rem;
+}
+
+.step {
+  text-align: center;
+  padding: 1rem;
+  background: #f8f9fa;
+  border-radius: 0.75rem;
+  border: 2px solid #e9ecef;
+  transition: all 0.3s ease;
+  position: relative;
+}
+
+.step.active {
+  background: #0d6efd;
+  border-color: #0d6efd;
+  color: white;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+.step.completed {
+  background: #198754;
+  border-color: #198754;
+  color: white;
+}
+
+.step-number {
+  font-size: 1.5rem;
+  font-weight: bold;
+  margin-bottom: 0.5rem;
+}
+
+.step-text {
+  font-size: 0.875rem;
+  line-height: 1.2;
+}
+
+/* 사용자 유형 선택 카드 */
+.user-type-card {
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.user-type-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: #0d6efd;
+}
+
+.user-type-card.active {
+  background: #e7f1ff;
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.1);
+}
+
+.user-type-icon {
+  color: #6c757d;
+  margin-bottom: 1rem;
+}
+
+.user-type-card.active .user-type-icon {
+  color: #0d6efd;
+}
+
+.user-type-title {
+  margin: 0;
+  font-weight: 600;
+  color: #495057;
+}
+
+.user-type-card.active .user-type-title {
+  color: #0d6efd;
+}
+
+/* 폼 스타일 */
+.form-control:focus,
+.form-select:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+.btn-primary {
+  background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.btn-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+}
+
+.progress {
+  border-radius: 10px;
+  background-color: #e9ecef;
+}
+
+.progress-bar {
+  border-radius: 10px;
+  transition: width 0.3s ease;
+}
+
+.list-group-item {
+  border-left: none;
+  border-right: none;
+  transition: all 0.2s ease;
+}
+
+.list-group-item:hover {
+  background-color: #f8f9fa;
+  transform: translateX(5px);
+}
+
+.list-group-item:first-child {
+  border-top: none;
+}
+
+.list-group-item:last-child {
+  border-bottom: none;
+}
+
+/* 모달 스타일 */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 1rem;
+  border: none;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  width: 90%;
+  max-width: 600px;
+  max-height: 80vh;
+  overflow: hidden;
+}
+
+.modal-header {
+  border-bottom: 1px solid #e9ecef;
+  border-radius: 1rem 1rem 0 0;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-body {
+  padding: 1.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.form-check-input:checked {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+}
+
+.form-check-input:focus {
+  border-color: #0d6efd;
+  box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .card-body {
+    padding: 2rem !important;
+  }
+  
+  .col-12 {
+    padding: 0 1rem;
+  }
+  
+  .step-text {
+    font-size: 0.75rem;
+  }
+  
+  .user-type-card {
+    padding: 1rem;
+  }
+}
+</style>
