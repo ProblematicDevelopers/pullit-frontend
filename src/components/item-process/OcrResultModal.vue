@@ -55,6 +55,7 @@
           :is-new-file="isNewFile"
           :selected-file="selectedFile"
           @update:problemInfo="itemInfo = $event"
+          @update:chapters="updateChapters"
           @prev-step="prevStep"
           @next-step="nextStep"
         />
@@ -66,6 +67,10 @@
           :selected-areas="selectedAreas"
           :edited-texts="editedTexts"
           :item-info="itemInfo"
+          :major-chapters="majorChapters"
+          :middle-chapters="middleChapters"
+          :minor-chapters="minorChapters"
+          :topic-chapters="topicChapters"
           @prev-step="prevStep"
           @save-complete="handleSaveComplete"
         />
@@ -271,13 +276,10 @@ export default {
     })
 
     // 단원 정보
-    const majorChapters = ref([
-      { id: 1, name: '대단원 1' },
-      { id: 2, name: '대단원 2' },
-      { id: 3, name: '대단원 3' }
-    ])
+    const majorChapters = ref([])
     const middleChapters = ref([])
     const minorChapters = ref([])
+    const topicChapters = ref([])
 
     // 계산된 속성 제거 (더 이상 problems 배열 사용하지 않음)
 
@@ -457,6 +459,35 @@ export default {
       } catch (error) {
         console.error('❌ [OcrResultModal] prevStep 실행 중 오류:', error)
       }
+    }
+
+    // 챕터 데이터 업데이트 함수
+    const updateChapters = (chaptersData) => {
+      console.log('📚 [OcrResultModal] updateChapters 함수 호출됨!')
+      console.log('📚 [OcrResultModal] 받은 데이터:', chaptersData)
+      if (chaptersData.majorChapters) {
+        majorChapters.value = chaptersData.majorChapters
+        console.log('📚 [OcrResultModal] majorChapters 업데이트됨:', majorChapters.value)
+      }
+      if (chaptersData.middleChapters) {
+        middleChapters.value = chaptersData.middleChapters
+        console.log('📚 [OcrResultModal] middleChapters 업데이트됨:', middleChapters.value)
+      }
+      if (chaptersData.minorChapters) {
+        minorChapters.value = chaptersData.minorChapters
+        console.log('📚 [OcrResultModal] minorChapters 업데이트됨:', minorChapters.value)
+      }
+      if (chaptersData.topicChapters) {
+        topicChapters.value = chaptersData.topicChapters
+        console.log('📚 [OcrResultModal] topicChapters 업데이트됨:', topicChapters.value)
+      }
+
+      console.log('📚 [OcrResultModal] 최종 챕터 상태:', {
+        majorChapters: majorChapters.value,
+        middleChapters: middleChapters.value,
+        minorChapters: minorChapters.value,
+        topicChapters: topicChapters.value
+      })
     }
 
     // 상태 초기화 함수
@@ -1769,6 +1800,8 @@ export default {
       majorChapters,
       middleChapters,
       minorChapters,
+      topicChapters,
+      updateChapters,
       onMajorChapterChange,
       onMiddleChapterChange,
       getChapterPath,

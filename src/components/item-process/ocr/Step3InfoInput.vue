@@ -56,13 +56,15 @@
 
             <div class="form-group">
               <label class="form-label">난이도</label>
-              <select v-model="problemInfo.difficulty" class="form-select">
+              <select v-model="problemInfo.difficulty" class="form-select" @change="updateProblemInfo">
                 <option value="">선택 값</option>
                 <option value="easy">쉬움</option>
                 <option value="medium">보통</option>
                 <option value="hard">어려움</option>
               </select>
             </div>
+
+
 
             <div class="form-group">
               <label class="form-label">지문 여부</label>
@@ -82,6 +84,7 @@
                 type="text"
                 class="form-control"
                 :placeholder="getAnswerPlaceholder()"
+                @input="updateProblemInfo"
               />
             </div>
           </div>
@@ -265,6 +268,7 @@ export default {
   },
   emits: [
     'update:problemInfo',
+    'update:chapters',
     'prev-step',
     'next-step'
   ],
@@ -275,8 +279,8 @@ export default {
       middleChapter: '',
       minorChapter: '',
       topicChapter: '',
-      problemType: '',
-      difficulty: '',
+      problemType: 'multiple_choice', // 기본값 설정
+      difficulty: 'medium', // 기본값 설정
       hasPassage: !!props.selectedAreas.question,
       answer: '',
       explanation: ''
@@ -304,7 +308,7 @@ export default {
       )
     })
 
-    // 대단원 선택 시 중단원 로드
+        // 대단원 선택 시 중단원 로드
     const loadMiddleChapters = (majorChapterId) => {
       const majorChapter = majorChapters.value.find(ch => ch.id === majorChapterId)
       if (majorChapter && majorChapter.children) {
@@ -321,10 +325,21 @@ export default {
         problemInfo.value.middleChapter = majorChapterId
         problemInfo.value.minorChapter = ''
         problemInfo.value.topicChapter = ''
+
+        // 문제 정보 업데이트
+        updateProblemInfo()
+
+        // 부모 컴포넌트에 챕터 데이터 전달
+        emit('update:chapters', {
+          majorChapters: majorChapters.value,
+          middleChapters: middleChapters.value,
+          minorChapters: minorChapters.value,
+          topicChapters: topicChapters.value
+        })
       }
     }
 
-    // 중단원 선택 시 소단원 로드
+        // 중단원 선택 시 소단원 로드
     const loadMinorChapters = (middleChapterId) => {
       const middleChapter = middleChapters.value.find(ch => ch.id === middleChapterId)
       if (middleChapter && middleChapter.children) {
@@ -339,6 +354,17 @@ export default {
         topicChapters.value = []
         problemInfo.value.minorChapter = middleChapterId
         problemInfo.value.topicChapter = ''
+
+        // 문제 정보 업데이트
+        updateProblemInfo()
+
+        // 부모 컴포넌트에 챕터 데이터 전달
+        emit('update:chapters', {
+          majorChapters: majorChapters.value,
+          middleChapters: middleChapters.value,
+          minorChapters: minorChapters.value,
+          topicChapters: topicChapters.value
+        })
       }
     }
 
@@ -352,6 +378,17 @@ export default {
         }))
         console.log('📚 [Step3InfoInput] 토픽 로드 완료:', topicChapters.value.length)
         problemInfo.value.topicChapter = minorChapterId
+
+        // 문제 정보 업데이트
+        updateProblemInfo()
+
+        // 부모 컴포넌트에 챕터 데이터 전달
+        emit('update:chapters', {
+          majorChapters: majorChapters.value,
+          middleChapters: middleChapters.value,
+          minorChapters: minorChapters.value,
+          topicChapters: topicChapters.value
+        })
       }
     }
 
@@ -446,16 +483,17 @@ export default {
             })
 
             // API 응답이 배열 형태로 오므로 직접 사용
-            if (Array.isArray(chapterData)) {
-              // 대단원: 최상위 배열 요소들
-              majorChapters.value = chapterData.map(chapter => ({
-                id: chapter.id,
-                name: chapter.name,
-                children: chapter.children || []
-              }))
+                    if (Array.isArray(chapterData)) {
+          // 대단원: 최상위 배열 요소들
+          majorChapters.value = chapterData.map(chapter => ({
+            id: chapter.id,
+            name: chapter.name,
+            children: chapter.children || []
+          }))
 
-              console.log('📚 [Step3InfoInput] 대단원 설정 완료:', majorChapters.value.length)
-              console.log('📚 [Step3InfoInput] 대단원 내용:', majorChapters.value)
+          console.log('📚 [Step3InfoInput] 대단원 설정 완료:', majorChapters.value.length)
+          console.log('📚 [Step3InfoInput] 대단원 내용:', majorChapters.value)
+          console.log('📚 [Step3InfoInput] 첫 번째 대단원 상세:', majorChapters.value[0])
 
               // 중단원, 소단원, 토픽은 선택된 대단원에 따라 동적으로 설정
               middleChapters.value = []
@@ -470,6 +508,20 @@ export default {
               console.log('🔄 [Step3InfoInput] 하위 챕터 초기화 완료')
               console.log('🔄 [Step3InfoInput] 대단원 개수:', majorChapters.value.length)
               console.log('🔄 [Step3InfoInput] 첫 번째 대단원:', majorChapters.value[0])
+
+              // 부모 컴포넌트에 챕터 데이터 전달
+              console.log('📤 [Step3InfoInput] emit update:chapters 호출:', {
+                majorChapters: majorChapters.value,
+                middleChapters: middleChapters.value,
+                minorChapters: minorChapters.value,
+                topicChapters: topicChapters.value
+              })
+              emit('update:chapters', {
+                majorChapters: majorChapters.value,
+                middleChapters: middleChapters.value,
+                minorChapters: minorChapters.value,
+                topicChapters: topicChapters.value
+              })
             } else {
               console.warn('⚠️ [Step3InfoInput] 챕터 데이터가 배열 형태가 아님:', chapterData)
               majorChapters.value = []
@@ -533,6 +585,14 @@ export default {
           problemInfo.value.topicChapter = ''
 
           console.log('🔄 [Step3InfoInput] 하위 챕터 초기화 완료')
+
+          // 부모 컴포넌트에 챕터 데이터 전달
+          emit('update:chapters', {
+            majorChapters: majorChapters.value,
+            middleChapters: middleChapters.value,
+            minorChapters: minorChapters.value,
+            topicChapters: topicChapters.value
+          })
         } else {
           console.warn('⚠️ [Step3InfoInput] 선택된 대단원에 중단원 데이터가 없음:', {
             majorChapterId: problemInfo.value.majorChapter,
@@ -721,6 +781,10 @@ export default {
         console.warn('⚠️ [Step3InfoInput] 교과서 정보:', props.selectedTextbook)
         console.warn('⚠️ [Step3InfoInput] 파일 정보:', props.selectedFile)
       }
+
+      // 컴포넌트 마운트 시 부모 컴포넌트로 초기 문제 정보 전달
+      console.log('📝 [Step3InfoInput] 마운트 시 초기 문제 정보 전달:', problemInfo.value)
+      updateProblemInfo()
     })
 
         // 교과서 변경 시 챕터 데이터 재로드 (신규 파일)
