@@ -50,7 +50,7 @@
 
           <div class="step-item d-flex align-items-center" :class="{ active: showOcrEditor }">
             <div class="step-number rounded-circle d-flex align-items-center justify-content-center fw-bold">4</div>
-            <span class="step-label ms-2 fw-medium">OCR 편집</span>
+            <span class="step-label ms-2 fw-medium">문제 추출</span>
           </div>
         </div>
       </div>
@@ -61,20 +61,75 @@
       <div class="content-wrapper">
         <!-- 단계별 컴포넌트 렌더링 -->
 
-        <!-- 1단계: 교과서 선택 -->
+        <!-- 0단계: 방식 선택 -->
+        <ProcessingMethodSelection
+          v-if="!processingMethod"
+          @method-selected="selectProcessingMethod"
+        />
+
+        <!-- 1-1단계: 교과서 선택 (새 파일 업로드) -->
         <TextbookSelection
-          v-if="!selectedTextbook"
+          v-else-if="processingMethod === 'new' && !selectedTextbook"
           :loading="loading"
-          :subjects="subjects"
+          :subjects="subjectCategories"
           :grouped-textbooks="groupedTextbooks"
           :selected-subject="selectedSubject"
           @select-subject="selectSubject"
           @select-textbook="selectTextbook"
+          @go-back="goBackToMethodSelection"
         />
 
-        <!-- 2단계: PDF 업로드 -->
+        <!-- 1-2단계: 기존 파일 선택 -->
+        <ExistingFileSelection
+          v-else-if="processingMethod === 'existing' && !selectedFile"
+          :loading="loadingFileHistory"
+          :file-histories="fileHistories"
+          :subjects="subjectOptions"
+          @go-back="goBackToMethodSelection"
+          @method-selected="selectProcessingMethod"
+          @file-selected="selectExistingFile"
+        />
+
+        <!-- 서버 에러 발생 시 대안 제시 -->
+        <div v-else-if="processingMethod === 'existing' && errorHandler.hasError() && errorHandler.isServerError()" class="server-error-fallback bg-light border rounded p-4 text-center">
+          <div class="mb-3">
+            <i class="bi bi-exclamation-triangle-fill text-warning" style="font-size: 2rem;"></i>
+          </div>
+          <h4 class="text-warning mb-3">서버 연결 문제</h4>
+          <p class="text-muted mb-4">
+            기존 파일 목록을 불러올 수 없습니다. 서버에 일시적인 문제가 있을 수 있습니다.
+            <br><small class="text-muted">에러 코드: {{ getErrorStatusCode() }}</small>
+          </p>
+
+          <!-- 에러 상세 정보 (개발 모드에서만 표시) -->
+          <div v-if="isDevelopment" class="alert alert-info text-start mb-3">
+            <small>
+              <strong>에러 상세:</strong><br>
+              {{ errorHandler.getErrorMessage() }}<br>
+              <strong>상태 코드:</strong> {{ getErrorStatusCode() }}<br>
+              <strong>시간:</strong> {{ new Date().toLocaleString('ko-KR') }}
+              <span v-if="retryCount > 0">
+                <br><strong>재시도 횟수:</strong> {{ retryCount }}회
+                <br><strong>마지막 재시도:</strong> {{ lastRetryTime ? lastRetryTime.toLocaleString('ko-KR') : 'N/A' }}
+              </span>
+            </small>
+          </div>
+
+          <div class="d-flex gap-2 justify-content-center">
+            <button @click="retryFileHistoryLoad" class="btn btn-warning" :disabled="loadingFileHistory">
+              <i class="bi bi-arrow-clockwise me-2"></i>
+              {{ loadingFileHistory ? '재시도 중...' : '다시 시도' }}
+            </button>
+            <button @click="switchToNewFileUpload" class="btn btn-primary">
+              <i class="bi bi-upload me-2"></i>
+              새 파일 업로드
+            </button>
+          </div>
+        </div>
+
+        <!-- 2단계: PDF 업로드 (새 파일 업로드 방식만) -->
         <PdfUpload
-          v-else-if="selectedTextbook && !pdfFile"
+          v-else-if="processingMethod === 'new' && selectedTextbook && !pdfFile"
           :selected-textbook="selectedTextbook"
           @file-selected="handlePdfFile"
         />
@@ -99,7 +154,7 @@
 
         <!-- 3단계: PDF 편집 -->
         <PdfEditor
-          v-else-if="!showOcrEditor && !isGeneratingPdf && !loading"
+          v-else-if="!showOcrEditor && !isGeneratingPdf && !loading && (pdfFile || selectedFile)"
           :pdf-pages="pdfPages"
           @page-removed="removePage"
           @page-moved="movePage"
@@ -135,7 +190,7 @@
 
         <!-- 4단계: OCR 편집 -->
         <PdfOcrEditor
-          v-else
+          v-else-if="showOcrEditor && pdfPages && pdfPages.length > 0"
           :pdf-pages="pdfPages"
           :presigned-url="presignedUrl"
           :file-id="fileId"
@@ -156,7 +211,17 @@
           <p class="text-dark mb-2">{{ errorHandler.getErrorMessage() }}</p>
           <p class="error-context text-muted small fst-italic mb-0">{{ errorHandler.getErrorContext() }}</p>
         </div>
-        <div class="error-actions d-flex justify-content-end">
+        <div class="error-actions d-flex justify-content-end gap-2">
+          <!-- 서버 에러인 경우 재시도 버튼 표시 -->
+          <button
+            v-if="errorHandler.isServerError()"
+            @click="retryFileHistoryLoad"
+            class="btn btn-warning"
+            :disabled="loadingFileHistory"
+          >
+            <i class="bi bi-arrow-clockwise me-2"></i>
+            {{ loadingFileHistory ? '재시도 중...' : '재시도' }}
+          </button>
           <button @click="errorHandler.clearError()" class="btn btn-primary">확인</button>
         </div>
       </div>
@@ -168,8 +233,11 @@
 import { onMounted, ref, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useItemProcessingStore } from '@/store/itemProcessingStore.js'
+import { useSubjectStore } from '@/store/subjectStore.js'
 
 // 새로 분리된 컴포넌트들 import
+import ProcessingMethodSelection from '@/components/item-process/ProcessingMethodSelection.vue'
+import ExistingFileSelection from '@/components/item-process/ExistingFileSelection.vue'
 import TextbookSelection from '@/components/item-process/TextbookSelection.vue'
 import PdfUpload from '@/components/item-process/PdfUpload.vue'
 import PdfEditor from '@/components/item-process/PdfEditor.vue'
@@ -181,6 +249,8 @@ import { useItemProcessingError } from '@/composables/item-process/useItemProces
 export default {
   name: 'ItemProcessing',
   components: {
+    ProcessingMethodSelection,
+    ExistingFileSelection,
     TextbookSelection,
     PdfUpload,
     PdfEditor,
@@ -189,7 +259,14 @@ export default {
   setup() {
     // Store 및 Router 초기화
     const itemProcessingStore = useItemProcessingStore()
+    const subjectStore = useSubjectStore()
     const router = useRouter()
+
+    // 처리 방식 관련 상태
+    const processingMethod = ref(null) // 'new' | 'existing'
+    const selectedFile = ref(null) // 기존 파일 선택 시
+    const fileHistories = ref([])
+    const loadingFileHistory = ref(false)
 
     // 기존 방식으로 복원 (문제 해결 후 다시 개선)
     const selectedTextbook = ref(null)
@@ -217,20 +294,64 @@ export default {
     const error = computed(() => itemProcessingStore.error)
     const textbooks = computed(() => itemProcessingStore.textbooks)
     const groupedTextbooks = computed(() => itemProcessingStore.groupedTextbooks)
-    const subjects = computed(() => itemProcessingStore.subjects)
+    const subjects = computed(() => subjectStore.list)
+
+    // 과목 옵션 (기존 파일 선택에서 사용)
+    const subjectOptions = computed(() => {
+      return subjects.value?.map(subject => ({
+        code: subject.areaCode,
+        name: subject.areaName
+      })) || []
+    })
+
+    // itemProcessingStore의 SUBJECTS 객체 사용
+    const subjectCategories = computed(() => {
+      if (!groupedTextbooks.value) return {}
+
+      const categories = {}
+      Object.keys(groupedTextbooks.value).forEach(areaCode => {
+        if (groupedTextbooks.value[areaCode]?.length > 0) {
+          // 과목별 이름과 색상 설정
+          let name = '기타'
+          let color = '#6b7280'
+
+          if (areaCode === 'MA') { name = '수학'; color = '#3b82f6' }
+          else if (areaCode === 'KO') { name = '국어'; color = '#ef4444' }
+          else if (areaCode === 'EN') { name = '영어'; color = '#10b981' }
+          else if (areaCode === 'SO') { name = '사회'; color = '#f59e0b' }
+          else if (areaCode === 'SC') { name = '과학'; color = '#84cc16' }
+          else if (areaCode === 'HS') { name = '역사'; color = '#8b5cf6' }
+          else if (areaCode === 'MO') { name = '도덕'; color = '#06b6d4' }
+
+          categories[areaCode] = { name, color }
+        }
+      })
+
+      return categories
+    })
 
     // 파일 히스토리 에러 관련 computed 속성
     const showFileHistoryError = computed(() => itemProcessingStore.showFileHistoryError)
     const fileHistoryErrorMessage = computed(() => itemProcessingStore.fileHistoryErrorMessage)
 
+    // 재시도 관련 상태
+    const retryCount = ref(0)
+    const lastRetryTime = ref(null)
+
 
     // Composable 초기화
     const errorHandler = useItemProcessingError()
 
+    // 개발 모드 확인
+    const isDevelopment = computed(() => import.meta.env.DEV)
+
     // 컴포넌트 마운트 시 실행
     onMounted(async () => {
       try {
-        await itemProcessingStore.fetchTextbooks()
+        await Promise.all([
+          itemProcessingStore.fetchTextbooks(),
+          subjectStore.fetchSubjects()
+        ])
       } catch (error) {
         errorHandler.handleGeneralError(error, '교과서 목록 로드')
       }
@@ -243,6 +364,164 @@ export default {
         itemProcessingStore.cleanupBlobUrls()
       }
     })
+
+    // ===== 처리 방식 선택 관련 메서드 =====
+
+    /**
+     * 처리 방식 선택
+     * @param {string} method - 'new' 또는 'existing'
+     */
+    const selectProcessingMethod = async (method) => {
+      processingMethod.value = method
+
+      if (method === 'existing') {
+        await loadFileHistories()
+      }
+    }
+
+    /**
+     * 방식 선택으로 돌아가기
+     */
+    const goBackToMethodSelection = () => {
+      processingMethod.value = null
+      selectedTextbook.value = null
+      selectedFile.value = null
+      pdfFile.value = null
+      pdfPages.value = []
+      selectedSubject.value = null
+      itemProcessingStore.selectTextbook(null)
+    }
+
+        /**
+     * 파일 히스토리 목록 로드
+     */
+    const loadFileHistories = async () => {
+      try {
+        loadingFileHistory.value = true
+        const response = await itemProcessingStore.fetchFileHistories()
+        fileHistories.value = response || []
+      } catch (error) {
+        console.error('파일 히스토리 로드 실패:', error)
+
+        // 서버 에러인 경우 더 구체적인 메시지 표시
+        if (error.response && error.response.status === 500) {
+          errorHandler.setError(
+            '서버 내부 오류가 발생했습니다.',
+            '파일 목록을 불러오는 중 서버에서 문제가 발생했습니다. 잠시 후 다시 시도해주세요.',
+            error
+          )
+        } else if (error.response && error.response.status === 401) {
+          errorHandler.setError(
+            '인증이 필요합니다.',
+            '로그인이 필요하거나 세션이 만료되었습니다. 다시 로그인해주세요.',
+            error
+          )
+        } else if (error.response && error.response.status === 403) {
+          errorHandler.setError(
+            '접근 권한이 없습니다.',
+            '이 기능에 접근할 권한이 없습니다.',
+            error
+          )
+        } else if (error.response && error.response.status >= 500) {
+          errorHandler.setError(
+            '서버 오류가 발생했습니다.',
+            '일시적인 서버 문제로 파일 목록을 불러올 수 없습니다. 잠시 후 다시 시도해주세요.',
+            error
+          )
+        } else {
+          errorHandler.handleGeneralError(error, '파일 목록 로드')
+        }
+
+        fileHistories.value = []
+      } finally {
+        loadingFileHistory.value = false
+      }
+    }
+
+    /**
+     * 파일 히스토리 재시도
+     */
+    const retryFileHistoryLoad = async () => {
+      try {
+        retryCount.value++
+        lastRetryTime.value = new Date()
+
+        await loadFileHistories()
+        errorHandler.clearError()
+
+        // 성공 시 재시도 카운트 초기화
+        retryCount.value = 0
+        lastRetryTime.value = null
+      } catch (error) {
+        console.error('파일 히스토리 재시도 실패:', error)
+      }
+    }
+
+    /**
+     * 새 파일 업로드 방식으로 전환
+     */
+    const switchToNewFileUpload = () => {
+      errorHandler.clearError()
+      processingMethod.value = 'new'
+      selectedFile.value = null
+      fileHistories.value = []
+    }
+
+    /**
+     * 에러 상태 코드 가져오기
+     */
+    const getErrorStatusCode = () => {
+      if (errorHandler.currentError.value && errorHandler.currentError.value.response) {
+        return errorHandler.currentError.value.response.status
+      }
+      return 'N/A'
+    }
+
+    /**
+     * 기존 파일 선택
+     * @param {Object} fileHistory - 선택된 파일 히스토리
+     */
+    const selectExistingFile = async (fileHistory) => {
+      try {
+        selectedFile.value = fileHistory
+        selectedSubject.value = fileHistory.areaCode
+
+        // 선택된 파일의 이미지들을 pdfPages로 설정
+        if (fileHistory.pdfImages && fileHistory.pdfImages.length > 0) {
+          pdfPages.value = fileHistory.pdfImages.map((image, index) => {
+            // S3 URL인 경우 프록시 URL로 변경
+            let previewUrl = image.imageUrl
+            if (previewUrl && previewUrl.includes('s3.ap-northeast-2.amazonaws.com')) {
+              const encodedUrl = encodeURIComponent(previewUrl)
+              previewUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/image/proxy?url=${encodedUrl}`
+              console.log('S3 URL을 프록시 URL로 변경:', previewUrl)
+            }
+
+            return {
+              index: index,
+              pageNumber: image.pageNumber || (index + 1),
+              preview: previewUrl,
+              originalPage: (image.pageNumber || (index + 1)) - 1, // 실제 페이지 번호에서 1을 뺀 0-based 인덱스
+              width: image.imageWidth,
+              height: image.imageHeight,
+              fileHistoryId: fileHistory.id,
+              pdfImageId: image.id
+            }
+          })
+        }
+
+        // Store에 파일 히스토리 정보 설정 (이미지 순서 업데이트를 위해 필요)
+        await itemProcessingStore.setUploadedPdfInfo({
+          fileHistoryId: fileHistory.id
+        })
+
+        // 바로 편집 모드로 진행
+        console.log('기존 파일 선택 완료:', fileHistory)
+      } catch (error) {
+        console.error('기존 파일 선택 처리 실패:', error)
+        errorHandler.handleGeneralError(error, '파일 선택 처리')
+      }
+    }
 
     // ===== 교과서 선택 관련 메서드 =====
 
@@ -278,8 +557,8 @@ export default {
       const pages = []
 
       try {
-        // fileData에서 file과 images 추출
-        const { file, images } = fileData
+        // fileData에서 file 추출
+        const { file } = fileData
 
         if (!file) {
           throw new Error('파일 데이터가 누락되었습니다.')
@@ -290,16 +569,12 @@ export default {
 
         // PDF 파일을 서버에 즉시 업로드 (원본 PDF)
         try {
-          console.log('🚀 PDF 파일 선택됨, 원본 PDF 서버 업로드 시작...')
-
           // 로딩 상태 시작
           itemProcessingStore.loading = true
 
-          const uploadResponse = await itemProcessingStore.uploadOriginalPdf()
-          console.log('✅ 원본 PDF 서버 업로드 완료:', uploadResponse)
+          await itemProcessingStore.uploadOriginalPdf()
 
           // 업로드 성공 후 PDF 편집 단계로 진행
-          console.log('📝 PDF 편집 단계로 진행...')
 
         } catch (uploadError) {
           console.error('❌ 원본 PDF 서버 업로드 실패:', uploadError)
@@ -313,8 +588,8 @@ export default {
         // 클라이언트에서 PDF를 이미지로 변환하는 기능은 주석 처리
         // 서버에서 이미지 변환 후 전송받을 예정
         /*
-        // images가 비어있으면 PDF를 이미지로 변환
-        if (!images || images.length === 0) {
+        // PDF를 이미지로 변환
+        if (!pages || pages.length === 0) {
           // 로딩 상태 시작
           isConvertingPdf.value = true
           convertedPdfPages.value = 0
@@ -386,7 +661,7 @@ export default {
             return total
           }, 0)
 
-          console.log(`📊 PDF 변환 완료: ${pages.length}페이지, 총 ${(totalImageSizeKB / 1024).toFixed(2)}MB`)
+
 
           // 로딩 상태 종료
           isConvertingPdf.value = false
@@ -404,11 +679,24 @@ export default {
         */
 
         // 서버에서 이미지 변환 후 전송받을 예정이므로 임시로 빈 배열 설정
-        console.log('📤 PDF 업로드 완료, 서버에서 이미지 변환 후 전송받을 예정')
-        pages.length = 0
 
-        pdfPages.value = pages
-        itemProcessingStore.setPdfPages(pages)
+
+        // PDF 업로드 후 서버에서 이미지 변환을 기다림
+        try {
+          // Store의 processPdfToImages 메서드 호출하여 서버에서 이미지 변환
+          await itemProcessingStore.processPdfToImages()
+
+          // 변환된 이미지들을 pdfPages에 설정
+          pdfPages.value = itemProcessingStore.pdfPages
+
+
+          // 이미지 변환이 완료되면 자동으로 PDF 편집 단계로 진행
+          // (v-else-if 조건으로 자동 처리됨)
+        } catch (error) {
+          console.error('❌ 서버 이미지 변환 실패:', error)
+          errorHandler.handleError('PDF 이미지 변환에 실패했습니다.', '서버 이미지 변환 오류')
+          return
+        }
 
       } catch (error) {
         // 에러 발생 시 생성된 Blob URL들 정리
@@ -434,12 +722,19 @@ export default {
      * 페이지 이동 처리
      * @param {Object} moveInfo - 이동 정보 { fromIndex: number, toIndex: number }
      */
-    const movePage = (moveInfo) => {
+    const movePage = async (moveInfo) => {
+      console.log('🚀 ItemProcessing.movePage 호출됨:', moveInfo)
       const { fromIndex, toIndex } = moveInfo
 
-      // Store에 페이지 이동 알림
+      // Store에 페이지 이동 알림 (async 처리)
       if (itemProcessingStore.movePage) {
-        itemProcessingStore.movePage(fromIndex, toIndex)
+        try {
+          await itemProcessingStore.movePage(fromIndex, toIndex)
+        } catch (error) {
+          console.error('❌ 페이지 이동 실패:', error)
+        }
+      } else {
+        console.error('❌ itemProcessingStore.movePage 메서드가 없습니다')
       }
     }
 
@@ -447,18 +742,26 @@ export default {
      * 단일 페이지 삭제
      * @param {number} pageIndex - 삭제할 페이지 인덱스
      */
-    const removePage = (pageIndex) => {
-      itemProcessingStore.removePage(pageIndex)
+    const removePage = async (pageIndex) => {
+      try {
+        await itemProcessingStore.removePage(pageIndex)
+      } catch (error) {
+        console.error('❌ 페이지 삭제 실패:', error)
+      }
     }
 
     /**
      * 여러 페이지 일괄 삭제
      * @param {Array<number>} pageIndexes - 삭제할 페이지 인덱스 배열
      */
-    const removeMultiplePages = (pageIndexes) => {
-      // Store의 일괄 삭제 메서드만 사용 (로컬 상태는 Store 변경 감지로 자동 업데이트)
+    const removeMultiplePages = async (pageIndexes) => {
+      // Store의 일괄 삭제 메서드 사용 (async 처리)
       if (itemProcessingStore.removeMultiplePages) {
-        itemProcessingStore.removeMultiplePages(pageIndexes)
+        try {
+          await itemProcessingStore.removeMultiplePages(pageIndexes)
+        } catch (error) {
+          console.error('❌ 다중 페이지 삭제 실패:', error)
+        }
       } else {
         // Store에 메서드가 없는 경우에만 로컬 상태 직접 업데이트
         const sortedIndexes = [...pageIndexes].sort((a, b) => b - a)
@@ -620,6 +923,27 @@ export default {
       itemProcessingStore.showFileHistoryError = false
     }
 
+    /**
+     * 이미지 프록시 실패 시 S3 URL로 fallback 처리
+     * @param {Object} fallbackInfo - fallback 정보
+     * @param {number} fallbackInfo.pageIndex - 페이지 인덱스
+     * @param {string} fallbackInfo.originalUrl - 원본 S3 URL
+     */
+    const handleImageFallback = (fallbackInfo) => {
+      const { pageIndex, originalUrl } = fallbackInfo
+      
+      if (pageIndex >= 0 && pageIndex < pdfPages.value.length) {
+        // 해당 페이지의 preview URL을 S3 URL로 변경
+        pdfPages.value[pageIndex].preview = originalUrl
+        pdfPages.value[pageIndex].useProxy = false
+        
+        console.log(`페이지 ${pageIndex + 1} 프록시에서 S3 URL로 fallback 완료:`, originalUrl)
+        
+        // 사용자에게 알림 (선택사항)
+        // toast.success(`페이지 ${pageIndex + 1} 이미지 로딩 방식을 변경했습니다.`)
+      }
+    }
+
 
     return {
       // 상태
@@ -628,6 +952,8 @@ export default {
       textbooks,
       groupedTextbooks,
       subjects,
+      subjectCategories,
+      subjectOptions,
       selectedSubject,
       selectedTextbook,
       pdfFile,
@@ -636,15 +962,19 @@ export default {
       presignedUrl,
       fileId,
       errorHandler,
-      // isConvertingPdf,
-      // convertedPdfPages,
-      // totalPdfPages,
-      // currentPdfPage,
       isGeneratingPdf,
       pdfGenerationProgress,
       currentPdfStage,
       showFileHistoryError,
       fileHistoryErrorMessage,
+
+      // 새로운 상태
+      processingMethod,
+      selectedFile,
+      fileHistories,
+      loadingFileHistory,
+      retryCount,
+      lastRetryTime,
 
       // 메서드
       selectSubject,
@@ -659,14 +989,108 @@ export default {
       goToOcrEditor,
       goBackFromOcr,
       hideFileHistoryError,
+
+      // 새로운 메서드
+      selectProcessingMethod,
+      goBackToMethodSelection,
+      loadFileHistories,
+      selectExistingFile,
+      retryFileHistoryLoad,
+      switchToNewFileUpload,
+      getErrorStatusCode,
+
+      // 개발 모드
+      isDevelopment,
     }
   },
 }
 </script>
 
 <style scoped>
-/* 단계별 진행 표시기 스타일 */
+/* 공통 페이지 헤더 스타일 */
+.page-header {
+  background: white !important;
+  border-bottom: 1px solid #e2e8f0 !important;
+  padding: 3rem 0 !important;
+}
+
+.page-header .page-title {
+  font-size: 1.875rem !important;
+  font-weight: 700 !important;
+  color: #1e293b !important;
+  margin: 0 !important;
+}
+
+.page-header .page-subtitle {
+  font-size: 1rem !important;
+  color: #64748b !important;
+  margin: 0 !important;
+}
+
+/* 공통 메인 컨테이너 스타일 */
+.main-content {
+  padding: 3rem 0;
+}
+
+.content-wrapper {
+  max-width: 100%;
+}
+
+/* 공통 컨테이너 스타일 */
+.page-header .container,
+.page-header > .container {
+  width: 100% !important;
+  max-width: 1300px !important;
+  margin: 0 auto !important;
+  padding: 0 2px !important;
+  box-sizing: border-box !important;
+}
+
+/* 반응형 컨테이너 */
+@media (max-width: 1200px) {
+  .page-header .container,
+  .page-header > .container {
+    width: 100% !important;
+    max-width: 960px !important;
+  }
+}
+
+@media (max-width: 768px) {
+  .page-header .container,
+  .page-header > .container {
+    width: 100% !important;
+    max-width: 720px !important;
+    padding: 0 2px !important;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header .container,
+  .page-header > .container {
+    width: 100% !important;
+    max-width: 540px !important;
+    padding: 0 3px !important;
+  }
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .page-header {
+    padding: 2rem 0;
+  }
+
+  .main-content {
+    padding: 2rem 0;
+  }
+}
+
+/* 기존 ItemProcessing 스타일들 */
+.item-processing-container {
+  background-color: #f8fafc;
+}
+
 .progress-stepper-container {
+  background: white;
   border-bottom: 1px solid #e2e8f0;
 }
 
@@ -676,53 +1100,51 @@ export default {
 
 .step-item {
   position: relative;
-  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
 }
 
-.step-number {
-  width: 40px;
-  height: 40px;
-  background-color: #e2e8f0;
-  color: #64748b;
-  border: 2px solid #e2e8f0;
-  transition: all 0.3s ease;
-}
-
-.step-label {
-  color: #64748b;
-  font-size: 0.9rem;
-  transition: all 0.3s ease;
-}
-
-.step-connector {
-  width: 60px;
-  height: 2px;
-  background-color: #e2e8f0;
-  transition: all 0.3s ease;
-}
-
-/* 활성 상태 */
 .step-item.active .step-number {
   background-color: #3b82f6;
   color: white;
-  border-color: #3b82f6;
 }
 
-.step-item.active .step-label {
-  color: #1e293b;
-  font-weight: 600;
+.step-item:not(.active) .step-number {
+  background-color: #e2e8f0;
+  color: #64748b;
 }
 
-/* 완료 상태 */
 .step-item.completed .step-number {
   background-color: #10b981;
   color: white;
-  border-color: #10b981;
+}
+
+.step-number {
+  width: 2.5rem;
+  height: 2.5rem;
+  font-size: 1rem;
+  border: 2px solid transparent;
+}
+
+.step-label {
+  color: #1e293b;
+  font-size: 0.875rem;
+}
+
+.step-item.active .step-label {
+  color: #3b82f6;
+  font-weight: 600;
 }
 
 .step-item.completed .step-label {
   color: #10b981;
   font-weight: 600;
+}
+
+.step-connector {
+  width: 3rem;
+  height: 2px;
+  background-color: #e2e8f0;
 }
 
 .step-item.completed .step-connector {
@@ -751,7 +1173,7 @@ export default {
 }
 
 /* 부트스트랩으로 대체할 수 없는 일부 커스텀 스타일 */
-/* 페이지 헤더 스타일은 common.css에서 관리 */
+/* 페이지 헤더 스타일은 이제 이 컴포넌트 내부에서 관리 */
 
 /* 로딩 상태 스타일 - TextbookSelection과 일관성 */
 .conversion-loading,
@@ -802,6 +1224,21 @@ export default {
 
 .error-header h3 {
   color: #dc2626;
+}
+
+/* 서버 에러 대안 UI 스타일 */
+.server-error-fallback {
+  max-width: 600px;
+  margin: 2rem auto;
+}
+
+.server-error-fallback .bi-exclamation-triangle-fill {
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 /* 커스텀 그림자 효과 */
