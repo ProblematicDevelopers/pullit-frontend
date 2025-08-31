@@ -341,15 +341,15 @@ export default {
         errors.push('보기 영역을 선택해야 합니다.')
       }
 
-      // 필수 문제 정보 검사
-      if (!props.itemInfo.itemType) {
+      // 필수 문제 정보 검사 (Step3 구조에 맞춤)
+      if (!props.itemInfo.problemType) {
         errors.push('문제 유형을 선택해야 합니다.')
       }
       if (!props.itemInfo.difficulty) {
         errors.push('난이도를 선택해야 합니다.')
       }
-      if (!props.itemInfo.score || props.itemInfo.score < 1) {
-        errors.push('배점을 입력해야 합니다.')
+      if (!props.itemInfo.answer || props.itemInfo.answer.trim() === '') {
+        errors.push('정답을 입력해야 합니다.')
       }
 
       // 편집된 텍스트 검사
@@ -372,17 +372,17 @@ export default {
 
         // 백엔드 ProcessedItem 구조에 맞춘 데이터 준비
         const processedItemData = {
-          // 백엔드 enum에 맞춘 문항 정보
-          type: props.itemInfo.itemType === 'multiple_choice' ? 'multiple' : 
-                props.itemInfo.itemType === 'subjective' ? 'subjective' :
-                props.itemInfo.itemType === 'short_answer' ? 'shortAnswer' :
-                props.itemInfo.itemType === 'essay' ? 'essay' : 'multiple',
+          // 백엔드 enum에 맞춘 문항 정보 (Step3 problemType 사용)
+          type: props.itemInfo.problemType === 'multiple_choice' ? 'multiple' : 
+                props.itemInfo.problemType === 'subjective' ? 'subjective' :
+                props.itemInfo.problemType === 'short_answer' ? 'shortAnswer' :
+                props.itemInfo.problemType === 'essay' ? 'essay' : 'multiple',
           
           difficulty: props.itemInfo.difficulty === 'easy' ? 'easy' :
                      props.itemInfo.difficulty === 'medium' ? 'medium' :
                      props.itemInfo.difficulty === 'hard' ? 'hard' : 'medium',
           
-          score: props.itemInfo.score || 1,
+          score: 1, // 기본 점수
           
           // 백엔드 필드명에 맞춤
           answer: props.editedTexts.problem || '',
@@ -390,9 +390,9 @@ export default {
           explanation: props.editedTexts.explanation || '',
           
           // 단원 정보 (Step3에서 설정된 값 사용)
-          majorChapterId: props.itemInfo.majorChapterId || null,
-          middleChapterId: props.itemInfo.middleChapterId || null,
-          minorChapterId: props.itemInfo.minorChapterId || null,
+          majorChapterId: props.itemInfo.majorChapter || null,
+          middleChapterId: props.itemInfo.middleChapter || null,
+          minorChapterId: props.itemInfo.minorChapter || null,
           
           // 지문 그룹 정보
           passageId: props.itemInfo.passageId || null,

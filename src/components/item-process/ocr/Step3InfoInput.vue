@@ -92,10 +92,10 @@
               <label class="form-label">문제 형태</label>
               <select v-model="problemInfo.problemType" class="form-select">
                 <option value="">선택 값</option>
-                <option value="multiple_choice">5지 선택</option>
-                <option value="short_answer">단답</option>
+                <option value="multiple_choice">객관식 (5지 선택)</option>
+                <option value="short_answer">단답형</option>
                 <option value="subjective">주관식</option>
-                <option value="sequence">유순형</option>
+                <option value="essay">서술형</option>
               </select>
             </div>
 
@@ -175,14 +175,28 @@
       <!-- 네비게이션 -->
       <div class="navigation-panel">
         <button @click="prevStep" class="btn btn-secondary">이전</button>
-        <button @click="nextStep" class="btn btn-primary">다음</button>
+        <button @click="nextStep" class="btn btn-primary" :disabled="!isFormValid">
+          {{ isFormValid ? '다음' : '필수 항목을 입력하세요' }}
+        </button>
+      </div>
+      
+      <!-- 유효성 검사 메시지 -->
+      <div v-if="!isFormValid && showValidationErrors" class="validation-errors">
+        <div class="alert alert-warning">
+          <h6>다음 항목들을 입력해주세요:</h6>
+          <ul class="mb-0">
+            <li v-if="!problemInfo.problemType">문제 형태</li>
+            <li v-if="!problemInfo.difficulty">난이도</li>
+            <li v-if="!problemInfo.answer">정답</li>
+          </ul>
+        </div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import Editor from '@tinymce/tinymce-vue'
 
 export default {
@@ -222,6 +236,16 @@ export default {
     // 해설 에디터 상태
     const showExplanationEditor = ref(false)
     const explanationEditorKey = ref(0)
+    const showValidationErrors = ref(false)
+
+    // 폼 유효성 검사
+    const isFormValid = computed(() => {
+      return !!(
+        problemInfo.value.problemType &&
+        problemInfo.value.difficulty &&
+        problemInfo.value.answer.trim()
+      )
+    })
 
     // 챕터 데이터 (실제로는 API에서 가져와야 함)
     const majorChapters = ref([
@@ -341,6 +365,12 @@ export default {
 
     // 다음 단계로
     const nextStep = () => {
+      if (!isFormValid.value) {
+        showValidationErrors.value = true
+        return
+      }
+      
+      showValidationErrors.value = false
       emit('update:problemInfo', problemInfo.value)
       emit('next-step')
     }
@@ -349,6 +379,8 @@ export default {
       problemInfo,
       showExplanationEditor,
       explanationEditorKey,
+      showValidationErrors,
+      isFormValid,
       majorChapters,
       middleChapters,
       minorChapters,
@@ -557,6 +589,43 @@ export default {
   justify-content: space-between;
   padding-top: 1rem;
   border-top: 1px solid #e9ecef;
+}
+
+.navigation-panel .btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* 유효성 검사 */
+.validation-errors {
+  margin-top: 1rem;
+}
+
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+}
+
+.alert-warning {
+  background-color: #fff3cd;
+  border: 1px solid #ffeaa7;
+  color: #856404;
+}
+
+.alert h6 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.alert ul {
+  margin: 0;
+  padding-left: 1.25rem;
+}
+
+.alert li {
+  margin-bottom: 0.25rem;
 }
 
 /* TinyMCE 스타일링 */
