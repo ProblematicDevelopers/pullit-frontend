@@ -89,13 +89,7 @@
               <div class="col-md-6">
                 <div class="info-item">
                   <label class="info-label">난이도</label>
-                  <div class="info-value">{{ getDifficultyLabel(itemInfo.difficulty) || '미선택' }}</div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="info-item">
-                  <label class="info-label">배점</label>
-                  <div class="info-value">{{ itemInfo.score || '미입력' }}점</div>
+                  <div class="info-value">{{ getDifficultyLabel(itemInfo.difficulty) }}</div>
                 </div>
               </div>
               <div class="col-md-6">
@@ -310,15 +304,15 @@ export default {
       if (props.itemInfo?.chapter) {
         const chapter = props.itemInfo.chapter
         let path = ''
-        
+
         if (chapter.subject) path += chapter.subject
         if (chapter.mainChapter) path += ` > ${chapter.mainChapter}`
         if (chapter.subChapter) path += ` > ${chapter.subChapter}`
         if (chapter.section) path += ` > ${chapter.section}`
-        
+
         return path || '단원 정보 없음'
       }
-      
+
       // 단원 정보가 없는 경우 기본값
       return props.itemInfo?.subject || '과목 정보 없음'
     }
@@ -341,15 +335,15 @@ export default {
         errors.push('보기 영역을 선택해야 합니다.')
       }
 
-      // 필수 문제 정보 검사
-      if (!props.itemInfo.itemType) {
+      // 필수 문제 정보 검사 (Step3 구조에 맞춤)
+      if (!props.itemInfo.problemType) {
         errors.push('문제 유형을 선택해야 합니다.')
       }
       if (!props.itemInfo.difficulty) {
         errors.push('난이도를 선택해야 합니다.')
       }
-      if (!props.itemInfo.score || props.itemInfo.score < 1) {
-        errors.push('배점을 입력해야 합니다.')
+      if (!props.itemInfo.answer || props.itemInfo.answer.trim() === '') {
+        errors.push('정답을 입력해야 합니다.')
       }
 
       // 편집된 텍스트 검사
@@ -372,31 +366,29 @@ export default {
 
         // 백엔드 ProcessedItem 구조에 맞춘 데이터 준비
         const processedItemData = {
-          // 백엔드 enum에 맞춘 문항 정보
-          type: props.itemInfo.itemType === 'multiple_choice' ? 'multiple' : 
-                props.itemInfo.itemType === 'subjective' ? 'subjective' :
-                props.itemInfo.itemType === 'short_answer' ? 'shortAnswer' :
-                props.itemInfo.itemType === 'essay' ? 'essay' : 'multiple',
-          
+          // 백엔드 enum에 맞춘 문항 정보 (Step3 problemType 사용)
+          type: props.itemInfo.problemType === 'multiple_choice' ? 'multiple' :
+                props.itemInfo.problemType === 'subjective' ? 'subjective' :
+                props.itemInfo.problemType === 'short_answer' ? 'shortAnswer' :
+                props.itemInfo.problemType === 'essay' ? 'essay' : 'multiple',
+
           difficulty: props.itemInfo.difficulty === 'easy' ? 'easy' :
                      props.itemInfo.difficulty === 'medium' ? 'medium' :
                      props.itemInfo.difficulty === 'hard' ? 'hard' : 'medium',
-          
-          score: props.itemInfo.score || 1,
-          
+
           // 백엔드 필드명에 맞춤
           answer: props.editedTexts.problem || '',
           solution: props.editedTexts.options || '',
           explanation: props.editedTexts.explanation || '',
-          
+
           // 단원 정보 (Step3에서 설정된 값 사용)
-          majorChapterId: props.itemInfo.majorChapterId || null,
-          middleChapterId: props.itemInfo.middleChapterId || null,
-          minorChapterId: props.itemInfo.minorChapterId || null,
-          
+          majorChapterId: props.itemInfo.majorChapter || null,
+          middleChapterId: props.itemInfo.middleChapter || null,
+          minorChapterId: props.itemInfo.minorChapter || null,
+
           // 지문 그룹 정보
           passageId: props.itemInfo.passageId || null,
-          
+
           // OCR 히스토리는 이미 저장된 상태이므로 빈 배열
           ocrHistories: []
         }

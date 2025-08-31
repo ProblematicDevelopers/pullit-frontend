@@ -40,7 +40,7 @@
           :ocr-results="ocrResults"
           :edited-texts="editedTexts"
           :current-editing-area="currentEditingArea"
-          @update:edited-texts="editedTexts = $event"
+          @update:edited-texts="onEditedTextsUpdate"
           @update:current-editing-area="currentEditingArea = $event"
           @prev-step="prevStep"
           @next-step="nextStep"
@@ -51,8 +51,10 @@
           v-if="currentStep === 3 && hasValidSelectedAreas"
           :selected-areas="selectedAreas"
           :edited-texts="editedTexts"
-          :item-info="itemInfo"
-          @update:item-info="itemInfo = $event"
+          :selected-textbook="selectedTextbook"
+          :is-new-file="isNewFile"
+          :selected-file="selectedFile"
+          @update:problemInfo="itemInfo = $event"
           @prev-step="prevStep"
           @next-step="nextStep"
         />
@@ -144,6 +146,18 @@ export default {
     subjectCode: {
       type: String,
       default: ''
+    },
+    selectedTextbook: {
+      type: Object,
+      default: () => ({})
+    },
+    isNewFile: {
+      type: Boolean,
+      default: true
+    },
+    selectedFile: {
+      type: Object,
+      default: null
     }
   },
   emits: ['close', 'save'],
@@ -195,6 +209,12 @@ export default {
       options: ''
     })
 
+    // editedTexts 업데이트를 렌더 완료 후 반영 (동시성 충돌 방지)
+    const onEditedTextsUpdate = (patch) => {
+      // 렌더 완료 후 반영: 같은 tick에 patch 재진입 방지
+      queueMicrotask(() => Object.assign(editedTexts.value, patch))
+    }
+
     // 현재 선택 중인 영역 타입
     const activeSelectionType = ref('problem')
 
@@ -237,16 +257,16 @@ export default {
       return true // 임시로 true
     })
 
-    // 문제 정보
+    // 문제 정보 (Step3InfoInput 구조에 맞춤)
     const itemInfo = ref({
-      type: 'multiple',
-      difficulty: 'medium',
-      answer: '',
-      score: 1,
       majorChapter: '',
       middleChapter: '',
       minorChapter: '',
-      solution: '',
+      topicChapter: '',
+      problemType: '',
+      difficulty: '',
+      hasPassage: false,
+      answer: '',
       explanation: ''
     })
 
@@ -284,9 +304,12 @@ export default {
             return false
           }
           return availableAreaTypes.value.every(areaType => editedTexts.value?.[areaType]?.trim())
-        case 3: // 정보입력 단계
-          return itemInfo.value.type && itemInfo.value.difficulty && itemInfo.value.answer &&
-                 itemInfo.value.score > 0 && itemInfo.value.majorChapter
+        case 3: // 정보입력 단계 (Step3InfoInput 구조에 맞춤)
+          return !!(
+            itemInfo.value.problemType &&
+            itemInfo.value.difficulty &&
+            itemInfo.value.answer && itemInfo.value.answer.trim()
+          )
         case 4: // 미리보기 단계
           return false // 마지막 단계이므로 다음 단계 없음
         default:
@@ -341,54 +364,107 @@ export default {
       }
     })
 
+    // TinyMCE 에디터 정리 함수
+    const cleanupTinyMCEEditors = async () => {
+      try {
+        if (window.tinymce && window.tinymce.editors) {
+          // 각 에디터를 개별적으로 정리
+          for (let editor of window.tinymce.editors) {
+            if (editor && !editor.destroyed) {
+              try {
+                editor.destroy()
+              } catch (e) {
+                console.warn('개별 에디터 정리 중 오류:', e)
+              }
+            }
+          }
 
+          // 전체 TinyMCE 제거
+          try {
+            window.tinymce.remove()
+          } catch (e) {
+            console.warn('TinyMCE 전체 제거 중 오류:', e)
+          }
+
+          // DOM 정리 대기
+          await new Promise(resolve => setTimeout(resolve, 150))
+        }
+      } catch (error) {
+        console.warn('TinyMCE 정리 중 전체 오류:', error)
+        // 에러가 있어도 계속 진행
+      }
+    }
 
     // 단계 네비게이션
     const nextStep = async () => {
       try {
+        console.log('🚀 [OcrResultModal] nextStep 시작 - 현재 단계:', currentStep.value)
+
         if (currentStep.value === 1) {
           // 1단계에서 2단계로 이동 시 OCR 처리
+          console.log('📝 [OcrResultModal] Step1에서 OCR 처리 시작')
           await processAllSelectedAreas()
         }
 
-        if (currentStep.value < steps.value.length) {
+                if (currentStep.value < steps.value.length) {
+          const previousStep = currentStep.value
           currentStep.value++
+          console.log('✅ [OcrResultModal] 단계 이동:', previousStep, '→', currentStep.value)
 
-          // DOM 업데이트를 기다린 후 추가 작업 수행
-          await nextTick()
+          try {
+            // DOM 업데이트를 기다린 후 추가 작업 수행
+            await nextTick()
 
-          // 2단계 진입 시 첫 번째 사용 가능한 영역으로 설정
-          if (currentStep.value === 2 && availableAreaTypes?.value?.length > 0) {
-            currentEditingArea.value = availableAreaTypes.value[0]
+            // 2단계 진입 시 첫 번째 사용 가능한 영역으로 설정
+            if (currentStep.value === 2 && availableAreaTypes?.value?.length > 0) {
+              currentEditingArea.value = availableAreaTypes.value[0]
+              console.log('📝 [OcrResultModal] Step2 진입 - 편집 영역 설정:', currentEditingArea.value)
+            }
+
+            // 추가 DOM 업데이트 대기
+            await nextTick()
+
+            // DOM 요소가 여전히 유효한지 확인
+            if (!imageCanvas.value || !selectionCanvas.value) {
+              console.warn('Canvas 요소가 유효하지 않음 - nextStep 완료')
+            }
+
+            console.log('✅ [OcrResultModal] nextStep 완료')
+          } catch (stepError) {
+            console.error('❌ [OcrResultModal] 단계 이동 중 오류:', stepError)
+            // 오류가 발생해도 단계는 이동된 상태로 유지
           }
-
-          // 추가 DOM 업데이트 대기
-          await nextTick()
         }
       } catch (error) {
-        console.error('nextStep 실행 중 오류:', error)
-        // 오류 발생 시 현재 단계 유지
-        console.error('오류 상세 정보:', error.stack)
+        console.error('❌ [OcrResultModal] nextStep 실행 중 오류:', error)
+        console.error('❌ [OcrResultModal] 오류 상세 정보:', error.stack)
       }
     }
 
     const prevStep = async () => {
       try {
+        console.log('⬅️ [OcrResultModal] prevStep 시작 - 현재 단계:', currentStep.value)
+
         if (currentStep.value > 1) {
+          const previousStep = currentStep.value
           currentStep.value--
+          console.log('✅ [OcrResultModal] 단계 이동:', previousStep, '→', currentStep.value)
 
           // DOM 업데이트를 기다린 후 추가 작업 수행
           await nextTick()
+          console.log('✅ [OcrResultModal] prevStep 완료')
         }
       } catch (error) {
-        console.error('prevStep 실행 중 오류:', error)
-        // 오류 발생 시 현재 단계 유지
+        console.error('❌ [OcrResultModal] prevStep 실행 중 오류:', error)
       }
     }
 
     // 상태 초기화 함수
     const resetState = async () => {
       try {
+        // TinyMCE 에디터 정리
+        await cleanupTinyMCEEditors()
+
         // 모든 상태를 초기값으로 리셋
         selectedAreas.value = {
           question: null,
@@ -431,8 +507,16 @@ export default {
       closeModal()
     }
 
-    const closeModal = () => {
+    const closeModal = async () => {
+      // 1) 먼저 닫아서 자식 언마운트
       emit('close')
+      // 2) 다음 틱에 TinyMCE 정리
+      await nextTick()
+      try {
+        await cleanupTinyMCEEditors()
+      } catch (error) {
+        console.warn('모달 닫기 중 TinyMCE 정리 오류:', error)
+      }
     }
 
     const zoomIn = () => {
@@ -1193,22 +1277,21 @@ export default {
     // 최종 저장
     const saveItem = () => {
       const itemData = {
-        // 기본 정보
-        type: itemInfo.value.type,
+        // 기본 정보 (Step3InfoInput 구조에 맞춤)
+        itemType: itemInfo.value.problemType,
         difficulty: itemInfo.value.difficulty,
         answer: itemInfo.value.answer,
-        score: itemInfo.value.score,
         majorChapter: itemInfo.value.majorChapter,
         middleChapter: itemInfo.value.middleChapter,
         minorChapter: itemInfo.value.minorChapter,
-        solution: itemInfo.value.solution,
+        topicChapter: itemInfo.value.topicChapter,
         explanation: itemInfo.value.explanation,
 
         // 선택된 영역 데이터
         selectedAreas: selectedAreas.value,
 
         // 편집된 텍스트
-        texts: editedTexts.value,
+        editedTexts: editedTexts.value,
 
         // 지문 그룹 (해당하는 경우)
         passageGroup: selectedPassageGroup.value,
@@ -1281,6 +1364,13 @@ export default {
         }
 
         const canvas = imageCanvas.value
+
+        // DOM 요소가 여전히 유효한지 확인
+        if (!canvas || !canvas.getContext) {
+          console.warn('Canvas 요소가 유효하지 않음 - setupCanvas 중단')
+          return
+        }
+
         const ctx = canvas.getContext('2d')
 
         const img = new Image()
@@ -1288,6 +1378,12 @@ export default {
           // 컨테이너 크기 가져오기
           const container = imageCanvas.value?.parentElement
           if (!container) return
+
+          // DOM 요소가 여전히 유효한지 확인
+          if (!container || !container.getBoundingClientRect) {
+            console.warn('컨테이너 요소가 유효하지 않음 - setupCanvas 중단')
+            return
+          }
 
           const containerRect = container.getBoundingClientRect()
           const maxContainerWidth = containerRect.width - 32 // padding 제외
@@ -1344,77 +1440,87 @@ export default {
       const imageCanvasEl = imageCanvas.value
       const selectionCanvasEl = selectionCanvas.value
 
-      // image-canvas의 실제 화면 크기 가져오기
-      const imageRect = imageCanvasEl.getBoundingClientRect()
-      const containerRect = imageCanvasEl.parentElement.getBoundingClientRect()
-
-      // 컨테이너 기준으로 상대 위치 계산
-      const relativeTop = imageRect.top - containerRect.top
-      const relativeLeft = imageRect.left - containerRect.left
-
-      // selection-canvas를 image-canvas와 정확히 같은 크기와 위치로 설정
-      // 1. 픽셀 크기 설정 (실제 Canvas 크기)
-      selectionCanvasEl.width = imageCanvasEl.width
-      selectionCanvasEl.height = imageCanvasEl.height
-
-      // 2. CSS 스타일 크기 설정 (화면 표시 크기)
-      // 줌 레벨이 100% 이상일 때도 컨테이너 영역을 벗어나지 않도록 제한
-      const maxWidth = Math.min(imageRect.width, containerRect.width - 32) // padding 고려
-      const maxHeight = Math.min(imageRect.height, containerRect.height - 32) // padding 고려
-
-      // image-canvas의 CSS 크기도 제한
-      imageCanvasEl.style.width = `${maxWidth}px`
-      imageCanvasEl.style.height = `${maxHeight}px`
-
-      // selection-canvas 크기 설정
-      selectionCanvasEl.style.width = `${maxWidth}px`
-      selectionCanvasEl.style.height = `${maxHeight}px`
-
-      // 3. 위치 설정 - 컨테이너 중앙에 맞춤
-      selectionCanvasEl.style.position = 'absolute'
-
-      // image-canvas가 컨테이너보다 클 때 중앙 정렬
-      if (imageRect.width > containerRect.width - 32 || imageRect.height > containerRect.height - 32) {
-        // 컨테이너 중앙에 맞춰서 위치 조정
-        const centerTop = (containerRect.height - maxHeight) / 2
-        const centerLeft = (containerRect.width - maxWidth) / 2
-
-        // image-canvas도 중앙 정렬
-        imageCanvasEl.style.position = 'absolute'
-        imageCanvasEl.style.top = `${centerTop}px`
-        imageCanvasEl.style.left = `${centerLeft}px`
-
-        // selection-canvas도 같은 위치에
-        selectionCanvasEl.style.top = `${centerTop}px`
-        selectionCanvasEl.style.left = `${centerLeft}px`
-      } else {
-        // image-canvas와 동일한 위치
-        selectionCanvasEl.style.top = `${relativeTop}px`
-        selectionCanvasEl.style.left = `${relativeLeft}px`
+      // DOM 요소가 여전히 유효한지 확인
+      if (!imageCanvasEl || !selectionCanvasEl || !imageCanvasEl.parentElement) {
+        console.warn('Canvas 요소가 유효하지 않음 - setupCanvasOverlay 중단')
+        return
       }
 
-      console.log('Canvas 오버레이 설정 완료:', {
-        imageCanvas: {
-          pixelWidth: imageCanvasEl.width,
-          pixelHeight: imageCanvasEl.height,
-          displayWidth: maxWidth,
-          displayHeight: maxHeight
-        },
-        selectionCanvas: {
-          pixelWidth: selectionCanvasEl.width,
-          pixelHeight: selectionCanvasEl.height,
-          styleWidth: maxWidth,
-          styleHeight: maxHeight
-        },
-        container: {
-          width: containerRect.width - 32,
-          height: containerRect.height - 32
-        },
-        position: {
-          top: selectionCanvasEl.style.top,
-          left: selectionCanvasEl.style.left
+      try {
+        // image-canvas의 실제 화면 크기 가져오기
+        const imageRect = imageCanvasEl.getBoundingClientRect()
+        const containerRect = imageCanvasEl.parentElement.getBoundingClientRect()
+
+        // 컨테이너 기준으로 상대 위치 계산
+        const relativeTop = imageRect.top - containerRect.top
+        const relativeLeft = imageRect.left - containerRect.left
+
+        // selection-canvas를 image-canvas와 정확히 같은 크기와 위치로 설정
+        // 1. 픽셀 크기 설정 (실제 Canvas 크기)
+        selectionCanvasEl.width = imageCanvasEl.width
+        selectionCanvasEl.height = imageCanvasEl.height
+
+        // 2. CSS 스타일 크기 설정 (화면 표시 크기)
+        // 줌 레벨이 100% 이상일 때도 컨테이너 영역을 벗어나지 않도록 제한
+        const maxWidth = Math.min(imageRect.width, containerRect.width - 32) // padding 고려
+        const maxHeight = Math.min(imageRect.height, containerRect.height - 32) // padding 고려
+
+        // image-canvas의 CSS 크기도 제한
+        imageCanvasEl.style.width = `${maxWidth}px`
+        imageCanvasEl.style.height = `${maxHeight}px`
+
+        // selection-canvas 크기 설정
+        selectionCanvasEl.style.width = `${maxWidth}px`
+        selectionCanvasEl.style.height = `${maxHeight}px`
+
+        // 3. 위치 설정 - 컨테이너 중앙에 맞춤
+        selectionCanvasEl.style.position = 'absolute'
+
+        // image-canvas가 컨테이너보다 클 때 중앙 정렬
+        if (imageRect.width > containerRect.width - 32 || imageRect.height > containerRect.height - 32) {
+          // 컨테이너 중앙에 맞춰서 위치 조정
+          const centerTop = (containerRect.height - maxHeight) / 2
+          const centerLeft = (containerRect.width - maxWidth) / 2
+
+          // image-canvas도 중앙 정렬
+          imageCanvasEl.style.position = 'absolute'
+          imageCanvasEl.style.top = `${centerTop}px`
+          imageCanvasEl.style.left = `${centerLeft}px`
+
+          // selection-canvas도 같은 위치에
+          selectionCanvasEl.style.top = `${centerTop}px`
+          selectionCanvasEl.style.left = `${centerLeft}px`
+        } else {
+          // image-canvas와 동일한 위치
+          selectionCanvasEl.style.top = `${relativeTop}px`
+          selectionCanvasEl.style.left = `${relativeLeft}px`
         }
-      })
+
+        console.log('Canvas 오버레이 설정 완료:', {
+          imageCanvas: {
+            pixelWidth: imageCanvasEl.width,
+            pixelHeight: imageCanvasEl.height,
+            displayWidth: maxWidth,
+            displayHeight: maxHeight
+          },
+          selectionCanvas: {
+            pixelWidth: selectionCanvasEl.width,
+            pixelHeight: selectionCanvasEl.height,
+            styleWidth: maxWidth,
+            styleHeight: maxHeight
+          },
+          container: {
+            width: containerRect.width - 32,
+            height: containerRect.height - 32
+          },
+          position: {
+            top: selectionCanvasEl.style.top,
+            left: selectionCanvasEl.style.left
+          }
+        })
+      } catch (error) {
+        console.warn('Canvas 오버레이 설정 중 오류:', error)
+      }
     }
 
     // 화면 좌표를 픽셀 좌표로 변환
@@ -1426,6 +1532,13 @@ export default {
         }
 
         const canvas = imageCanvas.value
+
+        // DOM 요소가 여전히 유효한지 확인
+        if (!canvas || !canvas.getBoundingClientRect) {
+          console.warn('Canvas 요소가 유효하지 않음 - convertScreenToPixelCoordinates 중단')
+          return screenSelection
+        }
+
         const rect = canvas.getBoundingClientRect()
 
         // 화면 표시 크기와 실제 픽셀 크기의 비율 계산 (줌 레벨 고려)
@@ -1469,6 +1582,12 @@ export default {
         }
 
         const canvas = imageCanvas.value
+
+        // DOM 요소가 여전히 유효한지 확인
+        if (!canvas || !canvas.getContext) {
+          console.warn('Canvas 요소가 유효하지 않음 - captureSelectedArea 중단')
+          return null
+        }
 
         // 선택된 영역의 좌표와 크기
         const { x, y, width, height } = selection
@@ -1517,7 +1636,10 @@ export default {
       if (newImage) {
         nextTick(() => {
           console.log('nextTick 실행 - setupCanvas 호출')
-          setupCanvas()
+          // DOM 요소가 여전히 유효한지 확인
+          if (imageCanvas.value) {
+            setupCanvas()
+          }
         })
       } else {
         console.log('capturedImage가 null이거나 빈 값')
@@ -1528,10 +1650,20 @@ export default {
     watch(zoomLevel, () => {
       if (imageCanvas.value && selectionCanvas.value) {
         nextTick(() => {
-          updateSelectionCanvasPosition()
+          // DOM 요소가 여전히 유효한지 확인
+          if (imageCanvas.value && selectionCanvas.value) {
+            updateSelectionCanvasPosition()
+          }
         })
       }
     })
+
+    // selectedAreas 변경 시 hasPassage 업데이트
+    watch(selectedAreas, (newAreas) => {
+      if (itemInfo.value) {
+        itemInfo.value.hasPassage = !!newAreas?.question
+      }
+    }, { deep: true })
 
     // 줌 레벨 변경 시 selection-canvas 위치만 업데이트
     const updateSelectionCanvasPosition = () => {
@@ -1540,46 +1672,56 @@ export default {
       const imageCanvasEl = imageCanvas.value
       const selectionCanvasEl = selectionCanvas.value
 
-      // image-canvas의 현재 화면 크기 가져오기
-      const imageRect = imageCanvasEl.getBoundingClientRect()
-      const containerRect = imageCanvasEl.parentElement.getBoundingClientRect()
+      // DOM 요소가 여전히 유효한지 확인
+      if (!imageCanvasEl || !selectionCanvasEl || !imageCanvasEl.parentElement) {
+        console.warn('Canvas 요소가 유효하지 않음 - updateSelectionCanvasPosition 중단')
+        return
+      }
 
-      // selection-canvas를 image-canvas와 정확히 같은 크기와 위치로 설정
-      selectionCanvasEl.width = imageCanvasEl.width
-      selectionCanvasEl.height = imageCanvasEl.height
+      try {
+        // image-canvas의 현재 화면 크기 가져오기
+        const imageRect = imageCanvasEl.getBoundingClientRect()
+        const containerRect = imageCanvasEl.parentElement.getBoundingClientRect()
 
-      // image-canvas의 실제 CSS 스타일 값을 직접 사용
-      const computedStyle = window.getComputedStyle(imageCanvasEl)
-      const imageTop = computedStyle.top
-      const imageLeft = computedStyle.left
-      const imagePosition = computedStyle.position
-      const imageWidth = computedStyle.width
-      const imageHeight = computedStyle.height
+        // selection-canvas를 image-canvas와 정확히 같은 크기와 위치로 설정
+        selectionCanvasEl.width = imageCanvasEl.width
+        selectionCanvasEl.height = imageCanvasEl.height
 
-      // selection-canvas를 image-canvas와 정확히 같은 크기와 위치로 설정
-      selectionCanvasEl.style.position = 'absolute'
-      selectionCanvasEl.style.width = imageWidth
-      selectionCanvasEl.style.height = imageHeight
-      selectionCanvasEl.style.top = imageTop
-      selectionCanvasEl.style.left = imageLeft
+        // image-canvas의 실제 CSS 스타일 값을 직접 사용
+        const computedStyle = window.getComputedStyle(imageCanvasEl)
+        const imageTop = computedStyle.top
+        const imageLeft = computedStyle.left
+        const imagePosition = computedStyle.position
+        const imageWidth = computedStyle.width
+        const imageHeight = computedStyle.height
 
-      console.log('Selection Canvas 위치 업데이트 완료:', {
-        zoomLevel: zoomLevel.value,
-        imageCanvas: {
-          computedStyle: { top: imageTop, left: imageLeft, position: imagePosition },
-          displayWidth: imageRect.width,
-          displayHeight: imageRect.height,
-          rect: { top: imageRect.top, left: imageRect.left }
-        },
-        container: {
-          rect: { top: containerRect.top, left: containerRect.left }
-        },
-        selectionCanvas: {
-          styleWidth: imageWidth,
-          styleHeight: imageHeight,
-          style: { top: imageTop, left: imageLeft, position: imagePosition }
-        }
-      })
+        // selection-canvas를 image-canvas와 정확히 같은 크기와 위치로 설정
+        selectionCanvasEl.style.position = 'absolute'
+        selectionCanvasEl.style.width = imageWidth
+        selectionCanvasEl.style.height = imageHeight
+        selectionCanvasEl.style.top = imageTop
+        selectionCanvasEl.style.left = imageLeft
+
+        console.log('Selection Canvas 위치 업데이트 완료:', {
+          zoomLevel: zoomLevel.value,
+          imageCanvas: {
+            computedStyle: { top: imageTop, left: imageLeft, position: imagePosition },
+            displayWidth: imageRect.width,
+            displayHeight: imageRect.height,
+            rect: { top: imageRect.top, left: imageRect.left }
+          },
+          container: {
+            rect: { top: containerRect.top, left: containerRect.left }
+          },
+          selectionCanvas: {
+            styleWidth: imageWidth,
+            styleHeight: imageHeight,
+            style: { top: imageTop, left: imageLeft, position: imagePosition }
+          }
+        })
+      } catch (error) {
+        console.warn('Selection Canvas 위치 업데이트 중 오류:', error)
+      }
     }
 
     return {

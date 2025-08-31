@@ -2,6 +2,8 @@
   <div class="step2-container">
     <!-- 좌측: 유형 선택 창 및 OCR 결과 -->
     <div class="left-section">
+
+
       <!-- 문제 내 유형 선택 -->
       <div class="type-selection-panel">
         <h5 class="panel-title">문제 내 유형 선택</h5>
@@ -35,13 +37,29 @@
       <div class="ocr-result-panel">
         <h6 class="panel-subtitle">OCR 텍스트 변환</h6>
         <div class="ocr-content">
-          <div v-if="editedTexts[currentEditingArea]" class="ocr-text">
+
+          <div v-if="editedTexts[currentEditingArea] && editedTexts[currentEditingArea].trim()" class="ocr-text">
             <!-- LaTeX 렌더링이 적용된 텍스트 표시 -->
-            <div v-html="renderLatexContent(editedTexts[currentEditingArea])"></div>
+            <div v-html="renderedOcrText"></div>
+
+            <!-- 디버깅: 원본 텍스트와 렌더링된 텍스트 비교 -->
+            <div class="debug-latex mt-3 p-2 bg-light border rounded">
+              <small class="text-muted">
+                <strong>LaTeX 디버깅:</strong><br>
+                원본 텍스트: <code>{{ editedTexts[currentEditingArea] }}</code><br>
+                LaTeX 패턴 포함: {{ editedTexts[currentEditingArea].includes('$') ? '예' : '아니오' }}<br>
+                MathJax v3 로드 상태: {{ mathJaxLoaded ? '로드됨' : '로드되지 않음' }}<br>
+                <button @click="forceRerender" class="btn btn-sm btn-outline-warning mt-1">강제 재렌더링</button>
+              </small>
+            </div>
           </div>
           <div v-else class="no-ocr">
             OCR 결과가 없습니다.
+            <br><small class="text-muted">현재 편집 영역: {{ currentEditingArea || '없음' }}</small>
+            <br><small class="text-muted">editedTexts 내용: {{ editedTexts[currentEditingArea] || '빈 문자열' }}</small>
           </div>
+
+
         </div>
         <div class="ocr-actions">
           <button
@@ -67,12 +85,13 @@
 
           <div class="editor-content">
             <Editor
-              :key="`editor-${currentEditingArea}-${editorKey}`"
+              id="tm-editor-main"
               :api-key="tinymceApiKey"
               :model-value="editedTexts[currentEditingArea] || ''"
               @update:model-value="updateEditedText"
               :init="editorConfig"
               class="tinymce-editor"
+              @init="onEditorInit"
             />
           </div>
         </div>
@@ -102,7 +121,7 @@
 
           <div class="tool-content-container">
             <!-- 수식 도구 -->
-            <div v-show="activeToolTab === 'math'" class="tool-content math-tools">
+            <div v-if="activeToolTab === 'math'" class="tool-content math-tools">
               <div class="tool-sections">
                 <div class="tool-section">
                   <h6>수식 검색</h6>
@@ -146,7 +165,7 @@
             </div>
 
             <!-- 도형 도구 -->
-            <div v-show="activeToolTab === 'shapes'" class="tool-content shape-tools">
+            <div v-if="activeToolTab === 'shapes'" class="tool-content shape-tools">
               <div class="tool-sections">
                 <div class="tool-section">
                   <h6>도형타입</h6>
@@ -181,7 +200,7 @@
             </div>
 
             <!-- 템플릿 도구 -->
-            <div v-show="activeToolTab === 'templates'" class="tool-content template-tools">
+            <div v-if="activeToolTab === 'templates'" class="tool-content template-tools">
               <div class="tool-sections">
                 <div class="template-list">
                   <div v-if="templates.length === 0" class="no-templates">
@@ -207,43 +226,75 @@
             {{ showPreview ? '접기' : '펼치기' }}
           </button>
         </h6>
-        <div v-show="showPreview" class="preview-content">
+        <div v-if="showPreview" class="preview-content">
           <!-- 문제 영역 -->
           <div v-if="editedTexts.problem" class="preview-section">
             <h6>문제</h6>
-            <div class="preview-html" v-html="renderLatexContent(editedTexts.problem)"></div>
+            <div class="preview-html" v-html="problemPreview"></div>
           </div>
           <!-- 보기 영역 -->
           <div v-if="editedTexts.options" class="preview-section">
             <h6>보기</h6>
-            <div class="preview-html" v-html="renderLatexContent(editedTexts.options)"></div>
+
+            <!-- 문제 유형 표시 -->
+            <div class="question-type-badge" :class="questionType">
+              {{ questionType === 'multiple-choice' ? '객관식' : '주관식' }}
+            </div>
+
+            <!-- 보기 항목들 (객관식일 때만) -->
+            <div v-if="questionType === 'multiple-choice'" class="options-list">
+              <div v-for="(option, index) in optionsList" :key="index" class="option-item">
+                <!-- 체크박스 -->
+                <input
+                  type="checkbox"
+                  :id="`option-${index}`"
+                  v-model="selectedOptions[index]"
+                  class="option-checkbox"
+                />
+
+                <!-- 라벨 -->
+                <label :for="`option-${index}`" class="option-label">
+                  <span class="option-number">({{ index + 1 }})</span>
+                  <span class="option-text" v-html="option"></span>
+                </label>
+
+                <!-- MathJax 렌더링 영역 -->
+                <div class="option-preview" v-html="option"></div>
+              </div>
+            </div>
+
+            <!-- 주관식일 때 보기 텍스트만 표시 -->
+            <div v-else class="subjective-options">
+              <div class="options-text" v-html="optionsPreview"></div>
+            </div>
+
+            <!-- 선택된 보기 표시 (객관식일 때만) -->
+            <div v-if="questionType === 'multiple-choice'" class="selected-options-summary">
+              선택된 보기: {{ selectedOptions.filter(Boolean).map((_, i) => i + 1).join(', ') }}
+            </div>
           </div>
           <!-- 지문 영역 -->
           <div v-if="editedTexts.question" class="preview-section">
             <h6>지문</h6>
-            <div class="preview-html" v-html="renderLatexContent(editedTexts.question)"></div>
+            <div class="preview-html" v-html="questionPreview"></div>
           </div>
           <!-- 이미지 영역 -->
           <div v-if="editedTexts.image" class="preview-section">
             <h6>이미지</h6>
-            <div class="preview-html" v-html="renderLatexContent(editedTexts.image)"></div>
+            <div class="preview-html" v-html="imagePreview"></div>
           </div>
         </div>
       </div>
 
-      <!-- 네비게이션 -->
-      <div class="navigation-panel">
-        <button @click="prevStep" class="btn btn-secondary">이전</button>
-        <button @click="nextStep" class="btn btn-primary">다음</button>
-      </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, watch, nextTick, onMounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted, markRaw } from 'vue'
 import Editor from '@tinymce/tinymce-vue'
-import { createCommonEditorConfig, getTinyMCEApiKey, insertMathToEditor, insertShapeToEditor } from '@/utils/tinymce-common-config'
+import { createCommonEditorConfig, getTinyMCEApiKey, insertShapeToEditor } from '@/utils/tinymce-common-config'
+import { renderMathJax, waitForMathJax } from '@/utils/mathjax'
 
 
 export default {
@@ -257,7 +308,7 @@ export default {
       required: true
     },
     ocrResults: {
-      type: Object,
+      type: Array,
       required: true
     },
     editedTexts: {
@@ -270,8 +321,8 @@ export default {
     }
   },
   emits: [
-    'update:editedTexts',
-    'update:currentEditingArea',
+    'update:edited-texts',
+    'update:current-editing-area',
     'prev-step',
     'next-step'
   ],
@@ -293,6 +344,64 @@ export default {
     const shapeLatex = ref('')
     const shapePreviewHtml = ref('')
 
+    // 보기 선택 기능
+    const selectedOptions = ref([true, false, false, false, false]) // 첫 번째는 기본 선택
+
+    // 문제 유형 자동 감지
+    const detectQuestionType = (questionText, optionsText) => {
+      if (!optionsText || optionsText.trim() === '') {
+        return 'subjective' // 보기가 없으면 주관식
+      }
+
+      // 객관식 패턴 감지
+      const hasOptions = /\(\d+\)/.test(optionsText)
+      const hasMultipleChoice = /[①②③④⑤⑥⑦⑧⑨⑩]/.test(optionsText) // 원문자 패턴
+
+      if (hasOptions || hasMultipleChoice) {
+        return 'multiple-choice'
+      }
+
+      return 'subjective'
+    }
+
+    // 문제 유형 computed
+    const questionType = computed(() => {
+      return detectQuestionType(props.editedTexts.question, props.editedTexts.options)
+    })
+
+    // 보기 텍스트를 항목별로 분리하는 함수
+    const splitOptions = (optionsText) => {
+      if (!optionsText) return []
+
+      // (1), (2), (3) 패턴으로 자동 분리
+      const parts = optionsText.split(/\(\d+\)/)
+      return parts.filter(part => part.trim()).map(part => part.trim())
+    }
+
+    // 보기 목록 computed
+    const optionsList = computed(() => {
+      const optionsText = props.editedTexts.options
+      return splitOptions(optionsText)
+    })
+
+    // 선택된 보기 텍스트
+    const selectedOptionsText = computed(() => {
+      return optionsList.value
+        .map((option, index) => selectedOptions.value[index] ? option : null)
+        .filter(Boolean)
+        .join('\n')
+    })
+
+    // 보기 선택 상태 초기화
+    const initializeOptionsSelection = () => {
+      const optionsCount = optionsList.value.length
+      if (optionsCount > 0) {
+        // 배열 크기 조정 (필수 제약 없음)
+        selectedOptions.value = new Array(Math.min(optionsCount, 5)).fill(false)
+        // 첫 번째도 선택하지 않음 (자유 선택)
+      }
+    }
+
     // Templates
     const templates = ref([])
 
@@ -310,18 +419,40 @@ export default {
 
     // TinyMCE 설정
     const tinymceApiKey = getTinyMCEApiKey()
-    const editorConfig = createCommonEditorConfig(tinymceApiKey)
-
-    // 편집 영역이 변경될 때 에디터 새로고침 (필요한 경우에만)
-    watch(() => props.currentEditingArea, (newArea, oldArea) => {
-      // 영역이 실제로 변경되었을 때만 에디터 새로고침
-      if (newArea && newArea !== oldArea) {
-        // 에디터 내용이 변경되었을 때만 새로고침
-        if (props.editedTexts[newArea] !== props.editedTexts[oldArea]) {
-          editorKey.value += 1
-        }
+    const editorConfig = createCommonEditorConfig({
+      setup: (editor) => {
+        // 변화 감지
+        editor.on('change input undo redo', () => {
+          if (editor.removed !== true && editor.getContent && typeof editor.getContent === 'function') {
+            try {
+              const content = editor.getContent()
+              emitEdited(props.currentEditingArea, content)
+            } catch (getContentError) {
+              console.warn('⚠️ 에디터 내용 가져오기 실패:', getContentError)
+            }
+          }
+        })
       }
     })
+
+
+
+
+
+
+
+    // editedTexts가 변경될 때 LaTeX 렌더링 강제 업데이트 (post-flush로 동시성 충돌 방지)
+    watch(() => props.editedTexts, async () => {
+      try {
+        // 다음 tick에서 DOM 업데이트를 기다린 후 강제로 렌더링 다시 실행
+        await nextTick()
+
+        // LaTeX 렌더링이 자동으로 업데이트되도록 강제 리렌더링
+        // editorKey 변경은 하지 않음 (불필요한 에디터 재생성 방지)
+      } catch (error) {
+        console.error('editedTexts 변경 감지 중 오류:', error)
+      }
+    }, { deep: true, flush: 'post' })
 
     // 사용 가능한 영역 타입들
     const availableAreaTypes = computed(() => {
@@ -351,55 +482,87 @@ export default {
       return currentArea.imageData || null
     }
 
-    // 편집 영역 선택
+    // 편집 영역 전환 상태 (중복 호출 방지)
+    const switching = ref(false)
+
+    // 편집 영역 선택 (직렬화된 버전 - 중복 호출/렌더 재진입 방지)
     const selectEditingArea = async (areaType) => {
+      if (switching.value || props.currentEditingArea === areaType) {
+        return
+      }
+
+      switching.value = true
       try {
-        // 현재 편집 중인 내용이 있다면 저장
-        if (props.currentEditingArea && props.currentEditingArea !== areaType) {
-          // 에디터 내용을 현재 영역에 저장
-          const newEditedTexts = { ...props.editedTexts }
-          // 현재 에디터 내용을 가져와서 저장 (실제로는 TinyMCE 인스턴스에서 가져와야 함)
-          emit('update:editedTexts', newEditedTexts)
+        console.log('편집 영역 선택 시작:', { from: props.currentEditingArea, to: areaType })
+
+        // 현재 내용 저장 (안전하게)
+        if (editorInstance.value && props.currentEditingArea) {
+          try {
+            if (typeof editorInstance.value.getContent === 'function' && editorInstance.value.removed !== true) {
+              const currentContent = editorInstance.value.getContent()
+              if (currentContent) {
+                const newEditedTexts = { ...props.editedTexts }
+                newEditedTexts[props.currentEditingArea] = currentContent
+                emit('update:edited-texts', newEditedTexts)
+                console.log('현재 에디터 내용 저장됨')
+              }
+            }
+          } catch (e) {
+            console.warn('내용 저장 실패 (무시됨):', e)
+          }
         }
 
-        // DOM 업데이트를 기다린 후 새로운 영역으로 전환
+        // Vue 상태 업데이트
+        emit('update:current-editing-area', areaType)
+
+        // DOM 업데이트를 기다림
         await nextTick()
+        // 레이아웃 반영까지 한 틱 더
+        await new Promise(r => requestAnimationFrame(() => r(null)))
 
-        // 새로운 영역으로 전환
-        emit('update:currentEditingArea', areaType)
+        const html = (props.editedTexts?.[areaType] ?? '')
+        if (editorInstance.value && editorInstance.value.removed !== true) {
+          editorInstance.value.setContent(html)
+          await nextTick()
+          editorInstance.value.focus()
+        }
 
-        // 추가 DOM 업데이트를 기다림
-        await nextTick()
-
-        console.log('편집 영역 변경:', {
-          from: props.currentEditingArea,
-          to: areaType,
-          hasContent: !!props.editedTexts[areaType]
-        })
+        console.log('✅ 편집 영역 변경 완료:', areaType)
       } catch (error) {
         console.error('편집 영역 변경 중 오류:', error)
+      } finally {
+        switching.value = false
       }
     }
 
     // 현재 편집 영역의 내용을 에디터에 새로고침
-    const copyOcrToEditor = () => {
-      // 현재 editedTexts의 내용을 에디터에 다시 설정
-      const currentContent = props.editedTexts[props.currentEditingArea] || ''
+    const copyOcrToEditor = async () => {
+      try {
+        // 현재 editedTexts의 내용을 에디터에 다시 설정
+        const currentContent = props.editedTexts[props.currentEditingArea] || ''
 
-      // 에디터 내용이 변경되었으므로 에디터 새로고침
-      editorKey.value += 1
-
-      console.log('에디터 내용 새로고침:', {
-        area: props.currentEditingArea,
-        content: currentContent.substring(0, 100) + '...'
-      })
+        // 에디터 인스턴스가 있고 유효하다면 내용만 교체
+        if (editorInstance.value && !editorInstance.value.destroyed) {
+          try {
+            editorInstance.value.setContent(currentContent)
+            console.log('에디터 내용 새로고침 완료:', {
+              area: props.currentEditingArea,
+              content: currentContent.substring(0, 100) + '...'
+            })
+          } catch (error) {
+            console.warn('에디터 내용 설정 중 오류:', error)
+          }
+        } else {
+          console.log('에디터 인스턴스가 준비되지 않음, 다음 초기화 시 내용이 설정됩니다.')
+        }
+      } catch (error) {
+        console.error('에디터 내용 새로고침 중 오류:', error)
+      }
     }
 
-    // 편집 내용 업데이트
+    // 편집 내용 업데이트 (emitEdited 사용)
     const updateEditedText = (content) => {
-      const newEditedTexts = { ...props.editedTexts }
-      newEditedTexts[props.currentEditingArea] = content
-      emit('update:editedTexts', newEditedTexts)
+      emitEdited(props.currentEditingArea, content)
 
       console.log('편집 내용 업데이트:', {
         area: props.currentEditingArea,
@@ -408,15 +571,218 @@ export default {
       })
     }
 
-    // 수식 삽입
-    const insertMath = (latex) => {
-      currentMathLatex.value = latex
-      insertMathToEditor(editorConfig, currentMathLatex.value)
+    // TinyMCE 에디터 인스턴스 참조
+    const editorInstance = ref(null)
+
+    // editedTexts 업데이트를 렌더 밖에서 emit (동시성 충돌 방지)
+    const emitEdited = (area, val) => {
+      // 렌더/patch 중간에 올려보내지 않기
+      Promise.resolve().then(() => emit('update:edited-texts', { [area]: val }))
     }
 
-    // 도형 삽입
-    const insertShape = () => {
-      insertShapeToEditor(editorConfig, selectedShapeType.value, shapeColor.value, shapeSize.value, shapeStrokeWidth.value, shapeText.value, shapeLatex.value)
+        // 안전한 에디터 초기화 핸들러
+    const onEditorInit = async (...args) => {
+      try {
+        console.log('TinyMCE 에디터 초기화 시작...')
+        console.log('onEditorInit args:', args)
+
+        // 에디터 인스턴스 안전하게 추출
+        let editor = null
+
+        // 1) 직접 에디터 인스턴스가 첫 인자로 온 경우
+        for (const arg of args) {
+          if (arg && typeof arg.getBody === 'function' && typeof arg.setContent === 'function') {
+            editor = arg
+            break
+          }
+        }
+
+        // 2) 이벤트 객체 형태 (e.target / e.editor)
+        if (!editor) {
+          for (const arg of args) {
+            const candidate = arg?.target || arg?.editor
+            if (candidate && typeof candidate.getBody === 'function' && typeof candidate.setContent === 'function') {
+              editor = candidate
+              break
+            }
+          }
+        }
+
+        if (!editor) {
+          console.error('❌ 에디터 초기화 실패 - 에디터 인스턴스를 찾지 못했습니다')
+          return
+        }
+
+        console.log('✅ 에디터 인스턴스 발견:', editor.id)
+
+        // 이전 인스턴스가 있다면 정리
+        if (editorInstance.value && editorInstance.value !== editor) {
+          try {
+            if (editorInstance.value.removed !== true && typeof editorInstance.value.remove === 'function') {
+              editorInstance.value.remove()
+            }
+          } catch (error) {
+            console.warn('이전 에디터 인스턴스 정리 중 오류:', error)
+          }
+        }
+
+        editorInstance.value = markRaw(editor)
+
+        // 에디터 상태 확인
+        const state = {
+          hasAllMethods: ['getBody', 'setContent', 'remove'].every(m => typeof editor[m] === 'function'),
+          hasBody: typeof editor.getBody === 'function',
+          hasValidId: !!editor.id,
+          isNotDestroyed: editor.removed !== true,
+          editorId: editor.id,
+        }
+        console.log('✅ 에디터 상태:', state)
+
+        // 내용 주입은 nextTick 이후가 안전
+        await nextTick()
+        try {
+          const html = props.editedTexts[props.currentEditingArea] || ''
+          editor.setContent(html)
+          await nextTick()
+          editor.focus()
+          console.log('✅ 에디터 내용 설정 및 포커스 완료')
+        } catch (e) {
+          console.warn('init 시 setContent/focus 중 경고(무시 가능):', e)
+        }
+
+
+
+      } catch (error) {
+        console.error('에디터 초기화 중 오류:', error)
+      }
+    }
+
+    // 테스트용 샘플 LaTeX 텍스트 추가
+    const addSampleLatexText = () => {
+      const sampleText = `이것은 테스트 텍스트입니다.
+
+수식 예시:
+- 인라인 수식: $x^2 + y^2 = z^2$
+- 블록 수식: $$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$
+- 분수: $\\frac{a}{b}$
+- 적분: $$\\int_0^1 x^2 dx$$
+
+더 많은 수식들...`
+
+      const newEditedTexts = { ...props.editedTexts }
+      newEditedTexts[props.currentEditingArea] = sampleText
+      emit('update:edited-texts', newEditedTexts)
+
+      console.log('샘플 LaTeX 텍스트 추가됨:', sampleText)
+    }
+
+    // 강제 재렌더링 함수
+    const forceRerender = async () => {
+      console.log('강제 재렌더링 실행')
+
+      try {
+        // 에디터 인스턴스가 있다면 내용만 새로고침
+        if (editorInstance.value && !editorInstance.value.destroyed) {
+          try {
+            const currentContent = props.editedTexts[props.currentEditingArea] || ''
+            editorInstance.value.setContent(currentContent)
+            console.log('에디터 내용 새로고침 완료')
+          } catch (error) {
+            console.warn('에디터 내용 새로고침 중 오류:', error)
+          }
+        } else {
+          console.log('에디터 인스턴스가 준비되지 않음')
+        }
+
+        console.log('강제 재렌더링 완료')
+      } catch (error) {
+        console.error('강제 재렌더링 중 오류:', error)
+      }
+    }
+
+    // 전체 미리보기 텍스트를 editedTexts에 복사
+    const copyPreviewToEditedTexts = () => {
+      console.log('전체 미리보기 텍스트를 editedTexts에 복사 시작')
+
+      const previewTexts = {
+        problem: `1. 다음 그림의 원 \\( O \\) 에서 \\( \\overline{A B}=\\overline{B C}=\\overline{D E} \\) 일 때, 다음 중에서 옳지 않은 것은?
+
+보기
+(1) \\( \\overline{A B}=\\overline{D E} \\) (2) \\( \\overline{A C}=2 \\overline{D E} \\) (3) \\( \\overline{A C}=2 \\overline{D E} \\) (4) \\( \\angle A O C=2 \\angle D O E \\) (5) (부채꼴 \\( A O C \\) 의 넓이) \\( =2 \\times \\) (부채꼴 \\( D O E \\) 의 넓이)`,
+        question: '지문 영역의 기본 텍스트입니다.',
+        options: '보기 영역의 기본 텍스트입니다.',
+        image: '이미지 영역의 기본 텍스트입니다.'
+      }
+
+      const newEditedTexts = { ...props.editedTexts, ...previewTexts }
+      emit('update:edited-texts', newEditedTexts)
+
+      console.log('전체 미리보기 텍스트 복사 완료:', newEditedTexts)
+    }
+
+    // 수식 삽입 (최대 안정성)
+    const insertMath = async (latex) => {
+      currentMathLatex.value = latex
+      console.log('수식 삽입 시도:', latex)
+
+      let retries = 40
+      while (retries > 0) {
+        if (editorInstance.value &&
+            typeof editorInstance.value.insertContent === 'function' &&
+            !editorInstance.value.destroyed) {
+
+          try {
+            const html = `<span class="math-latex" data-latex="${latex}">$${latex}$</span>`
+            editorInstance.value.insertContent(html)
+            console.log('수식 삽입 성공:', latex)
+            return
+          } catch (insertError) {
+            console.warn('수식 삽입 시도 실패:', insertError)
+          }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 100))
+        retries--
+      }
+
+      console.error('수식 삽입 최종 실패:', latex)
+      alert('수식 삽입에 실패했습니다. 에디터를 새로고침해주세요.')
+    }
+
+    // 도형 삽입 (안전한 버전)
+    const insertShape = async () => {
+      try {
+        // 에디터 인스턴스 검증
+        if (!editorInstance.value) {
+          console.warn('에디터 인스턴스가 아직 초기화되지 않았습니다.')
+          return
+        }
+
+        // 에디터가 준비되었는지 확인
+        if (!editorInstance.value.insertContent || typeof editorInstance.value.insertContent !== 'function') {
+          console.warn('에디터 insertContent 메서드가 사용할 수 없습니다.')
+          return
+        }
+
+        // 에디터에 포커스
+        editorInstance.value.focus()
+
+        // 도형 삽입
+        insertShapeToEditor(editorInstance.value, {
+          type: selectedShapeType.value,
+          color: shapeColor.value,
+          size: shapeSize.value,
+          strokeWidth: shapeStrokeWidth.value,
+          text: shapeText.value,
+          latex: shapeLatex.value
+        })
+
+        console.log('도형 삽입 성공')
+      } catch (error) {
+        console.error('도형 삽입 중 오류:', error)
+        // 에디터 재초기화 시도
+        await forceRerender()
+      }
     }
 
     // 도형 내보내기
@@ -446,18 +812,6 @@ export default {
       emit('next-step')
     }
 
-    // Math preview computed
-    const mathPreviewHtml = computed(() => {
-      if (!currentMathLatex.value.trim()) return ''
-      try {
-        return window.katex ?
-          window.katex.renderToString(currentMathLatex.value, { throwOnError: false, displayMode: false }) :
-          `$${currentMathLatex.value}$`
-      } catch {
-        return `<span class="text-danger">LaTeX 오류</span>`
-      }
-    })
-
     // 수식 검색 결과 (안전장치 추가)
     const filteredMathTemplates = computed(() => {
       if (!mathSearch.value?.trim() || !mathTemplates.value) return []
@@ -470,82 +824,374 @@ export default {
       )
     })
 
+        // MathJax 로드 확인 및 로드 함수 (기존 시스템 사용)
+    const ensureMathJaxLoaded = async () => {
+      await waitForMathJax()
 
-
-    // LaTeX 수식을 KaTeX로 렌더링하는 함수
-    const renderLatexContent = (content) => {
-      if (!content || typeof content !== 'string') return ''
-
-      try {
-        // KaTeX가 로드되었는지 확인
-        if (window.katex) {
-          // LaTeX 수식을 찾아서 렌더링 ($$...$$ 또는 $...$ 형태)
-          return content.replace(/\$\$([^$]+)\$\$/g, (match, latex) => {
-            try {
-              return window.katex.renderToString(latex, {
-                throwOnError: false,
-                displayMode: true
-              })
-            } catch {
-              return match
-            }
-          }).replace(/\$([^$]+)\$/g, (match, latex) => {
-            try {
-              return window.katex.renderToString(latex, {
-                throwOnError: false,
-                displayMode: false
-              })
-            } catch {
-              return match
-            }
-          })
-        } else {
-          // KaTeX가 로드되지 않은 경우 LaTeX 코드를 그대로 표시
-          return content
+      // MathJax 설정 강제 적용 (LaTeX 패턴 인식)
+      if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+        // MathJax 설정 강제 적용
+        window.MathJax.config = {
+          tex: {
+            inlineMath: [['$', '$'], ['\\(', '\\)']],
+            displayMath: [['$$', '$$'], ['\\[', '\\]']],
+            processEscapes: true,
+            processEnvironments: true,
+            packages: ['base', 'ams', 'noerrors', 'noundefined']
+          },
+          options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+            ignoreHtmlClass: 'tex2jax_ignore',
+            processHtmlClass: 'tex2jax_process'
+          }
         }
-      } catch (error) {
-        console.warn('LaTeX 렌더링 오류:', error)
-        return content
+
+        // MathJax 문서 재설정
+        if (window.MathJax.startup.document) {
+          window.MathJax.startup.document.clear()
+          window.MathJax.startup.document.updateDocument()
+        }
+
+        console.log('MathJax LaTeX 설정 강제 적용 및 문서 재설정 완료')
       }
     }
 
-    // KaTeX 로드 확인 및 로드 함수
-    const ensureKatexLoaded = () => {
-      if (window.katex) return Promise.resolve()
 
-      return new Promise((resolve, reject) => {
-        // KaTeX CSS 로드
-        if (!document.querySelector('link[href*="katex"]')) {
-          const link = document.createElement('link')
-          link.rel = 'stylesheet'
-          link.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css'
-          link.onload = () => {
-            // KaTeX JS 로드
-            if (!window.katex) {
-              const script = document.createElement('script')
-              script.src = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js'
-              script.onload = resolve
-              script.onerror = reject
-              document.head.appendChild(script)
-            } else {
-              resolve()
-            }
-          }
-          link.onerror = reject
-          document.head.appendChild(link)
-        } else {
-          resolve()
-        }
+
+    // MathJax 로드 상태 추적 (기존 시스템 사용)
+    const mathJaxLoaded = computed(() => {
+      return !!(window.MathJax && window.MathJax.startup && window.MathJax.startup.document)
+    })
+
+    // LaTeX 수식을 MathJax로 렌더링하는 함수 (기존 시스템 사용)
+    const renderLatexContent = async (content) => {
+      console.log('renderLatexContent 호출됨:', {
+        content,
+        type: typeof content,
+        length: content ? content.length : 0,
+        hasLatex: content ? (content.includes('$') || content.includes('\\')) : false
       })
+
+      if (!content || typeof content !== 'string') {
+        console.log('content가 유효하지 않음:', content)
+        return ''
+      }
+
+      try {
+        // MathJax가 로드되었는지 확인
+        console.log('MathJax 상태 확인:', {
+          mathJaxExists: !!window.MathJax,
+          startupExists: !!(window.MathJax && window.MathJax.startup)
+        })
+
+        if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+          console.log('MathJax 사용하여 렌더링 시작')
+
+          // 임시 div에 수식 렌더링
+          const tempDiv = document.createElement('div')
+          tempDiv.innerHTML = content
+          tempDiv.style.position = 'absolute'
+          tempDiv.style.left = '-9999px'
+          tempDiv.style.visibility = 'hidden'
+          document.body.appendChild(tempDiv)
+
+          try {
+            // MathJax로 렌더링
+            await renderMathJax(tempDiv, { clearFirst: false })
+            console.log('MathJax 렌더링 성공')
+
+            // 렌더링된 HTML 가져오기
+            const result = tempDiv.innerHTML
+
+            // 임시 div 제거
+            document.body.removeChild(tempDiv)
+
+            console.log('최종 렌더링 결과:', result)
+            return result
+
+          } catch (renderError) {
+            console.warn('MathJax 렌더링 실패:', renderError)
+            document.body.removeChild(tempDiv)
+
+            // 렌더링 실패 시 LaTeX 코드를 스타일링하여 표시
+            return styleLatexCode(content)
+          }
+        } else {
+          console.log('MathJax가 로드되지 않음, LaTeX 코드 스타일링 적용')
+          return styleLatexCode(content)
+        }
+      } catch (error) {
+        console.warn('LaTeX 렌더링 함수 오류:', error)
+        return styleLatexCode(content)
+      }
     }
 
-    // 컴포넌트 마운트 시 초기화 및 KaTeX 로드
+    // LaTeX 코드를 스타일링하는 함수 (MathJax가 로드되지 않은 경우)
+    const styleLatexCode = (content) => {
+      let result = content
+
+      // $$...$$ 패턴 (display mode)
+      result = result.replace(/\$\$([^$]+?)\$\$/g, '<div class="latex-code-display">$$$1$$</div>')
+
+      // $...$ 패턴 (inline mode)
+      result = result.replace(/\$([^$\n]+?)\$/g, '<span class="latex-code-inline">$$1$</span>')
+
+      // \(...\) 패턴 (inline mode) - 원본 LaTeX 유지
+      result = result.replace(/\\\(([^)]+?)\\\)/g, '<span class="latex-code-inline">\\($1\\)</span>')
+
+      // \[...\] 패턴 (display mode) - 원본 LaTeX 유지
+      result = result.replace(/\\\[([^\]]+?)\\\]/g, '<div class="latex-code-display">\\[$1\\]</div>')
+
+      // \displaystyle{...} 패턴
+      result = result.replace(/\\displaystyle\s*\{([^}]+?)\}/g, '<div class="latex-code-display">displaystyle: $1</div>')
+
+      // \text{...} 패턴
+      result = result.replace(/\\text\{([^}]+?)\}/g, '<span class="latex-text">$1</span>')
+
+      return result
+    }
+
+
+
+    // MathJax로 수식 재렌더링 (기존 시스템 사용)
+    const reRenderMathJax = async () => {
+      try {
+        // MathJax 로드 대기
+        await waitForMathJax()
+
+        console.log('MathJax 재렌더링 시작')
+
+        // OCR 텍스트 영역 찾기
+        const ocrTextElement = document.querySelector('.ocr-text > div') ||
+                               document.querySelector('.ocr-text')
+        if (ocrTextElement) {
+          console.log('OCR 텍스트 영역 렌더링:', ocrTextElement)
+          await renderMathJax(ocrTextElement, { clearFirst: false })
+        }
+
+        // 미리보기 영역들 찾기 (더 정확한 선택자)
+        const previewElements = document.querySelectorAll('.preview-html')
+        console.log(`미리보기 영역 ${previewElements.length}개 발견`)
+
+        for (const element of previewElements) {
+          if (element.innerHTML && (element.innerHTML.includes('$') || element.innerHTML.includes('\\'))) {
+            console.log('미리보기 영역 렌더링:', element.innerHTML.substring(0, 100))
+
+            // 원본 LaTeX 텍스트가 이미 있으므로 별도 복원 불필요
+            console.log('원본 LaTeX 텍스트로 렌더링 진행')
+
+                    // MathJax 설정 재확인
+        if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+          console.log('MathJax 상태 확인:', {
+            config: window.MathJax.config,
+            tex: window.MathJax.config?.tex,
+            inlineMath: window.MathJax.config?.tex?.inlineMath
+          })
+
+          // MathJax 문서 업데이트
+          window.MathJax.startup.document.updateDocument()
+
+          // 강제 렌더링 시도
+          try {
+            await window.MathJax.typesetPromise([element])
+            console.log('MathJax 강제 렌더링 성공:', element)
+          } catch (error) {
+            console.warn('MathJax 강제 렌더링 실패, 기본 렌더링 시도:', error)
+            await renderMathJax(element, { clearFirst: false })
+          }
+        } else {
+          await renderMathJax(element, { clearFirst: false })
+        }
+          }
+        }
+
+        console.log('MathJax 재렌더링 완료')
+      } catch (error) {
+        console.error('MathJax 재렌더링 중 오류:', error)
+      }
+    }
+
+    // OCR 텍스트 렌더링 (computed로 반응형 처리)
+    const renderedOcrText = computed(() => {
+      const currentText = props.editedTexts[props.currentEditingArea]
+      console.log('renderedOcrText computed 실행:', {
+        currentText,
+        area: props.currentEditingArea,
+        editedTextsKeys: Object.keys(props.editedTexts),
+        currentTextType: typeof currentText,
+        currentTextLength: currentText ? currentText.length : 0,
+        currentTextTrimmed: currentText ? currentText.trim() : '',
+        isEmpty: !currentText || currentText.trim() === ''
+      })
+
+      if (!currentText || currentText.trim() === '') {
+        console.log('renderedOcrText: 텍스트가 비어있음')
+        return ''
+      }
+
+      console.log('renderedOcrText: 텍스트 렌더링 시작')
+
+      // 동기적으로 처리하고 Promise가 아닌 문자열 반환 보장
+      try {
+        const styledResult = styleLatexCode(currentText)
+        // Promise인지 확인
+        if (styledResult instanceof Promise) {
+          console.warn('styleLatexCode가 Promise를 반환함')
+          return currentText // Promise인 경우 원본 텍스트 반환
+        }
+        return styledResult
+      } catch (error) {
+        console.error('styleLatexCode 오류:', error)
+        return currentText // 오류 시 원본 텍스트 반환
+      }
+    })
+
+    // 각 영역별 미리보기 computed (원본 LaTeX 텍스트 반환)
+    const problemPreview = computed(() => {
+      const text = props.editedTexts.problem
+      if (!text) return ''
+      console.log('problemPreview computed 실행:', { text: text.substring(0, 100) })
+      return text // 원본 LaTeX 텍스트 반환
+    })
+
+    const optionsPreview = computed(() => {
+      const text = props.editedTexts.options
+      if (!text) return ''
+      return text // 원본 LaTeX 텍스트 반환
+    })
+
+    const questionPreview = computed(() => {
+      const text = props.editedTexts.question
+      if (!text) return ''
+      return text // 원본 LaTeX 텍스트 반환
+    })
+
+    const imagePreview = computed(() => {
+      const text = props.editedTexts.image
+      if (!text) return ''
+      return text // 원본 LaTeX 텍스트 반환
+    })
+
+        // MathJax 렌더링을 위한 watch 추가 (더 포괄적으로)
+    watch(() => props.editedTexts, async (newTexts) => {
+      // LaTeX 패턴이 포함된 텍스트가 있는지 확인
+      const hasLatex = Object.values(newTexts).some(text =>
+        text && (text.includes('$') || text.includes('\\'))
+      )
+
+      if (hasLatex) {
+        await nextTick()
+        await reRenderMathJax()
+      }
+    }, { deep: true })
+
+    // 보기 텍스트 변경 시 선택 상태 초기화
+    watch(() => props.editedTexts.options, (newOptions) => {
+      if (newOptions) {
+        initializeOptionsSelection()
+      }
+    })
+
+        // Math preview computed (기존 MathJax 시스템 사용)
+    const mathPreviewHtml = computed(() => {
+      if (!currentMathLatex.value.trim()) return ''
+
+      try {
+        if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+          // MathJax가 로드된 경우 LaTeX 코드 반환 (렌더링은 별도로 처리)
+          return `$${currentMathLatex.value}$`
+        } else {
+          return `$${currentMathLatex.value}$`
+        }
+      } catch {
+        return `<span class="text-danger">LaTeX 오류</span>`
+      }
+    })
+
+    // 컴포넌트 마운트 시 초기화 및 MathJax 로드 (기존 시스템 사용)
     onMounted(async () => {
       try {
-        await ensureKatexLoaded()
-        console.log('Step2TextEditing 초기화 완료 - KaTeX 로드 완료')
+        await ensureMathJaxLoaded()
+        console.log('Step2TextEditing 초기화 완료 - MathJax 로드 완료')
+
+        // 디버깅: 현재 상태 확인
+        console.log('마운트 시 상태:', {
+          currentEditingArea: props.currentEditingArea,
+          editedTexts: props.editedTexts,
+          selectedAreas: props.selectedAreas
+        })
+
+        // editedTexts가 비어있다면 기본값 설정
+        if (!props.editedTexts || Object.keys(props.editedTexts).length === 0) {
+          console.log('editedTexts가 비어있음, 기본값 설정 시도')
+          const defaultTexts = {}
+
+          // 선택된 영역들에 기본 텍스트 설정
+          if (props.selectedAreas) {
+            Object.keys(props.selectedAreas).forEach(areaType => {
+              if (props.selectedAreas[areaType]) {
+                defaultTexts[areaType] = `이것은 ${areaType} 영역의 기본 텍스트입니다.
+
+LaTeX 수식 예시:
+- 인라인 수식: $x^2 + y^2 = z^2$
+- 블록 수식: $$\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}$$
+- 분수: $\\frac{a}{b}$
+- 적분: $$\\int_0^1 x^2 dx$$
+- displaystyle: $\\displaystyle{\\frac{1}{2} + \\frac{1}{3}}$
+- text 환경: $\\text{이것은 텍스트입니다}$
+
+더 많은 수식들...`
+              }
+            })
+          }
+
+          if (Object.keys(defaultTexts).length > 0) {
+            emit('update:edited-texts', defaultTexts)
+            console.log('기본 텍스트 설정됨:', defaultTexts)
+          }
+        }
+
+        // 초기 MathJax 렌더링 실행
+        await nextTick()
+        // DOM이 완전히 준비될 때까지 잠시 대기
+        await new Promise(resolve => setTimeout(resolve, 100))
+        await reRenderMathJax()
+
+        // 보기 선택 상태 초기화
+        initializeOptionsSelection()
+
       } catch (error) {
         console.warn('Step2TextEditing 초기화 실패:', error)
+      }
+    })
+
+    // 컴포넌트 정리
+    onUnmounted(async () => {
+      try {
+        console.log('Step2TextEditing 컴포넌트 정리 시작')
+
+        // 타임아웃 정리 (areaChangeTimeout 제거됨)
+
+        // 에디터 정리 (더 안전하게)
+        if (editorInstance.value) {
+          try {
+            if (editorInstance.value.removed !== true && typeof editorInstance.value.remove === 'function') {
+              editorInstance.value.remove()
+            }
+          } catch (editorError) {
+            console.warn('에디터 정리 중 오류 (무시됨):', editorError)
+          } finally {
+            // 에디터 정리 실패 시에도 인스턴스는 null로 설정
+            editorInstance.value = null
+          }
+        }
+
+        console.log('Step2TextEditing 컴포넌트 정리 완료')
+      } catch (error) {
+        console.error('컴포넌트 정리 중 오류:', error)
+        // 최종 정리
+        editorInstance.value = null
+
       }
     })
 
@@ -570,7 +1216,7 @@ export default {
       mathTemplates,
       filteredMathTemplates,
       renderLatexContent,
-      ensureKatexLoaded,
+            ensureMathJaxLoaded,
       getAreaTypeLabel,
       getCurrentAreaImage,
       selectEditingArea,
@@ -582,7 +1228,25 @@ export default {
       loadTemplate,
       togglePreview,
       prevStep,
-      nextStep
+      nextStep,
+      editorInstance,
+      onEditorInit,
+      renderedOcrText,
+      addSampleLatexText,
+      forceRerender,
+      copyPreviewToEditedTexts,
+      mathJaxLoaded,
+      reRenderMathJax,
+      styleLatexCode,
+      problemPreview,
+      optionsPreview,
+      questionPreview,
+      imagePreview,
+      optionsList,
+      selectedOptions,
+      selectedOptionsText,
+      initializeOptionsSelection,
+      questionType
     }
   }
 }
@@ -901,12 +1565,7 @@ export default {
   line-height: 1.4;
 }
 
-.navigation-panel {
-  display: flex;
-  justify-content: space-between;
-  padding-top: 1rem;
-  border-top: 1px solid #e9ecef;
-}
+
 
 .template-list {
   display: flex;
@@ -971,26 +1630,166 @@ export default {
   font-size: 0.75rem;
 }
 
-/* LaTeX 렌더링 스타일링 */
-.ocr-text .katex,
-.preview-html .katex {
+/* 문제 유형 배지 */
+.question-type-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+.question-type-badge.multiple-choice {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.question-type-badge.subjective {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+/* 보기 선택 UI 스타일링 */
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.option-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  background: #f8f9fa;
+  transition: all 0.2s ease;
+}
+
+.option-item:hover {
+  background: #e9ecef;
+  border-color: #007bff;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1);
+}
+
+.option-checkbox {
+  margin-top: 0.25rem;
+  transform: scale(1.2);
+}
+
+.option-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  cursor: pointer;
+}
+
+.option-number {
+  font-weight: bold;
+  color: #007bff;
+  font-size: 1.1em;
+}
+
+.option-text {
+  line-height: 1.5;
+  color: #495057;
+}
+
+.option-preview {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 0.25rem;
+  border: 1px solid #dee2e6;
+  font-size: 0.9em;
+}
+
+.selected-options-summary {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 0.25rem;
+  color: #155724;
+  font-weight: 500;
+}
+
+/* 주관식 보기 스타일 */
+.subjective-options {
+  padding: 1rem;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+}
+
+.options-text {
+  line-height: 1.6;
+  color: #495057;
+}
+
+/* MathJax 렌더링 스타일링 (기존 시스템 사용) */
+.ocr-text mjx-container,
+.preview-html mjx-container,
+.option-preview mjx-container {
   font-size: 1em;
   line-height: 1.2;
 }
 
-.ocr-text .katex-display,
-.preview-html .katex-display {
+.ocr-text mjx-container[display="true"],
+.preview-html mjx-container[display="true"] {
   margin: 0.5em 0;
   text-align: center;
 }
 
-.ocr-text .katex-error,
-.preview-html .katex-error {
+.ocr-text .mathjax-error,
+.preview-html .mathjax-error {
   color: #dc3545;
   background: #f8d7da;
   padding: 0.25em 0.5em;
   border-radius: 0.25em;
   font-family: monospace;
+}
+
+/* LaTeX 코드 스타일링 (KaTeX가 로드되지 않은 경우) */
+.latex-code-display {
+  display: block;
+  font-family: 'Courier New', monospace;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  padding: 0.5em;
+  margin: 0.5em 0;
+  font-size: 0.9em;
+  color: #495057;
+}
+
+.latex-code-inline {
+  font-family: 'Courier New', monospace;
+  background-color: #f8f9fa;
+  border: 1px solid #dee2e6;
+  border-radius: 3px;
+  padding: 0.2em 0.4em;
+  font-size: 0.9em;
+  color: #495057;
+}
+
+/* LaTeX 오류 스타일링 */
+.latex-error {
+  color: #dc3545;
+  background-color: #f8d7da;
+  border: 1px solid #f5c6cb;
+  border-radius: 3px;
+  padding: 0.2em 0.4em;
+  font-size: 0.9em;
+  cursor: help;
 }
 
 /* TinyMCE 스타일링 */
@@ -1036,9 +1835,6 @@ export default {
     flex-direction: column;
   }
 
-  .navigation-panel {
-    flex-direction: column;
-    gap: 0.5rem;
-  }
+
 }
 </style>
