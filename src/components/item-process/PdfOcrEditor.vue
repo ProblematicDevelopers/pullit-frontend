@@ -210,9 +210,9 @@
       :captured-image-info="capturedImageInfo"
       :ocr-results="ocrResults"
       :subject-code="subjectCode"
-      :selected-textbook="{ subjectId: subjectCode, name: `과목 ${subjectCode}` }"
-      :is-new-file="true"
-      :selected-file="null"
+      :selected-textbook="selectedTextbook"
+      :is-new-file="isNewFile"
+      :selected-file="selectedFile"
       @close="closeOcrModal"
       @save="saveOcrResults"
     />
@@ -251,6 +251,21 @@ export default {
     subjectCode: {
       type: String,
       required: true
+    },
+    selectedTextbook: {
+      type: Object,
+      required: false,
+      default: null
+    },
+    isNewFile: {
+      type: Boolean,
+      required: false,
+      default: false
+    },
+    selectedFile: {
+      type: Object,
+      required: false,
+      default: null
     }
   },
   emits: ['go-back'],
