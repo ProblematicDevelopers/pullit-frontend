@@ -113,7 +113,7 @@
             <div v-else>
               <div class="form-group">
                 <label class="form-label">대단원 챕터</label>
-                <select v-model="problemInfo.majorChapter" class="form-select" :disabled="majorChapters.length === 0">
+                <select v-model="problemInfo.majorChapter" class="form-select" :disabled="majorChapters.length === 0" @change="loadMiddleChapters(problemInfo.majorChapter)">
                   <option value="">{{ majorChapters.length === 0 ? '단원 정보가 없습니다' : '선택 값' }}</option>
                   <option v-for="chapter in majorChapters" :key="chapter.id" :value="chapter.id">
                     {{ chapter.name }}
@@ -126,7 +126,7 @@
 
               <div class="form-group">
                 <label class="form-label">중단원 챕터</label>
-                <select v-model="problemInfo.middleChapter" class="form-select" :disabled="middleChapters.length === 0">
+                <select v-model="problemInfo.middleChapter" class="form-select" :disabled="middleChapters.length === 0" @change="loadMinorChapters(problemInfo.middleChapter)">
                   <option value="">{{ middleChapters.length === 0 ? '대단원을 먼저 선택하세요' : '선택 값' }}</option>
                   <option v-for="chapter in middleChapters" :key="chapter.id" :value="chapter.id">
                     {{ chapter.name }}
@@ -139,7 +139,7 @@
 
               <div class="form-group">
                 <label class="form-label">소단원 챕터</label>
-                <select v-model="problemInfo.minorChapter" class="form-select" :disabled="minorChapters.length === 0">
+                <select v-model="problemInfo.minorChapter" class="form-select" :disabled="minorChapters.length === 0" @change="loadTopicChapters(problemInfo.minorChapter)">
                   <option value="">{{ minorChapters.length === 0 ? '중단원을 먼저 선택하세요' : '선택 값' }}</option>
                   <option v-for="chapter in minorChapters" :key="chapter.id" :value="chapter.id">
                     {{ chapter.name }}
@@ -304,6 +304,57 @@ export default {
       )
     })
 
+    // 대단원 선택 시 중단원 로드
+    const loadMiddleChapters = (majorChapterId) => {
+      const majorChapter = majorChapters.value.find(ch => ch.id === majorChapterId)
+      if (majorChapter && majorChapter.children) {
+        middleChapters.value = majorChapter.children.map(chapter => ({
+          id: chapter.id,
+          name: chapter.name,
+          children: chapter.children || []
+        }))
+        console.log('📚 [Step3InfoInput] 중단원 로드 완료:', middleChapters.value.length)
+
+        // 중단원, 소단원, 토픽 초기화
+        minorChapters.value = []
+        topicChapters.value = []
+        problemInfo.value.middleChapter = majorChapterId
+        problemInfo.value.minorChapter = ''
+        problemInfo.value.topicChapter = ''
+      }
+    }
+
+    // 중단원 선택 시 소단원 로드
+    const loadMinorChapters = (middleChapterId) => {
+      const middleChapter = middleChapters.value.find(ch => ch.id === middleChapterId)
+      if (middleChapter && middleChapter.children) {
+        minorChapters.value = middleChapter.children.map(chapter => ({
+          id: chapter.id,
+          name: chapter.name,
+          topics: chapter.topics || []
+        }))
+        console.log('📚 [Step3InfoInput] 소단원 로드 완료:', minorChapters.value.length)
+
+        // 소단원, 토픽 초기화
+        topicChapters.value = []
+        problemInfo.value.minorChapter = middleChapterId
+        problemInfo.value.topicChapter = ''
+      }
+    }
+
+    // 소단원 선택 시 토픽 로드
+    const loadTopicChapters = (minorChapterId) => {
+      const minorChapter = minorChapters.value.find(ch => ch.id === minorChapterId)
+      if (minorChapter && minorChapter.topics) {
+        topicChapters.value = minorChapter.topics.map(topic => ({
+          id: topic.id,
+          name: topic.name
+        }))
+        console.log('📚 [Step3InfoInput] 토픽 로드 완료:', topicChapters.value.length)
+        problemInfo.value.topicChapter = minorChapterId
+      }
+    }
+
     // 챕터 데이터 로드
     const loadChapters = async () => {
       console.log('🚀 [Step3InfoInput] loadChapters 시작')
@@ -389,32 +440,43 @@ export default {
             const chapterData = response.data.data
             console.log('✅ [Step3InfoInput] 챕터 데이터 로드 완료')
             console.log('📊 [Step3InfoInput] 챕터 데이터 구조:', {
-              majorChaptersCount: chapterData.majorChapters?.length || 0,
-              hasMiddleChapters: !!chapterData.middleChapters,
-              hasMinorChapters: !!chapterData.minorChapters,
-              hasTopicChapters: !!chapterData.topicChapters,
-              sampleMajorChapter: chapterData.majorChapters?.[0] || null
+              isArray: Array.isArray(chapterData),
+              length: Array.isArray(chapterData) ? chapterData.length : 0,
+              sampleChapter: Array.isArray(chapterData) ? chapterData[0] : null
             })
 
-            // 대단원 설정 (배열이 비어있어도 빈 배열로 설정)
-            majorChapters.value = Array.isArray(chapterData.majorChapters) ? chapterData.majorChapters : []
-            console.log('📚 [Step3InfoInput] 대단원 설정 완료:', majorChapters.value.length)
-            console.log('📚 [Step3InfoInput] 대단원 내용:', majorChapters.value)
+            // API 응답이 배열 형태로 오므로 직접 사용
+            if (Array.isArray(chapterData)) {
+              // 대단원: 최상위 배열 요소들
+              majorChapters.value = chapterData.map(chapter => ({
+                id: chapter.id,
+                name: chapter.name,
+                children: chapter.children || []
+              }))
 
-            // 중단원, 소단원, 토픽 초기화 (배열이 비어있어도 빈 배열로 설정)
-            middleChapters.value = Array.isArray(chapterData.middleChapters) ? chapterData.middleChapters : []
-            minorChapters.value = Array.isArray(chapterData.minorChapters) ? chapterData.minorChapters : []
-            topicChapters.value = Array.isArray(chapterData.topicChapters) ? chapterData.topicChapters : []
+              console.log('📚 [Step3InfoInput] 대단원 설정 완료:', majorChapters.value.length)
+              console.log('📚 [Step3InfoInput] 대단원 내용:', majorChapters.value)
 
-            // 선택된 챕터들도 초기화
-            problemInfo.value.middleChapter = ''
-            problemInfo.value.minorChapter = ''
-            problemInfo.value.topicChapter = ''
+              // 중단원, 소단원, 토픽은 선택된 대단원에 따라 동적으로 설정
+              middleChapters.value = []
+              minorChapters.value = []
+              topicChapters.value = []
 
-            console.log('🔄 [Step3InfoInput] 하위 챕터 초기화 완료')
-            console.log('🔄 [Step3InfoInput] 중단원 개수:', middleChapters.value.length)
-            console.log('🔄 [Step3InfoInput] 소단원 개수:', minorChapters.value.length)
-            console.log('🔄 [Step3InfoInput] 토픽 개수:', topicChapters.value.length)
+              // 선택된 챕터들도 초기화
+              problemInfo.value.middleChapter = ''
+              problemInfo.value.minorChapter = ''
+              problemInfo.value.topicChapter = ''
+
+              console.log('🔄 [Step3InfoInput] 하위 챕터 초기화 완료')
+              console.log('🔄 [Step3InfoInput] 대단원 개수:', majorChapters.value.length)
+              console.log('🔄 [Step3InfoInput] 첫 번째 대단원:', majorChapters.value[0])
+            } else {
+              console.warn('⚠️ [Step3InfoInput] 챕터 데이터가 배열 형태가 아님:', chapterData)
+              majorChapters.value = []
+              middleChapters.value = []
+              minorChapters.value = []
+              topicChapters.value = []
+            }
 
         } else {
           console.error('❌ [Step3InfoInput] API 응답이 성공하지 않음:', response.data)
@@ -848,7 +910,10 @@ export default {
       insertMathToExplanation,
       prevStep,
       nextStep,
-      loadChapters
+      loadChapters,
+      loadMiddleChapters,
+      loadMinorChapters,
+      loadTopicChapters
     }
   }
 }
