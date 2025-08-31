@@ -233,7 +233,43 @@
           <!-- 보기 영역 -->
           <div v-if="editedTexts.options" class="preview-section">
             <h6>보기</h6>
-            <div class="preview-html" v-html="optionsPreview"></div>
+
+            <!-- 문제 유형 표시 -->
+            <div class="question-type-badge" :class="questionType">
+              {{ questionType === 'multiple-choice' ? '객관식' : '주관식' }}
+            </div>
+
+            <!-- 보기 항목들 (객관식일 때만) -->
+            <div v-if="questionType === 'multiple-choice'" class="options-list">
+              <div v-for="(option, index) in optionsList" :key="index" class="option-item">
+                <!-- 체크박스 -->
+                <input
+                  type="checkbox"
+                  :id="`option-${index}`"
+                  v-model="selectedOptions[index]"
+                  class="option-checkbox"
+                />
+
+                <!-- 라벨 -->
+                <label :for="`option-${index}`" class="option-label">
+                  <span class="option-number">({{ index + 1 }})</span>
+                  <span class="option-text" v-html="option"></span>
+                </label>
+
+                <!-- MathJax 렌더링 영역 -->
+                <div class="option-preview" v-html="option"></div>
+              </div>
+            </div>
+
+            <!-- 주관식일 때 보기 텍스트만 표시 -->
+            <div v-else class="subjective-options">
+              <div class="options-text" v-html="optionsPreview"></div>
+            </div>
+
+            <!-- 선택된 보기 표시 (객관식일 때만) -->
+            <div v-if="questionType === 'multiple-choice'" class="selected-options-summary">
+              선택된 보기: {{ selectedOptions.filter(Boolean).map((_, i) => i + 1).join(', ') }}
+            </div>
           </div>
           <!-- 지문 영역 -->
           <div v-if="editedTexts.question" class="preview-section">
@@ -306,6 +342,64 @@ export default {
     const shapeLatex = ref('')
     const shapePreviewHtml = ref('')
 
+    // 보기 선택 기능
+    const selectedOptions = ref([true, false, false, false, false]) // 첫 번째는 기본 선택
+
+    // 문제 유형 자동 감지
+    const detectQuestionType = (questionText, optionsText) => {
+      if (!optionsText || optionsText.trim() === '') {
+        return 'subjective' // 보기가 없으면 주관식
+      }
+
+      // 객관식 패턴 감지
+      const hasOptions = /\(\d+\)/.test(optionsText)
+      const hasMultipleChoice = /[①②③④⑤⑥⑦⑧⑨⑩]/.test(optionsText) // 원문자 패턴
+
+      if (hasOptions || hasMultipleChoice) {
+        return 'multiple-choice'
+      }
+
+      return 'subjective'
+    }
+
+    // 문제 유형 computed
+    const questionType = computed(() => {
+      return detectQuestionType(props.editedTexts.question, props.editedTexts.options)
+    })
+
+    // 보기 텍스트를 항목별로 분리하는 함수
+    const splitOptions = (optionsText) => {
+      if (!optionsText) return []
+
+      // (1), (2), (3) 패턴으로 자동 분리
+      const parts = optionsText.split(/\(\d+\)/)
+      return parts.filter(part => part.trim()).map(part => part.trim())
+    }
+
+    // 보기 목록 computed
+    const optionsList = computed(() => {
+      const optionsText = props.editedTexts.options
+      return splitOptions(optionsText)
+    })
+
+    // 선택된 보기 텍스트
+    const selectedOptionsText = computed(() => {
+      return optionsList.value
+        .map((option, index) => selectedOptions.value[index] ? option : null)
+        .filter(Boolean)
+        .join('\n')
+    })
+
+    // 보기 선택 상태 초기화
+    const initializeOptionsSelection = () => {
+      const optionsCount = optionsList.value.length
+      if (optionsCount > 0) {
+        // 배열 크기 조정 (필수 제약 없음)
+        selectedOptions.value = new Array(Math.min(optionsCount, 5)).fill(false)
+        // 첫 번째도 선택하지 않음 (자유 선택)
+      }
+    }
+
     // Templates
     const templates = ref([])
 
@@ -325,16 +419,20 @@ export default {
     const tinymceApiKey = getTinyMCEApiKey()
     const editorConfig = createCommonEditorConfig(tinymceApiKey)
 
-    // 편집 영역이 변경될 때 에디터 새로고침 (필요한 경우에만)
+    // 편집 영역이 변경될 때 에디터 새로고침 (개선된 버전)
     watch(() => props.currentEditingArea, async (newArea, oldArea) => {
       try {
         // 영역이 실제로 변경되었을 때만 에디터 새로고침
         if (newArea && newArea !== oldArea) {
+          console.log('편집 영역 변경 감지:', { from: oldArea, to: newArea })
+
           // 현재 에디터 인스턴스가 있다면 안전하게 제거
           if (editorInstance.value) {
             try {
+              console.log('기존 에디터 인스턴스 제거 중...')
               editorInstance.value.destroy()
               editorInstance.value = null
+              console.log('기존 에디터 인스턴스 제거 완료')
             } catch (error) {
               console.warn('에디터 인스턴스 제거 중 오류:', error)
             }
@@ -343,16 +441,22 @@ export default {
           // DOM 업데이트를 기다림
           await nextTick()
 
-          // 에디터 내용이 변경되었을 때만 새로고침
-          if (props.editedTexts[newArea] !== props.editedTexts[oldArea]) {
-            editorKey.value += 1
-          }
+          // 에디터 키 변경으로 새 에디터 생성
+          editorKey.value += 1
+          console.log('에디터 키 변경됨:', editorKey.value)
 
           // 추가 DOM 업데이트를 기다림
           await nextTick()
+
+          // 에디터가 완전히 초기화될 때까지 대기
+          await new Promise(resolve => setTimeout(resolve, 100))
+
+          console.log('편집 영역 변경 완료:', newArea)
         }
       } catch (error) {
         console.error('편집 영역 변경 감지 중 오류:', error)
+        // 오류 발생 시 에디터 재생성
+        editorKey.value += 1
       }
     })
 
@@ -397,22 +501,34 @@ export default {
       return currentArea.imageData || null
     }
 
-    // 편집 영역 선택
+    // 편집 영역 선택 (개선된 버전)
     const selectEditingArea = async (areaType) => {
       try {
+        console.log('편집 영역 선택 시작:', { from: props.currentEditingArea, to: areaType })
+
         // 현재 편집 중인 내용이 있다면 저장
         if (props.currentEditingArea && props.currentEditingArea !== areaType) {
           // 에디터 내용을 현재 영역에 저장
-          const newEditedTexts = { ...props.editedTexts }
-          // 현재 에디터 내용을 가져와서 저장 (실제로는 TinyMCE 인스턴스에서 가져와야 함)
-          emit('update:editedTexts', newEditedTexts)
+          if (editorInstance.value && editorInstance.value.getContent) {
+            try {
+              const currentContent = editorInstance.value.getContent()
+              const newEditedTexts = { ...props.editedTexts }
+              newEditedTexts[props.currentEditingArea] = currentContent
+              emit('update:editedTexts', newEditedTexts)
+              console.log('현재 에디터 내용 저장됨:', currentContent.substring(0, 100))
+            } catch (error) {
+              console.warn('에디터 내용 저장 중 오류:', error)
+            }
+          }
         }
 
         // 현재 에디터 인스턴스가 있다면 안전하게 제거
         if (editorInstance.value) {
           try {
+            console.log('기존 에디터 인스턴스 제거 중...')
             editorInstance.value.destroy()
             editorInstance.value = null
+            console.log('기존 에디터 인스턴스 제거 완료')
           } catch (error) {
             console.warn('에디터 인스턴스 제거 중 오류:', error)
           }
@@ -426,18 +542,23 @@ export default {
 
         // 에디터 키를 변경하여 새로운 에디터 생성
         editorKey.value += 1
+        console.log('에디터 키 변경됨:', editorKey.value)
 
         // 추가 DOM 업데이트를 기다림
         await nextTick()
 
-        console.log('편집 영역 변경:', {
+        // 에디터가 완전히 초기화될 때까지 대기
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        console.log('편집 영역 변경 완료:', {
           from: props.currentEditingArea,
           to: areaType,
-          hasContent: !!props.editedTexts[areaType]
+          hasContent: !!props.editedTexts[areaType],
+          editorKey: editorKey.value
         })
       } catch (error) {
         console.error('편집 영역 변경 중 오류:', error)
-        // 오류 발생 시 기본값으로 복구
+        // 오류 발생 시 에디터 재생성
         editorKey.value += 1
       }
     }
@@ -494,10 +615,42 @@ export default {
     // TinyMCE 에디터 인스턴스 참조
     const editorInstance = ref(null)
 
-    // 에디터 초기화 이벤트 핸들러
+    // 에디터 초기화 이벤트 핸들러 (개선된 버전)
     const onEditorInit = (editor) => {
-      editorInstance.value = editor
-      console.log('TinyMCE 에디터 초기화 완료:', editor)
+      try {
+        console.log('TinyMCE 에디터 초기화 시작...')
+
+        // 에디터 인스턴스 검증
+        if (!editor || typeof editor.insertContent !== 'function') {
+          console.error('에디터 인스턴스가 유효하지 않습니다:', editor)
+          return
+        }
+
+        // 에디터 인스턴스 저장
+        editorInstance.value = editor
+
+        // 에디터 준비 상태 확인
+        if (editor.ready) {
+          console.log('TinyMCE 에디터 초기화 완료 (ready 상태):', editor)
+        } else {
+          console.log('TinyMCE 에디터 초기화 완료 (초기화 중):', editor)
+        }
+
+        // 에디터 내용 설정 (기존 내용이 있다면)
+        const currentContent = props.editedTexts[props.currentEditingArea]
+        if (currentContent && editor.setContent) {
+          try {
+            editor.setContent(currentContent)
+            console.log('에디터 내용 설정 완료:', currentContent.substring(0, 100))
+          } catch (error) {
+            console.warn('에디터 내용 설정 중 오류:', error)
+          }
+        }
+
+      } catch (error) {
+        console.error('에디터 초기화 중 오류:', error)
+        editorInstance.value = null
+      }
     }
 
     // 테스트용 샘플 LaTeX 텍스트 추가
@@ -571,19 +724,62 @@ export default {
       console.log('전체 미리보기 텍스트 복사 완료:', newEditedTexts)
     }
 
-    // 수식 삽입
-    const insertMath = (latex) => {
+    // 수식 삽입 (안전한 버전)
+    const insertMath = async (latex) => {
       currentMathLatex.value = latex
-      if (editorInstance.value) {
+
+      try {
+        // 에디터 인스턴스 검증
+        if (!editorInstance.value) {
+          console.warn('에디터 인스턴스가 아직 초기화되지 않았습니다.')
+          return
+        }
+
+        // 에디터가 준비되었는지 확인
+        if (!editorInstance.value.insertContent || typeof editorInstance.value.insertContent !== 'function') {
+          console.warn('에디터 insertContent 메서드가 사용할 수 없습니다.')
+          return
+        }
+
+        // 에디터가 포커스되어 있는지 확인
+        if (!editorInstance.value.focus) {
+          console.warn('에디터가 포커스되지 않았습니다.')
+          return
+        }
+
+        // 에디터에 포커스
+        editorInstance.value.focus()
+
+        // 수식 삽입
         insertMathToEditor(editorInstance.value, currentMathLatex.value)
-      } else {
-        console.warn('에디터 인스턴스가 아직 초기화되지 않았습니다.')
+
+        console.log('수식 삽입 성공:', latex)
+      } catch (error) {
+        console.error('수식 삽입 중 오류:', error)
+        // 에디터 재초기화 시도
+        await forceRerender()
       }
     }
 
-    // 도형 삽입
-    const insertShape = () => {
-      if (editorInstance.value) {
+    // 도형 삽입 (안전한 버전)
+    const insertShape = async () => {
+      try {
+        // 에디터 인스턴스 검증
+        if (!editorInstance.value) {
+          console.warn('에디터 인스턴스가 아직 초기화되지 않았습니다.')
+          return
+        }
+
+        // 에디터가 준비되었는지 확인
+        if (!editorInstance.value.insertContent || typeof editorInstance.value.insertContent !== 'function') {
+          console.warn('에디터 insertContent 메서드가 사용할 수 없습니다.')
+          return
+        }
+
+        // 에디터에 포커스
+        editorInstance.value.focus()
+
+        // 도형 삽입
         insertShapeToEditor(editorInstance.value, {
           type: selectedShapeType.value,
           color: shapeColor.value,
@@ -592,8 +788,12 @@ export default {
           text: shapeText.value,
           latex: shapeLatex.value
         })
-      } else {
-        console.warn('에디터 인스턴스가 아직 초기화되지 않았습니다.')
+
+        console.log('도형 삽입 성공')
+      } catch (error) {
+        console.error('도형 삽입 중 오류:', error)
+        // 에디터 재초기화 시도
+        await forceRerender()
       }
     }
 
@@ -884,7 +1084,7 @@ export default {
       return text // 원본 LaTeX 텍스트 반환
     })
 
-    // MathJax 렌더링을 위한 watch 추가 (더 포괄적으로)
+        // MathJax 렌더링을 위한 watch 추가 (더 포괄적으로)
     watch(() => props.editedTexts, async (newTexts) => {
       // LaTeX 패턴이 포함된 텍스트가 있는지 확인
       const hasLatex = Object.values(newTexts).some(text =>
@@ -896,6 +1096,13 @@ export default {
         await reRenderMathJax()
       }
     }, { deep: true })
+
+    // 보기 텍스트 변경 시 선택 상태 초기화
+    watch(() => props.editedTexts.options, (newOptions) => {
+      if (newOptions) {
+        initializeOptionsSelection()
+      }
+    })
 
         // Math preview computed (기존 MathJax 시스템 사용)
     const mathPreviewHtml = computed(() => {
@@ -962,6 +1169,9 @@ LaTeX 수식 예시:
         await new Promise(resolve => setTimeout(resolve, 100))
         await reRenderMathJax()
 
+        // 보기 선택 상태 초기화
+        initializeOptionsSelection()
+
       } catch (error) {
         console.warn('Step2TextEditing 초기화 실패:', error)
       }
@@ -1026,7 +1236,12 @@ LaTeX 수식 예시:
       problemPreview,
       optionsPreview,
       questionPreview,
-      imagePreview
+      imagePreview,
+      optionsList,
+      selectedOptions,
+      selectedOptionsText,
+      initializeOptionsSelection,
+      questionType
     }
   }
 }
@@ -1410,9 +1625,115 @@ LaTeX 수식 예시:
   font-size: 0.75rem;
 }
 
+/* 문제 유형 배지 */
+.question-type-badge {
+  display: inline-block;
+  padding: 0.25rem 0.75rem;
+  border-radius: 1rem;
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  margin-bottom: 1rem;
+}
+
+.question-type-badge.multiple-choice {
+  background: #d4edda;
+  color: #155724;
+  border: 1px solid #c3e6cb;
+}
+
+.question-type-badge.subjective {
+  background: #fff3cd;
+  color: #856404;
+  border: 1px solid #ffeaa7;
+}
+
+/* 보기 선택 UI 스타일링 */
+.options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin: 1rem 0;
+}
+
+.option-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  background: #f8f9fa;
+  transition: all 0.2s ease;
+}
+
+.option-item:hover {
+  background: #e9ecef;
+  border-color: #007bff;
+  box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1);
+}
+
+.option-checkbox {
+  margin-top: 0.25rem;
+  transform: scale(1.2);
+}
+
+.option-label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  flex: 1;
+  cursor: pointer;
+}
+
+.option-number {
+  font-weight: bold;
+  color: #007bff;
+  font-size: 1.1em;
+}
+
+.option-text {
+  line-height: 1.5;
+  color: #495057;
+}
+
+.option-preview {
+  margin-top: 0.5rem;
+  padding: 0.75rem;
+  background: white;
+  border-radius: 0.25rem;
+  border: 1px solid #dee2e6;
+  font-size: 0.9em;
+}
+
+.selected-options-summary {
+  margin-top: 1rem;
+  padding: 0.75rem;
+  background: #d4edda;
+  border: 1px solid #c3e6cb;
+  border-radius: 0.25rem;
+  color: #155724;
+  font-weight: 500;
+}
+
+/* 주관식 보기 스타일 */
+.subjective-options {
+  padding: 1rem;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
+  margin: 1rem 0;
+}
+
+.options-text {
+  line-height: 1.6;
+  color: #495057;
+}
+
 /* MathJax 렌더링 스타일링 (기존 시스템 사용) */
 .ocr-text mjx-container,
-.preview-html mjx-container {
+.preview-html mjx-container,
+.option-preview mjx-container {
   font-size: 1em;
   line-height: 1.2;
 }
