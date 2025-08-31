@@ -10,36 +10,81 @@
                 회원가입
               </h3>
             </div>
-            
+
             <div class="card-body p-4 p-md-5">
               <!-- 단계 표시 -->
               <div class="step-indicator mb-4">
-                <div class="row">
-                  <div class="col-4">
-                    <div class="step" :class="{ active: signupStep === 1, completed: signupStep > 1 }">
-                      <div class="step-number">1</div>
-                      <div class="step-text">약관동의<br/>유형선택</div>
+                <div class="step-progress">
+                  <div class="step-line" :class="{ 'completed': signupStep > 1 }"></div>
+                  <div class="step-line" :class="{ 'completed': signupStep > 2 }"></div>
+                  <div class="step-line" :class="{ 'completed': signupStep > 3 }"></div>
+                </div>
+
+                <div class="steps-container">
+                  <div class="step-item" :class="{
+                    'active': signupStep === 1,
+                    'completed': signupStep > 1
+                  }">
+                    <div class="step-icon">
+                      <div v-if="signupStep <= 1" class="step-number">1</div>
+                      <div v-if="signupStep > 1" class="step-check">
+                        <i class="bi bi-check-lg"></i>
+                      </div>
+                    </div>
+                    <div class="step-content">
+                      <div class="step-title">약관동의</div>
+                      <div class="step-subtitle">이용약관</div>
                     </div>
                   </div>
-                  <div class="col-4">
-                    <div class="step" :class="{ 
-                      active: signupStep === 2, 
-                      completed: signupStep > 2,
-                      'oauth2-skipped': signupForm.isOAuth2User && signupStep > 1
-                    }">
-                      <div class="step-number">2</div>
-                      <div class="step-text">
-                        휴대폰 인증
-                        <small v-if="signupForm.isOAuth2User && signupStep > 1" class="d-block text-success">
-                          <i class="bi bi-check-circle"></i> 건너뜀
-                        </small>
+
+                  <div class="step-item" :class="{
+                    'active': signupStep === 2,
+                    'completed': signupStep > 2
+                  }">
+                    <div class="step-icon">
+                      <div v-if="signupStep <= 2" class="step-number">2</div>
+                      <div v-if="signupStep > 2" class="step-check">
+                        <i class="bi bi-check-lg"></i>
+                      </div>
+                    </div>
+                    <div class="step-content">
+                      <div class="step-title">유형선택</div>
+                      <div class="step-subtitle">선생님/학생</div>
+                    </div>
+                  </div>
+
+                  <div class="step-item" :class="{
+                    'active': signupStep === 3,
+                    'completed': signupStep > 3,
+                    'oauth2-skipped': signupForm.isOAuth2User && signupStep > 2
+                  }">
+                    <div class="step-icon">
+                      <div v-if="signupStep <= 3" class="step-number">3</div>
+                      <div v-if="signupStep > 3" class="step-check">
+                        <i class="bi bi-check-lg"></i>
+                      </div>
+                      <div v-if="signupForm.isOAuth2User && signupStep > 2" class="step-skip">
+                        <i class="bi bi-forward"></i>
+                      </div>
+                    </div>
+                    <div class="step-content">
+                      <div class="step-title">휴대폰 인증</div>
+                      <div v-if="signupForm.isOAuth2User && signupStep > 2" class="step-subtitle text-success">
+                        <i class="bi bi-check-circle"></i> 건너뜀
                       </div>
                     </div>
                   </div>
-                  <div class="col-4">
-                    <div class="step" :class="{ active: signupStep === 3 }">
-                      <div class="step-number">3</div>
-                      <div class="step-text">정보 입력</div>
+
+                  <div class="step-item" :class="{
+                    'active': signupStep === 4,
+                    'completed': false
+                  }">
+                    <div class="step-icon">
+                      <div class="step-number">4</div>
+                    </div>
+                    <div class="step-content">
+                      <div class="step-title">정보 입력</div>
+                      <div class="step-subtitle">회원정보</div>
                     </div>
                   </div>
                 </div>
@@ -56,11 +101,11 @@
                   </div>
                 </div>
               </div>
-              
+
               <h5 class="section-title mb-4">
                 이용약관 동의
               </h5>
-              
+
               <!-- 전체 동의 -->
               <div class="form-check mb-3">
                 <input
@@ -74,9 +119,9 @@
                   전체 동의
                 </label>
               </div>
-              
+
               <hr class="my-4">
-              
+
               <!-- 개별 약관 -->
               <div class="form-check mb-3">
                 <input
@@ -91,7 +136,7 @@
                   <button type="button" @click="showTermsModal" class="btn btn-link text-decoration-none ms-2 p-0">보기</button>
                 </label>
               </div>
-              
+
               <div class="form-check mb-3">
                 <input
                   class="form-check-input me-3"
@@ -105,7 +150,7 @@
                   <button type="button" @click="showPrivacyModal" class="btn btn-link text-decoration-none ms-2 p-0">보기</button>
                 </label>
               </div>
-              
+
               <div class="form-check mb-4">
                 <input
                   class="form-check-input me-3"
@@ -119,11 +164,24 @@
                 </label>
               </div>
 
-              <!-- 사용자 유형 선택 -->
+              <!-- 다음 단계 버튼 -->
+              <div class="d-grid">
+                <button
+                  @click="nextStep"
+                  class="btn btn-primary btn-lg fw-bold"
+                  :disabled="!canProceedToStep2"
+                >
+                  다음 단계
+                </button>
+              </div>
+            </div>
+
+            <!-- Step 2: 가입 유형 선택 -->
+            <div v-if="signupStep === 2">
               <h5 class="section-title mb-4">
                 가입 유형 선택
               </h5>
-              
+
               <div class="row g-3 mb-4">
                 <div class="col-6">
                   <div
@@ -131,9 +189,9 @@
                     :class="{ active: signupForm.userType === 'teacher' }"
                     @click="signupForm.userType = 'teacher'"
                   >
-                                      <div class="user-type-icon">
-                    <img src="@/assets/icons/teacher-icon.png" alt="선생님" class="user-icon">
-                  </div>
+                    <div class="user-type-icon">
+                      <img src="@/assets/icons/teacher-icon.png" alt="선생님" class="user-icon">
+                    </div>
                     <h6 class="user-type-title">선생님</h6>
                   </div>
                 </div>
@@ -143,32 +201,35 @@
                     :class="{ active: signupForm.userType === 'student' }"
                     @click="signupForm.userType = 'student'"
                   >
-                                      <div class="user-type-icon">
-                    <img src="@/assets/icons/student-icon.png" alt="학생" class="user-icon">
-                  </div>
+                    <div class="user-type-icon">
+                      <img src="@/assets/icons/student-icon.png" alt="학생" class="user-icon">
+                    </div>
                     <h6 class="user-type-title">학생</h6>
                   </div>
                 </div>
               </div>
 
-              <!-- 다음 단계 버튼 -->
-              <div class="d-grid">
+              <!-- 단계 이동 버튼 -->
+              <div class="d-flex gap-3">
+                <button @click="prevStep" class="btn btn-secondary flex-fill">
+                  이전
+                </button>
                 <button
                   @click="nextStep"
-                  class="btn btn-primary btn-lg fw-bold"
-                  :disabled="!canProceedToStep2"
+                  class="btn btn-primary flex-fill"
+                  :disabled="!signupForm.userType"
                 >
-                  {{ signupForm.isOAuth2User ? '간편 회원가입하기' : '다음 단계' }}
+                  다음 단계
                 </button>
               </div>
             </div>
 
-            <!-- Step 2: 휴대폰 인증 -->
-            <div v-if="signupStep === 2">
+            <!-- Step 3: 휴대폰 인증 -->
+            <div v-if="signupStep === 3">
               <h5 class="section-title mb-4">
                 휴대폰 인증
               </h5>
-              
+
               <!-- 휴대폰 번호 입력 -->
               <div class="mb-3">
                 <label for="phone" class="form-label fw-bold">휴대폰 번호</label>
@@ -242,8 +303,8 @@
               </div>
             </div>
 
-            <!-- Step 3: 정보 입력 -->
-            <div v-if="signupStep === 3">
+            <!-- Step 4: 정보 입력 -->
+            <div v-if="signupStep === 4">
               <!-- OAuth2 사용자 안내 -->
               <div v-if="signupForm.isOAuth2User" class="alert alert-success mb-4">
                 <div class="d-flex align-items-center">
@@ -257,11 +318,11 @@
                   </div>
                 </div>
               </div>
-              
+
               <h5 class="section-title mb-4">
                 회원 정보 입력
               </h5>
-              
+
               <form @submit.prevent="handleSignup">
                 <!-- 아이디 입력 -->
                 <div class="mb-3">
@@ -321,8 +382,8 @@
                     <div class="d-flex align-items-center">
                       <span class="me-2">보안도:</span>
                       <div class="progress flex-grow-1 me-2" style="height: 8px;">
-                        <div 
-                          class="progress-bar" 
+                        <div
+                          class="progress-bar"
                           :class="passwordStrengthClass"
                           :style="{ width: passwordStrengthWidth }"
                         ></div>
@@ -348,7 +409,7 @@
                     휴대폰번호는 필수입니다. 010-0000-0000, 01000000000 등 어떤 형식으로 입력해도 됩니다.
                   </div> -->
                 </div>
-                
+
 
 
                 <!-- 비밀번호 확인 -->
@@ -377,6 +438,25 @@
                   </div>
                 </div>
 
+                <!-- 이름 입력 -->
+                <div class="mb-3">
+                  <label for="fullName" class="form-label fw-bold">이름</label>
+                  <input
+                    type="text"
+                    class="form-control"
+                    :class="{'is-invalid': !nameValid && nameErrorMessage, 'is-valid': nameValid}"
+                    id="fullName"
+                    v-model="signupForm.fullName"
+                    @blur="checkNameFormat"
+                    @input="checkNameFormat"
+                    placeholder="이름을 입력하세요"
+                    required
+                    maxlength="20"
+                  >
+                  <div v-if="nameErrorMessage" class="invalid-feedback">{{ nameErrorMessage }}</div>
+                  <div v-else-if="nameValid" class="valid-feedback">올바른 이름 형식입니다.</div>
+                </div>
+
                 <!-- 이메일 입력 -->
                 <div class="mb-3">
                   <label for="email" class="form-label fw-bold">이메일</label>
@@ -400,9 +480,9 @@
                   <label for="birthDate" class="form-label fw-bold">생년월일</label>
                   <div class="row g-2">
                     <div class="col-4">
-                      <select 
-                        class="form-select" 
-                        v-model="birthYear" 
+                      <select
+                        class="form-select"
+                        v-model="birthYear"
                         @change="updateBirthDate"
                         required
                       >
@@ -411,9 +491,9 @@
                       </select>
                     </div>
                     <div class="col-4">
-                      <select 
-                        class="form-select" 
-                        v-model="birthMonth" 
+                      <select
+                        class="form-select"
+                        v-model="birthMonth"
                         @change="updateBirthDateAndDays"
                         required
                       >
@@ -422,9 +502,9 @@
                       </select>
                     </div>
                     <div class="col-4">
-                      <select 
-                        class="form-select" 
-                        v-model="birthDay" 
+                      <select
+                        class="form-select"
+                        v-model="birthDay"
                         @change="updateBirthDate"
                         required
                       >
@@ -438,8 +518,8 @@
                 <!-- 선생님인 경우 과목 선택 -->
                 <div class="mb-3" v-if="signupForm.userType === 'teacher'">
                   <label for="subject" class="form-label fw-bold">담당 과목</label>
-                  <select 
-                    class="form-select" 
+                  <select
+                    class="form-select"
                     id="subject"
                     v-model="signupForm.subject"
                     required
@@ -494,14 +574,14 @@
             <!-- 로그인 링크 -->
             <div class="text-center mt-4">
               <p class="mb-0">
-                이미 계정이 있으신가요? 
+                이미 계정이 있으신가요?
                 <router-link to="/login" class="text-decoration-none fw-bold">로그인</router-link>
               </p>
             </div>
           </div>
         </div>
       </div>
-      
+
       <!-- Footer를 메인 컨테이너 안으로 이동 -->
       <div class="mt-5">
         <Footer />
@@ -522,15 +602,15 @@
         <!-- 검색 입력 -->
         <div class="mb-3">
           <div class="input-group">
-            <input 
-              type="text" 
-              class="form-control" 
+            <input
+              type="text"
+              class="form-control"
               v-model="schoolSearchKeyword"
               @keyup.enter="searchSchools"
               placeholder="학교명을 입력하세요"
             >
-            <button 
-              class="btn btn-primary" 
+            <button
+              class="btn btn-primary"
               @click="searchSchools"
               :disabled="!schoolSearchKeyword.trim() || isSchoolSearching"
             >
@@ -544,8 +624,8 @@
         <div v-if="schoolSearchResults.length > 0" class="mb-3">
           <h6 class="fw-bold mb-2">검색 결과 ({{ schoolSearchResults.length }}건)</h6>
           <div class="list-group">
-            <button 
-              v-for="school in schoolSearchResults" 
+            <button
+              v-for="school in schoolSearchResults"
               :key="school.id"
               type="button"
               class="list-group-item list-group-item-action"
@@ -579,7 +659,7 @@
           </div>
     </div>
   </div>
-  
+
   <!-- 학교 검색 모달 -->
   <div v-if="showSchoolModal" class="modal-overlay" @click="closeSchoolModal">
     <div class="modal-content" @click.stop>
@@ -593,15 +673,15 @@
         <!-- 검색 입력 -->
         <div class="mb-3">
           <div class="input-group">
-            <input 
-              type="text" 
-              class="form-control" 
+            <input
+              type="text"
+              class="form-control"
               v-model="schoolSearchKeyword"
               @keyup.enter="searchSchools"
               placeholder="학교명을 입력하세요"
             >
-            <button 
-              class="btn btn-primary" 
+            <button
+              class="btn btn-primary"
               @click="searchSchools"
               :disabled="!schoolSearchKeyword.trim() || isSchoolSearching"
             >
@@ -615,8 +695,8 @@
         <div v-if="schoolSearchResults.length > 0" class="mb-3">
           <h6 class="fw-bold mb-2">검색 결과 ({{ schoolSearchResults.length }}건)</h6>
           <div class="list-group">
-            <button 
-              v-for="school in schoolSearchResults" 
+            <button
+              v-for="school in schoolSearchResults"
               :key="school.id"
               type="button"
               class="list-group-item list-group-item-action"
@@ -649,7 +729,7 @@
       </div>
     </div>
   </div>
-  
+
   <!-- 약관 모달 -->
   <div v-if="showTermsModalFlag" class="modal-overlay" @click="closeTermsModal">
     <div class="modal-content" @click.stop>
@@ -661,11 +741,11 @@
         <div class="terms-content">
           <h6 class="fw-bold mb-3">제1조 (목적)</h6>
           <p class="mb-3">이 약관은 PullIt(이하 "회사")이 제공하는 교육 서비스의 이용과 관련하여 회사와 회원과의 권리, 의무 및 책임사항, 기타 필요한 사항을 규정함을 목적으로 합니다.</p>
-          
+
           <h6 class="fw-bold mb-3">제2조 (정의)</h6>
           <p class="mb-3">1. "서비스"라 함은 회사가 제공하는 교육 관련 서비스를 의미합니다.</p>
           <p class="mb-3">2. "회원"이라 함은 회사의 서비스에 접속하여 이 약관에 따라 회사와 이용계약을 체결하고 회사가 제공하는 서비스를 이용하는 고객을 의미합니다.</p>
-          
+
           <h6 class="fw-bold mb-3">제3조 (약관의 효력 및 변경)</h6>
           <p class="mb-3">1. 이 약관은 서비스 화면에 게시하거나 기타의 방법으로 회원에게 공지함으로써 효력이 발생합니다.</p>
           <p class="mb-3">2. 회사는 필요한 경우 관련법령을 위배하지 않는 범위에서 이 약관을 변경할 수 있습니다.</p>
@@ -685,17 +765,17 @@
         <div class="privacy-content">
           <h6 class="fw-bold mb-3">1. 개인정보의 처리 목적</h6>
           <p class="mb-3">회사는 다음의 목적을 위하여 개인정보를 처리합니다. 처리하고 있는 개인정보는 다음의 목적 이외의 용도로는 이용되지 않으며, 이용 목적이 변경되는 경우에는 개인정보보호법 제18조에 따라 별도의 동의를 받는 등 필요한 조치를 이행할 예정입니다.</p>
-          
+
           <h6 class="fw-bold mb-3">2. 개인정보의 처리 및 보유기간</h6>
           <p class="mb-3">회사는 법령에 따른 개인정보 보유·이용기간 또는 정보주체로부터 개인정보를 수집 시에 동의받은 개인정보 보유·이용기간 내에서 개인정보를 처리·보유합니다.</p>
-          
+
           <h6 class="fw-bold mb-3">3. 개인정보의 제3자 제공</h6>
           <p class="mb-3">회사는 정보주체의 개인정보를 제1조(개인정보의 처리 목적)에서 명시한 범위 내에서만 처리하며, 정보주체의 동의, 법률의 특별한 규정 등 개인정보보호법 제17조 및 제18조에 해당하는 경우에만 개인정보를 제3자에게 제공합니다.</p>
         </div>
       </div>
     </div>
   </div>
-  
+
 </template>
 
 <script setup>
@@ -756,6 +836,10 @@ const passwordStrengthText = ref('')
 const showPassword = ref(false)
 const showPasswordConfirm = ref(false)
 
+// 이름 유효성 검사
+const nameValid = ref(false)
+const nameErrorMessage = ref('')
+
 // 이메일 유효성 검사
 const emailValid = ref(false)
 const emailErrorMessage = ref('')
@@ -783,7 +867,7 @@ const apiBaseUrl = 'http://localhost:8080/api'
 
 // computed properties
 const canProceedToStep2 = computed(() => {
-  return agreements.value.terms && agreements.value.privacy && signupForm.value.userType
+  return agreements.value.terms && agreements.value.privacy
 })
 
 const isValidPhone = computed(() => {
@@ -840,10 +924,10 @@ const initBirthDateOptions = () => {
   // 연도 옵션 (현재 연도부터 100년 전까지)
   const currentYear = new Date().getFullYear()
   birthYears.value = Array.from({length: 100}, (_, i) => currentYear - i)
-  
+
   // 월 옵션 (1~12월)
   birthMonths.value = Array.from({length: 12}, (_, i) => i + 1)
-  
+
   // 일 옵션 (1~31일)
   birthDays.value = Array.from({length: 31}, (_, i) => i + 1)
 }
@@ -870,7 +954,7 @@ const updateBirthDays = () => {
     const month = birthMonth.value
     const daysInMonth = new Date(year, month, 0).getDate()
     birthDays.value = Array.from({length: daysInMonth}, (_, i) => i + 1)
-    
+
     // 현재 선택된 일이 해당 월의 최대 일수보다 크면 리셋
     if (birthDay.value > daysInMonth) {
       birthDay.value = ''
@@ -882,7 +966,7 @@ const updateBirthDays = () => {
 // 휴대폰번호를 API 전송용 형식으로 변환 (숫자만)
 const formatPhoneForAPI = (phone) => {
   if (!phone) return ''
-  
+
   // 숫자만 추출하여 반환
   return phone.replace(/[^0-9]/g, '')
 }
@@ -993,6 +1077,33 @@ const validateEmail = (email) => {
   return emailRegex.test(email)
 }
 
+const validateName = (name) => {
+  // 한글, 영어만 허용하는 정규식 (공백 허용하지 않음)
+  const nameRegex = /^[가-힣a-zA-Z]{2,20}$/
+  return nameRegex.test(name)
+}
+
+const checkNameFormat = () => {
+  const name = signupForm.value.fullName
+
+  if (!name) {
+    nameValid.value = false
+    nameErrorMessage.value = ''
+    return
+  }
+
+  if (name.length < 2) {
+    nameValid.value = false
+    nameErrorMessage.value = '이름은 최소 2글자 이상 입력해주세요.'
+  } else if (!validateName(name)) {
+    nameValid.value = false
+    nameErrorMessage.value = '이름은 한글 또는 영어만 입력 가능합니다.'
+  } else {
+    nameValid.value = true
+    nameErrorMessage.value = ''
+  }
+}
+
 const checkEmailFormat = () => {
   const email = signupForm.value.email
 
@@ -1063,7 +1174,7 @@ const closeSchoolModal = () => {
 const searchSchools = async () => {
   console.log('🚀 searchSchools 함수 실행 시작')
   console.log('🚀 schoolSearchKeyword.value:', schoolSearchKeyword.value)
-  
+
   if (!schoolSearchKeyword.value.trim()) {
     console.log('🚀 검색어가 없어서 함수 종료')
     return
@@ -1079,7 +1190,7 @@ const searchSchools = async () => {
     console.log('검색 키워드:', keyword)
     console.log('검색 키워드 길이:', keyword.length)
     console.log('검색 키워드 바이트:', new TextEncoder().encode(keyword))
-    
+
     const response = await axios.get(`http://localhost:8080/api/schools/search?keyword=${encodeURIComponent(keyword)}`)
     console.log('검색 결과:', response.data)
     schoolSearchResults.value = response.data
@@ -1101,18 +1212,21 @@ const selectSchool = (school) => {
 
 const nextStep = () => {
   if (signupStep.value === 1) {
-    // Step 1 (약관동의) → Step 2 (휴대폰 인증) 또는 Step 3 (정보 입력)
+    // Step 1 (약관동의) → Step 2 (유형선택)
+    signupStep.value = 2
+  } else if (signupStep.value === 2) {
+    // Step 2 (유형선택) → Step 3 (휴대폰 인증) 또는 Step 4 (정보 입력)
     if (signupForm.value.isOAuth2User) {
       // OAuth2 사용자는 휴대폰 인증 건너뛰고 바로 정보 입력 단계로
-      signupStep.value = 3
+      signupStep.value = 4
       console.log('OAuth2 사용자: 휴대폰 인증 건너뛰고 정보 입력 단계로 이동')
     } else {
       // 일반 사용자는 휴대폰 인증 단계로
-      signupStep.value = 2
+      signupStep.value = 3
     }
-  } else if (signupStep.value === 2 && signupStep.value < 3) {
-    // Step 2 (휴대폰 인증) → Step 3 (정보 입력)
-    signupStep.value = 3
+  } else if (signupStep.value === 3) {
+    // Step 3 (휴대폰 인증) → Step 4 (정보 입력)
+    signupStep.value = 4
   }
 }
 
@@ -1127,21 +1241,21 @@ const checkOAuth2Info = () => {
   // URL 쿼리 파라미터에서 OAuth2 정보 확인
   const urlParams = new URLSearchParams(window.location.search)
   const isOAuth2 = urlParams.get('oauth2')
-  
+
   if (isOAuth2 === 'true') {
     console.log('OAuth2 소셜 로그인으로 회원가입 진행')
-    
+
     // URL 쿼리에서 소셜 정보 가져오기
     const provider = urlParams.get('provider')
     const email = urlParams.get('email')
     const name = urlParams.get('name')
     const providerId = urlParams.get('providerId')
     const username = urlParams.get('username')
-    
+
     // sessionStorage에서도 확인 (OAuth2Callback에서 저장한 정보)
     const oauth2Info = sessionStorage.getItem('oauth2_social_info')
     let socialInfo = {}
-    
+
     if (oauth2Info) {
       try {
         socialInfo = JSON.parse(oauth2Info)
@@ -1150,17 +1264,18 @@ const checkOAuth2Info = () => {
         console.error('OAuth2 정보 파싱 오류:', error)
       }
     }
-    
+
     // 폼에 정보 자동 채우기
     if (email) {
       signupForm.value.email = email
       checkEmailFormat() // 이메일 유효성 검사 실행
     }
-    
+
     if (name) {
       signupForm.value.fullName = name
+      checkNameFormat() // 이름 유효성 검사 실행
     }
-    
+
     if (username) {
       signupForm.value.username = username
       // 아이디 중복 확인 자동 실행
@@ -1168,21 +1283,21 @@ const checkOAuth2Info = () => {
         checkUsernameAvailability()
       }, 500)
     }
-    
+
     // 소셜 로그인 정보를 회원가입 데이터에 포함
     signupForm.value.socialProvider = provider
     signupForm.value.socialProviderId = providerId
-    
+
     // OAuth2 사용자임을 표시
     signupForm.value.isOAuth2User = true
-    
+
     console.log('OAuth2 정보로 폼 자동 채움 완료:', {
       email: signupForm.value.email,
       fullName: signupForm.value.fullName,
       username: signupForm.value.username,
       provider: signupForm.value.socialProvider
     })
-    
+
     // OAuth2 사용자는 약관동의부터 시작 (일반 사용자와 동일)
     console.log('OAuth2 사용자: 약관동의부터 시작')
   }
@@ -1210,6 +1325,16 @@ const handleSignup = async () => {
 
   if (!usernameAvailable.value) {
     alert('아이디 중복 확인을 해주세요.')
+    return
+  }
+
+  if (!signupForm.value.fullName.trim()) {
+    alert('이름을 입력해주세요.')
+    return
+  }
+
+  if (!nameValid.value) {
+    alert('올바른 이름 형식을 입력해주세요.')
     return
   }
 
@@ -1245,8 +1370,8 @@ const handleSignup = async () => {
       username: signupForm.value.username,
       password: signupForm.value.password || 'SOCIAL_LOGIN_' + Date.now(), // OAuth2 사용자는 임시 비밀번호
       email: signupForm.value.email,
-      phone: signupForm.value.isOAuth2User ? 
-        formatPhoneForAPI(signupForm.value.phoneNumber || '') : 
+      phone: signupForm.value.isOAuth2User ?
+        formatPhoneForAPI(signupForm.value.phoneNumber || '') :
         formatPhoneForAPI(signupForm.value.phone || ''),
       fullName: signupForm.value.fullName || signupForm.value.username,
       role: signupForm.value.userType.toUpperCase(),
@@ -1265,16 +1390,16 @@ const handleSignup = async () => {
         'SC': { code: 'SC', name: '과학' },
         'SO': { code: 'SO', name: '사회' }
       }
-      
+
       const selectedSubject = subjectMapping[signupForm.value.subject] || { code: '', name: '' }
-      
+
       signupData.teacherInfo = {
         schoolName: signupForm.value.school, // 학교명 또는 ID
         areaCode: selectedSubject.code, // 과목 코드
         areaName: selectedSubject.name // 과목명
       }
     }
-    
+
     // Student인 경우 studentInfo 추가
     if (signupForm.value.userType === 'student') {
       signupData.studentInfo = {
@@ -1302,7 +1427,7 @@ const handleSignup = async () => {
     console.error('회원가입 에러:', error)
     console.error('에러 응답:', error.response?.data)
     console.error('에러 상태:', error.response?.status)
-    
+
     if (error.response?.status === 400) {
       alert('입력 정보를 확인해주세요: ' + (error.response.data.message || '잘못된 요청입니다.'))
     } else if (error.response?.status === 409) {
@@ -1323,10 +1448,10 @@ watch(() => signupForm.value.phone, () => {
 // 생명주기 훅
 onMounted(() => {
   console.log('Signup 컴포넌트 마운트 완료')
-  
+
   // OAuth2 소셜 로그인 정보 확인 및 폼 자동 채우기
   checkOAuth2Info()
-  
+
   // 생년월일 옵션 초기화
   initBirthDateOptions()
 })
@@ -1354,84 +1479,191 @@ onUnmounted(() => {
   padding-bottom: 0.5rem;
 }
 
-/* 단계 표시 스타일 */
+/* 현대적인 단계 표시 스타일 */
 .step-indicator {
-  margin-bottom: 2rem;
+  margin-bottom: 3rem;
+  position: relative;
 }
 
-.step {
-  text-align: center;
-  padding: 1.5rem 1rem;
-  background: #f8f9fa;
-  border-radius: 0.75rem;
-  border: 2px solid #e9ecef;
-  transition: all 0.3s ease;
+.step-progress {
+  position: absolute;
+  top: 2rem;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #e9ecef;
+  z-index: 1;
+}
+
+.step-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: #0d6efd;
+  width: 0;
+  transition: width 0.6s ease;
+  border-radius: 1px;
+}
+
+.step-line.completed {
+  width: 100%;
+}
+
+.steps-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
   position: relative;
-  height: 140px;
+  z-index: 2;
+}
+
+.step-item {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-}
-
-.step.active {
-  background: #0d6efd;
-  border-color: #0d6efd;
-  color: white;
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
-}
-
-.step.completed {
-  background: #198754;
-  border-color: #198754;
-  color: white;
-}
-
-.step.oauth2-skipped {
-  background: #17a2b8;
-  border-color: #17a2b8;
-  color: white;
+  text-align: center;
+  flex: 1;
+  max-width: 200px;
   position: relative;
 }
 
-.step.oauth2-skipped::after {
-  content: '⏭️';
-  position: absolute;
-  top: -8px;
-  right: -8px;
-  background: #17a2b8;
+.step-icon {
+  position: relative;
+  width: 4rem;
+  height: 4rem;
+  background: #f8f9fa;
+  border: 3px solid #e9ecef;
   border-radius: 50%;
-  width: 24px;
-  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 12px;
+  margin-bottom: 1rem;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.step-item.active .step-icon {
+  background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+  border-color: #0d6efd;
+  transform: scale(1.1);
+  box-shadow: 0 8px 25px rgba(13, 110, 253, 0.3);
+}
+
+.step-item.completed .step-icon {
+  background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+  border-color: #198754;
+  transform: scale(1.05);
+  box-shadow: 0 6px 20px rgba(25, 135, 84, 0.3);
+}
+
+.step-item.oauth2-skipped .step-icon {
+  background: linear-gradient(135deg, #17a2b8 0%, #138496 100%);
+  border-color: #17a2b8;
 }
 
 .step-number {
   font-weight: 700;
-  font-size: 1.5rem;
-  margin: 0 auto 0.75rem;
-  transition: all 0.3s ease;
+  font-size: 1.25rem;
   color: #6c757d;
+  transition: all 0.3s ease;
 }
 
-.step.active .step-number {
-  color: white;
-  transform: scale(1.1);
-}
-
-.step.completed .step-number {
+.step-item.active .step-number {
   color: white;
 }
 
-.step-text {
-  font-size: 1rem;
+.step-item.completed .step-number {
+  color: white;
+}
+
+.step-check {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 1.5rem;
+  animation: checkIn 0.4s ease-out;
+}
+
+.step-skip {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 1.25rem;
+  animation: skipIn 0.4s ease-out;
+}
+
+.step-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.step-title {
   font-weight: 600;
+  font-size: 1rem;
+  color: #495057;
+  margin-bottom: 0.25rem;
+  transition: color 0.3s ease;
+}
+
+.step-subtitle {
+  font-size: 0.875rem;
+  color: #6c757d;
   line-height: 1.3;
-  text-align: center;
+  transition: color 0.3s ease;
+}
+
+.step-item.active .step-title {
+  color: #0d6efd;
+  font-weight: 700;
+}
+
+.step-item.active .step-subtitle {
+  color: #0d6efd;
+}
+
+.step-item.completed .step-title {
+  color: #198754;
+  font-weight: 600;
+}
+
+.step-item.completed .step-subtitle {
+  color: #198754;
+}
+
+/* 애니메이션 */
+@keyframes checkIn {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+@keyframes skipIn {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.5) rotate(-90deg);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.2) rotate(-45deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1) rotate(0deg);
+  }
 }
 
 /* 사용자 유형 선택 카드 */
@@ -1592,6 +1824,53 @@ onUnmounted(() => {
   box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.25);
 }
 
+/* 체크박스를 정사각형으로 만들기 - 더 강력한 방법 */
+.form-check-input {
+  width: 20px !important;
+  height: 20px !important;
+  border-radius: 4px !important;
+  flex-shrink: 0 !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  box-sizing: border-box !important;
+  appearance: none !important;
+  -webkit-appearance: none !important;
+  -moz-appearance: none !important;
+  background-color: #fff !important;
+  border: 2px solid #dee2e6 !important;
+  position: relative !important;
+  cursor: pointer !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  line-height: 1 !important;
+  font-size: 0 !important;
+  overflow: hidden !important;
+}
+
+.form-check-input:checked {
+  background-color: #0d6efd !important;
+  border-color: #0d6efd !important;
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e") !important;
+  background-size: 75% !important;
+  background-position: center !important;
+  background-repeat: no-repeat !important;
+}
+
+/* 체크박스 컨테이너도 정사각형으로 강제 */
+.form-check {
+  display: flex !important;
+  align-items: center !important;
+  min-height: 20px !important;
+}
+
+.form-check-input {
+  flex: 0 0 20px !important;
+}
+
 /* 체크박스 간격 개선 */
 .form-check-input.me-3 {
   margin-right: 1rem !important;
@@ -1688,32 +1967,44 @@ body {
   .signup-container {
     padding: 1rem 0.5rem;
   }
-  
+
   .card-body {
     padding: 1.5rem !important;
   }
-  
+
   .col-12 {
     padding: 0 0.5rem;
   }
-  
-  .step-text {
+
+  .step-title {
     font-size: 0.875rem;
   }
-  
-  .step {
-    height: 120px;
-    padding: 1rem 0.5rem;
+
+  .step-subtitle {
+    font-size: 0.75rem;
   }
-  
+
+  .step-icon {
+    width: 3rem;
+    height: 3rem;
+  }
+
   .step-number {
+    font-size: 1rem;
+  }
+
+  .step-check {
     font-size: 1.25rem;
   }
-  
+
+  .step-skip {
+    font-size: 1rem;
+  }
+
   .user-type-card {
     padding: 1rem;
   }
-  
+
   /* 모바일에서 스크롤 강화 */
   .signup-page {
     overflow-y: auto;

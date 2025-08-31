@@ -52,7 +52,10 @@ export const cbtAPI = {
 
   // Redis 데이터 업데이트
   updateRedisData: (attemptId, data) => {
-    return api.post(`/cbt/redis/${attemptId}`, data)
+    return api.post(`/cbt/redis/${attemptId}`, {
+      value: attemptId,
+      data: data,
+    })
   },
 
   // Redis 데이터를 DB로 마이그레이션
