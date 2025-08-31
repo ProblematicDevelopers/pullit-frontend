@@ -36,7 +36,8 @@
         <h6 class="panel-subtitle">OCR 텍스트 변환</h6>
         <div class="ocr-content">
           <div v-if="editedTexts[currentEditingArea]" class="ocr-text">
-            {{ editedTexts[currentEditingArea] }}
+            <!-- LaTeX 렌더링이 적용된 텍스트 표시 -->
+            <div v-html="renderLatexContent(editedTexts[currentEditingArea])"></div>
           </div>
           <div v-else class="no-ocr">
             OCR 결과가 없습니다.
@@ -66,7 +67,7 @@
 
           <div class="editor-content">
             <Editor
-              :key="`editor-fixed`"
+              :key="`editor-${currentEditingArea}-${editorKey}`"
               :api-key="tinymceApiKey"
               :model-value="editedTexts[currentEditingArea] || ''"
               @update:model-value="updateEditedText"
@@ -108,9 +109,21 @@
                   <input
                     v-model="mathSearch"
                     type="text"
-                    placeholder="수식 검색..."
+                    placeholder="덧셈, 방정식, 분수..."
                     class="form-control form-control-sm"
                   />
+                  <!-- 검색 결과 -->
+                  <div class="search-results mt-2" v-if="filteredMathTemplates.length > 0 && mathSearch">
+                    <div
+                      v-for="template in filteredMathTemplates"
+                      :key="template.id"
+                      @click="insertMath(template.latex)"
+                      class="search-result-item small p-2 border rounded mb-1"
+                    >
+                      <div class="template-name fw-semibold">{{ template.name }}</div>
+                      <div class="template-preview text-muted">{{ template.preview }}</div>
+                    </div>
+                  </div>
                 </div>
                 <div class="tool-section">
                   <h6>수식 입력</h6>
@@ -198,22 +211,22 @@
           <!-- 문제 영역 -->
           <div v-if="editedTexts.problem" class="preview-section">
             <h6>문제</h6>
-            <div class="preview-html" v-html="editedTexts.problem"></div>
+            <div class="preview-html" v-html="renderLatexContent(editedTexts.problem)"></div>
           </div>
           <!-- 보기 영역 -->
           <div v-if="editedTexts.options" class="preview-section">
             <h6>보기</h6>
-            <div class="preview-html" v-html="editedTexts.options"></div>
+            <div class="preview-html" v-html="renderLatexContent(editedTexts.options)"></div>
           </div>
           <!-- 지문 영역 -->
           <div v-if="editedTexts.question" class="preview-section">
             <h6>지문</h6>
-            <div class="preview-html" v-html="editedTexts.question"></div>
+            <div class="preview-html" v-html="renderLatexContent(editedTexts.question)"></div>
           </div>
           <!-- 이미지 영역 -->
           <div v-if="editedTexts.image" class="preview-section">
             <h6>이미지</h6>
-            <div class="preview-html" v-html="editedTexts.image"></div>
+            <div class="preview-html" v-html="renderLatexContent(editedTexts.image)"></div>
           </div>
         </div>
       </div>
@@ -228,7 +241,7 @@
 </template>
 
 <script>
-import { ref, computed, watch, nextTick } from 'vue'
+import { ref, computed, watch, nextTick, onMounted } from 'vue'
 import Editor from '@tinymce/tinymce-vue'
 import { createCommonEditorConfig, getTinyMCEApiKey, insertMathToEditor, insertShapeToEditor } from '@/utils/tinymce-common-config'
 
@@ -282,6 +295,18 @@ export default {
 
     // Templates
     const templates = ref([])
+
+    // 수식 검색을 위한 템플릿 데이터 (먼저 정의)
+    const mathTemplates = ref([
+      { id: 1, name: '이차방정식', latex: 'ax^2 + bx + c = 0', preview: 'ax² + bx + c = 0', category: 'algebra' },
+      { id: 2, name: '분수', latex: '\\frac{a}{b}', preview: 'a/b', category: 'algebra' },
+      { id: 3, name: '근의 공식', latex: 'x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}', preview: 'x = (-b ± √(b²-4ac))/2a', category: 'algebra' },
+      { id: 4, name: '피타고라스', latex: 'a^2 + b^2 = c^2', preview: 'a² + b² = c²', category: 'geometry' },
+      { id: 5, name: '원의 넓이', latex: 'A = \\pi r^2', preview: 'A = πr²', category: 'geometry' },
+      { id: 6, name: '미분', latex: '\\frac{d}{dx}f(x)', preview: 'd/dx f(x)', category: 'calculus' },
+      { id: 7, name: '적분', latex: '\\int_a^b f(x) dx', preview: '∫ₐᵇ f(x) dx', category: 'calculus' },
+      { id: 8, name: '평균', latex: '\\bar{x} = \\frac{1}{n}\\sum_{i=1}^{n} x_i', preview: 'x̄ = (1/n)Σxᵢ', category: 'statistics' }
+    ])
 
     // TinyMCE 설정
     const tinymceApiKey = getTinyMCEApiKey()
@@ -433,6 +458,97 @@ export default {
       }
     })
 
+    // 수식 검색 결과 (안전장치 추가)
+    const filteredMathTemplates = computed(() => {
+      if (!mathSearch.value?.trim() || !mathTemplates.value) return []
+
+      const query = mathSearch.value.toLowerCase()
+      return mathTemplates.value.filter(template =>
+        template.name.toLowerCase().includes(query) ||
+        template.preview.toLowerCase().includes(query) ||
+        template.category.toLowerCase().includes(query)
+      )
+    })
+
+
+
+    // LaTeX 수식을 KaTeX로 렌더링하는 함수
+    const renderLatexContent = (content) => {
+      if (!content || typeof content !== 'string') return ''
+
+      try {
+        // KaTeX가 로드되었는지 확인
+        if (window.katex) {
+          // LaTeX 수식을 찾아서 렌더링 ($$...$$ 또는 $...$ 형태)
+          return content.replace(/\$\$([^$]+)\$\$/g, (match, latex) => {
+            try {
+              return window.katex.renderToString(latex, {
+                throwOnError: false,
+                displayMode: true
+              })
+            } catch {
+              return match
+            }
+          }).replace(/\$([^$]+)\$/g, (match, latex) => {
+            try {
+              return window.katex.renderToString(latex, {
+                throwOnError: false,
+                displayMode: false
+              })
+            } catch {
+              return match
+            }
+          })
+        } else {
+          // KaTeX가 로드되지 않은 경우 LaTeX 코드를 그대로 표시
+          return content
+        }
+      } catch (error) {
+        console.warn('LaTeX 렌더링 오류:', error)
+        return content
+      }
+    }
+
+    // KaTeX 로드 확인 및 로드 함수
+    const ensureKatexLoaded = () => {
+      if (window.katex) return Promise.resolve()
+
+      return new Promise((resolve, reject) => {
+        // KaTeX CSS 로드
+        if (!document.querySelector('link[href*="katex"]')) {
+          const link = document.createElement('link')
+          link.rel = 'stylesheet'
+          link.href = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css'
+          link.onload = () => {
+            // KaTeX JS 로드
+            if (!window.katex) {
+              const script = document.createElement('script')
+              script.src = 'https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js'
+              script.onload = resolve
+              script.onerror = reject
+              document.head.appendChild(script)
+            } else {
+              resolve()
+            }
+          }
+          link.onerror = reject
+          document.head.appendChild(link)
+        } else {
+          resolve()
+        }
+      })
+    }
+
+    // 컴포넌트 마운트 시 초기화 및 KaTeX 로드
+    onMounted(async () => {
+      try {
+        await ensureKatexLoaded()
+        console.log('Step2TextEditing 초기화 완료 - KaTeX 로드 완료')
+      } catch (error) {
+        console.warn('Step2TextEditing 초기화 실패:', error)
+      }
+    })
+
     return {
       showPreview,
       editorKey,
@@ -451,6 +567,10 @@ export default {
       editorConfig,
       availableAreaTypes,
       mathPreviewHtml,
+      mathTemplates,
+      filteredMathTemplates,
+      renderLatexContent,
+      ensureKatexLoaded,
       getAreaTypeLabel,
       getCurrentAreaImage,
       selectEditingArea,
@@ -818,6 +938,59 @@ export default {
   color: #6c757d;
   font-style: italic;
   padding: 2rem;
+}
+
+/* 수식 검색 결과 스타일링 */
+.search-results {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  background: #f8f9fa;
+}
+
+.search-result-item {
+  background: white;
+  border-color: #dee2e6 !important;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+
+.search-result-item:hover {
+  background: #e9ecef;
+  border-color: #007bff !important;
+}
+
+.search-result-item .template-name {
+  color: #495057;
+  font-size: 0.875rem;
+}
+
+.search-result-item .template-preview {
+  color: #6c757d;
+  font-size: 0.75rem;
+}
+
+/* LaTeX 렌더링 스타일링 */
+.ocr-text .katex,
+.preview-html .katex {
+  font-size: 1em;
+  line-height: 1.2;
+}
+
+.ocr-text .katex-display,
+.preview-html .katex-display {
+  margin: 0.5em 0;
+  text-align: center;
+}
+
+.ocr-text .katex-error,
+.preview-html .katex-error {
+  color: #dc3545;
+  background: #f8d7da;
+  padding: 0.25em 0.5em;
+  border-radius: 0.25em;
+  font-family: monospace;
 }
 
 /* TinyMCE 스타일링 */

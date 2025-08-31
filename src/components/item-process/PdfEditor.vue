@@ -11,6 +11,8 @@
       <PdfMainPreview
         :pdf-pages="pdfPages"
         :current-page-index="currentPageIndex"
+        @image-error="handleImageError"
+        @image-load="handleImageLoad"
       />
 
       <!-- 오른쪽: 모든 페이지 썸네일 그리드 -->
@@ -58,7 +60,7 @@ export default {
       required: true
     }
   },
-  emits: ['page-removed', 'page-moved', 'pages-removed', 'page-selected', 'go-back', 'next-step'],
+  emits: ['page-removed', 'page-moved', 'pages-removed', 'page-selected', 'go-back', 'next-step', 'image-fallback'],
   setup(props, { emit }) {
     // props를 ref로 변환하여 반응성 유지
     const pdfPagesRef = toRef(props, 'pdfPages')
@@ -111,7 +113,7 @@ export default {
           fromIndex: selectedForMove.value,
           toIndex: index
         })
-        selectedForMove.value = null // 선택 상태 초기화
+        selectedForMove.value = null // 선태 상태 초기화
       }
     }
 
@@ -130,6 +132,30 @@ export default {
       emit('page-moved', moveInfo)
     }
 
+    // 이미지 에러 처리
+    const handleImageError = (errorInfo) => {
+      console.warn('이미지 로드 에러:', errorInfo)
+      
+      // 프록시 실패 시 S3 URL로 fallback
+      if (errorInfo.originalUrl && errorInfo.proxyUrl) {
+        const pageIndex = errorInfo.pageIndex
+        if (pageIndex >= 0 && pageIndex < props.pdfPages.length) {
+          // 부모 컴포넌트에 fallback 요청
+          emit('image-fallback', {
+            pageIndex,
+            originalUrl: errorInfo.originalUrl
+          })
+          
+          console.log(`페이지 ${pageIndex + 1} 프록시에서 S3 URL로 fallback 요청:`, errorInfo.originalUrl)
+        }
+      }
+    }
+
+    // 이미지 로드 성공 처리
+    const handleImageLoad = (loadInfo) => {
+      console.log('이미지 로드 성공:', loadInfo)
+    }
+
     return {
       currentPageIndex,
       currentPage,
@@ -144,7 +170,9 @@ export default {
       handlePageClick,
       goBack,
       nextStep,
-      handlePageMoved
+      handlePageMoved,
+      handleImageError,
+      handleImageLoad
     }
   }
 }

@@ -488,16 +488,26 @@ export default {
 
         // 선택된 파일의 이미지들을 pdfPages로 설정
         if (fileHistory.pdfImages && fileHistory.pdfImages.length > 0) {
-          pdfPages.value = fileHistory.pdfImages.map((image, index) => ({
-            index: index,
-            pageNumber: image.pageNumber || (index + 1),
-            preview: image.imageUrl,
-            originalPage: (image.pageNumber || (index + 1)) - 1, // 실제 페이지 번호에서 1을 뺀 0-based 인덱스
-            width: image.imageWidth,
-            height: image.imageHeight,
-            fileHistoryId: fileHistory.id,
-            pdfImageId: image.id
-          }))
+          pdfPages.value = fileHistory.pdfImages.map((image, index) => {
+            // S3 URL인 경우 프록시 URL로 변경
+            let previewUrl = image.imageUrl
+            if (previewUrl && previewUrl.includes('s3.ap-northeast-2.amazonaws.com')) {
+              const encodedUrl = encodeURIComponent(previewUrl)
+              previewUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/image/proxy?url=${encodedUrl}`
+              console.log('S3 URL을 프록시 URL로 변경:', previewUrl)
+            }
+
+            return {
+              index: index,
+              pageNumber: image.pageNumber || (index + 1),
+              preview: previewUrl,
+              originalPage: (image.pageNumber || (index + 1)) - 1, // 실제 페이지 번호에서 1을 뺀 0-based 인덱스
+              width: image.imageWidth,
+              height: image.imageHeight,
+              fileHistoryId: fileHistory.id,
+              pdfImageId: image.id
+            }
+          })
         }
 
         // Store에 파일 히스토리 정보 설정 (이미지 순서 업데이트를 위해 필요)
@@ -911,6 +921,27 @@ export default {
      */
     const hideFileHistoryError = () => {
       itemProcessingStore.showFileHistoryError = false
+    }
+
+    /**
+     * 이미지 프록시 실패 시 S3 URL로 fallback 처리
+     * @param {Object} fallbackInfo - fallback 정보
+     * @param {number} fallbackInfo.pageIndex - 페이지 인덱스
+     * @param {string} fallbackInfo.originalUrl - 원본 S3 URL
+     */
+    const handleImageFallback = (fallbackInfo) => {
+      const { pageIndex, originalUrl } = fallbackInfo
+      
+      if (pageIndex >= 0 && pageIndex < pdfPages.value.length) {
+        // 해당 페이지의 preview URL을 S3 URL로 변경
+        pdfPages.value[pageIndex].preview = originalUrl
+        pdfPages.value[pageIndex].useProxy = false
+        
+        console.log(`페이지 ${pageIndex + 1} 프록시에서 S3 URL로 fallback 완료:`, originalUrl)
+        
+        // 사용자에게 알림 (선택사항)
+        // toast.success(`페이지 ${pageIndex + 1} 이미지 로딩 방식을 변경했습니다.`)
+      }
     }
 
 

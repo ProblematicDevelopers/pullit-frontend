@@ -674,11 +674,11 @@ export default {
           })
         }
 
+        // 이미지 로드 실패 처리
         img.onerror = (error) => {
           console.error('이미지 로드 실패:', error)
           console.error('이미지 URL:', pageData.preview)
-
-          // 이미지 로드 실패 시 사용자에게 알림
+          
           const errorDiv = document.createElement('div')
           errorDiv.className = 'pdf-load-error'
           errorDiv.style.cssText = `
@@ -688,15 +688,19 @@ export default {
             transform: translate(-50%, -50%);
             background: #f8d7da;
             color: #721c24;
-            padding: 1rem;
-            border-radius: 4px;
+            padding: 1.5rem;
+            border-radius: 8px;
             text-align: center;
             z-index: 10;
+            max-width: 300px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
           `
+          
           errorDiv.innerHTML = `
-            <div>⚠️ 이미지 로드 실패</div>
+            <div style="font-size: 18px; margin-bottom: 8px;">⚠️ 이미지 로드 실패</div>
             <small>페이지를 새로고침하거나 다시 시도해주세요</small>
           `
+          
           imageContainer.appendChild(errorDiv)
         }
 
@@ -1177,21 +1181,67 @@ export default {
       showOcrModal.value = false
     }
 
-    const saveOcrResults = async (problems) => {
+    const saveOcrResults = async (itemData) => {
       try {
-        console.log('저장된 문제들:', problems)
+        console.log('문항 저장 시작:', itemData)
 
-        if (capturedImageData.value) {
-          success('OCR 결과가 성공적으로 저장되었습니다.')
-        } else {
-          success('OCR 결과가 저장되었습니다.')
+        // 백엔드 ProcessedItem 엔티티 구조에 맞춘 데이터 준비
+        const processedItemData = {
+          // 기본 문항 정보 (백엔드 enum에 맞춤)
+          type: itemData.itemType === 'multiple_choice' ? 'multiple' : 
+                itemData.itemType === 'subjective' ? 'subjective' :
+                itemData.itemType === 'short_answer' ? 'shortAnswer' :
+                itemData.itemType === 'essay' ? 'essay' : 'multiple',
+          
+          difficulty: itemData.difficulty === 'easy' ? 'easy' :
+                     itemData.difficulty === 'medium' ? 'medium' :
+                     itemData.difficulty === 'hard' ? 'hard' : 'medium',
+          
+          score: itemData.score || 1,
+          
+          // 백엔드 필드명에 맞춤 (questionText -> answer, optionsText -> solution)
+          answer: itemData.editedTexts?.problem || itemData.ocrResults?.problemText || '',
+          solution: itemData.editedTexts?.options || itemData.ocrResults?.optionsText || '',
+          explanation: itemData.editedTexts?.explanation || itemData.explanation || '',
+          
+          // 단원 정보 (현재는 null, 추후 Step3에서 설정)
+          majorChapterId: null,
+          middleChapterId: null,
+          minorChapterId: null,
+          
+          // 지문 그룹 (해당하는 경우)
+          passageId: itemData.passageGroup ? parseInt(itemData.passageGroup) : null,
+          
+          // OCR 히스토리 데이터 (백엔드 AreaType enum에 맞춤)
+          ocrHistories: Object.entries(itemData.selectedAreas || {}).map(([areaType, areaInfo]) => ({
+            pdfImageId: capturedImageInfo.value?.pdfImageId || null,
+            areaType: areaType === 'problem' ? 'PROBLEM' :
+                     areaType === 'options' ? 'OPTIONS' :
+                     areaType === 'question' ? 'QUESTION' :
+                     areaType === 'image' ? 'IMAGE' : 'PROBLEM',
+            ocrText: ocrResults.value?.[areaType]?.rawText || '',
+            editedText: itemData.editedTexts?.[areaType] || '',
+            originalImageUrl: capturedImageInfo.value?.imageUrl || null,
+            positionX: areaInfo.x?.toString() || '0',
+            positionY: areaInfo.y?.toString() || '0',
+            sizeX: areaInfo.width?.toString() || '0',
+            sizeY: areaInfo.height?.toString() || '0'
+          }))
         }
 
+        console.log('API 호출 데이터:', processedItemData)
+
+        // API를 통해 processed_items 테이블에 저장 (OCR 히스토리 포함)
+        const result = await ocrApi.saveProcessedItem(processedItemData)
+        
+        console.log('문항 저장 성공:', result)
+
+        success('문항이 성공적으로 저장되었습니다.')
         closeOcrModal()
 
       } catch (error) {
-        console.error('OCR 결과 저장 실패:', error)
-        showError('OCR 결과 저장에 실패했습니다: ' + error.message)
+        console.error('문항 저장 실패:', error)
+        showError('문항 저장에 실패했습니다: ' + error.message)
       }
     }
 
