@@ -111,7 +111,7 @@
               <div class="list-group list-group-flush" style="max-height: 300px; overflow-y: auto">
                 <div
                   class="list-group-item list-group-item-action d-flex align-items-center"
-                  v-for="participant in onlineParticipants"
+                  v-for="participant in participantsWithProgress"
                   :key="participant.userId"
                 >
                   <div class="d-flex align-items-center flex-grow-1">
@@ -134,7 +134,51 @@
                           >🟢</span
                         >
                       </div>
-                      <small class="text-muted">{{ participant.userRole }}</small>
+                      <!-- 시험 진행 상황 표시 -->
+                      <div v-if="participant.progress != null" class="progress-info mt-2">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                          <small class="text-primary fw-medium">
+                            📝 {{ participant.progress.currentQuestion }}번 문제
+                          </small>
+                          <small class="text-muted">
+                            ⏱️ {{ formatRemainingTime(participant.progress.remainingTime) }}
+                          </small>
+                        </div>
+                        <div class="progress" style="height: 8px; background-color: #e9ecef">
+                          <div
+                            class="progress-bar bg-success"
+                            :style="{
+                              width: `${(participant.progress.answeredQuestions / participant.progress.totalQuestions) * 100}%`,
+                            }"
+                            role="progressbar"
+                            :aria-valuenow="participant.progress.answeredQuestions"
+                            :aria-valuemin="0"
+                            :aria-valuemax="participant.progress.totalQuestions"
+                          ></div>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-1">
+                          <small class="text-muted">
+                            {{ participant.progress.answeredQuestions }}/{{
+                              participant.progress.totalQuestions
+                            }}
+                            문제 완료
+                          </small>
+                          <small class="text-success fw-medium">
+                            {{
+                              Math.round(
+                                (participant.progress.answeredQuestions /
+                                  participant.progress.totalQuestions) *
+                                  100,
+                              )
+                            }}%
+                          </small>
+                        </div>
+                      </div>
+
+                      <!-- 시험 시작 전 상태 -->
+                      <div v-else-if="!examStarted" class="mt-2">
+                        <small class="text-warning">⏳ 시험 대기 중</small>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -246,7 +290,6 @@ const currentUserRole = ref(userInfo.value.role)
 
 // 시험 상태 관리
 const examStarted = ref(false)
-
 // 시험 상태 텍스트와 클래스
 const examStatusText = computed(() => {
   if (!examStarted.value) return '대기 중'
@@ -265,6 +308,17 @@ const channelName = ref('')
 
 // 온라인 참가자 목록
 const onlineParticipants = ref([])
+
+// 학생별 진행 상황을 별도로 관리
+const studentProgress = ref({})
+
+// onlineParticipants와 studentProgress를 결합한 computed
+const participantsWithProgress = computed(() => {
+  return onlineParticipants.value.map((participant) => ({
+    ...participant,
+    progress: studentProgress.value[participant.userId] || null,
+  }))
+})
 
 // 스크롤을 최하단으로 이동시키는 함수
 const scrollToBottom = () => {
@@ -297,6 +351,15 @@ const formatTime = (timestamp) => {
   if (hours < 24) return `${hours}시간 전`
 
   return messageDate.toLocaleDateString()
+}
+
+// 남은 시간 포맷팅 함수
+const formatRemainingTime = (seconds) => {
+  if (!seconds || seconds <= 0) return '시간 종료'
+
+  const minutes = Math.floor(seconds / 60)
+  const remainingSeconds = seconds % 60
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`
 }
 
 // 시험 정보 로드
@@ -393,6 +456,7 @@ const updateParticipantsStatus = (participants, status) => {
           userName: onlineUser.userName,
           userRole: onlineUser.userRole,
           status: 'ONLINE',
+          progress: null, // 진행 상황 초기화
         })
       }
     })
@@ -407,6 +471,7 @@ const updateParticipantsStatus = (participants, status) => {
           userName: status.userName || '알 수 없음',
           userRole: status.userRole || 'STUDENT',
           status: 'ONLINE',
+          progress: null, // 진행 상황 초기화
         })
       }
     } else if (status.status === 'OFFLINE' && status.userRole !== 'TEACHER') {
@@ -416,6 +481,18 @@ const updateParticipantsStatus = (participants, status) => {
         participants.splice(index, 1)
       }
     }
+  }
+}
+
+// 학생 진행 상황 업데이트
+const updateStudentProgress = (progressData) => {
+  // studentProgress 객체에 직접 업데이트 (Vue 반응성 자동 처리)
+  studentProgress.value[progressData.userId] = {
+    currentQuestion: progressData.currentQuestion,
+    answeredQuestions: progressData.answeredQuestions?.length || 0,
+    totalQuestions: examInfo.value.totalItem, // 기본값 또는 시험 정보에서 가져올 수 있음
+    remainingTime: progressData.remainingTime,
+    lastUpdate: progressData.timestamp,
   }
 }
 
@@ -449,8 +526,22 @@ onMounted(async () => {
         updateParticipantsStatus(onlineParticipants.value, status)
       },
       onExamProgress: (examProgress) => {
-        // 학생들의 시험 진행 상황 모니터링
-        console.log('📊 학생 시험 진행 상황:', examProgress)
+        try {
+          // examProgress가 이미 객체이므로 JSON.parse() 불필요
+          const progressData = examProgress
+
+          // userProgresses에서 각 학생의 진행 상황 업데이트
+          if (progressData.userProgresses) {
+            Object.keys(progressData.userProgresses).forEach((userId) => {
+              const userProgress = progressData.userProgresses[userId]
+
+              // 실시간 참가자 목록에 진행 상황 업데이트
+              updateStudentProgress(userProgress)
+            })
+          }
+        } catch (error) {
+          console.error('시험 진행 상황 처리 오류:', error)
+        }
       },
     })
 
