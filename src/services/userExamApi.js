@@ -1,12 +1,12 @@
 /**
  * User Exam API 서비스
- * 
+ *
  * 사용자 시험지 관리 관련 API 호출
  */
 
 import api from '@/services/api'
 
-const BASE_URL = '/api/user-exams'
+const BASE_URL = '/user-exams'
 
 const userExamApi = {
   /**
@@ -15,11 +15,7 @@ const userExamApi = {
    * @returns {Promise} 생성된 시험지 정보
    */
   createExamWithPDF(formData) {
-    return api.post(BASE_URL, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      }
-    })
+    return api.post(BASE_URL, formData)
   },
 
   /**
@@ -31,12 +27,8 @@ const userExamApi = {
   updatePDF(examId, pdfFile) {
     const formData = new FormData()
     formData.append('pdfFile', pdfFile)
-    
-    return api.put(`${BASE_URL}/${examId}/pdf`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      }
-    })
+
+    return api.put(`${BASE_URL}/${examId}/pdf`, formData)
   },
 
   /**
@@ -75,12 +67,8 @@ const userExamApi = {
   updateAnswerPDF(examId, answerPdfFile) {
     const formData = new FormData()
     formData.append('answerPdfFile', answerPdfFile)
-    
-    return api.put(`${BASE_URL}/${examId}/answer-pdf`, formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-      }
-    })
+
+    return api.put(`${BASE_URL}/${examId}/answer-pdf`, formData)
   }
 }
 

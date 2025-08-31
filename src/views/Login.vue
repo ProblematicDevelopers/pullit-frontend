@@ -194,9 +194,9 @@ const handleLogin = async () => {
       } else {
         // 역할에 따라 기본 페이지로 리다이렉트
         if (user.role === 'ADMIN') {
-          router.push('/class-management')
+          router.push('/class-dashboard')
         } else if (user.role === 'TEACHER') {
-          router.push('/class-management')
+          router.push('/class-dashboard')
         } else {
           router.push('/student/main')
         }

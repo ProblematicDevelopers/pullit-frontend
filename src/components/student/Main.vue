@@ -129,8 +129,88 @@
   </div>
 </template>
 
-<script>
-export default { name: 'StudentMain' }
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue'
+import wsService from '@/services/websocket'
+import classApi from '@/services/classApi'
+
+// 현재 사용자 정보
+const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
+const classInfo = ref(null)
+
+// WebSocket 연결 함수
+const connectToClassWebSocket = async () => {
+  try {
+    // 학생의 반 정보 조회
+    const response = await classApi.getStudentClass()
+    if (response.data && response.data.success && response.data.data) {
+      classInfo.value = response.data.data
+      
+      // WebSocket 연결
+      if (classInfo.value.classId) {
+        const userId = userInfo.value.id || userInfo.value.userId
+        const userName = userInfo.value.fullName || userInfo.value.name
+        const channelName = `class-${classInfo.value.classId}`
+        
+        console.log('🎓 학생 WebSocket 연결 시작:', {
+          classId: classInfo.value.classId,
+          userId: userId,
+          userName: userName,
+          channelName: channelName
+        })
+        
+        // 기존 연결이 있으면 끊기
+        if (wsService.isConnected()) {
+          wsService.disconnect()
+        }
+        
+        // 새로 연결
+        await wsService.connect(
+          channelName,
+          userId,
+          userName,
+          'STUDENT',
+          {
+            onOnlineStatus: (status) => {
+              console.log('📡 학생 온라인 상태 업데이트:', status)
+            }
+          }
+        )
+        
+        console.log('✅ 학생 WebSocket 연결 성공')
+        
+        // 온라인 상태 전송
+        wsService.updateOnlineStatus(channelName, userId, userName, 'STUDENT', 'ONLINE')
+      }
+    }
+  } catch (error) {
+    console.error('❌ 학생 WebSocket 연결 실패:', error)
+  }
+}
+
+onMounted(() => {
+  // 학생이 로그인하면 바로 WebSocket 연결
+  if (userInfo.value && userInfo.value.role === 'STUDENT') {
+    connectToClassWebSocket()
+  }
+})
+
+onUnmounted(() => {
+  // 페이지를 떠날 때 연결 해제
+  if (wsService.isConnected()) {
+    const userId = userInfo.value.id || userInfo.value.userId
+    const userName = userInfo.value.fullName || userInfo.value.name
+    const channelName = classInfo.value ? `class-${classInfo.value.classId}` : null
+    
+    if (channelName) {
+      // 오프라인 상태 전송
+      wsService.updateOnlineStatus(channelName, userId, userName, 'STUDENT', 'OFFLINE')
+      wsService.removeUser(channelName, userId, userName, 'STUDENT')
+    }
+    
+    wsService.disconnect()
+  }
+})
 </script>
 
 <style scoped>
