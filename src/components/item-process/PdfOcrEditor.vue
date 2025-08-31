@@ -84,12 +84,6 @@
             >
               {{ ocrLoading ? '추출 실행 중...' : '문제 추출' }}
             </button>
-            <button
-              @click="addDemoData"
-              class="btn btn-secondary"
-            >
-              테스트 데이터
-            </button>
           </div>
         </div>
 
@@ -174,7 +168,7 @@
               </div>
               <div class="step">
                 <span class="step-number">3</span>
-                <span class="step-text">추출된 텍스트를 CKEditor 편집</span>
+                <span class="step-text">추출된 텍스트를 편집</span>
               </div>
             </div>
           </div>
@@ -182,7 +176,7 @@
       </div>
     </div>
 
-    <!-- CKEditor 모달 -->
+    <!-- 텍스트 편집 모달 -->
     <div v-if="showEditor" class="editor-modal-overlay" @click="closeEditor">
       <div class="editor-modal" @click.stop>
         <div class="modal-header">
@@ -191,13 +185,13 @@
         </div>
         <div class="modal-content">
           <div class="editor-container">
-            <div class="ckeditor-wrapper">
-              <CKEditorComponent
+            <div class="text-editor-wrapper">
+              <textarea
                 v-model="currentEditingText"
-                :show-math-tools="true"
-                :show-output="false"
-                class="ckeditor-component"
-              />
+                class="form-control text-editor"
+                rows="15"
+                placeholder="OCR 결과를 편집하세요..."
+              ></textarea>
             </div>
           </div>
           <div class="modal-actions">
@@ -210,6 +204,7 @@
 
     <!-- OCR 결과 모달 -->
     <OcrResultModal
+      v-if="showOcrModal && capturedImageBase64 && capturedImageInfo"
       :is-visible="showOcrModal"
       :captured-image="capturedImageBase64"
       :captured-image-info="capturedImageInfo"
@@ -229,13 +224,11 @@ import { useToast } from '@/composables/useToast'
 import { ocrApi } from '@/services/ocrApi'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
-import CKEditorComponent from './CKEditorComponent.vue'
 import OcrResultModal from './OcrResultModal.vue'
 
 export default {
   name: 'PdfOcrEditor',
   components: {
-    CKEditorComponent,
     OcrResultModal
   },
   props: {
@@ -260,8 +253,6 @@ export default {
   emits: ['go-back'],
   setup(props, { emit }) {
     const { success, error: showError } = useToast()
-
-    // CKEditor 관련 - 동적 import로 처리됨
 
     // props로 받은 pdfPages 상태 확인 및 디버깅
     console.log('=== PdfOcrEditor 컴포넌트 마운트 ===')
@@ -302,24 +293,10 @@ export default {
     const capturedImageBase64 = ref('')
     const capturedImageInfo = ref({})
 
-    // CKEditor 편집 관련
+    // 텍스트 편집 관련
     const showEditor = ref(false)
     const currentEditingText = ref('')
     const currentEditingIndex = ref(-1)
-    const customMath = ref('') // 사용자 정의 수식 입력
-
-    // CKEditor 설정
-    const editorConfig = {
-      language: 'ko',
-      toolbar: {
-        items: [
-          'heading', '|', 'bold', 'italic', '|',
-          'numberedList', 'bulletedList', '|',
-          'link', 'insertTable', '|',
-          'undo', 'redo'
-        ]
-      }
-    }
 
     // KaTeX를 사용한 수식 렌더링 (computed)
     const renderedMath = ref('')
@@ -345,13 +322,7 @@ export default {
       }
     }
 
-    // 사용자 정의 수식 삽입
-    const insertCustomMath = () => {
-      if (customMath.value.trim()) {
-        insertMath(customMath.value)
-        customMath.value = ''
-      }
-    }
+
 
     // KaTeX를 사용한 수식 렌더링 함수
     const renderMathWithKaTeX = (text) => {
@@ -651,46 +622,90 @@ export default {
           return
         }
 
-        // preview 이미지를 Canvas에 직접 렌더링
-        const img = new Image()
+        // Canvas 대신 img 태그를 사용하여 이미지 표시
+        const imageContainer = pdfCanvas.value.parentElement
+        if (!imageContainer) {
+          console.error('이미지 컨테이너를 찾을 수 없음')
+          return
+        }
 
-        // CORS 설정으로 Canvas tainted 상태 방지
-        img.crossOrigin = 'anonymous'
+        // 기존 이미지 제거
+        const existingImg = imageContainer.querySelector('.pdf-page-image')
+        if (existingImg) {
+          existingImg.remove()
+        }
 
+        // 새 이미지 생성
+        const img = document.createElement('img')
+        img.className = 'pdf-page-image'
+        img.crossOrigin = 'anonymous' // CORS 오류 방지
+        img.style.cssText = `
+          width: 100%;
+          height: auto;
+          display: block;
+          position: absolute;
+          top: 0;
+          left: 0;
+          z-index: 1;
+        `
+        img.alt = `PDF 페이지 ${pageIndex + 1}`
+
+        // 이미지 로드 완료 후 Canvas 크기 설정
         img.onload = () => {
-          const canvas = pdfCanvas.value
-          const context = canvas.getContext('2d')
+          console.log('이미지 로드 완료:', {
+            naturalWidth: img.naturalWidth,
+            naturalHeight: img.naturalHeight,
+            displayWidth: img.offsetWidth,
+            displayHeight: img.offsetHeight
+          })
 
-          // 원본 이미지 크기 사용 (픽셀 정확도 보장)
-          const originalWidth = img.naturalWidth || img.width
-          const originalHeight = img.naturalHeight || img.height
+          // Canvas 크기를 이미지 표시 크기에 맞게 설정
+          const rect = img.getBoundingClientRect()
+          pdfCanvas.value.width = rect.width
+          pdfCanvas.value.height = rect.height
 
-          // Canvas 크기를 원본 이미지 크기로 설정
-          canvas.width = originalWidth
-          canvas.height = originalHeight
+          console.log('Canvas 크기 설정:', pdfCanvas.value.width, 'x', pdfCanvas.value.height)
 
-          console.log('Canvas 크기 설정:', canvas.width, 'x', canvas.height)
-          console.log('원본 이미지 크기:', originalWidth, 'x', originalHeight)
-
-          // 이미지 그리기 (원본 크기 그대로)
-          context.drawImage(img, 0, 0, originalWidth, originalHeight)
-          console.log('이미지 렌더링 완료')
-
-          // Canvas 오버레이 설정 - 렌더링 완료 후
+          // Canvas 오버레이 설정
           nextTick(() => {
             if (pdfCanvas.value && selectionCanvas.value) {
               setupCanvasOverlay()
-            } else {
-              console.log('Canvas 요소들이 아직 준비되지 않음, 오버레이 설정 건너뜀')
             }
           })
         }
 
         img.onerror = (error) => {
           console.error('이미지 로드 실패:', error)
+          console.error('이미지 URL:', pageData.preview)
+
+          // 이미지 로드 실패 시 사용자에게 알림
+          const errorDiv = document.createElement('div')
+          errorDiv.className = 'pdf-load-error'
+          errorDiv.style.cssText = `
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: #f8d7da;
+            color: #721c24;
+            padding: 1rem;
+            border-radius: 4px;
+            text-align: center;
+            z-index: 10;
+          `
+          errorDiv.innerHTML = `
+            <div>⚠️ 이미지 로드 실패</div>
+            <small>페이지를 새로고침하거나 다시 시도해주세요</small>
+          `
+          imageContainer.appendChild(errorDiv)
         }
 
+        // 이미지 로드 시작
+        console.log('이미지 로드 시작:', pageData.preview)
         img.src = pageData.preview
+
+        // 이미지를 컨테이너에 추가
+        imageContainer.appendChild(img)
 
       } catch (error) {
         console.error('PDF 페이지 렌더링 오류:', error)
@@ -787,8 +802,20 @@ export default {
         return
       }
 
+      // DOM 요소가 실제로 존재하는지 확인
+      if (!canvas.getBoundingClientRect) {
+        console.warn('Canvas DOM 요소가 유효하지 않음')
+        return
+      }
+
       // Canvas의 실제 픽셀 좌표 계산
       const rect = canvas.getBoundingClientRect()
+
+      // 유효한 크기인지 확인
+      if (rect.width <= 0 || rect.height <= 0) {
+        console.warn('Canvas 크기가 유효하지 않음:', { width: rect.width, height: rect.height })
+        return
+      }
 
       // 클릭 좌표를 Canvas 내부 좌표로 변환
       const x = event.clientX - rect.left
@@ -832,8 +859,20 @@ export default {
         return
       }
 
+      // DOM 요소가 실제로 존재하는지 확인
+      if (!canvas.getBoundingClientRect) {
+        console.warn('Canvas DOM 요소가 유효하지 않음')
+        return
+      }
+
       // Canvas의 실제 픽셀 좌표 계산
       const rect = canvas.getBoundingClientRect()
+
+      // 유효한 크기인지 확인
+      if (rect.width <= 0 || rect.height <= 0) {
+        console.warn('Canvas 크기가 유효하지 않음:', { width: rect.width, height: rect.height })
+        return
+      }
 
       // 클릭 좌표를 Canvas 내부 좌표로 변환
       const endX = event.clientX - rect.left
@@ -932,55 +971,76 @@ export default {
           throw new Error('PDF Canvas가 준비되지 않았습니다.')
         }
 
-        // 선택된 영역을 이미지로 캡처
-        const capturedImage = await captureSelectedArea(canvas, selection.value)
+        // 선택된 영역 정보 가져오기
+        const selectionInfo = await captureSelectedArea(canvas, selection.value)
 
-        // 캡처된 이미지와 영역 정보를 분리하여 저장
+        // 캡처된 영역 정보와 이미지 소스 정보를 저장
         const selectedAreaInfo = {
           x: selection.value.x,
           y: selection.value.y,
           width: selection.value.width,
           height: selection.value.height,
           pageIndex: currentPage.value,
-          timestamp: new Date().toISOString()
+          timestamp: new Date().toISOString(),
+          // 선택된 영역의 실제 픽셀 좌표와 스케일 정보 추가
+          pixelX: selectionInfo.x,
+          pixelY: selectionInfo.y,
+          pixelWidth: selectionInfo.width,
+          pixelHeight: selectionInfo.height,
+          scaleX: selectionInfo.scaleX,
+          scaleY: selectionInfo.scaleY,
+          imageSrc: selectionInfo.imageSrc,
+          naturalWidth: selectionInfo.naturalWidth,
+          naturalHeight: selectionInfo.naturalHeight
         }
 
-        // 이미지 데이터와 영역 정보를 분리하여 저장
-        capturedImageBase64.value = capturedImage
+                // 캡처된 이미지 데이터와 영역 정보를 모두 저장
+        // capturedImageData가 null인 경우 fallback으로 원본 이미지 URL 사용
+        if (selectionInfo.capturedImageData) {
+          capturedImageBase64.value = selectionInfo.capturedImageData
+          console.log('✅ capturedImageData 사용:', selectionInfo.capturedImageData.substring(0, 100) + '...')
+        } else if (selectionInfo.imageSrc) {
+          console.warn('⚠️ 이미지 캡처 실패, 원본 이미지 URL 사용')
+          capturedImageBase64.value = selectionInfo.imageSrc
+          console.log('🔗 원본 이미지 URL 사용:', selectionInfo.imageSrc)
+        } else {
+          throw new Error('이미지 데이터를 가져올 수 없습니다.')
+        }
+
+        // null 체크 후 props 설정
+        if (!capturedImageBase64.value) {
+          throw new Error('캡처된 이미지가 없습니다.')
+        }
+
         capturedImageInfo.value = selectedAreaInfo
-        capturedImageData.value = JSON.stringify(selectedAreaInfo) // 이미지 데이터 제외
+        capturedImageData.value = JSON.stringify(selectedAreaInfo)
 
-        // 이미지 데이터 유효성 검증
-        if (!capturedImage || capturedImage.length === 0) {
-          throw new Error('캡처된 이미지 데이터가 비어있습니다.')
-        }
+        // 디버깅: capturedImageBase64 설정 확인
+        console.log('=== capturedImageBase64 설정 확인 ===')
+        console.log('capturedImageBase64.value 설정됨:', !!capturedImageBase64.value)
+        console.log('capturedImageBase64.value 길이:', capturedImageBase64.value ? capturedImageBase64.value.length : 0)
+        console.log('capturedImageBase64.value 형식:', capturedImageBase64.value ? capturedImageBase64.value.substring(0, 100) + '...' : '없음')
+        console.log('capturedImageBase64.value 타입:', typeof capturedImageBase64.value)
+        console.log('capturedImageBase64.value가 URL인가?', capturedImageBase64.value && capturedImageBase64.value.startsWith('http'))
+        console.log('capturedImageBase64.value가 base64인가?', capturedImageBase64.value && capturedImageBase64.value.startsWith('data:image'))
 
-        // base64 데이터 형식 검증
-        if (!capturedImage.startsWith('data:image/')) {
-          throw new Error('캡처된 이미지가 올바른 형식이 아닙니다.')
-        }
-
-        // 이미지 데이터 크기 검증 (최소 1KB 이상)
-        const base64Data = capturedImage.split(',')[1]
-        const dataSize = Math.ceil((base64Data.length * 3) / 4)
-        if (dataSize < 1024) {
-          throw new Error(`캡처된 이미지가 너무 작습니다. (${dataSize} bytes)`)
+        // 영역 정보 유효성 검증
+        if (!selectionInfo || !selectionInfo.imageSrc) {
+          throw new Error('선택된 영역 정보가 올바르지 않습니다.')
         }
 
         // 디버깅 로그
         console.log('=== 영역 선택 및 캡처 완료 ===')
         console.log('선택된 영역 정보:', selectedAreaInfo)
-        console.log('캡처된 이미지 데이터 길이:', capturedImage ? capturedImage.length : 0)
-        console.log('이미지 데이터 크기 (bytes):', dataSize)
-        console.log('이미지 데이터 형식:', capturedImage.substring(0, 50) + '...')
+        console.log('이미지 소스:', selectionInfo.imageSrc)
+        console.log('자연 크기:', selectionInfo.naturalWidth, 'x', selectionInfo.naturalHeight)
+        console.log('픽셀 좌표:', selectionInfo.x, selectionInfo.y, selectionInfo.width, selectionInfo.height)
+        console.log('스케일:', selectionInfo.scaleX, selectionInfo.scaleY)
         console.log('capturedImageData.value 설정됨:', !!capturedImageData.value)
-        console.log('capturedImageBase64.value 설정됨:', !!capturedImageBase64.value)
-        console.log('capturedImageBase64.value 길이:', capturedImageBase64.value ? capturedImageBase64.value.length : 0)
-        console.log('capturedImageBase64.value 형식:', capturedImageBase64.value ? capturedImageBase64.value.substring(0, 50) + '...' : 'null')
+        console.log('capturedImageInfo.value 설정됨:', !!capturedImageInfo.value)
 
-        // OCR 모달에 전달될 데이터 검증
+        // OCR 모달 전달될 데이터 검증
         console.log('=== OCR 모달 전달 데이터 검증 ===')
-        console.log('capturedImage prop으로 전달될 값:', capturedImageBase64.value ? capturedImageBase64.value.substring(0, 100) + '...' : 'null')
         console.log('capturedImageInfo prop으로 전달될 값:', capturedImageInfo.value)
 
         // OCR 모달 표시
@@ -1004,12 +1064,26 @@ export default {
       try {
         console.log('=== 영역 캡처 시작 ===')
         console.log('선택된 영역:', selection)
-        console.log('Canvas 크기:', canvas.width, 'x', canvas.height)
+
+        // img 태그에서 이미지 가져오기
+        const imageContainer = pdfCanvas.value.parentElement
+        const imgElement = imageContainer.querySelector('.pdf-page-image')
+
+        if (!imgElement) {
+          throw new Error('PDF 페이지 이미지를 찾을 수 없습니다.')
+        }
+
+        console.log('이미지 요소 정보:', {
+          naturalWidth: imgElement.naturalWidth,
+          naturalHeight: imgElement.naturalHeight,
+          offsetWidth: imgElement.offsetWidth,
+          offsetHeight: imgElement.offsetHeight
+        })
 
         // Canvas의 화면 표시 크기와 실제 픽셀 크기의 비율 계산
-        const rect = canvas.getBoundingClientRect()
-        const scaleX = canvas.width / rect.width
-        const scaleY = canvas.height / rect.height
+        const rect = imgElement.getBoundingClientRect()
+        const scaleX = imgElement.naturalWidth / rect.width
+        const scaleY = imgElement.naturalHeight / rect.height
 
         // 화면 좌표를 픽셀 좌표로 변환
         const pixelX = Math.round(selection.x * scaleX)
@@ -1023,9 +1097,9 @@ export default {
           스케일: { scaleX, scaleY }
         })
 
-        // 선택 영역이 Canvas 범위를 벗어나지 않는지 확인
-        const maxX = Math.min(pixelX + pixelWidth, canvas.width)
-        const maxY = Math.min(pixelY + pixelHeight, canvas.height)
+        // 선택 영역이 이미지 범위를 벗어나지 않는지 확인
+        const maxX = Math.min(pixelX + pixelWidth, imgElement.naturalWidth)
+        const maxY = Math.min(pixelY + pixelHeight, imgElement.naturalHeight)
         const captureX = Math.max(0, pixelX)
         const captureY = Math.max(0, pixelY)
         const captureWidth = maxX - captureX
@@ -1035,45 +1109,62 @@ export default {
           throw new Error('유효하지 않은 캡처 영역입니다.')
         }
 
-        // 새로운 Canvas에 선택된 영역을 복사
-        const tempCanvas = document.createElement('canvas')
-        tempCanvas.width = captureWidth
-        tempCanvas.height = captureHeight
+        // 선택된 영역을 실제로 캡처하여 base64 이미지 데이터 생성
+        try {
+          // 임시 Canvas 생성
+          const tempCanvas = document.createElement('canvas')
+          tempCanvas.width = captureWidth
+          tempCanvas.height = captureHeight
 
-        const ctx = tempCanvas.getContext('2d')
+          const ctx = tempCanvas.getContext('2d')
 
-        // 원본 Canvas에서 선택된 영역을 새 Canvas로 복사
-        ctx.drawImage(
-          canvas,
-          captureX, captureY, captureWidth, captureHeight,
-          0, 0, captureWidth, captureHeight
-        )
+          // 원본 이미지에서 선택된 영역을 Canvas에 그리기
+          ctx.drawImage(
+            imgElement,
+            captureX, captureY, captureWidth, captureHeight,
+            0, 0, captureWidth, captureHeight
+          )
 
-        console.log('영역 캡처 성공:', {
-          원본선택: selection,
-          픽셀변환: { x: pixelX, y: pixelY, width: pixelWidth, height: pixelHeight },
-          실제캡처: { x: captureX, y: captureY, width: captureWidth, height: captureHeight }
-        })
+          // Canvas를 base64로 변환
+          const capturedImageData = tempCanvas.toDataURL('image/png')
 
-        // CORS 오류 방지를 위해 Blob 방식으로 이미지 데이터 생성
-        return new Promise((resolve, reject) => {
-          tempCanvas.toBlob((blob) => {
-            if (blob) {
-              const reader = new FileReader()
-              reader.onload = () => {
-                console.log('Blob 방식으로 이미지 데이터 생성 성공')
-                resolve(reader.result)
-              }
-              reader.onerror = () => {
-                console.error('FileReader 오류:', reader.error)
-                reject(new Error('이미지 데이터 읽기 실패'))
-              }
-              reader.readAsDataURL(blob)
-            } else {
-              reject(new Error('Blob 생성 실패'))
-            }
-          }, 'image/png', 0.9)
-        })
+          console.log('영역 캡처 성공:', {
+            원본선택: selection,
+            픽셀변환: { x: pixelX, y: pixelY, width: pixelWidth, height: pixelHeight },
+            실제캡처: { x: captureX, y: captureY, width: captureWidth, height: captureHeight },
+            이미지데이터길이: capturedImageData.length
+          })
+
+          // 캡처된 이미지 데이터와 영역 정보를 함께 반환
+          return {
+            x: captureX,
+            y: captureY,
+            width: captureWidth,
+            height: captureHeight,
+            scaleX,
+            scaleY,
+            imageSrc: imgElement.src,
+            naturalWidth: imgElement.naturalWidth,
+            naturalHeight: imgElement.naturalHeight,
+            capturedImageData: capturedImageData
+          }
+
+        } catch (captureError) {
+          console.error('이미지 캡처 실패:', captureError)
+          // 캡처 실패 시 영역 정보만 반환
+          return {
+            x: captureX,
+            y: captureY,
+            width: captureWidth,
+            height: captureHeight,
+            scaleX,
+            scaleY,
+            imageSrc: imgElement.src,
+            naturalWidth: imgElement.naturalWidth,
+            naturalHeight: imgElement.naturalHeight,
+            capturedImageData: null
+          }
+        }
 
       } catch (error) {
         console.error('영역 캡처 오류:', error)
@@ -1215,7 +1306,7 @@ export default {
       emit('go-back')
     }
 
-    // CKEditor 편집 관련 함수
+    // 텍스트 편집 관련 함수
     const editResult = async (index) => {
       currentEditingIndex.value = index
       currentEditingText.value = ocrResults.value[index].text
@@ -1236,49 +1327,6 @@ export default {
         success('OCR 결과가 저장되었습니다.')
       }
     }
-
-    // 테스트용 데모 데이터 추가 함수
-    const addDemoData = () => {
-      const demoData = [
-        {
-          page: 0,
-          text: '1. 다음 중 올바른 것은?\n\nA) 2x + 3 = 7\nB) 2x + 3 = 8\nC) 2x + 3 = 9\nD) 2x + 3 = 10\n\n정답: A',
-          image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMzAwIiBoZWlnaHQ9IjIwMCIgZmlsbD0iI2YwZjhmZiIvPjx0ZXh0IHg9IjE1MCIgeT0iMTAwIiBmb250LWZhbWlseT0iQXJpYWwiIGZvbnQtc2l6ZT0iMTQiIGZpbGw9IiMzMzMiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkRlbW8gSW1hZ2UgMTwvdGV4dD48L3N2Zz4=',
-          x: 150,
-          y: 120,
-          width: 300,
-          height: 200,
-          edited: false
-        },
-        {
-          page: 0,
-          text: '2. 삼각형의 내각의 합은?\n\nA) 90도\nB) 180도\nC) 270도\nD) 360도\n\n정답: B',
-          image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjgwIiBoZWlnaHQ9IjE4MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjgwIiBoZWlnaHQ9IjE4MCIgZmlsbD0iI2YwZjhmZiIvPjx0ZXh0IHg9IjE0MCIgeT0iOTAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzMzMyIgdGV4dC1hbmNob3I9Im1pZGRsZSI+RGVtbyBJbWFnZSAyPC90ZXh0Pjwvc3ZnPg==',
-          x: 500,
-          y: 150,
-          width: 280,
-          height: 180,
-          edited: false
-        },
-        {
-          page: 1,
-          text: '3. 물의 화학식은?\n\nA) H2O\nB) CO2\nC) O2\nD) N2\n\n정답: A',
-          image: 'data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjUwIiBoZWlnaHQ9IjE2MCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cmVjdCB3aWR0aD0iMjUwIiBoZWlnaHQ9IjE2MCIgZmlsbD0iI2YwZjhmZiIvPjx0ZXh0IHg9IjEyNSIgeT0iODAiIGZvbnQtZmFtaWx5PSJBcmlhbCIgZm9udC1zaXplPSIxNCIgZmlsbD0iIzMzMyIgdGV4dC1hbmNob3I9Im1pZGRsZSI+RGVtbyBJbWFnZSAzPC90ZXh0Pjwvc3ZnPg==',
-          x: 200,
-          y: 200,
-          width: 250,
-          height: 160,
-          edited: false
-        }
-      ];
-
-      // 기존 데이터에 추가
-      demoData.forEach(item => {
-        ocrResults.value.push(item);
-      });
-
-      success(`${demoData.length}개의 테스트 문제가 추가되었습니다.`);
-    };
 
     // 유효한 OCR 결과만 필터링
     const validOcrResults = computed(() => {
@@ -1302,11 +1350,9 @@ export default {
       capturedImageBase64,
       capturedImageInfo,
 
-      // CKEditor 관련
+      // 텍스트 편집 관련
       showEditor,
       currentEditingText,
-      customMath, // 추가된 상태
-      editorConfig, // CKEditor 설정
 
       // 계산된 속성
       selectionStyle,
@@ -1330,9 +1376,9 @@ export default {
       closeEditor,
       saveEditedText,
       clearAllResults,
-      addDemoData,
+
       insertMath,
-      insertCustomMath,
+
       renderMathWithKaTeX,
       closeOcrModal,
       saveOcrResults
@@ -1419,7 +1465,9 @@ export default {
   z-index: 10; /* PDF Canvas 위에 표시 */
   cursor: crosshair;
   background: transparent; /* 투명 배경 */
-  border: 1px solid rgba(59, 130, 246, 0.3); /* 디버깅용 테두리 */
+  border: 1px solid rgba(59, 130, 246, 0.5);
+  border-radius: 4px;
+  background: rgba(59, 130, 246, 0.05);
   /* 픽셀 정확도를 위한 설정 */
   image-rendering: -webkit-optimize-contrast;
   image-rendering: -moz-crisp-edges;
@@ -1784,17 +1832,13 @@ export default {
   overflow: hidden;
 }
 
-.ckeditor-component {
+.text-editor {
   height: 100%;
-}
-
-.ckeditor-component :deep(.ck-editor__main) {
-  height: calc(100% - 50px);
-}
-
-.ckeditor-component :deep(.ck-content) {
-  height: 100%;
-  overflow-y: auto;
+  resize: vertical;
+  font-family: 'Courier New', monospace;
+  font-size: 14px;
+  line-height: 1.6;
+  padding: 1rem;
 }
 
 .loading-editor {
@@ -1821,7 +1865,7 @@ export default {
   100% { transform: rotate(360deg); }
 }
 
-.ckeditor-wrapper {
+.text-editor-wrapper {
   height: 100%;
 }
 

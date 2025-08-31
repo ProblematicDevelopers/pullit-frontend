@@ -48,43 +48,49 @@
 
       <!-- 파일 업로드 완료 상태 -->
       <div v-else class="file-info">
-        <div class="file-success-header text-center mb-4">
-          <div class="success-icon">✅</div>
-          <h4 class="success-title text-success">파일 업로드 완료!</h4>
+        <div class="file-info-header">
+          <div class="file-icon">📄</div>
+          <div class="file-details">
+            <h4 class="file-name">{{ pdfFile.name }}</h4>
+            <p class="file-size">{{ formatFileSize(pdfFile.size) }}</p>
+          </div>
         </div>
 
-        <div class="file-details bg-light rounded-3 p-4 mb-4">
-          <div class="file-details-header d-flex align-items-center gap-3 mb-3">
-            <div class="file-icon">📄</div>
-            <div class="file-text">
-              <p class="file-name fw-semibold text-dark mb-1">{{ pdfFile.name }}</p>
-              <p class="file-size text-muted mb-0">{{ formatFileSize(pdfFile.size) }}</p>
-            </div>
-          </div>
-
-                  <!-- 진행 상태 표시 -->
-        <div class="upload-progress mt-3">
-          <div v-if="isProcessing" class="processing-status">
+        <!-- 이미지 변환 상태 표시 -->
+        <div v-if="isProcessing" class="conversion-status">
+          <div class="status-indicator">
             <div class="spinner-border spinner-border-sm text-primary me-2" role="status">
-              <span class="visually-hidden">처리 중...</span>
+              <span class="visually-hidden">변환 중...</span>
             </div>
-            <span class="text-primary">서버에서 이미지 변환 중...</span>
+            <span class="status-text">PDF를 이미지로 변환 중...</span>
           </div>
-          <div v-else class="progress" style="height: 8px;">
-            <div class="progress-bar bg-success" style="width: 100%"></div>
+          <div class="status-description">
+            <small class="text-muted">
+              서버에서 PDF를 고품질 이미지로 변환하고 있습니다.<br>
+              파일 크기에 따라 시간이 걸릴 수 있습니다.
+            </small>
           </div>
-          <small v-if="!isProcessing" class="text-success mt-2 d-block">업로드 완료</small>
-        </div>
         </div>
 
-        <div class="file-actions d-flex justify-content-center gap-3">
-          <button @click.stop="removeFile" class="btn btn-outline-danger" :disabled="isProcessing">
-            <span class="btn-icon">🗑️</span>
+        <!-- 변환 완료 상태 -->
+        <div v-else class="conversion-complete">
+          <div class="success-indicator">
+            <i class="bi bi-check-circle-fill text-success me-2"></i>
+            <span class="status-text">이미지 변환 완료</span>
+          </div>
+          <div class="completion-description">
+            <small class="text-muted">
+              PDF가 성공적으로 이미지로 변환되었습니다.<br>
+              이제 편집 및 OCR 처리를 진행할 수 있습니다.
+            </small>
+          </div>
+        </div>
+
+        <!-- 파일 제거 버튼 -->
+        <div class="file-actions mt-3">
+          <button @click="removeFile" class="btn btn-outline-danger">
+            <i class="bi bi-trash me-1"></i>
             파일 제거
-          </button>
-          <button @click.stop="triggerFileInput" class="btn btn-outline-primary" :disabled="isProcessing">
-            <span class="btn-icon">🔄</span>
-            다른 파일 선택
           </button>
         </div>
       </div>
@@ -392,34 +398,7 @@ const formatFileSize = (bytes) => {
   padding-top: 1rem;
 }
 
-.file-success-header {
-  margin-bottom: 2rem;
-}
-
-.success-icon {
-  font-size: 4rem;
-  color: #22c55e;
-  margin-bottom: 1rem;
-  animation: bounceIn 0.6s ease-out;
-}
-
-.success-title {
-  font-size: 1.75rem;
-  font-weight: 700;
-  color: #22c55e;
-  margin: 0;
-}
-
-.file-details {
-  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
-  border-radius: 16px;
-  padding: 2rem;
-  margin-bottom: 2rem;
-  border: 1px solid #e2e8f0;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
-}
-
-.file-details-header {
+.file-info-header {
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -431,7 +410,7 @@ const formatFileSize = (bytes) => {
   color: #3b82f6;
 }
 
-.file-text {
+.file-details {
   flex: 1;
 }
 
@@ -449,22 +428,50 @@ const formatFileSize = (bytes) => {
   font-size: 1rem;
 }
 
-.upload-progress {
-  text-align: center;
+.conversion-status,
+.conversion-complete {
+  margin-top: 1.5rem;
+  padding: 1.5rem;
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
 }
 
-.progress {
-  height: 8px;
-  border-radius: 4px;
-  background-color: #e2e8f0;
-  overflow: hidden;
+.status-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
   margin-bottom: 0.5rem;
 }
 
-.progress-bar {
-  border-radius: 4px;
-  background: linear-gradient(90deg, #22c55e, #16a34a);
-  transition: width 0.3s ease-in-out;
+.status-text {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.completion-description {
+  text-align: center;
+}
+
+.completion-description small {
+  color: #64748b;
+  font-size: 0.9rem;
+}
+
+.success-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.success-indicator .bi-check-circle-fill {
+  font-size: 1.5rem;
+  color: #22c55e;
 }
 
 .file-actions {
