@@ -233,6 +233,8 @@
 import { ref, computed, watch, onMounted } from 'vue'
 import Editor from '@tinymce/tinymce-vue'
 import chapterApi from '@/services/chapterApi'
+import { useSubjectStore } from '@/store/subjectStore.js'
+import { fileHistoryAPI } from '@/services/fileHistoryApi.js'
 
 export default {
   name: 'Step3InfoInput',
@@ -305,146 +307,87 @@ export default {
     // 챕터 데이터 로드
     const loadChapters = async () => {
       console.log('🚀 [Step3InfoInput] loadChapters 시작')
-      console.log('📋 [Step3InfoInput] 현재 상태:', {
-        isNewFile: props.isNewFile,
-        selectedTextbook: props.selectedTextbook,
-        selectedFile: props.selectedFile
-      })
 
-      // 신규 파일인 경우: 교과서 ID로 단원 정보 조회
+      let subjectId = null
+
       if (props.isNewFile) {
-        if (!props.selectedTextbook?.subjectId) {
-          console.warn('📚 [Step3InfoInput] 신규 파일 - 교과서 정보가 없어 챕터를 로드할 수 없습니다.')
-          console.warn('📚 [Step3InfoInput] selectedTextbook:', props.selectedTextbook)
-          return
-        }
+        // 새 파일: 교과서에서 subjectId
+        subjectId = props.selectedTextbook?.subjectId
+                 || props.selectedTextbook?.id   // 혹시 id로 오는 경로 대비
+                 || props.selectedTextbook?.code || null
+      } else if (props.selectedFile?.id) {
+        // 기존 파일: selectedFile.subjectId 우선 사용 (상위에서 이미 설정됨)
+        subjectId = props.selectedFile?.subjectId || props.selectedFile?.subject?.id
 
-        try {
-          chaptersLoading.value = true
-          chaptersError.value = null
-
-          console.log('📚 [Step3InfoInput] 신규 파일 - 교과서 ID로 챕터 데이터 로드 시작')
-          console.log('📚 [Step3InfoInput] API 호출 정보:', {
-            method: 'GET',
-            endpoint: `/chapter/${props.selectedTextbook.subjectId}/tree`,
-            subjectId: props.selectedTextbook.subjectId,
-            textbookName: props.selectedTextbook.name
-          })
-
-          const startTime = Date.now()
-          const response = await chapterApi.getChapterTree(props.selectedTextbook.id)
-          const endTime = Date.now()
-
-          console.log('📊 [Step3InfoInput] API 응답 정보:', {
-            status: response.status,
-            statusText: response.statusText,
-            responseTime: `${endTime - startTime}ms`,
-            hasData: !!response.data,
-            dataKeys: response.data ? Object.keys(response.data) : [],
-            success: response.data?.success
-          })
-
-          if (response.data && response.data.success) {
-            const chapterData = response.data.data
-            console.log('✅ [Step3InfoInput] 신규 파일 - 챕터 데이터 로드 완료')
-            console.log('📊 [Step3InfoInput] 챕터 데이터 구조:', {
-              majorChaptersCount: chapterData.majorChapters?.length || 0,
-              hasMiddleChapters: !!chapterData.middleChapters,
-              hasMinorChapters: !!chapterData.minorChapters,
-              hasTopicChapters: !!chapterData.topicChapters,
-              sampleMajorChapter: chapterData.majorChapters?.[0] || null
-            })
-
-            // 대단원 설정
-            majorChapters.value = chapterData.majorChapters || []
-            console.log('📚 [Step3InfoInput] 대단원 설정 완료:', majorChapters.value.length)
-
-            // 중단원, 소단원, 토픽 초기화
-            middleChapters.value = []
-            minorChapters.value = []
-            topicChapters.value = []
-
-            // 선택된 챕터들도 초기화
-            problemInfo.value.middleChapter = ''
-            problemInfo.value.minorChapter = ''
-            problemInfo.value.topicChapter = ''
-
-            console.log('🔄 [Step3InfoInput] 하위 챕터 초기화 완료')
-
-          } else {
-            console.error('❌ [Step3InfoInput] API 응답이 성공하지 않음:', response.data)
-            throw new Error(response.data?.message || '챕터 데이터 로드 실패')
+        if (!subjectId) {
+          // subjectId가 없는 경우에만 fileHistoryId로 조회
+          try {
+            const { subjectId: sid, areaCode } = await fileHistoryAPI.getSubjectIdByFileHistoryId(props.selectedFile.id)
+            subjectId = sid
+            if (!subjectId && areaCode) {
+              // areaCode만 왔다면 매핑(필요시 subjectStore 사용)
+              const subjectStore = useSubjectStore()
+              if (subjectStore.list.length === 0) {
+                await subjectStore.fetchSubjects()
+              }
+              const subject = subjectStore.list.find(s => s.areaCode === areaCode)
+              if (subject) {
+                subjectId = subject.subjectId
+                console.log('✅ [Step3InfoInput] areaCode 매핑 성공:', areaCode, '→', subjectId)
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ fileHistory→subjectId 조회 실패:', e)
           }
-        } catch (error) {
-          console.error('❌ [Step3InfoInput] 신규 파일 - 챕터 데이터 로드 실패')
-          console.error('❌ [Step3InfoInput] 오류 상세:', {
-            message: error.message,
-            stack: error.stack,
-            response: error.response?.data,
-            status: error.response?.status
-          })
-          chaptersError.value = error.message || '챕터 데이터를 불러오는데 실패했습니다.'
-        } finally {
-          chaptersLoading.value = false
-          console.log('🏁 [Step3InfoInput] 신규 파일 챕터 로드 완료 (성공/실패 여부와 관계없이)')
         }
       }
-      // 기존 파일인 경우: FileHistory에서 subjectId를 추출하여 단원 정보 조회
-      else {
-        if (!props.selectedFile?.id) {
-          console.warn('📚 [Step3InfoInput] 기존 파일 - 파일 정보가 없어 챕터를 로드할 수 없습니다.')
-          console.warn('📚 [Step3InfoInput] selectedFile:', props.selectedFile)
-          return
+
+      if (!subjectId) {
+        console.warn('⚠️ subjectId 없음 → 챕터 로드 중단', {
+          selectedTextbook: props.selectedTextbook,
+          selectedFile: props.selectedFile
+        })
+        chaptersError.value = '과목 정보를 찾을 수 없어 챕터를 로드할 수 없습니다.'
+        return
+      }
+
+      try {
+        chaptersLoading.value = true
+        chaptersError.value = null
+
+        console.log('📚 [Step3InfoInput] API 호출 정보:', {
+          method: 'GET',
+          endpoint: `/chapter/${subjectId}/tree`,
+          subjectId,
+          textbookName: props.selectedTextbook?.name,
+          fileName: props.selectedFile?.name
+        })
+
+        const startTime = Date.now()
+        const response = await chapterApi.getChapterTree(subjectId)
+        const endTime = Date.now()
+
+        console.log('📊 [Step3InfoInput] API 응답 정보:', {
+          status: response.status,
+          statusText: response.statusText,
+          responseTime: `${endTime - startTime}ms`,
+          hasData: !!response.data,
+          dataKeys: response.data ? Object.keys(response.data) : [],
+          success: response.data?.success
+        })
+
+        // 실제 응답 데이터 구조 상세 확인
+        console.log('🔍 [Step3InfoInput] 전체 응답 데이터:', response.data)
+        if (response.data?.data) {
+          console.log('🔍 [Step3InfoInput] 챕터 데이터 상세:', response.data.data)
+          console.log('🔍 [Step3InfoInput] 대단원 배열:', response.data.data.majorChapters)
+          console.log('🔍 [Step3InfoInput] 중단원 배열:', response.data.data.middleChapters)
+          console.log('🔍 [Step3InfoInput] 소단원 배열:', response.data.data.minorChapters)
         }
 
-        // FileHistory에서 subjectId 추출
-        const subjectId = props.selectedFile.subjectId || props.selectedFile.subject?.id
-        if (!subjectId) {
-          console.error('❌ [Step3InfoInput] 기존 파일 - subjectId를 찾을 수 없습니다.')
-          console.error('❌ [Step3InfoInput] selectedFile 구조:', {
-            id: props.selectedFile.id,
-            name: props.selectedFile.name,
-            subjectId: props.selectedFile.subjectId,
-            subject: props.selectedFile.subject,
-            hasSubjectId: !!props.selectedFile.subjectId,
-            hasSubject: !!props.selectedFile.subject,
-            subjectKeys: props.selectedFile.subject ? Object.keys(props.selectedFile.subject) : []
-          })
-          chaptersError.value = '파일에서 과목 정보를 찾을 수 없습니다.'
-          return
-        }
-
-        try {
-          chaptersLoading.value = true
-          chaptersError.value = null
-
-          console.log('📚 [Step3InfoInput] 기존 파일 - FileHistory에서 추출한 subjectId로 챕터 데이터 로드 시작')
-          console.log('📚 [Step3InfoInput] API 호출 정보:', {
-            method: 'GET',
-            endpoint: `/chapter/${subjectId}/tree`,
-            subjectId: subjectId,
-            fileHistoryId: props.selectedFile.id,
-            fileName: props.selectedFile.name,
-            extractedFrom: props.selectedFile.subjectId ? 'selectedFile.subjectId' : 'selectedFile.subject.id'
-          })
-
-          const startTime = Date.now()
-          // 기존 파일도 동일한 API 사용 (subjectId 기반)
-          const response = await chapterApi.getChapterTree(subjectId)
-          const endTime = Date.now()
-
-          console.log('📊 [Step3InfoInput] API 응답 정보:', {
-            status: response.status,
-            statusText: response.statusText,
-            responseTime: `${endTime - startTime}ms`,
-            hasData: !!response.data,
-            dataKeys: response.data ? Object.keys(response.data) : [],
-            success: response.data?.success
-          })
-
-          if (response.data && response.data.success) {
+                  if (response.data && response.data.success) {
             const chapterData = response.data.data
-            console.log('✅ [Step3InfoInput] 기존 파일 - 챕터 데이터 로드 완료')
+            console.log('✅ [Step3InfoInput] 챕터 데이터 로드 완료')
             console.log('📊 [Step3InfoInput] 챕터 데이터 구조:', {
               majorChaptersCount: chapterData.majorChapters?.length || 0,
               hasMiddleChapters: !!chapterData.middleChapters,
@@ -453,14 +396,15 @@ export default {
               sampleMajorChapter: chapterData.majorChapters?.[0] || null
             })
 
-            // 대단원 설정
-            majorChapters.value = chapterData.majorChapters || []
+            // 대단원 설정 (배열이 비어있어도 빈 배열로 설정)
+            majorChapters.value = Array.isArray(chapterData.majorChapters) ? chapterData.majorChapters : []
             console.log('📚 [Step3InfoInput] 대단원 설정 완료:', majorChapters.value.length)
+            console.log('📚 [Step3InfoInput] 대단원 내용:', majorChapters.value)
 
-            // 중단원, 소단원, 토픽 초기화
-            middleChapters.value = []
-            minorChapters.value = []
-            topicChapters.value = []
+            // 중단원, 소단원, 토픽 초기화 (배열이 비어있어도 빈 배열로 설정)
+            middleChapters.value = Array.isArray(chapterData.middleChapters) ? chapterData.middleChapters : []
+            minorChapters.value = Array.isArray(chapterData.minorChapters) ? chapterData.minorChapters : []
+            topicChapters.value = Array.isArray(chapterData.topicChapters) ? chapterData.topicChapters : []
 
             // 선택된 챕터들도 초기화
             problemInfo.value.middleChapter = ''
@@ -468,25 +412,26 @@ export default {
             problemInfo.value.topicChapter = ''
 
             console.log('🔄 [Step3InfoInput] 하위 챕터 초기화 완료')
+            console.log('🔄 [Step3InfoInput] 중단원 개수:', middleChapters.value.length)
+            console.log('🔄 [Step3InfoInput] 소단원 개수:', minorChapters.value.length)
+            console.log('🔄 [Step3InfoInput] 토픽 개수:', topicChapters.value.length)
 
-          } else {
-            console.error('❌ [Step3InfoInput] API 응답이 성공하지 않음:', response.data)
-            throw new Error(response.data?.message || '챕터 데이터 로드 실패')
-          }
-        } catch (error) {
-          console.error('❌ [Step3InfoInput] 기존 파일 - 챕터 데이터 로드 실패')
-          console.error('❌ [Step3InfoInput] 오류 상세:', {
-            message: error.message,
-            stack: error.stack,
-            response: error.response?.data,
-            status: error.response?.status,
-            subjectId: subjectId
-          })
-          chaptersError.value = error.message || '챕터 데이터를 불러오는데 실패했습니다.'
-        } finally {
-          chaptersLoading.value = false
-          console.log('🏁 [Step3InfoInput] 기존 파일 챕터 로드 완료 (성공/실패 여부와 관계없이)')
+        } else {
+          console.error('❌ [Step3InfoInput] API 응답이 성공하지 않음:', response.data)
+          throw new Error(response.data?.message || '챕터 데이터 로드 실패')
         }
+      } catch (error) {
+        console.error('❌ [Step3InfoInput] 챕터 데이터 로드 실패')
+        console.error('❌ [Step3InfoInput] 오류 상세:', {
+          message: error.message,
+          stack: error.stack,
+          response: error.response?.data,
+          status: error.response?.status
+        })
+        chaptersError.value = error.message || '챕터 데이터를 불러오는데 실패했습니다.'
+      } finally {
+        chaptersLoading.value = false
+        console.log('🏁 [Step3InfoInput] 챕터 로드 완료 (성공/실패 여부와 관계없이)')
       }
     }
 

@@ -245,7 +245,7 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
     async movePage(fromIndex, toIndex) {
       try {
         console.log('🔄 movePage 호출됨:', { fromIndex, toIndex, pdfPagesLength: this.pdfPages.length })
-        
+
         if (fromIndex >= 0 && toIndex >= 0 && fromIndex < this.pdfPages.length && toIndex < this.pdfPages.length) {
           // 로컬에서 먼저 변경
           const page = this.pdfPages.splice(fromIndex, 1)[0]
@@ -256,11 +256,11 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
           if (this.uploadedPdfInfo?.fileHistoryId) {
             // 현재 남아있는 페이지들의 원본 인덱스를 순서대로 imgOrder 생성
             const imageOrder = this.pdfPages.map(page => page.originalPage || 0).join(',')
-            console.log('📤 서버에 이미지 순서 업데이트 요청:', { 
-              fileHistoryId: this.uploadedPdfInfo.fileHistoryId, 
-              imageOrder 
+            console.log('📤 서버에 이미지 순서 업데이트 요청:', {
+              fileHistoryId: this.uploadedPdfInfo.fileHistoryId,
+              imageOrder
             })
-            
+
             const response = await fileHistoryAPI.updateImageOrder(
               this.uploadedPdfInfo.fileHistoryId,
               imageOrder
@@ -652,12 +652,13 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
 
         // 원본 PDF 업로드 후 파일 히스토리 생성
         const fileMetadataId = response.data?.data?.id ?? response.data?.data?.fileMetadataId ?? response.data?.data?.fileId
-        if (fileMetadataId && this.selectedTextbook?.areaCode) {
-          const subjectId = await this.getSubjectIdFromAreaCode(this.selectedTextbook.areaCode)
+        if (fileMetadataId) {
+          const subjectId = await this.resolveSubjectId()
           if (subjectId) {
             try {
               const fileHistoryResponse = await fileHistoryAPI.createFileHistoryWithRetry(fileMetadataId, subjectId)
               this.uploadedPdfInfo.fileHistoryId = fileHistoryResponse.data.data
+              console.log('✅ 파일 히스토리 생성 성공:', this.uploadedPdfInfo.fileHistoryId)
             } catch (err) {
               console.error('❌ 원본 PDF 파일 히스토리 생성 실패:', err)
               this.showFileHistoryError = true
@@ -667,11 +668,7 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
             console.warn('⚠️ 과목 ID를 찾을 수 없어 파일 히스토리를 생성하지 않습니다.')
           }
         } else {
-          console.warn('⚠️ 파일 히스토리 생성 조건 미충족:', {
-            fileMetadataId: !!fileMetadataId,
-            selectedTextbook: !!this.selectedTextbook,
-            areaCode: this.selectedTextbook?.areaCode
-          })
+          console.warn('⚠️ 파일 히스토리 생성 조건 미충족: fileMetadataId 없음')
         }
 
         // PDF를 서버에서 이미지로 변환은 handlePdfFile에서 처리
@@ -798,6 +795,63 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
       }
     },
 
+        /**
+     * 과목 ID 해석 헬퍼 (단일 소스 오브 트루스)
+     * 경로에 따라 다른 데이터 소스에서 subjectId를 찾아 반환
+     * @returns {Promise<number|null>} 과목 ID 또는 null
+     */
+    async resolveSubjectId() {
+      try {
+        // 1) 기존 파일 경로: fileHistoryId → subjectId 조회
+        if (this.selectedFile?.id) {
+          try {
+            const { subjectId, areaCode } = await fileHistoryAPI.getSubjectIdByFileHistoryId(this.selectedFile.id)
+            if (subjectId) {
+              console.log('✅ resolveSubjectId: fileHistoryId→subjectId 조회 성공:', subjectId)
+              return subjectId
+            }
+            if (areaCode) {
+              const id = await this.getSubjectIdFromAreaCode(areaCode)
+              if (id) {
+                console.log('✅ resolveSubjectId: fileHistoryId→areaCode 매핑 성공:', areaCode, '→', id)
+                return id
+              }
+            }
+          } catch (e) {
+            console.warn('⚠️ [resolveSubjectId] fileHistoryId→subjectId 조회 실패:', e)
+          }
+        }
+
+        // 2) 새 파일 경로: 교과서에서 subjectId 사용
+        if (this.selectedTextbook?.subjectId) {
+          console.log('✅ resolveSubjectId: selectedTextbook.subjectId에서 찾음:', this.selectedTextbook.subjectId)
+          return this.selectedTextbook.subjectId
+        }
+        if (this.selectedTextbook?.areaCode) {
+          const id = await this.getSubjectIdFromAreaCode(this.selectedTextbook.areaCode)
+          if (id) {
+            console.log('✅ resolveSubjectId: selectedTextbook.areaCode 매핑에서 찾음:', id)
+            return id
+          }
+        }
+
+        // 3) 마지막 보루: 선택된 과목코드로 매핑
+        if (this.selectedSubject) {
+          const id = await this.getSubjectIdFromAreaCode(this.selectedSubject)
+          if (id) {
+            console.log('✅ resolveSubjectId: selectedSubject 매핑에서 찾음:', id)
+            return id
+          }
+        }
+
+        console.warn('⚠️ resolveSubjectId: 과목 ID를 찾을 수 없음')
+        return null
+      } catch (error) {
+        console.error('❌ resolveSubjectId 오류:', error)
+        return null
+      }
+    },
+
     /**
      * "다음" 버튼 클릭 시 변경사항을 서버에 저장 (더 이상 사용하지 않음)
      * 현재는 편집할 때마다 실시간으로 API를 호출하므로 이 메서드는 deprecated
@@ -821,10 +875,10 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
         this.error = null
 
         const response = await itemProcessingAPI.getFileHistories(page, size, subject)
-        
+
         if (response.data && response.data.success) {
           const fileHistories = response.data.data.content || response.data.data
-          
+
           // 각 파일 히스토리의 PDF 이미지들을 함께 조회
           const enrichedFileHistories = await Promise.all(
             fileHistories.map(async (fileHistory) => {
@@ -842,7 +896,7 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
               return fileHistory
             })
           )
-          
+
           return enrichedFileHistories
         } else {
           console.warn('파일 히스토리 조회 실패:', response.data)

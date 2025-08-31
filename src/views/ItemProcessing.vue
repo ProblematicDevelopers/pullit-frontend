@@ -195,8 +195,19 @@
           :presigned-url="presignedUrl"
           :file-id="fileId"
           :subject-code="selectedSubject"
+          :selected-textbook="selectedTextbook"
+          :is-new-file="processingMethod === 'new' && !selectedFile"
+          :selected-file="selectedFile"
           @go-back="goBackFromOcr"
         />
+        <!-- 디버깅용 로그 -->
+        <div v-if="showOcrEditor" class="debug-info" style="background: #f0f0f0; padding: 10px; margin: 10px 0; font-size: 12px;">
+          <strong>Debug Info:</strong><br>
+          processingMethod: {{ processingMethod }}<br>
+          selectedFile: {{ selectedFile ? '있음' : '없음' }}<br>
+          selectedTextbook: {{ selectedTextbook ? '있음' : '없음' }}<br>
+          showOcrEditor: {{ showOcrEditor }}
+        </div>
       </div>
     </div>
 
@@ -234,6 +245,7 @@ import { onMounted, ref, computed, watch, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useItemProcessingStore } from '@/store/itemProcessingStore.js'
 import { useSubjectStore } from '@/store/subjectStore.js'
+import { fileHistoryAPI } from '@/services/fileHistoryApi.js'
 
 // 새로 분리된 컴포넌트들 import
 import ProcessingMethodSelection from '@/components/item-process/ProcessingMethodSelection.vue'
@@ -352,10 +364,61 @@ export default {
           itemProcessingStore.fetchTextbooks(),
           subjectStore.fetchSubjects()
         ])
+
+        // 🔧 OCR API 테스트 - 저장된 문항들 조회 테스트
+        await testOcrApiFunctions()
       } catch (error) {
         errorHandler.handleGeneralError(error, '교과서 목록 로드')
       }
     })
+
+    /**
+     * OCR API 기능 테스트 함수
+     * 저장된 문항, OCR 히스토리, 완료된 영역 조회 기능 테스트
+     */
+    const testOcrApiFunctions = async () => {
+      try {
+        console.log('🧪 [ItemProcessing] OCR API 테스트 시작')
+
+        // 1. 저장된 처리된 문항들 조회 테스트
+        const { ocrApi } = await import('@/services/ocrApi')
+        const processedItems = await ocrApi.getProcessedItems({
+          page: 0,
+          size: 10,
+          subjectCode: 'MA' // 수학 과목 테스트
+        })
+        console.log('✅ [ItemProcessing] 저장된 문항 조회 성공:', processedItems)
+
+        // 2. 첫 번째 문항이 있으면 상세 조회 테스트
+        if (processedItems.data && processedItems.data.length > 0) {
+          const firstItemId = processedItems.data[0].id
+          const itemDetail = await ocrApi.getProcessedItem(firstItemId)
+          console.log('✅ [ItemProcessing] 문항 상세 조회 성공:', itemDetail)
+        }
+
+        // 3. OCR 히스토리 조회 테스트 (임시 파일 ID 사용)
+        try {
+          const ocrHistory = await ocrApi.getOcrHistory(1) // 임시 파일 ID
+          console.log('✅ [ItemProcessing] OCR 히스토리 조회 성공:', ocrHistory)
+        } catch (error) {
+          console.log('ℹ️ [ItemProcessing] OCR 히스토리 조회 (파일 ID 1 없음):', error.message)
+        }
+
+        // 4. 완료된 OCR 영역 조회 테스트
+        try {
+          const completedRegions = await ocrApi.getCompletedOcrRegions(1) // 임시 파일 ID
+          console.log('✅ [ItemProcessing] 완료된 OCR 영역 조회 성공:', completedRegions)
+        } catch (error) {
+          console.log('ℹ️ [ItemProcessing] 완료된 OCR 영역 조회 (파일 ID 1 없음):', error.message)
+        }
+
+        console.log('🎉 [ItemProcessing] OCR API 테스트 완료')
+
+      } catch (error) {
+        console.error('❌ [ItemProcessing] OCR API 테스트 실패:', error)
+        // 에러가 있어도 앱 로딩은 계속 진행
+      }
+    }
 
     // 컴포넌트 언마운트 시 실행
     onUnmounted(() => {
@@ -486,6 +549,70 @@ export default {
         selectedFile.value = fileHistory
         selectedSubject.value = fileHistory.areaCode
 
+        // 기존 파일 선택시에도 selectedTextbook을 채워주기
+        // fileHistoryId로 subjectId 조회하여 정확한 정보 설정
+        try {
+          const { subjectId, areaCode } = await fileHistoryAPI.getSubjectIdByFileHistoryId(fileHistory.id)
+          console.log('🔍 [ItemProcessing] subjects.value 구조 확인:', subjects.value)
+          console.log('🔍 [ItemProcessing] 찾으려는 subjectId:', subjectId, '타입:', typeof subjectId)
+
+                    if (subjectId) {
+            // API에서 받은 subjectId를 우선 사용 (가장 정확한 정보)
+            console.log('✅ [ItemProcessing] API에서 받은 subjectId 사용:', subjectId)
+
+            // subjectStore에서 추가 정보(areaName 등)가 있다면 보완
+            const subject = subjects.value?.find(s =>
+              s.subjectId === subjectId ||
+              s.subjectId === Number(subjectId) ||
+              String(s.subjectId) === String(subjectId)
+            )
+
+            if (subject) {
+              // subjectStore에서 찾은 경우: API subjectId + 추가 정보
+              selectedTextbook.value = {
+                ...subject,
+                subjectId: subjectId // API에서 받은 subjectId로 덮어쓰기
+              }
+              console.log('✅ [ItemProcessing] subjectStore 정보로 보완됨')
+            } else {
+              // subjectStore에서 찾지 못한 경우: API 정보만으로 구성
+              selectedTextbook.value = {
+                subjectId: subjectId, // API에서 받은 실제 subjectId
+                areaCode: areaCode || fileHistory.areaCode,
+                name: areaCode || fileHistory.areaCode
+              }
+              console.log('⚠️ [ItemProcessing] subjectStore 정보 없음, API 정보만 사용')
+            }
+
+            itemProcessingStore.selectTextbook(selectedTextbook.value)
+            console.log('✅ [ItemProcessing] 최종 selectedTextbook:', selectedTextbook.value)
+          } else {
+            // subjectId가 없는 경우 areaCode로 매핑
+            const subject = subjects.value?.find(s => s.areaCode === (areaCode || fileHistory.areaCode))
+            selectedTextbook.value = subject
+              ? { ...subject }
+              : {
+                  areaCode: areaCode || fileHistory.areaCode,
+                  subjectId: null,
+                  name: areaCode || fileHistory.areaCode
+                }
+            itemProcessingStore.selectTextbook(selectedTextbook.value)
+            console.log('⚠️ [ItemProcessing] subjectId 없음, areaCode로 매핑')
+          }
+        } catch (e) {
+          console.warn('⚠️ [ItemProcessing] 기존 파일 subjectId 조회 실패:', e)
+          // fallback: areaCode로 매핑
+          const subject = subjects.value?.find(s => s.areaCode === fileHistory.areaCode)
+          selectedTextbook.value = subject
+            ? { ...subject }
+            : {
+                areaCode: fileHistory.areaCode,
+                subjectId: null,
+                name: fileHistory.areaCode
+              }
+          itemProcessingStore.selectTextbook(selectedTextbook.value)
+        }
+
         // 선택된 파일의 이미지들을 pdfPages로 설정
         if (fileHistory.pdfImages && fileHistory.pdfImages.length > 0) {
           pdfPages.value = fileHistory.pdfImages.map((image, index) => {
@@ -517,6 +644,7 @@ export default {
 
         // 바로 편집 모드로 진행
         console.log('기존 파일 선택 완료:', fileHistory)
+        console.log('설정된 selectedTextbook:', selectedTextbook.value)
       } catch (error) {
         console.error('기존 파일 선택 처리 실패:', error)
         errorHandler.handleGeneralError(error, '파일 선택 처리')
@@ -931,14 +1059,14 @@ export default {
      */
     const handleImageFallback = (fallbackInfo) => {
       const { pageIndex, originalUrl } = fallbackInfo
-      
+
       if (pageIndex >= 0 && pageIndex < pdfPages.value.length) {
         // 해당 페이지의 preview URL을 S3 URL로 변경
         pdfPages.value[pageIndex].preview = originalUrl
         pdfPages.value[pageIndex].useProxy = false
-        
+
         console.log(`페이지 ${pageIndex + 1} 프록시에서 S3 URL로 fallback 완료:`, originalUrl)
-        
+
         // 사용자에게 알림 (선택사항)
         // toast.success(`페이지 ${pageIndex + 1} 이미지 로딩 방식을 변경했습니다.`)
       }
