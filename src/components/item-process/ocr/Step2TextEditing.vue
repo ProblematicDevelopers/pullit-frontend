@@ -2,6 +2,8 @@
   <div class="step2-container">
     <!-- 좌측: 유형 선택 창 및 OCR 결과 -->
     <div class="left-section">
+
+
       <!-- 문제 내 유형 선택 -->
       <div class="type-selection-panel">
         <h5 class="panel-title">문제 내 유형 선택</h5>
@@ -83,7 +85,7 @@
 
           <div class="editor-content">
             <Editor
-              :key="`editor-${currentEditingArea}-${editorKey}`"
+              id="tm-editor-main"
               :api-key="tinymceApiKey"
               :model-value="editedTexts[currentEditingArea] || ''"
               @update:model-value="updateEditedText"
@@ -119,7 +121,7 @@
 
           <div class="tool-content-container">
             <!-- 수식 도구 -->
-            <div v-show="activeToolTab === 'math'" class="tool-content math-tools">
+            <div v-if="activeToolTab === 'math'" class="tool-content math-tools">
               <div class="tool-sections">
                 <div class="tool-section">
                   <h6>수식 검색</h6>
@@ -163,7 +165,7 @@
             </div>
 
             <!-- 도형 도구 -->
-            <div v-show="activeToolTab === 'shapes'" class="tool-content shape-tools">
+            <div v-if="activeToolTab === 'shapes'" class="tool-content shape-tools">
               <div class="tool-sections">
                 <div class="tool-section">
                   <h6>도형타입</h6>
@@ -198,7 +200,7 @@
             </div>
 
             <!-- 템플릿 도구 -->
-            <div v-show="activeToolTab === 'templates'" class="tool-content template-tools">
+            <div v-if="activeToolTab === 'templates'" class="tool-content template-tools">
               <div class="tool-sections">
                 <div class="template-list">
                   <div v-if="templates.length === 0" class="no-templates">
@@ -224,7 +226,7 @@
             {{ showPreview ? '접기' : '펼치기' }}
           </button>
         </h6>
-        <div v-show="showPreview" class="preview-content">
+        <div v-if="showPreview" class="preview-content">
           <!-- 문제 영역 -->
           <div v-if="editedTexts.problem" class="preview-section">
             <h6>문제</h6>
@@ -289,9 +291,9 @@
 </template>
 
 <script>
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted, markRaw } from 'vue'
 import Editor from '@tinymce/tinymce-vue'
-import { createCommonEditorConfig, getTinyMCEApiKey, insertMathToEditor, insertShapeToEditor } from '@/utils/tinymce-common-config'
+import { createCommonEditorConfig, getTinyMCEApiKey, insertShapeToEditor } from '@/utils/tinymce-common-config'
 import { renderMathJax, waitForMathJax } from '@/utils/mathjax'
 
 
@@ -306,7 +308,7 @@ export default {
       required: true
     },
     ocrResults: {
-      type: Object,
+      type: Array,
       required: true
     },
     editedTexts: {
@@ -319,8 +321,8 @@ export default {
     }
   },
   emits: [
-    'update:editedTexts',
-    'update:currentEditingArea',
+    'update:edited-texts',
+    'update:current-editing-area',
     'prev-step',
     'next-step'
   ],
@@ -417,50 +419,29 @@ export default {
 
     // TinyMCE 설정
     const tinymceApiKey = getTinyMCEApiKey()
-    const editorConfig = createCommonEditorConfig(tinymceApiKey)
-
-    // 편집 영역이 변경될 때 에디터 새로고침 (개선된 버전)
-    watch(() => props.currentEditingArea, async (newArea, oldArea) => {
-      try {
-        // 영역이 실제로 변경되었을 때만 에디터 새로고침
-        if (newArea && newArea !== oldArea) {
-          console.log('편집 영역 변경 감지:', { from: oldArea, to: newArea })
-
-          // 현재 에디터 인스턴스가 있다면 안전하게 제거
-          if (editorInstance.value) {
+    const editorConfig = createCommonEditorConfig({
+      setup: (editor) => {
+        // 변화 감지
+        editor.on('change input undo redo', () => {
+          if (editor.removed !== true && editor.getContent && typeof editor.getContent === 'function') {
             try {
-              console.log('기존 에디터 인스턴스 제거 중...')
-              editorInstance.value.destroy()
-              editorInstance.value = null
-              console.log('기존 에디터 인스턴스 제거 완료')
-            } catch (error) {
-              console.warn('에디터 인스턴스 제거 중 오류:', error)
+              const content = editor.getContent()
+              emitEdited(props.currentEditingArea, content)
+            } catch (getContentError) {
+              console.warn('⚠️ 에디터 내용 가져오기 실패:', getContentError)
             }
           }
-
-          // DOM 업데이트를 기다림
-          await nextTick()
-
-          // 에디터 키 변경으로 새 에디터 생성
-          editorKey.value += 1
-          console.log('에디터 키 변경됨:', editorKey.value)
-
-          // 추가 DOM 업데이트를 기다림
-          await nextTick()
-
-          // 에디터가 완전히 초기화될 때까지 대기
-          await new Promise(resolve => setTimeout(resolve, 100))
-
-          console.log('편집 영역 변경 완료:', newArea)
-        }
-      } catch (error) {
-        console.error('편집 영역 변경 감지 중 오류:', error)
-        // 오류 발생 시 에디터 재생성
-        editorKey.value += 1
+        })
       }
     })
 
-    // editedTexts가 변경될 때 LaTeX 렌더링 강제 업데이트
+
+
+
+
+
+
+    // editedTexts가 변경될 때 LaTeX 렌더링 강제 업데이트 (post-flush로 동시성 충돌 방지)
     watch(() => props.editedTexts, async () => {
       try {
         // 다음 tick에서 DOM 업데이트를 기다린 후 강제로 렌더링 다시 실행
@@ -471,7 +452,7 @@ export default {
       } catch (error) {
         console.error('editedTexts 변경 감지 중 오류:', error)
       }
-    }, { deep: true })
+    }, { deep: true, flush: 'post' })
 
     // 사용 가능한 영역 타입들
     const availableAreaTypes = computed(() => {
@@ -501,65 +482,56 @@ export default {
       return currentArea.imageData || null
     }
 
-    // 편집 영역 선택 (개선된 버전)
+    // 편집 영역 전환 상태 (중복 호출 방지)
+    const switching = ref(false)
+
+    // 편집 영역 선택 (직렬화된 버전 - 중복 호출/렌더 재진입 방지)
     const selectEditingArea = async (areaType) => {
+      if (switching.value || props.currentEditingArea === areaType) {
+        return
+      }
+
+      switching.value = true
       try {
         console.log('편집 영역 선택 시작:', { from: props.currentEditingArea, to: areaType })
 
-        // 현재 편집 중인 내용이 있다면 저장
-        if (props.currentEditingArea && props.currentEditingArea !== areaType) {
-          // 에디터 내용을 현재 영역에 저장
-          if (editorInstance.value && editorInstance.value.getContent) {
-            try {
-              const currentContent = editorInstance.value.getContent()
-              const newEditedTexts = { ...props.editedTexts }
-              newEditedTexts[props.currentEditingArea] = currentContent
-              emit('update:editedTexts', newEditedTexts)
-              console.log('현재 에디터 내용 저장됨:', currentContent.substring(0, 100))
-            } catch (error) {
-              console.warn('에디터 내용 저장 중 오류:', error)
-            }
-          }
-        }
-
-        // 현재 에디터 인스턴스가 있다면 안전하게 제거
-        if (editorInstance.value) {
+        // 현재 내용 저장 (안전하게)
+        if (editorInstance.value && props.currentEditingArea) {
           try {
-            console.log('기존 에디터 인스턴스 제거 중...')
-            editorInstance.value.destroy()
-            editorInstance.value = null
-            console.log('기존 에디터 인스턴스 제거 완료')
-          } catch (error) {
-            console.warn('에디터 인스턴스 제거 중 오류:', error)
+            if (typeof editorInstance.value.getContent === 'function' && editorInstance.value.removed !== true) {
+              const currentContent = editorInstance.value.getContent()
+              if (currentContent) {
+                const newEditedTexts = { ...props.editedTexts }
+                newEditedTexts[props.currentEditingArea] = currentContent
+                emit('update:edited-texts', newEditedTexts)
+                console.log('현재 에디터 내용 저장됨')
+              }
+            }
+          } catch (e) {
+            console.warn('내용 저장 실패 (무시됨):', e)
           }
         }
 
-        // DOM 업데이트를 기다린 후 새로운 영역으로 전환
+        // Vue 상태 업데이트
+        emit('update:current-editing-area', areaType)
+
+        // DOM 업데이트를 기다림
         await nextTick()
+        // 레이아웃 반영까지 한 틱 더
+        await new Promise(r => requestAnimationFrame(() => r(null)))
 
-        // 새로운 영역으로 전환
-        emit('update:currentEditingArea', areaType)
+        const html = (props.editedTexts?.[areaType] ?? '')
+        if (editorInstance.value && editorInstance.value.removed !== true) {
+          editorInstance.value.setContent(html)
+          await nextTick()
+          editorInstance.value.focus()
+        }
 
-        // 에디터 키를 변경하여 새로운 에디터 생성
-        editorKey.value += 1
-        console.log('에디터 키 변경됨:', editorKey.value)
-
-        // 추가 DOM 업데이트를 기다림
-        await nextTick()
-
-        // 에디터가 완전히 초기화될 때까지 대기
-        await new Promise(resolve => setTimeout(resolve, 100))
-
-        console.log('편집 영역 변경 완료:', {
-          from: props.currentEditingArea,
-          to: areaType,
-          hasContent: !!props.editedTexts[areaType],
-          editorKey: editorKey.value
-        })
+        console.log('✅ 편집 영역 변경 완료:', areaType)
       } catch (error) {
         console.error('편집 영역 변경 중 오류:', error)
-        // 오류 발생 시 에디터 재생성
-        editorKey.value += 1
+      } finally {
+        switching.value = false
       }
     }
 
@@ -569,41 +541,28 @@ export default {
         // 현재 editedTexts의 내용을 에디터에 다시 설정
         const currentContent = props.editedTexts[props.currentEditingArea] || ''
 
-        // 현재 에디터 인스턴스가 있다면 안전하게 제거
-        if (editorInstance.value) {
+        // 에디터 인스턴스가 있고 유효하다면 내용만 교체
+        if (editorInstance.value && !editorInstance.value.destroyed) {
           try {
-            editorInstance.value.destroy()
-            editorInstance.value = null
+            editorInstance.value.setContent(currentContent)
+            console.log('에디터 내용 새로고침 완료:', {
+              area: props.currentEditingArea,
+              content: currentContent.substring(0, 100) + '...'
+            })
           } catch (error) {
-            console.warn('에디터 인스턴스 제거 중 오류:', error)
+            console.warn('에디터 내용 설정 중 오류:', error)
           }
+        } else {
+          console.log('에디터 인스턴스가 준비되지 않음, 다음 초기화 시 내용이 설정됩니다.')
         }
-
-        // DOM 업데이트를 기다림
-        await nextTick()
-
-        // 에디터 내용이 변경되었으므로 에디터 새로고침
-        editorKey.value += 1
-
-        // 추가 DOM 업데이트를 기다림
-        await nextTick()
-
-        console.log('에디터 내용 새로고침:', {
-          area: props.currentEditingArea,
-          content: currentContent.substring(0, 100) + '...'
-        })
       } catch (error) {
-        console.error('에디터 새로고침 중 오류:', error)
-        // 오류 발생 시 기본값으로 복구
-        editorKey.value += 1
+        console.error('에디터 내용 새로고침 중 오류:', error)
       }
     }
 
-    // 편집 내용 업데이트
+    // 편집 내용 업데이트 (emitEdited 사용)
     const updateEditedText = (content) => {
-      const newEditedTexts = { ...props.editedTexts }
-      newEditedTexts[props.currentEditingArea] = content
-      emit('update:editedTexts', newEditedTexts)
+      emitEdited(props.currentEditingArea, content)
 
       console.log('편집 내용 업데이트:', {
         area: props.currentEditingArea,
@@ -615,41 +574,86 @@ export default {
     // TinyMCE 에디터 인스턴스 참조
     const editorInstance = ref(null)
 
-    // 에디터 초기화 이벤트 핸들러 (개선된 버전)
-    const onEditorInit = (editor) => {
+    // editedTexts 업데이트를 렌더 밖에서 emit (동시성 충돌 방지)
+    const emitEdited = (area, val) => {
+      // 렌더/patch 중간에 올려보내지 않기
+      Promise.resolve().then(() => emit('update:edited-texts', { [area]: val }))
+    }
+
+        // 안전한 에디터 초기화 핸들러
+    const onEditorInit = async (...args) => {
       try {
         console.log('TinyMCE 에디터 초기화 시작...')
+        console.log('onEditorInit args:', args)
 
-        // 에디터 인스턴스 검증
-        if (!editor || typeof editor.insertContent !== 'function') {
-          console.error('에디터 인스턴스가 유효하지 않습니다:', editor)
-          return
-        }
+        // 에디터 인스턴스 안전하게 추출
+        let editor = null
 
-        // 에디터 인스턴스 저장
-        editorInstance.value = editor
-
-        // 에디터 준비 상태 확인
-        if (editor.ready) {
-          console.log('TinyMCE 에디터 초기화 완료 (ready 상태):', editor)
-        } else {
-          console.log('TinyMCE 에디터 초기화 완료 (초기화 중):', editor)
-        }
-
-        // 에디터 내용 설정 (기존 내용이 있다면)
-        const currentContent = props.editedTexts[props.currentEditingArea]
-        if (currentContent && editor.setContent) {
-          try {
-            editor.setContent(currentContent)
-            console.log('에디터 내용 설정 완료:', currentContent.substring(0, 100))
-          } catch (error) {
-            console.warn('에디터 내용 설정 중 오류:', error)
+        // 1) 직접 에디터 인스턴스가 첫 인자로 온 경우
+        for (const arg of args) {
+          if (arg && typeof arg.getBody === 'function' && typeof arg.setContent === 'function') {
+            editor = arg
+            break
           }
         }
 
+        // 2) 이벤트 객체 형태 (e.target / e.editor)
+        if (!editor) {
+          for (const arg of args) {
+            const candidate = arg?.target || arg?.editor
+            if (candidate && typeof candidate.getBody === 'function' && typeof candidate.setContent === 'function') {
+              editor = candidate
+              break
+            }
+          }
+        }
+
+        if (!editor) {
+          console.error('❌ 에디터 초기화 실패 - 에디터 인스턴스를 찾지 못했습니다')
+          return
+        }
+
+        console.log('✅ 에디터 인스턴스 발견:', editor.id)
+
+        // 이전 인스턴스가 있다면 정리
+        if (editorInstance.value && editorInstance.value !== editor) {
+          try {
+            if (editorInstance.value.removed !== true && typeof editorInstance.value.remove === 'function') {
+              editorInstance.value.remove()
+            }
+          } catch (error) {
+            console.warn('이전 에디터 인스턴스 정리 중 오류:', error)
+          }
+        }
+
+        editorInstance.value = markRaw(editor)
+
+        // 에디터 상태 확인
+        const state = {
+          hasAllMethods: ['getBody', 'setContent', 'remove'].every(m => typeof editor[m] === 'function'),
+          hasBody: typeof editor.getBody === 'function',
+          hasValidId: !!editor.id,
+          isNotDestroyed: editor.removed !== true,
+          editorId: editor.id,
+        }
+        console.log('✅ 에디터 상태:', state)
+
+        // 내용 주입은 nextTick 이후가 안전
+        await nextTick()
+        try {
+          const html = props.editedTexts[props.currentEditingArea] || ''
+          editor.setContent(html)
+          await nextTick()
+          editor.focus()
+          console.log('✅ 에디터 내용 설정 및 포커스 완료')
+        } catch (e) {
+          console.warn('init 시 setContent/focus 중 경고(무시 가능):', e)
+        }
+
+
+
       } catch (error) {
         console.error('에디터 초기화 중 오류:', error)
-        editorInstance.value = null
       }
     }
 
@@ -667,7 +671,7 @@ export default {
 
       const newEditedTexts = { ...props.editedTexts }
       newEditedTexts[props.currentEditingArea] = sampleText
-      emit('update:editedTexts', newEditedTexts)
+      emit('update:edited-texts', newEditedTexts)
 
       console.log('샘플 LaTeX 텍스트 추가됨:', sampleText)
     }
@@ -677,30 +681,22 @@ export default {
       console.log('강제 재렌더링 실행')
 
       try {
-        // 현재 에디터 인스턴스가 있다면 안전하게 제거
-        if (editorInstance.value) {
+        // 에디터 인스턴스가 있다면 내용만 새로고침
+        if (editorInstance.value && !editorInstance.value.destroyed) {
           try {
-            editorInstance.value.destroy()
-            editorInstance.value = null
+            const currentContent = props.editedTexts[props.currentEditingArea] || ''
+            editorInstance.value.setContent(currentContent)
+            console.log('에디터 내용 새로고침 완료')
           } catch (error) {
-            console.warn('에디터 인스턴스 제거 중 오류:', error)
+            console.warn('에디터 내용 새로고침 중 오류:', error)
           }
+        } else {
+          console.log('에디터 인스턴스가 준비되지 않음')
         }
-
-        // DOM 업데이트를 기다림
-        await nextTick()
-
-        // editorKey를 변경하여 컴포넌트 강제 새로고침
-        editorKey.value += 1
-
-        // 추가 DOM 업데이트를 기다림
-        await nextTick()
 
         console.log('강제 재렌더링 완료')
       } catch (error) {
         console.error('강제 재렌더링 중 오류:', error)
-        // 오류 발생 시 기본값으로 복구
-        editorKey.value += 1
       }
     }
 
@@ -719,46 +715,38 @@ export default {
       }
 
       const newEditedTexts = { ...props.editedTexts, ...previewTexts }
-      emit('update:editedTexts', newEditedTexts)
+      emit('update:edited-texts', newEditedTexts)
 
       console.log('전체 미리보기 텍스트 복사 완료:', newEditedTexts)
     }
 
-    // 수식 삽입 (안전한 버전)
+    // 수식 삽입 (최대 안정성)
     const insertMath = async (latex) => {
       currentMathLatex.value = latex
+      console.log('수식 삽입 시도:', latex)
 
-      try {
-        // 에디터 인스턴스 검증
-        if (!editorInstance.value) {
-          console.warn('에디터 인스턴스가 아직 초기화되지 않았습니다.')
-          return
+      let retries = 40
+      while (retries > 0) {
+        if (editorInstance.value &&
+            typeof editorInstance.value.insertContent === 'function' &&
+            !editorInstance.value.destroyed) {
+
+          try {
+            const html = `<span class="math-latex" data-latex="${latex}">$${latex}$</span>`
+            editorInstance.value.insertContent(html)
+            console.log('수식 삽입 성공:', latex)
+            return
+          } catch (insertError) {
+            console.warn('수식 삽입 시도 실패:', insertError)
+          }
         }
 
-        // 에디터가 준비되었는지 확인
-        if (!editorInstance.value.insertContent || typeof editorInstance.value.insertContent !== 'function') {
-          console.warn('에디터 insertContent 메서드가 사용할 수 없습니다.')
-          return
-        }
-
-        // 에디터가 포커스되어 있는지 확인
-        if (!editorInstance.value.focus) {
-          console.warn('에디터가 포커스되지 않았습니다.')
-          return
-        }
-
-        // 에디터에 포커스
-        editorInstance.value.focus()
-
-        // 수식 삽입
-        insertMathToEditor(editorInstance.value, currentMathLatex.value)
-
-        console.log('수식 삽입 성공:', latex)
-      } catch (error) {
-        console.error('수식 삽입 중 오류:', error)
-        // 에디터 재초기화 시도
-        await forceRerender()
+        await new Promise(resolve => setTimeout(resolve, 100))
+        retries--
       }
+
+      console.error('수식 삽입 최종 실패:', latex)
+      alert('수식 삽입에 실패했습니다. 에디터를 새로고침해주세요.')
     }
 
     // 도형 삽입 (안전한 버전)
@@ -1158,7 +1146,7 @@ LaTeX 수식 예시:
           }
 
           if (Object.keys(defaultTexts).length > 0) {
-            emit('update:editedTexts', defaultTexts)
+            emit('update:edited-texts', defaultTexts)
             console.log('기본 텍스트 설정됨:', defaultTexts)
           }
         }
@@ -1177,16 +1165,33 @@ LaTeX 수식 예시:
       }
     })
 
-    // 컴포넌트 언마운트 시 에디터 인스턴스 정리
-    onUnmounted(() => {
+    // 컴포넌트 정리
+    onUnmounted(async () => {
       try {
+        console.log('Step2TextEditing 컴포넌트 정리 시작')
+
+        // 타임아웃 정리 (areaChangeTimeout 제거됨)
+
+        // 에디터 정리 (더 안전하게)
         if (editorInstance.value) {
-          editorInstance.value.destroy()
-          editorInstance.value = null
-          console.log('에디터 인스턴스 정리 완료')
+          try {
+            if (editorInstance.value.removed !== true && typeof editorInstance.value.remove === 'function') {
+              editorInstance.value.remove()
+            }
+          } catch (editorError) {
+            console.warn('에디터 정리 중 오류 (무시됨):', editorError)
+          } finally {
+            // 에디터 정리 실패 시에도 인스턴스는 null로 설정
+            editorInstance.value = null
+          }
         }
+
+        console.log('Step2TextEditing 컴포넌트 정리 완료')
       } catch (error) {
-        console.warn('에디터 인스턴스 정리 중 오류:', error)
+        console.error('컴포넌트 정리 중 오류:', error)
+        // 최종 정리
+        editorInstance.value = null
+
       }
     })
 
