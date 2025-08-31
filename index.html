@@ -1,13 +1,169 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="">
   <head>
-    <meta charset="UTF-8">
-    <link rel="icon" href="/favicon.ico">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta charset="UTF-8" />
+    <link rel="icon" href="/favicon.ico" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Vite App</title>
+
+    <!-- Bootstrap CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css"
+      rel="stylesheet"
+    />
+    <!-- Bootstrap Icons -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css"
+    />
+    <!-- Font Awesome -->
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Korean Font Support -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css" integrity="sha512-DTOQO9RWCH3ppGqcWaEA1BIZOC6xxalwEsw9c2QQeAIftl+Vegovlnee1c9QX4TctnWMn13TZye+giMm8e2LwA==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+
+    <!-- Critical CSS for preventing MathJax FOUC -->
+    <style id="mathjax-fouc-prevention">
+      /* Pre-hide math content to prevent FOUC */
+      [data-mathjax-pending="true"],
+      .mathjax-formula:not(.mathjax-processed) {
+        visibility: hidden !important;
+        position: relative;
+        min-height: 1em;
+      }
+      
+      /* Show processed elements */
+      .mathjax-processed {
+        visibility: visible !important;
+        transition: visibility 0.1s ease-in-out;
+      }
+      
+      /* MathJax containers are always visible */
+      mjx-container {
+        visibility: visible !important;
+        opacity: 1 !important;
+        display: inline-block !important;
+      }
+      
+      /* Block math containers */
+      mjx-container[display="true"] {
+        display: block !important;
+        text-align: center;
+        margin: 1em 0;
+      }
+      
+      /* Prevent layout shift for common containers */
+      .item-html,
+      .choice,
+      .choice-text,
+      .question-text,
+      .math-content {
+        min-height: 1.5em;
+        position: relative;
+      }
+      
+      /* Smooth transition when showing math */
+      .item-html mjx-container,
+      .choice mjx-container {
+        animation: fadeIn 0.2s ease-in-out;
+      }
+      
+      @keyframes fadeIn {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      
+      /* Loading shimmer effect for pending math */
+      [data-mathjax-pending="true"]::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(90deg, #f5f5f5 25%, #fafafa 50%, #f5f5f5 75%);
+        background-size: 200% 100%;
+        animation: shimmer 1.2s infinite;
+        visibility: visible;
+        z-index: 1;
+        pointer-events: none;
+        border-radius: 4px;
+      }
+      
+      @keyframes shimmer {
+        0% { background-position: 200% 0; }
+        100% { background-position: -200% 0; }
+      }
+      
+      /* Hide raw LaTeX during processing */
+      .mathjax-processing {
+        color: transparent !important;
+        user-select: none !important;
+      }
+    </style>
+
+    <!-- MathJax 3 Configuration -->
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          displayMath: [['$$', '$$'], ['\\[', '\\]']],
+          processEscapes: true,
+          processEnvironments: true
+        },
+        options: {
+          skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+          processHtmlClass: 'mathjax-process',  // Only process elements with this class
+          skipStartupTypeset: false,  // 초기 typesetting 활성화
+          ignoreHtmlClass: 'mathjax-ignore'     // Ignore elements with this class
+        },
+        startup: {
+          typeset: false,  // Disable automatic typesetting
+          pageReady: () => {
+            // Don't do initial typesetting
+            return MathJax.startup.defaultPageReady().then(() => {
+              console.log('MathJax initialized and ready');
+              // Remove initial typesetting promise
+              MathJax.startup.document.clear();
+              MathJax.startup.document.updateDocument();
+            });
+          }
+        },
+        chtml: {
+          scale: 1,
+          minScale: 0.5,
+          mtextInheritFont: true,
+          merrorInheritFont: true,
+          mathmlSpacing: false,
+          skipAttributes: {},
+          exFactor: 0.5,
+          displayAlign: 'center',
+          displayIndent: '0'
+        }
+      };
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js" async></script>
+
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+
+    <!-- KaTeX CSS for math rendering -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.8/dist/katex.min.css" />
+
   </head>
   <body>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
+    
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
   </body>
 </html>

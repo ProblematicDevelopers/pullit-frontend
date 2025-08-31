@@ -1,49 +1,73 @@
-<script setup>
-import HelloWorld from './components/HelloWorld.vue'
-import TheWelcome from './components/TheWelcome.vue'
-import ApiTest from './components/ApiTest.vue'
+<template>
+  <div class="app-container">
+    <!-- 팝업 창이 아닐 때만 헤더 표시 -->
+    <Header v-if="!isPopup" />
+    <main class="main" :class="{ 'popup-main': isPopup }">
+      <router-view /> <!-- 페이지별 콘텐츠 표시 -->
+    </main>
+    <!-- 팝업 창이 아닐 때만 푸터 표시 -->
+    <Footer v-if="!isPopup" />
+    
+    <!-- 전역 Toast 컴포넌트 -->
+    <Toast />
+  </div>
+</template>
+<script>
+import { computed } from 'vue'
+import { useRoute } from 'vue-router'
+import Header from '@/components/common/Header.vue'
+import Footer from '@/components/common/Footer.vue'
+import Toast from '@/components/common/Toast.vue'
+
+export default {
+  components: { Header, Footer, Toast },
+  setup() {
+    const route = useRoute()
+    
+    // 팝업 창인지 확인 (라우터 메타 정보 또는 경로로 판단)
+    const isPopup = computed(() => {
+      // wizard 경로이거나 메타에 isPopup이 true인 경우
+      // 또는 로그인 페이지인 경우 헤더/푸터 숨김
+      return route.path.includes('/exam/wizard') || 
+             route.path.includes('/test-wizard') || 
+             route.meta.isPopup === true ||
+             route.meta.hideHeader === true
+    })
+    
+    return {
+      isPopup
+    }
+  }
+}
 </script>
 
-<template>
-  <header>
-    <img alt="Vue logo" class="logo" src="./assets/logo.svg" width="125" height="125" />
-
-    <div class="wrapper">
-      <HelloWorld msg="Pullit - 문제은행 사이트" />
-    </div>
-  </header>
-
-  <main>
-    <ApiTest />
-    <TheWelcome />
-  </main>
-</template>
-
 <style scoped>
-header {
-  line-height: 1.5;
+.app-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  width: 100%;
+  overflow-x: hidden;
 }
 
-.logo {
-  display: block;
-  margin: 0 auto 2rem;
+.main {
+  flex: 1;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
 }
 
-@media (min-width: 1024px) {
-  header {
-    display: flex;
-    place-items: center;
-    padding-right: calc(var(--section-gap) / 2);
-  }
-
-  .logo {
-    margin: 0 2rem 0 0;
-  }
-
-  header .wrapper {
-    display: flex;
-    place-items: flex-start;
-    flex-wrap: wrap;
-  }
+/* 팝업 창일 때 main의 padding 제거 및 전체 화면 사용 */
+.main.popup-main {
+  padding: 0;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 9999;
 }
 </style>
