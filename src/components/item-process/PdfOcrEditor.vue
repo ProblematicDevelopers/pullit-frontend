@@ -1148,20 +1148,22 @@ export default {
           passageId: itemData.passageGroup ? parseInt(itemData.passageGroup) : null,
 
           // OCR 히스토리 데이터 (백엔드 AreaType enum에 맞춤)
-          ocrHistories: Object.entries(itemData.selectedAreas || {}).map(([areaType, areaInfo]) => ({
-            pdfImageId: capturedImageInfo.value?.pdfImageId || null,
-            areaType: areaType === 'problem' ? 'PROBLEM' :
-                     areaType === 'options' ? 'OPTIONS' :
-                     areaType === 'question' ? 'QUESTION' :
-                     areaType === 'image' ? 'IMAGE' : 'PROBLEM',
-            ocrText: ocrResults.value?.[areaType]?.rawText || '',
-            editedText: itemData.editedTexts?.[areaType] || '',
-            originalImageUrl: capturedImageInfo.value?.imageUrl || null,
-            positionX: areaInfo.x?.toString() || '0',
-            positionY: areaInfo.y?.toString() || '0',
-            sizeX: areaInfo.width?.toString() || '0',
-            sizeY: areaInfo.height?.toString() || '0'
-          }))
+          ocrHistories: Object.entries(itemData.selectedAreas || {})
+            .filter(([, areaInfo]) => areaInfo !== null && areaInfo !== undefined && typeof areaInfo === 'object')
+            .map(([areaType, areaInfo]) => ({
+              pdfImageId: capturedImageInfo.value?.pdfImageId || null,
+              areaType: areaType === 'problem' ? 'PROBLEM' :
+                       areaType === 'options' ? 'OPTIONS' :
+                       areaType === 'question' ? 'QUESTION' :
+                       areaType === 'image' ? 'IMAGE' : 'PROBLEM',
+              ocrText: ocrResults.value?.[areaType]?.rawText || '',
+              editedText: itemData.editedTexts?.[areaType] || '',
+              originalImageUrl: capturedImageInfo.value?.imageUrl || null,
+              positionX: (areaInfo?.x !== null && areaInfo?.x !== undefined) ? areaInfo.x.toString() : '0',
+              positionY: (areaInfo?.y !== null && areaInfo?.y !== undefined) ? areaInfo.y.toString() : '0',
+              sizeX: (areaInfo?.width !== null && areaInfo?.width !== undefined) ? areaInfo.width.toString() : '0',
+              sizeY: (areaInfo?.height !== null && areaInfo?.height !== undefined) ? areaInfo.height.toString() : '0'
+            }))
         }
 
         console.log('API 호출 데이터:', processedItemData)
