@@ -241,7 +241,6 @@ const authService = {
 
       if (response.data.success) {
         const { accessToken, refreshToken, user } = response.data.data
-        const { accessToken, refreshToken, user } = response.data.data
 
         // 토큰 저장
         tokenManager.setTokens(accessToken, refreshToken)
