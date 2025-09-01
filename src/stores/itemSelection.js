@@ -15,6 +15,9 @@ export const useItemSelectionStore = defineStore('itemSelection', {
     // 선택된 문항 목록
     selectedItems: [],
 
+    // 변환된 이미지 데이터 - 반응성 보장을 위해 초기값 명시
+    convertedImages: [],
+
     // 페이지네이션
     currentPage: 1,
     totalPages: 1,
@@ -221,6 +224,32 @@ export const useItemSelectionStore = defineStore('itemSelection', {
      */
     setItems(items) {
       this.items = items || []
+    },
+
+    /**
+     * 변환된 이미지 데이터 저장
+     */
+    setConvertedImages(images) {
+      console.log('[itemSelectionStore] setConvertedImages 호출됨')
+      console.log('[itemSelectionStore] 받은 이미지 수:', images?.length || 0)
+      if (images && images.length > 0) {
+        console.log('[itemSelectionStore] 첫 번째 이미지 확인:', {
+          dataUrl존재: !!images[0].dataUrl,
+          dataUrl길이: images[0].dataUrl?.length,
+          type: images[0].type
+        })
+      }
+      this.convertedImages = images || []
+      console.log('[itemSelectionStore] 저장 후 convertedImages 길이:', this.convertedImages.length)
+    },
+
+    /**
+     * 변환된 이미지 데이터 가져오기
+     */
+    getConvertedImages() {
+      console.log('[itemSelectionStore] getConvertedImages 호출됨')
+      console.log('[itemSelectionStore] 반환할 이미지 수:', this.convertedImages?.length || 0)
+      return this.convertedImages
     },
 
     /**

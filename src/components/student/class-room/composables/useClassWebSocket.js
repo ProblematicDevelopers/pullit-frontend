@@ -47,30 +47,49 @@ export function useClassWebSocket(
             }
           },
           onOnlineStatus: (status) => {
+            console.log('🔍 useClassWebSocket - onOnlineStatus called with:', status)
+            
             // 서버에서 전체 온라인 사용자 목록을 받은 경우
             if (status.onlineUsers && Array.isArray(status.onlineUsers)) {
+              console.log('📋 Processing full online users list:', status.onlineUsers.length, 'users')
+              
               // 기존 온라인 사용자 목록 초기화
               onlineUsers.value.clear()
+              
+              // 학생 수 카운트 초기화
+              let studentCount = 0
+              let teacherCount = 0
 
-              // 서버에서 받은 온라인 사용자들을 추가
+              // 서버에서 받은 온라인 사용자들을 추가 (학생만 카운트)
               status.onlineUsers.forEach((user) => {
+                console.log(`  👤 User: id=${user.userId}, name=${user.userName}, role=${user.userRole}, status=${user.status}`)
+                
                 if (user.status === 'ONLINE') {
                   onlineUsers.value.add(user.userId)
+                  // 학생만 카운트 (STUDENT 역할만)
+                  if (user.userRole === 'STUDENT') {
+                    studentCount++
+                    console.log(`    ✅ Counted as STUDENT: ${user.userName}`)
+                  } else if (user.userRole === 'TEACHER') {
+                    teacherCount++
+                    console.log(`    ℹ️ Skipped (TEACHER): ${user.userName}`)
+                  }
                 }
               })
 
-              // 접속중인 학생 수 업데이트
-              onlineStudents.value = onlineUsers.value.size
+              // 접속중인 학생 수 업데이트 (학생만)
+              onlineStudents.value = studentCount
+              console.log('📊 Final count - Students:', studentCount, 'Teachers:', teacherCount, 'Total online:', onlineUsers.value.size)
             } else if (status.userId && status.status) {
               // 개별 사용자 상태 업데이트
-
               if (status.status === 'ONLINE') {
                 onlineUsers.value.add(status.userId)
               } else if (status.status === 'OFFLINE') {
                 onlineUsers.value.delete(status.userId)
               }
-
-              onlineStudents.value = onlineUsers.value.size
+              
+              // 개별 업데이트 시에도 전체 온라인 상태를 다시 요청하는 것이 더 정확함
+              // 왜냐하면 개별 업데이트에는 role 정보가 없을 수 있기 때문
             }
 
             if (callbacks.onOnlineStatus) {
@@ -225,9 +244,9 @@ export function useClassWebSocket(
         classmate.status = 'OFFLINE'
       })
 
-      // 온라인 사용자들의 상태를 업데이트
+      // 온라인 학생들의 상태를 업데이트 (STUDENT 역할만)
       status.onlineUsers.forEach((onlineUser) => {
-        if (onlineUser.status === 'ONLINE') {
+        if (onlineUser.status === 'ONLINE' && onlineUser.userRole === 'STUDENT') {
           const classmate = classmates.find((c) => c.studentId == onlineUser.userId)
           if (classmate) {
             classmate.status = 'ONLINE'

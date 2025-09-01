@@ -1,6 +1,6 @@
 /**
  * PDF Content Pagination Utilities
- * 
+ *
  * Provides accurate content measurement and intelligent splitting
  * for A4 page-based PDF generation
  */
@@ -29,10 +29,10 @@ export const A4_CONSTANTS = {
   GROUP_MARGIN_PX: 30 // 그룹 간 여백
 }
 
-// Calculate usable heights (더 보수적으로 계산)
+// Calculate usable heights (적절한 여백으로 조정)
 export const USABLE_HEIGHT = {
-  FIRST_PAGE: Math.floor((A4_CONSTANTS.PAGE_HEIGHT_MM - A4_CONSTANTS.TOP_MARGIN_MM - A4_CONSTANTS.BOTTOM_MARGIN_MM) * A4_CONSTANTS.MM_TO_PX - A4_CONSTANTS.HEADER_HEIGHT_PX - A4_CONSTANTS.FOOTER_HEIGHT_PX) - 50, // 추가 여백
-  REGULAR_PAGE: Math.floor((A4_CONSTANTS.PAGE_HEIGHT_MM - A4_CONSTANTS.TOP_MARGIN_MM - A4_CONSTANTS.BOTTOM_MARGIN_MM) * A4_CONSTANTS.MM_TO_PX - A4_CONSTANTS.FOOTER_HEIGHT_PX) - 30 // 추가 여백
+  FIRST_PAGE: Math.floor((A4_CONSTANTS.PAGE_HEIGHT_MM - A4_CONSTANTS.TOP_MARGIN_MM - A4_CONSTANTS.BOTTOM_MARGIN_MM) * A4_CONSTANTS.MM_TO_PX - A4_CONSTANTS.HEADER_HEIGHT_PX - A4_CONSTANTS.FOOTER_HEIGHT_PX) - 20, // 적절한 여백
+  REGULAR_PAGE: Math.floor((A4_CONSTANTS.PAGE_HEIGHT_MM - A4_CONSTANTS.TOP_MARGIN_MM - A4_CONSTANTS.BOTTOM_MARGIN_MM) * A4_CONSTANTS.MM_TO_PX - A4_CONSTANTS.FOOTER_HEIGHT_PX) - 15 // 적절한 여백
 }
 
 /**
@@ -70,20 +70,20 @@ export function removeMeasurementContainer() {
  */
 export async function measureContentHeight(htmlContent, layoutMode = 'single') {
   const container = createMeasurementContainer(layoutMode)
-  
+
   try {
     // Set the HTML content
     container.innerHTML = htmlContent
-    
+
     // Wait for DOM to update
     await nextTick()
-    
+
     // Force browser reflow to get accurate measurements
     void container.offsetHeight
-    
+
     // Get the actual height including margins
     const height = container.scrollHeight
-    
+
     return height
   } finally {
     removeMeasurementContainer()
@@ -98,31 +98,31 @@ export function splitHtmlContent(htmlContent, maxHeight, layoutMode = 'single') 
   const parser = new DOMParser()
   const doc = parser.parseFromString(htmlContent, 'text/html')
   const body = doc.body
-  
+
   const splitPoints = []
   let currentSplit = []
   let currentHeight = 0
-  
+
   // Helper to serialize nodes back to HTML
   const serializeNodes = (nodes) => {
     const temp = document.createElement('div')
     nodes.forEach(node => temp.appendChild(node.cloneNode(true)))
     return temp.innerHTML
   }
-  
+
   // Process each top-level element
   const elements = Array.from(body.children)
-  
+
   if (elements.length === 0 && body.textContent) {
     // Handle plain text content
     const text = body.textContent
     const sentences = text.split(/(?<=[.!?])\s+/)
-    
+
     let currentChunk = ''
     for (const sentence of sentences) {
       const testChunk = currentChunk + ' ' + sentence
       const testHeight = estimateTextHeight(testChunk, layoutMode)
-      
+
       if (testHeight > maxHeight && currentChunk) {
         splitPoints.push(currentChunk.trim())
         currentChunk = sentence
@@ -130,19 +130,19 @@ export function splitHtmlContent(htmlContent, maxHeight, layoutMode = 'single') 
         currentChunk = testChunk
       }
     }
-    
+
     if (currentChunk) {
       splitPoints.push(currentChunk.trim())
     }
-    
+
     return splitPoints
   }
-  
+
   // Process structured HTML elements
   for (let i = 0; i < elements.length; i++) {
     const element = elements[i]
     const elementHeight = estimateElementHeight(element, layoutMode)
-    
+
     if (currentHeight + elementHeight > maxHeight && currentSplit.length > 0) {
       // Save current split
       splitPoints.push(serializeNodes(currentSplit))
@@ -155,7 +155,7 @@ export function splitHtmlContent(htmlContent, maxHeight, layoutMode = 'single') 
         currentSplit = []
         currentHeight = 0
       }
-      
+
       // Split large element (like long paragraph)
       const subSplits = splitLargeElement(element, maxHeight, layoutMode)
       subSplits.forEach((split, index) => {
@@ -174,12 +174,12 @@ export function splitHtmlContent(htmlContent, maxHeight, layoutMode = 'single') 
       currentHeight += elementHeight
     }
   }
-  
+
   // Add remaining content
   if (currentSplit.length > 0) {
     splitPoints.push(serializeNodes(currentSplit))
   }
-  
+
   return splitPoints
 }
 
@@ -189,17 +189,17 @@ export function splitHtmlContent(htmlContent, maxHeight, layoutMode = 'single') 
 function splitLargeElement(element, maxHeight, layoutMode) {
   const tagName = element.tagName.toLowerCase()
   const content = element.innerHTML
-  
+
   if (tagName === 'p' || tagName === 'div') {
     // Try to split at sentence boundaries
     const sentences = content.split(/(?<=[.!?。])\s*/)
     const splits = []
     let currentSplit = ''
     let currentHeight = 0
-    
+
     for (const sentence of sentences) {
       const sentenceHeight = estimateTextHeight(sentence, layoutMode)
-      
+
       if (currentHeight + sentenceHeight > maxHeight && currentSplit) {
         splits.push(`<${tagName}>${currentSplit}</${tagName}>`)
         currentSplit = sentence
@@ -209,14 +209,14 @@ function splitLargeElement(element, maxHeight, layoutMode) {
         currentHeight += sentenceHeight
       }
     }
-    
+
     if (currentSplit) {
       splits.push(`<${tagName}>${currentSplit}</${tagName}>`)
     }
-    
+
     return splits
   }
-  
+
   // For other elements, return as is
   return [element.outerHTML]
 }
@@ -229,9 +229,9 @@ function estimateElementHeight(element, layoutMode) {
   const textLength = element.textContent.length
   const charsPerLine = layoutMode === 'double' ? 30 : 60
   const lines = Math.ceil(textLength / charsPerLine)
-  
+
   let baseHeight = lines * A4_CONSTANTS.LINE_HEIGHT_PX
-  
+
   // Add margins based on element type
   switch (tagName) {
     case 'p':
@@ -248,7 +248,7 @@ function estimateElementHeight(element, layoutMode) {
       baseHeight = items * A4_CONSTANTS.LINE_HEIGHT_PX * 1.2
       break
   }
-  
+
   return baseHeight
 }
 
@@ -286,33 +286,33 @@ export async function calculateOptimalPageBreaks(groups, layoutMode = 'single') 
   let column1Height = 0
   let column2Height = 0
   let pageNum = 1
-  
+
   for (const group of groups) {
     // Estimate group height first (faster than actual measurement)
     const estimatedHeight = estimateGroupHeightFast(group, layoutMode)
-    
+
     // Calculate available height for current page
-    const availableHeight = pageNum === 1 
-      ? USABLE_HEIGHT.FIRST_PAGE 
+    const availableHeight = pageNum === 1
+      ? USABLE_HEIGHT.FIRST_PAGE
       : USABLE_HEIGHT.REGULAR_PAGE
-    
+
     if (layoutMode === 'double') {
       // Two-column layout - 더 스마트한 분할 로직
       let placed = false
-      
+
       console.log(`Trying to place group. Col1: ${column1Height}px, Col2: ${column2Height}px, Group: ${estimatedHeight}px, Available: ${availableHeight}px`)
-      
+
       // 컬럼 높이의 절반을 기준으로 분할 여부 결정 (2단이므로 실제로는 페이지의 1/2)
-      const columnThreshold = Math.floor(availableHeight / 2)
-      
+      const columnThreshold = Math.floor(availableHeight * 0.45) // 조금 더 여유 있게
+
       // 첫 번째 컬럼이 비어있으면 우선 배치
       if (currentPage.column1.length === 0 && column1Height === 0) {
-        // 그룹이 한 컬럼 높이를 초과하면 분할 검토 (컬럼 높이는 페이지의 절반)
-        if (estimatedHeight > availableHeight) {
+        // 그룹이 한 컬럼 높이를 초과하면 분할 검토
+        if (estimatedHeight > availableHeight * 0.9) { // 90% 이상이면 분할 검토
           console.log('First column: Group too tall for page, splitting', estimatedHeight, 'vs', availableHeight)
-          // 컬럼에 맞게 분할 (더 작은 단위로)
-          const splitGroups = await splitPassageAtBoundary(group, columnThreshold * 1.5, layoutMode)
-          
+          // 컬럼에 맞게 분할 (적절한 크기로)
+          const splitGroups = await splitPassageAtBoundary(group, columnThreshold * 1.3, layoutMode)
+
           for (const splitGroup of splitGroups) {
             const splitHeight = estimateGroupHeightFast(splitGroup, layoutMode)
             if (column1Height + splitHeight <= availableHeight) {
@@ -349,32 +349,32 @@ export async function calculateOptimalPageBreaks(groups, layoutMode = 'single') 
         column2Height += estimatedHeight + A4_CONSTANTS.GROUP_MARGIN_PX
         placed = true
       }
-      
+
       // 두 컬럼 모두 공간이 부족한 경우에만 페이지 넘김
       if (!placed) {
         // 현재 페이지 저장
         if (currentPage.column1.length > 0 || currentPage.column2.length > 0) {
           pages.push(currentPage)
         }
-        
+
         // 새 페이지 시작
         pageNum++
         const nextPageHeight = USABLE_HEIGHT.REGULAR_PAGE
-        
-        // 그룹이 페이지 높이의 70% 이상이면 분할 검토
-        if (estimatedHeight > nextPageHeight * 0.7) {
+
+        // 그룹이 페이지 높이의 80% 이상이면 분할 검토
+        if (estimatedHeight > nextPageHeight * 0.8) {
           // 지문이 긴 경우 분할
           console.log('Splitting large group:', estimatedHeight, 'vs', nextPageHeight * 0.7)
           const splitGroups = await splitPassageAtBoundary(group, nextPageHeight, layoutMode)
-          
+
           // 분할된 그룹 추가
           currentPage = { column1: [], column2: [] }
           column1Height = 0
           column2Height = 0
-          
+
           for (const splitGroup of splitGroups) {
             const splitHeight = estimateGroupHeightFast(splitGroup, layoutMode)
-            
+
             if (column1Height + splitHeight <= nextPageHeight) {
               currentPage.column1.push(splitGroup)
               column1Height += splitHeight + A4_CONSTANTS.GROUP_MARGIN_PX
@@ -404,17 +404,17 @@ export async function calculateOptimalPageBreaks(groups, layoutMode = 'single') 
           column1Height = 0
           pageNum++
         }
-        
+
         const nextPageHeight = pageNum === 1 ? USABLE_HEIGHT.FIRST_PAGE : USABLE_HEIGHT.REGULAR_PAGE
-        
-        // 그룹이 페이지 높이의 70% 이상이면 분할 검토
-        if (estimatedHeight > nextPageHeight * 0.7) {
+
+        // 그룹이 페이지 높이의 80% 이상이면 분할 검토
+        if (estimatedHeight > nextPageHeight * 0.8) {
           console.log('Splitting large group (single column):', estimatedHeight, 'vs', nextPageHeight * 0.7)
           const splitGroups = await splitPassageAtBoundary(group, nextPageHeight, layoutMode)
-          
+
           for (const splitGroup of splitGroups) {
             const splitHeight = estimateGroupHeightFast(splitGroup, layoutMode)
-            
+
             if (column1Height + splitHeight <= nextPageHeight) {
               currentPage.column1.push(splitGroup)
               column1Height += splitHeight + A4_CONSTANTS.GROUP_MARGIN_PX
@@ -436,12 +436,12 @@ export async function calculateOptimalPageBreaks(groups, layoutMode = 'single') 
       }
     }
   }
-  
+
   // 마지막 페이지 추가
   if (currentPage.column1.length > 0 || (currentPage.column2 && currentPage.column2.length > 0)) {
     pages.push(currentPage)
   }
-  
+
   return pages
 }
 
@@ -450,19 +450,22 @@ export async function calculateOptimalPageBreaks(groups, layoutMode = 'single') 
  */
 function estimateGroupHeightFast(group, layoutMode) {
   let height = A4_CONSTANTS.GROUP_MARGIN_PX
-  
+
   if (group.type === 'passage-group') {
     height += A4_CONSTANTS.PASSAGE_HEADER_HEIGHT_PX
-    
+
     // Estimate passage height based on character count - 더 정확한 계산
     if (group.passageHtml) {
       const plainText = group.passageHtml.replace(/<[^>]*>/g, '')
-      const charsPerLine = layoutMode === 'double' ? 30 : 60  // 더 보수적인 값
+      // 한글과 영문 구분하여 더 정확한 계산
+      const koreanRatio = (plainText.match(/[가-힣]/g) || []).length / plainText.length
+      const baseCharsPerLine = layoutMode === 'double' ? 35 : 65
+      const charsPerLine = koreanRatio > 0.5 ? baseCharsPerLine * 0.85 : baseCharsPerLine
       const estimatedLines = Math.ceil(plainText.length / charsPerLine)
       // 제한 없이 실제 높이 반영
       height += estimatedLines * A4_CONSTANTS.LINE_HEIGHT_PX
     }
-    
+
     // Add question heights
     if (group.questions && group.questions.length > 0) {
       group.questions.forEach(q => {
@@ -478,9 +481,49 @@ function estimateGroupHeightFast(group, layoutMode) {
         }
       })
     }
+  } else if (group.type === 'passage-only') {
+    // 지문만 있는 경우 (분할된 첫 부분)
+    height += A4_CONSTANTS.PASSAGE_HEADER_HEIGHT_PX
+
+    if (group.passageHtml) {
+      const plainText = group.passageHtml.replace(/<[^>]*>/g, '')
+      const koreanRatio = (plainText.match(/[가-힣]/g) || []).length / plainText.length || 0
+      const baseCharsPerLine = layoutMode === 'double' ? 35 : 65
+      const charsPerLine = koreanRatio > 0.5 ? baseCharsPerLine * 0.85 : baseCharsPerLine
+      const estimatedLines = Math.ceil(plainText.length / charsPerLine)
+      height += estimatedLines * A4_CONSTANTS.LINE_HEIGHT_PX
+    }
+  } else if (group.type === 'passage-continuation') {
+    // 이어지는 지문 (분할된 두 번째 부분)
+    height += 30 // 작은 헤더 공간
+
+    if (group.passageHtml) {
+      const plainText = group.passageHtml.replace(/<[^>]*>/g, '')
+      const koreanRatio = (plainText.match(/[가-힣]/g) || []).length / plainText.length || 0
+      const baseCharsPerLine = layoutMode === 'double' ? 35 : 65
+      const charsPerLine = koreanRatio > 0.5 ? baseCharsPerLine * 0.85 : baseCharsPerLine
+      const estimatedLines = Math.ceil(plainText.length / charsPerLine)
+      height += estimatedLines * A4_CONSTANTS.LINE_HEIGHT_PX
+    }
+  } else if (group.type === 'questions-only') {
+    // 문제만 있는 경우 (분할된 지문의 문제들)
+    height += 20 // 작은 여백
+
+    if (group.questions && group.questions.length > 0) {
+      group.questions.forEach(q => {
+        height += A4_CONSTANTS.QUESTION_BASE_HEIGHT_PX
+        if (q.choices && q.choices.length > 0) {
+          height += q.choices.length * A4_CONSTANTS.CHOICE_HEIGHT_PX
+        } else {
+          const choiceCount = [q.choice1Html, q.choice2Html, q.choice3Html, q.choice4Html, q.choice5Html]
+            .filter(c => c).length
+          height += choiceCount * A4_CONSTANTS.CHOICE_HEIGHT_PX
+        }
+      })
+    }
   } else if (group.type === 'passage-group-continuation') {
     height += 40 // Continuation header 높이 증가
-    
+
     if (group.questions && group.questions.length > 0) {
       group.questions.forEach(q => {
         height += A4_CONSTANTS.QUESTION_BASE_HEIGHT_PX
@@ -508,7 +551,7 @@ function estimateGroupHeightFast(group, layoutMode) {
       })
     }
   }
-  
+
   console.log('Estimated height for group:', group.type, height, 'px')
   return height
 }
@@ -520,70 +563,73 @@ async function splitPassageAtBoundary(group, maxHeight, layoutMode) {
   if (group.type !== 'passage-group') {
     return [group]
   }
-  
-  // 최소 분할 크기 설정 - 너무 자주 분할되지 않도록
-  const MIN_CHAR_COUNT = 800      // 최소 800자는 유지해야 분할
-  
+
+  // 최소 분할 크기 설정 - 적절한 분할을 위해 조정
+  const MIN_CHAR_COUNT = 500      // 최소 500자는 유지해야 분할
+
   // 지문 높이 추정
   const passageHeight = A4_CONSTANTS.PASSAGE_HEADER_HEIGHT_PX
   let passageContentHeight = 0
-  
+
   if (!group.passageHtml) {
     return [group]
   }
-  
+
   const plainText = group.passageHtml.replace(/<[^>]*>/g, '')
-  const charsPerLine = layoutMode === 'double' ? 35 : 70
+  // 한글과 영문 구분하여 더 정확한 계산
+  const koreanRatio = (plainText.match(/[가-힣]/g) || []).length / plainText.length
+  const baseCharsPerLine = layoutMode === 'double' ? 35 : 70
+  const charsPerLine = koreanRatio > 0.5 ? baseCharsPerLine * 0.85 : baseCharsPerLine
   const estimatedLines = Math.ceil(plainText.length / charsPerLine)
   passageContentHeight = estimatedLines * A4_CONSTANTS.LINE_HEIGHT_PX
-  
+
   const totalPassageHeight = passageHeight + passageContentHeight
-  
-  // 분할 기준: 최대 높이의 1.5배를 초과하고 충분히 긴 경우만
-  // 너무 자주 분할하지 않도록 조건을 엄격하게
-  const shouldSplit = totalPassageHeight > maxHeight * 1.5 && plainText.length > MIN_CHAR_COUNT
-  
+
+  // 분할 기준: 최대 높이의 1.2배를 초과하고 충분히 긴 경우
+  // 적절한 분할을 위해 조건 완화
+  const shouldSplit = totalPassageHeight > maxHeight * 1.2 && plainText.length > MIN_CHAR_COUNT
+
   if (!shouldSplit) {
     console.log('No split needed:', totalPassageHeight, 'vs maxHeight * 1.5:', maxHeight * 1.5, 'chars:', plainText.length)
     return [group]
   }
-  
+
   console.log('Splitting passage:', totalPassageHeight, 'vs maxHeight:', maxHeight)
-  
+
   const splitGroups = []
   let passageContent = group.passageHtml
-  
+
   // 단순히 반으로 나누기 - 복잡한 로직 제거
   const targetSplitPoint = Math.floor(plainText.length / 2)
-  
-  // <p> 태그가 있는 경우 
+
+  // <p> 태그가 있는 경우
   if (passageContent.includes('<p>') || passageContent.includes('<P>')) {
     // DOM 파서를 사용하여 안전하게 처리
     const parser = new DOMParser()
     const doc = parser.parseFromString(passageContent, 'text/html')
     const paragraphs = doc.querySelectorAll('p')
-    
+
     if (paragraphs.length > 0) {
       let firstHalf = ''
       let secondHalf = ''
       let currentLength = 0
       let splitIndex = Math.floor(paragraphs.length / 2) // 단락의 중간 지점
-      
+
       // 전체 텍스트 길이의 중간에 가장 가까운 단락 찾기
       let bestSplitIndex = splitIndex
       let bestDiff = Math.abs(targetSplitPoint)
-      
+
       for (let i = 0; i < paragraphs.length; i++) {
         const paraText = paragraphs[i].textContent || ''
         currentLength += paraText.length
-        
+
         const diff = Math.abs(currentLength - targetSplitPoint)
         if (diff < bestDiff) {
           bestDiff = diff
           bestSplitIndex = i + 1 // 다음 단락부터 두 번째 그룹
         }
       }
-      
+
       // 단락을 두 그룹으로 나누기
       for (let i = 0; i < paragraphs.length; i++) {
         if (i < bestSplitIndex) {
@@ -592,47 +638,61 @@ async function splitPassageAtBoundary(group, maxHeight, layoutMode) {
           secondHalf += paragraphs[i].outerHTML
         }
       }
-      
+
       if (firstHalf && secondHalf) {
+        // 첫 번째 부분: 지문만
         splitGroups.push({
-          type: 'passage-group',
+          type: 'passage-only',
           passageId: group.passageId,
           passageHtml: firstHalf + '<p style="text-align: right; font-style: italic; color: #666; margin-top: 10px;">(계속)</p>',
           questions: [],
           questionNumbers: group.questionNumbers,
-          isSplit: true
+          isSplit: true,
+          splitPart: 1
         })
-        
+
+        // 두 번째 부분: 나머지 지문만
         splitGroups.push({
-          type: 'passage-group',
+          type: 'passage-continuation',
           passageId: group.passageId,
           passageHtml: '<p style="font-style: italic; color: #666; margin-bottom: 10px;">(이어서)</p>' + secondHalf,
-          questions: group.questions,
+          questions: [],
           questionNumbers: group.questionNumbers,
           isSplit: true,
-          isLastSplit: true
+          splitPart: 2
         })
-        
+
+        // 세 번째 부분: 문제들만 별도 그룹으로
+        if (group.questions && group.questions.length > 0) {
+          splitGroups.push({
+            type: 'questions-only',
+            passageId: group.passageId,
+            questions: group.questions,
+            questionNumbers: group.questionNumbers,
+            relatedToSplitPassage: true
+          })
+        }
+
         console.log(`Split passage into ${splitGroups.length} groups:`)
         splitGroups.forEach((g, i) => {
           const passageLength = g.passageHtml ? g.passageHtml.replace(/<[^>]*>/g, '').length : 0
           console.log(`  Group ${i + 1}: ${passageLength} chars, ${g.questions ? g.questions.length : 0} questions`)
         })
-        
+
         return splitGroups
       }
     }
   }
-  
+
   // <p> 태그가 없거나 파싱 실패한 경우 - 단순 텍스트 분할
   // 문장 단위로 분할 시도
   const sentences = passageContent.split(/(?<=[.!?。])\s+/)
-  
+
   if (sentences.length > 1) {
     let firstPart = ''
     let secondPart = ''
     let currentLength = 0
-    
+
     for (const sentence of sentences) {
       if (currentLength < targetSplitPoint) {
         firstPart += sentence + ' '
@@ -641,36 +701,50 @@ async function splitPassageAtBoundary(group, maxHeight, layoutMode) {
         secondPart += sentence + ' '
       }
     }
-    
+
     if (firstPart && secondPart) {
+      // 첫 번째 부분: 지문만
       splitGroups.push({
-        type: 'passage-group',
+        type: 'passage-only',
         passageId: group.passageId,
         passageHtml: firstPart.trim() + '<div style="text-align: right; font-style: italic; color: #666; margin-top: 10px;">(계속)</div>',
         questions: [],
         questionNumbers: group.questionNumbers,
-        isSplit: true
+        isSplit: true,
+        splitPart: 1
       })
-      
+
+      // 두 번째 부분: 나머지 지문만
       splitGroups.push({
-        type: 'passage-group',
+        type: 'passage-continuation',
         passageId: group.passageId,
         passageHtml: '<div style="font-style: italic; color: #666; margin-bottom: 10px;">(이어서)</div>' + secondPart.trim(),
-        questions: group.questions,
+        questions: [],
         questionNumbers: group.questionNumbers,
         isSplit: true,
-        isLastSplit: true
+        splitPart: 2
       })
+
+      // 세 번째 부분: 문제들만 별도 그룹으로
+      if (group.questions && group.questions.length > 0) {
+        splitGroups.push({
+          type: 'questions-only',
+          passageId: group.passageId,
+          questions: group.questions,
+          questionNumbers: group.questionNumbers,
+          relatedToSplitPassage: true
+        })
+      }
     }
   }
-  
+
   // 분할 결과 로그
   console.log(`Split passage into ${splitGroups.length} groups:`)
   splitGroups.forEach((g, i) => {
     const passageLength = g.passageHtml ? g.passageHtml.replace(/<[^>]*>/g, '').length : 0
     console.log(`  Group ${i + 1}: ${passageLength} chars, ${g.questions ? g.questions.length : 0} questions`)
   })
-  
+
   return splitGroups.length > 0 ? splitGroups : [group]
 }
 
@@ -683,25 +757,25 @@ async function splitLargeGroup(group, maxHeight, layoutMode) {
     // For non-passage groups, return as is
     return [group]
   }
-  
+
   const splitGroups = []
-  
+
   // Measure passage height
   const passageHeight = await measureContentHeight(group.passageHtml, layoutMode)
-  
+
   if (passageHeight > maxHeight * 0.7) {
     // Passage itself needs splitting
     const passageSplits = splitHtmlContent(
-      group.passageHtml, 
+      group.passageHtml,
       maxHeight * 0.7, // Leave room for at least one question
       layoutMode
     )
-    
+
     // Create groups for each passage split
     passageSplits.forEach((splitContent, index) => {
       const isFirst = index === 0
       const isLast = index === passageSplits.length - 1
-      
+
       const splitGroup = {
         type: 'passage-group',
         passageId: group.passageId,
@@ -712,10 +786,10 @@ async function splitLargeGroup(group, maxHeight, layoutMode) {
         splitPart: index + 1,
         totalSplits: passageSplits.length
       }
-      
+
       splitGroups.push(splitGroup)
     })
-    
+
     // If questions exist and last split doesn't have room, create another group
     if (group.questions.length > 0 && splitGroups[splitGroups.length - 1].questions.length === 0) {
       splitGroups[splitGroups.length - 1].questions = group.questions
@@ -727,13 +801,13 @@ async function splitLargeGroup(group, maxHeight, layoutMode) {
       ...group,
       questions: []
     }
-    
+
     let currentHeight = passageHeight + A4_CONSTANTS.PASSAGE_HEADER_HEIGHT_PX
-    
+
     for (const question of group.questions) {
-      const questionHeight = A4_CONSTANTS.QUESTION_BASE_HEIGHT_PX + 
+      const questionHeight = A4_CONSTANTS.QUESTION_BASE_HEIGHT_PX +
         (question.choices ? question.choices.length * A4_CONSTANTS.CHOICE_HEIGHT_PX : 0)
-      
+
       if (currentHeight + questionHeight > maxHeight && currentGroup.questions.length > 0) {
         splitGroups.push(currentGroup)
         currentGroup = {
@@ -749,12 +823,12 @@ async function splitLargeGroup(group, maxHeight, layoutMode) {
         currentHeight += questionHeight
       }
     }
-    
+
     if (currentGroup.questions.length > 0) {
       splitGroups.push(currentGroup)
     }
   }
-  
+
   return splitGroups
 }
 
@@ -763,19 +837,19 @@ async function splitLargeGroup(group, maxHeight, layoutMode) {
  */
 async function renderGroupToHtml(group) {
   let html = '<div class="group-container">'
-  
+
   if (group.type === 'passage-group') {
     html += `
       <div class="passage-header">[${group.questionNumbers}] 다음 글을 읽고 물음에 답하시오.</div>
       <div class="passage-content">${group.passageHtml}</div>
     `
-    
+
     for (const question of group.questions) {
       html += renderQuestionToHtml(question)
     }
   } else if (group.type === 'passage-group-continuation') {
     html += '<div class="continuation-note">(앞 페이지에서 계속)</div>'
-    
+
     for (const question of group.questions) {
       html += renderQuestionToHtml(question)
     }
@@ -784,7 +858,7 @@ async function renderGroupToHtml(group) {
       html += renderQuestionToHtml(question)
     }
   }
-  
+
   html += '</div>'
   return html
 }
@@ -801,7 +875,7 @@ function renderQuestionToHtml(question) {
     </div>
     <div class="question-text">${question.questionHtml}</div>
   `
-  
+
   if (question.choices && question.choices.length > 0) {
     html += '<div class="choices">'
     question.choices.forEach((choice, idx) => {
@@ -815,7 +889,7 @@ function renderQuestionToHtml(question) {
     })
     html += '</div>'
   }
-  
+
   html += '</div>'
   return html
 }
