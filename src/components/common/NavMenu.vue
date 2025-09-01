@@ -3,8 +3,8 @@
     <div class="nav-container">
       <!-- Role Selector -->
       <div class="role-selector">
-        <button 
-          class="role-btn" 
+        <button
+          class="role-btn"
           :class="{ active: currentRole === 'teacher' }"
           @click="setRole('teacher')"
         >
@@ -13,8 +13,8 @@
           </svg>
           선생님
         </button>
-        <button 
-          class="role-btn" 
+        <button
+          class="role-btn"
           :class="{ active: currentRole === 'student' }"
           @click="setRole('student')"
         >
@@ -27,8 +27,8 @@
 
       <!-- Main Navigation Menu -->
       <div class="nav-menu">
-        <router-link 
-          to="/" 
+        <router-link
+          to="/"
           class="nav-item"
           :class="{ 'active': isCurrentRoute('/') }"
         >
@@ -37,9 +37,9 @@
           </svg>
           <span>홈</span>
         </router-link>
-        
-        <router-link 
-          to="/test-bank" 
+
+        <router-link
+          to="/test-bank"
           class="nav-item"
           :class="{ 'active': isCurrentRoute('/test-bank') }"
         >
@@ -48,9 +48,9 @@
           </svg>
           <span>문제은행</span>
         </router-link>
-        
-        <router-link 
-          to="/exam-management" 
+
+        <router-link
+          to="/exam-management"
           class="nav-item"
           :class="{ 'active': isCurrentRoute('/exam-management') }"
         >
@@ -59,9 +59,9 @@
           </svg>
           <span>시험관리</span>
         </router-link>
-        
-        <router-link 
-          to="/student/report" 
+
+        <router-link
+          to="/student/report"
           class="nav-item"
           :class="{ 'active': isCurrentRoute('/student/report') }"
         >
@@ -71,8 +71,8 @@
           <span>성적분석</span>
         </router-link>
 
-        <router-link 
-          to="/resources" 
+        <router-link
+          to="/resources"
           class="nav-item"
           :class="{ 'active': isCurrentRoute('/resources') }"
         >
@@ -82,8 +82,8 @@
           <span>학습자료</span>
         </router-link>
 
-        <router-link 
-          to="/analytics" 
+        <router-link
+          to="/analytics"
           class="nav-item"
           :class="{ 'active': isCurrentRoute('/analytics') }"
         >
@@ -96,7 +96,7 @@
 
       <!-- Quick Actions -->
       <div class="nav-actions">
-        <button 
+        <button
           class="action-btn primary-action"
           @click="createNewTest"
           title="새 시험지 만들기"
@@ -121,7 +121,7 @@ export default {
   setup(props, { emit }) {
     const route = useRoute()
     const router = useRouter()
-    
+
     // State
     const currentRole = ref('teacher')
 
@@ -139,10 +139,10 @@ export default {
     }
 
     const createNewTest = () => {
-      router.push('/test-wizard')
+      router.push('/exam/wizard')
     }
 
-    return { 
+    return {
       currentRole,
       isCurrentRoute,
       setRole,
@@ -319,29 +319,29 @@ export default {
     padding: 16px;
     gap: 16px;
   }
-  
+
   .nav-menu {
     order: 1;
     flex-wrap: wrap;
     gap: 8px;
   }
-  
+
   .role-selector {
     order: 0;
     align-self: stretch;
     justify-content: center;
   }
-  
+
   .nav-actions {
     order: 2;
     align-self: stretch;
     justify-content: center;
   }
-  
+
   .nav-item span {
     display: none;
   }
-  
+
   .nav-item {
     padding: 10px;
   }
@@ -351,7 +351,7 @@ export default {
   .action-btn span {
     display: none;
   }
-  
+
   .nav-item {
     padding: 8px;
   }

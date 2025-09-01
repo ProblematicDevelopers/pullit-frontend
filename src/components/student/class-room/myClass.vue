@@ -437,7 +437,7 @@ const loadClassData = async () => {
     classInfo.value.totalStudents = res.totalStudents
     teacherInfo.value = res.teacher
     classmates.value = res.students
-    channelName.value = 'my_class_' + res.classId
+    channelName.value = 'class-' + res.classId
   } catch (error) {
     console.error('반 정보 로드 실패:', error)
   }

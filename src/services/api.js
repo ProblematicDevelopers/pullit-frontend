@@ -92,5 +92,22 @@ export const cbtAPI = {
   }
 }
 
+// 인증 관련 API 함수들
+export const authAPI = {
+  // 휴대폰 인증번호 발송
+  sendVerificationCode: (phoneNumber) => {
+    return api.post('/auth/verification/send', { phoneNumber })
+  },
+
+  // 인증번호 확인
+  verifyCode: (phoneNumber, code) => {
+    return api.post('/auth/verification/verify', { phoneNumber, code })
+  },
+
+  // 인증번호 재발송
+  resendVerificationCode: (phoneNumber) => {
+    return api.post('/auth/verification/resend', { phoneNumber })
+  }
+}
 
 export default api

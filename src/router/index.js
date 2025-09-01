@@ -1,6 +1,6 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Home from '../Home.vue'
-import MainDashboard from '../views/MainDashboard.vue'
+import ClassDashboard from '../views/ClassDashboard.vue'
 import Report from '../components/student/report/ReportList.vue'
 import BasicReport from '../components/student/report/BasicReport.vue'
 import StudentMain from '../components/student/Main.vue'
@@ -136,11 +136,23 @@ const routes = [
     },
   },
 
-  // 학급관리 페이지 (대시보드)
+  // 학급 대시보드 (메인)
+  {
+    path: '/class-dashboard',
+    name: 'ClassDashboard',
+    component: ClassDashboard,
+    beforeEnter: requireAuth,
+    meta: {
+      requiresAuth: true,
+      role: 'teacher',
+    },
+  },
+  
+  // 학급관리 상세 페이지
   {
     path: '/class-management',
     name: 'ClassManagement',
-    component: MainDashboard,
+    component: () => import('@/views/ClassManagement.vue'),
     beforeEnter: requireAuth,
     meta: {
       requiresAuth: true,
