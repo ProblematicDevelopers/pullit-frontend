@@ -11,25 +11,25 @@
             <div v-if="editedTexts.problem" class="preview-section">
               <div class="preview-html" v-html="editedTexts.problem"></div>
             </div>
-            
+
             <!-- 지문 영역 -->
             <div v-if="editedTexts.question" class="preview-section">
               <h6>지문</h6>
               <div class="preview-html" v-html="editedTexts.question"></div>
             </div>
-            
+
             <!-- 이미지 영역 -->
             <div v-if="editedTexts.image" class="preview-section">
               <h6>이미지</h6>
               <div class="preview-html" v-html="editedTexts.image"></div>
             </div>
-            
+
             <!-- 보기 영역 -->
             <div v-if="editedTexts.options" class="preview-section">
               <h6>보기</h6>
               <div class="preview-html" v-html="editedTexts.options"></div>
             </div>
-            
+
             <!-- 빈 내용 표시 -->
             <div v-if="!hasAnyContent" class="no-content">
               작성된 문제 내용이 없습니다.
@@ -64,7 +64,7 @@
     <div class="right-section">
       <div class="info-summary-panel">
         <h5 class="panel-title">추가 정보</h5>
-        
+
         <div class="info-content">
           <!-- 단원 정보 -->
           <div class="info-section">
@@ -189,9 +189,9 @@ export default {
 
     // 문제 내용이 있는지 확인
     const hasAnyContent = computed(() => {
-      return !!(props.editedTexts.problem || 
-                props.editedTexts.question || 
-                props.editedTexts.image || 
+      return !!(props.editedTexts.problem ||
+                props.editedTexts.question ||
+                props.editedTexts.image ||
                 props.editedTexts.options)
     })
 
@@ -205,10 +205,10 @@ export default {
     // 문제 형태 라벨
     const getProblemTypeLabel = (type) => {
       const labels = {
-        'multiple_choice': '5지 선택',
-        'short_answer': '단답',
-        'subjective': '주관식',
-        'sequence': '유순형'
+        'fiveChoice': '5지 선택',
+        'shortAnswerOrdered': '단답 유순형',
+        'shortAnswerUnOrdered': '단답 무순형',
+        'freeChoice': '자유 선지형'
       }
       return labels[type] || '선택 값'
     }
@@ -216,11 +216,9 @@ export default {
     // 난이도 라벨
     const getDifficultyLabel = (difficulty) => {
       const labels = {
-        'highest': '최상',
-        'high': '상',
+        'easy': '하',
         'medium': '중',
-        'low': '하',
-        'lowest': '최하'
+        'hard': '상'
       }
       return labels[difficulty] || '선택 값'
     }
@@ -250,7 +248,7 @@ export default {
 
         // 저장 데이터 준비
         const saveData = prepareSaveData()
-        
+
         // 부모 컴포넌트에 완료 이벤트 전달
         emit('complete-problem', saveData)
 
@@ -641,11 +639,11 @@ export default {
     grid-template-columns: 1fr;
     height: auto;
   }
-  
+
   .preview-panels {
     max-height: 60vh;
   }
-  
+
   .info-content {
     max-height: 40vh;
   }
@@ -656,22 +654,22 @@ export default {
     padding: 0.5rem;
     gap: 0.5rem;
   }
-  
+
   .info-item {
     grid-template-columns: 1fr;
     gap: 0.25rem;
   }
-  
+
   .passage-status {
     flex-direction: column;
     align-items: flex-start;
   }
-  
+
   .navigation-panel {
     flex-direction: column;
     gap: 0.5rem;
   }
-  
+
   .btn-lg {
     width: 100%;
   }
