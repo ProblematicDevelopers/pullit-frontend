@@ -17,19 +17,7 @@
 
     <!-- 메인 컨텐츠 영역 -->
     <div class="content-wrapper">
-      <!-- 왼쪽: PDF 미리보기 -->
-      <div class="pdf-preview-section">
-        <ExamPDFPreview
-          ref="pdfPreviewRef"
-          :selected-items="selectedItems"
-          @download="handleDownload"
-          @save="handleSave"
-          @update:gradeInfo="handleGradeUpdate"
-          @update:subjectInfo="handleSubjectUpdate"
-        />
-      </div>
-
-      <!-- 오른쪽: 시험 설정 -->
+      <!-- 왼쪽: 시험 설정 -->
       <div class="exam-settings-section">
         <div class="settings-card">
           <h3 class="settings-title">시험 설정</h3>
@@ -69,35 +57,7 @@
                   <small>모든 사용자가 볼 수 있음</small>
                 </span>
               </label>
-
-              <label class="radio-option">
-                <input
-                  type="radio"
-                  v-model="examSettings.visibility"
-                  value="CLASS_ONLY"
-                />
-                <span class="radio-label">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M17 21V19C17 17.8954 16.1046 17 15 17H9C7.89543 17 7 17.8954 7 19V21"
-                          stroke="currentColor" stroke-width="2"/>
-                    <circle cx="12" cy="11" r="3" stroke="currentColor" stroke-width="2"/>
-                  </svg>
-                  클래스 전용
-                  <small>특정 클래스만 접근</small>
-                </span>
-              </label>
             </div>
-          </div>
-
-          <!-- 클래스 선택 (CLASS_ONLY일 때만 표시) -->
-          <div class="setting-group" v-if="examSettings.visibility === 'CLASS_ONLY'">
-            <label class="setting-label">클래스 선택</label>
-            <select v-model="examSettings.classId" class="setting-input">
-              <option :value="null">클래스를 선택하세요</option>
-              <option v-for="cls in availableClasses" :key="cls.id" :value="cls.id">
-                {{ cls.name }}
-              </option>
-            </select>
           </div>
 
           <!-- 시험 날짜 설정 -->
@@ -168,6 +128,27 @@
           </div>
         </div>
       </div>
+
+      <!-- 오른쪽: PDF 미리보기 -->
+      <div class="pdf-preview-section">
+        <!-- 이미지 기반 미리보기 (변환된 이미지가 있을 때) -->
+        <ExamImagePreview
+          v-if="hasConvertedImages"
+          ref="pdfPreviewRef"
+          :converted-images="convertedImages"
+        />
+
+        <!-- HTML 기반 미리보기 (변환된 이미지가 없을 때) -->
+        <ExamPDFPreview
+          v-else
+          ref="pdfPreviewRef"
+          :selected-items="selectedItems"
+          @download="handleDownload"
+          @save="handleSave"
+          @update:gradeInfo="handleGradeUpdate"
+          @update:subjectInfo="handleSubjectUpdate"
+        />
+      </div>
     </div>
 
     <!-- 하단 액션 버튼 -->
@@ -208,6 +189,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useTestBankStore } from '@/stores/testBank'
 import { useItemSelectionStore } from '@/stores/itemSelection'
 import ExamPDFPreview from './ExamPDFPreviewFixed.vue'
+import ExamImagePreview from './ExamImagePreview.vue'
 import examApi from '@/services/examApi'
 import userExamApi from '@/services/userExamApi'
 
@@ -246,6 +228,25 @@ const todayDate = computed(() => {
 const testBankStore = useTestBankStore()
 const itemSelectionStore = useItemSelectionStore()
 
+// 변환된 이미지가 있는지 확인
+const hasConvertedImages = computed(() => {
+  const images = itemSelectionStore.getConvertedImages()
+  return images && images.length > 0
+})
+
+// 변환된 이미지 데이터
+const convertedImages = computed(() => {
+  const images = itemSelectionStore.getConvertedImages() || []
+  console.log('[Step3] Converted images to pass:', images.length)
+  if (images.length > 0) {
+    console.log('[Step3] First image check:', {
+      hasDataUrl: !!images[0].dataUrl,
+      dataUrlStart: images[0].dataUrl ? images[0].dataUrl.substring(0, 50) : 'no dataUrl'
+    })
+  }
+  return images
+})
+
 // 선택된 문항들
 const selectedItems = computed(() => {
   const items = itemSelectionStore.selectedItems ||
@@ -254,6 +255,7 @@ const selectedItems = computed(() => {
                 []
 
   console.log('Step3: 선택된 문항 수:', items.length)
+  console.log('Step3: 변환된 이미지 수:', itemSelectionStore.getConvertedImages()?.length || 0)
 
   return items.map((item, index) => ({
     ...item,
@@ -283,19 +285,20 @@ const handleDownload = async (data) => {
   // ExamPDFPreview 컴포넌트에서 html2pdf.js로 처리됨
 }
 
-// 저장 처리
+// 저장 처리 (ExamPDFPreview에서 호출)
 const handleSave = async (data) => {
-  console.log('시험지 저장:', data)
+  console.log('시험지 저장 데이터 수신:', data)
 
-  try {
-    // 저장 로직 구현
-    // API 호출 등
-
-    alert('시험지가 저장되었습니다.')
-  } catch (error) {
-    console.error('저장 오류:', error)
-    alert('저장 중 오류가 발생했습니다.')
+  // 받은 데이터에 실제 문항이 포함되어 있는지 확인
+  if (!data.items || data.items.length === 0) {
+    console.error('문항 데이터가 없습니다!')
+    alert('저장할 문항이 없습니다.')
+    return
   }
+
+  // 실제 데이터베이스에 저장하는 함수 호출
+  console.log('데이터베이스에 저장 시작...')
+  await saveExamToDatabase()
 }
 
 // Handle grade info update from ExamPDFPreview
@@ -376,15 +379,17 @@ const saveExamToDatabase = async () => {
   isSaving.value = true
 
   try {
-    // 1. PDF 생성
+    // 1. PDF 생성은 선택적으로 처리
     console.log('PDF 생성 시작...')
     let pdfBlob = null
 
-    if (pdfPreviewRef.value && pdfPreviewRef.value.generateAndSavePDF) {
-      pdfBlob = await pdfPreviewRef.value.generateAndSavePDF()
-      console.log('PDF Blob 생성 완료:', pdfBlob)
-    } else {
-      console.warn('PDF 생성 기능을 사용할 수 없습니다.')
+    try {
+      if (pdfPreviewRef.value && pdfPreviewRef.value.generateAndSavePDF) {
+        pdfBlob = await pdfPreviewRef.value.generateAndSavePDF()
+        console.log('PDF Blob 생성 완료:', pdfBlob)
+      }
+    } catch (pdfError) {
+      console.warn('PDF 생성 실패, 시험지만 저장합니다:', pdfError)
     }
 
     // examInfo에서 기본 정보 가져오기
@@ -427,7 +432,8 @@ const saveExamToDatabase = async () => {
 
     // 2. FormData 생성 (PDF와 함께 전송)
     const formData = new FormData()
-    formData.append('examData', new Blob([JSON.stringify(examData)], { type: 'application/json' }))
+    // JSON 문자열로 직접 추가 (Blob 대신)
+    formData.append('examData', JSON.stringify(examData))
 
     if (pdfBlob) {
       const fileName = `${examData.examName}_${new Date().toISOString().split('T')[0]}.pdf`
@@ -435,16 +441,53 @@ const saveExamToDatabase = async () => {
       console.log('PDF 파일 추가됨:', fileName)
     }
 
-    // 3. API 호출 (UserExam 생성 + PDF S3 업로드)
-    const response = await userExamApi.createExamWithPDF(formData)
+    // 3. API 호출 시도 - 실패 시 로컬 저장으로 대체
+    let response = null
 
-    console.log('시험지 및 PDF 저장 성공:', response.data)
-    examSavedId.value = response.data.id
+    try {
+      console.log('API 호출 시작 - userExamApi.createExamWithPDF')
+      response = await userExamApi.createExamWithPDF(formData)
+      console.log('API 응답 받음:', response)
 
-    // 성공 메시지 (더 친화적으로)
-    const successMessage = pdfBlob
-      ? '시험지가 PDF와 함께 성공적으로 저장되었습니다!'
-      : '시험지가 성공적으로 저장되었습니다!'
+      if (response && response.data) {
+        console.log('시험지 및 PDF 저장 성공:', response.data)
+        examSavedId.value = response.data.id
+      } else {
+        throw new Error('응답 데이터가 없습니다')
+      }
+    } catch (apiError) {
+      console.error('API 저장 실패:', apiError)
+      console.error('에러 상세:', {
+        message: apiError.message,
+        response: apiError.response,
+        status: apiError.response?.status,
+        data: apiError.response?.data
+      })
+
+      // 로컬 스토리지에 저장
+      const localExamData = {
+        ...examData,
+        id: `local_${Date.now()}`,
+        createdAt: new Date().toISOString(),
+        isLocal: true
+      }
+
+      // 기존 로컬 시험지 목록 가져오기
+      const existingLocalExams = JSON.parse(localStorage.getItem('localExams') || '[]')
+      existingLocalExams.push(localExamData)
+      localStorage.setItem('localExams', JSON.stringify(existingLocalExams))
+
+      examSavedId.value = localExamData.id
+      response = { data: localExamData }
+    }
+
+    // 성공 메시지 (저장 방식에 따라 다르게)
+    const isLocalSave = response.data.isLocal
+    const successMessage = isLocalSave
+      ? '시험지가 로컬에 임시 저장되었습니다. 나중에 서버에 동기화됩니다.'
+      : pdfBlob
+        ? '시험지가 PDF와 함께 성공적으로 저장되었습니다!'
+        : '시험지가 성공적으로 저장되었습니다!'
     alert(successMessage)
 
     // store에 저장된 시험지 ID와 URL 저장
@@ -499,9 +542,32 @@ const handleComplete = () => {
 onMounted(() => {
   console.log('Step3ExamSave 마운트됨')
   console.log('선택된 문항 수:', selectedItems.value.length)
+  console.log('변환된 이미지 사용:', hasConvertedImages.value)
+
+  // Store에서 직접 이미지 가져와서 확인
+  const directImages = itemSelectionStore.getConvertedImages()
+  console.log('Store에서 직접 가져온 이미지:', directImages)
+  console.log('Store 이미지 수:', directImages?.length || 0)
+
+  if (directImages && directImages.length > 0) {
+    console.log('첫 번째 이미지 상세 확인:', {
+      전체객체: directImages[0],
+      dataUrl존재: !!directImages[0].dataUrl,
+      dataUrl길이: directImages[0].dataUrl?.length,
+      dataUrl시작: directImages[0].dataUrl?.substring(0, 100)
+    })
+  }
+
+  console.log('convertedImages computed 값:', convertedImages.value)
   console.log('testBankStore.examInfo:', testBankStore.examInfo)
   console.log('itemSelectionStore.selectedItems:', itemSelectionStore.selectedItems)
   console.log('testBankStore.selectedItems:', testBankStore.selectedItems)
+
+  if (hasConvertedImages.value) {
+    console.log('✅ ExamImagePreview 컴포넌트를 사용합니다 (이미지 기반)')
+  } else {
+    console.log('📄 ExamPDFPreview 컴포넌트를 사용합니다 (HTML 기반)')
+  }
 })
 </script>
 
@@ -639,19 +705,21 @@ onMounted(() => {
 }
 
 .pdf-preview-section {
-  flex: 1.5;
+  flex: 1;
   overflow: hidden;
   display: flex;
   flex-direction: column;
   background: white;
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  order: 2;
 }
 
 .exam-settings-section {
-  width: 400px;
+  width: 420px;
   overflow-y: auto;
-  padding-right: 0.5rem;
+  padding-right: 1rem;
+  order: 1;
 }
 
 /* 설정 카드 */
@@ -736,7 +804,7 @@ onMounted(() => {
 }
 
 .radio-option:has(input:checked) {
-  background: #eff6ff;
+  background: #f0f9ff;
   border-color: #2563eb;
 }
 
@@ -759,7 +827,7 @@ onMounted(() => {
   display: block;
   margin-left: auto;
   font-size: 0.75rem;
-  color: #a0aec0;
+  color: #94a3b8;
 }
 
 /* 시간 입력 */

@@ -111,7 +111,7 @@
             <div class="content-card">
               <div class="card-header">
                 <h3 class="card-title">예정된 일정</h3>
-                <button class="calendar-btn">
+                <button class="calendar-btn" @click="showCalendarModal = true">
                   <svg viewBox="0 0 24 24" fill="currentColor">
                     <path d="M19 3H18V1H16V3H8V1H6V3H5C3.89 3 3 3.9 3 5V19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3M19 19H5V8H19V19Z"/>
                   </svg>
@@ -152,10 +152,34 @@
     />
 
     <!-- Class Management Modal -->
-    <ClassManagementModal 
+    <ClassManagementModal
       v-model="showClassManagementModal"
       @create-class="showCreateClassModal = true"
       @invite-students="openStudentInviteModal"
+    />
+
+    <!-- Calendar Modal -->
+    <CalendarModal
+      :isOpen="showCalendarModal"
+      :upcomingEvents="upcomingEvents"
+      @close="showCalendarModal = false"
+      @schedule-added="handleScheduleAdded"
+    />
+
+    <!-- My Exams Modal -->
+    <MyExamsModal
+      :isOpen="showMyExamsModal"
+      @close="showMyExamsModal = false"
+      @exam-selected="handleExamSelected"
+      @assign-exam="handleAssignExam"
+    />
+
+    <!-- Exam Assign Modal -->
+    <ExamAssignModal
+      :isOpen="showExamAssignModal"
+      :exam="selectedExamForAssign"
+      @close="showExamAssignModal = false"
+      @assigned="handleExamAssigned"
     />
   </div>
 </template>
@@ -166,8 +190,13 @@ import { useRouter } from 'vue-router'
 import StudentInviteModal from '@/components/StudentInviteModal.vue'
 import ClassCreateModal from '@/components/ClassCreateModal.vue'
 import ClassManagementModal from '@/components/ClassManagementModal.vue'
+import CalendarModal from '@/components/CalendarModal.vue'
+import MyExamsModal from '@/components/MyExamsModal.vue'
+import ExamAssignModal from '@/components/ExamAssignModal.vue'
 import authService from '@/services/auth'
 import examApi from '@/services/examApi'
+import dashboardApi from '@/services/dashboardApi'
+import scheduleApi from '@/services/scheduleApi'
 import { useClassWebSocket } from '@/components/student/class-room/composables/useClassWebSocket'
 
 const router = useRouter()
@@ -179,7 +208,11 @@ const userType = ref('teacher')
 const showInviteModal = ref(false)
 const showCreateClassModal = ref(false)
 const showClassManagementModal = ref(false)
+const showCalendarModal = ref(false)
+const showMyExamsModal = ref(false)
+const showExamAssignModal = ref(false)
 const currentClassId = ref(null)
+const selectedExamForAssign = ref(null)
 
 // WebSocket 관련 변수
 const currentUserId = ref(null)
@@ -283,10 +316,10 @@ const displayStats = computed(() => [
 // Quick actions
 const quickActions = ref([
   {
-    title: '시험지 생성',
-    description: '새로운 시험지를 만들고 관리하세요',
+    title: '시험 출제',
+    description: '내 시험지로 학생들에게 시험을 출제하세요',
     icon: BookOpenIcon,
-    action: 'create-exam'
+    action: 'assign-exam'
   },
   {
     title: '성적 관리',
@@ -308,84 +341,18 @@ const quickActions = ref([
   }
 ])
 
-// Recent activities
-const recentActivities = ref([
-  {
-    id: '1',
-    type: 'grade',
-    title: '수학 퀴즈 #3 채점 완료',
-    description: '32명 완료 - 평균: 89%',
-    time: '2시간 전',
-    icon: AwardIcon
-  },
-  {
-    id: '2',
-    type: 'student',
-    title: '새 학생 등록',
-    description: '김민지 학생이 물리학 수업에 참여했습니다',
-    time: '4시간 전',
-    icon: UsersIcon
-  },
-  {
-    id: '3',
-    type: 'exam',
-    title: '화학 시험 발행',
-    description: '기말고사가 다음 주로 예정되었습니다',
-    time: '1일 전',
-    icon: FileTextIcon
-  },
-  {
-    id: '4',
-    type: 'grade',
-    title: '생물학 성적 업데이트',
-    description: '28명의 실험 보고서 점수 추가',
-    time: '2일 전',
-    icon: AwardIcon
-  }
-])
+// Recent activities - 초기값만 설정, 실제 데이터는 API에서 로드
+const recentActivities = ref([])
 
-// Upcoming events
-const upcomingEvents = ref([
-  {
-    id: '1',
-    title: '물리학 기말고사',
-    date: '내일',
-    time: '오전 10:00',
-    type: 'exam',
-    participants: 45
-  },
-  {
-    id: '2',
-    title: '학부모 상담',
-    date: '금요일',
-    time: '오후 2:00',
-    type: 'meeting',
-    participants: 12
-  },
-  {
-    id: '3',
-    title: '과제 마감',
-    date: '월요일',
-    time: '오후 11:59',
-    type: 'deadline',
-    participants: 38
-  },
-  {
-    id: '4',
-    title: '화학 실험 평가',
-    date: '다음주',
-    time: '오전 9:00',
-    type: 'exam',
-    participants: 32
-  }
-])
+// Upcoming events - 초기값만 설정, 실제 데이터는 API에서 로드
+const upcomingEvents = ref([])
 
 
 // Handle action click
 const handleActionClick = (action) => {
   switch(action.action) {
-    case 'create-exam':
-      openTestWizardPopup()
+    case 'assign-exam':
+      showMyExamsModal.value = true  // 내 시험지 목록 모달 열기
       break
     case 'manage-grades':
       router.push('/class-report')
@@ -399,6 +366,25 @@ const handleActionClick = (action) => {
   }
 }
 
+// 시험지 선택 처리
+const handleExamSelected = (exam) => {
+  console.log('시험지 선택됨:', exam)
+  // 선택한 시험지로 추가 작업 수행 가능
+}
+
+// 시험 출제 처리
+const handleAssignExam = (exam) => {
+  selectedExamForAssign.value = exam
+  showExamAssignModal.value = true
+}
+
+// 시험 출제 완료 처리
+const handleExamAssigned = (result) => {
+  console.log('시험 출제 완료:', result)
+  // 대시보드 데이터 새로고침
+  loadDashboardData()
+}
+
 // 시험지 제작 팝업 열기
 const openTestWizardPopup = () => {
   const width = 1200
@@ -409,7 +395,7 @@ const openTestWizardPopup = () => {
   const features = `width=${width},height=${height},left=${left},top=${top},resizable=yes,scrollbars=yes,status=yes`
 
   // 새 창으로 시험지 제작 마법사 열기
-  window.open('/test-wizard', 'TestWizardPopup', features)
+  window.open('/exam/wizard', 'TestWizardPopup', features)
 }
 
 // 학생 초대 모달 열기
@@ -419,7 +405,7 @@ const openStudentInviteModal = async () => {
     showInviteModal.value = true
     return
   }
-  
+
   try {
     // 현재 학급 정보 가져오기
     const response = await authService.getClassInfo()
@@ -457,33 +443,80 @@ const handleClassCreated = (createdClass) => {
   }, 500)
 }
 
-// 통계 데이터 로드
-const loadStatistics = async () => {
+// 대시보드 데이터 로드
+const loadDashboardData = async () => {
   try {
-    // 내 시험지 목록 조회
+    // 1. 대시보드 통계 로드
+    const statsResponse = await dashboardApi.getDashboardStats()
+    if (statsResponse.success) {
+      stats.value = statsResponse.data
+    }
+
+    // 2. 최근 활동 로드
+    const activitiesResponse = await dashboardApi.getRecentActivities(5)
+    if (activitiesResponse.success) {
+      recentActivities.value = activitiesResponse.data.map(activity => ({
+        id: activity.id,
+        type: activity.iconType,
+        title: activity.title,
+        description: activity.description,
+        time: activity.relativeTime,
+        icon: getIconComponent(activity.iconType)
+      }))
+    }
+
+    // 3. 예정된 일정 로드
+    const schedulesResponse = await dashboardApi.getUpcomingSchedules(5)
+    if (schedulesResponse.success) {
+      upcomingEvents.value = schedulesResponse.data.map(schedule => ({
+        id: schedule.id,
+        title: schedule.title,
+        date: schedule.dateDisplay,
+        time: schedule.timeDisplay,
+        type: schedule.type,
+        participants: schedule.participants
+      }))
+    }
+  } catch (error) {
+    console.error('대시보드 데이터 로드 실패:', error)
+  }
+}
+
+// 아이콘 컴포넌트 매핑
+const getIconComponent = (type) => {
+  switch(type) {
+    case 'exam': return FileTextIcon
+    case 'student': return UsersIcon
+    case 'grade': return AwardIcon
+    default: return CalendarIcon
+  }
+}
+
+// 일정 추가 완료 핸들러
+const handleScheduleAdded = () => {
+  // 예정된 일정 목록 새로고침
+  loadDashboardData()
+}
+
+// 시험 출제 모달 열기
+const openExamAssignModal = async () => {
+  // 내 시험지 목록을 먼저 조회
+  try {
     const myExamsResponse = await examApi.get('/my', {
       params: { page: 0, size: 100 }
     })
 
-    if (myExamsResponse.data.success) {
-      stats.value.createdExams = myExamsResponse.data.data.totalElements || 0
-
-      // 총 문항 수 계산
-      const exams = myExamsResponse.data.data.content || []
-      stats.value.totalQuestions = exams.reduce((total, exam) => {
-        return total + (exam.totalItems || 0)
-      }, 0)
-    }
-
-    // 필터 옵션에서 추가 통계 가져오기
-    const filterResponse = await examApi.get('/filters')
-    if (filterResponse.data.success) {
-      // 필터 데이터에서 추가 통계 활용 가능
-      const filterData = filterResponse.data.data
-      // 예: 과목별 문제 수 등
+    if (myExamsResponse.data.success && myExamsResponse.data.data.content.length > 0) {
+      // 시험지가 있으면 시험 출제 모달 열기
+      router.push('/exam-assign') // 시험 출제 페이지로 이동
+    } else {
+      // 시험지가 없으면 먼저 시험지 제작 유도
+      alert('먼저 시험지를 생성해주세요.')
+      openTestWizardPopup()
     }
   } catch (error) {
-    console.error('통계 데이터 로드 실패:', error)
+    console.error('시험지 조회 실패:', error)
+    alert('시험지 목록을 불러오는데 실패했습니다.')
   }
 }
 
@@ -495,7 +528,7 @@ onMounted(async () => {
   const user = authService.getCurrentUser()
   if (user) {
     userType.value = user.role === 'TEACHER' ? 'teacher' : 'student'
-    
+
     // WebSocket용 사용자 정보 설정
     currentUserId.value = user.id || user.userId
     currentUserName.value = user.fullName || user.name
@@ -509,7 +542,7 @@ onMounted(async () => {
           // 담당 학급이 있으면 클래스 정보 저장
           currentClassId.value = teacherClass.classId
           channelName.value = `class-${teacherClass.classId}`
-          
+
           // 사용자 정보가 설정된 후에 WebSocket composable 초기화
           wsComposable = useClassWebSocket(
             currentUserId.value,
@@ -518,7 +551,7 @@ onMounted(async () => {
             null, // scrollToBottom 함수 (채팅이 없으므로 null)
             channelName,
           )
-          
+
           // WebSocket 연결
           console.log('🔌 ClassDashboard: WebSocket 연결 시작', {
             classId: teacherClass.classId,
@@ -526,7 +559,7 @@ onMounted(async () => {
             userName: currentUserName.value,
             channelName: channelName.value
           })
-          
+
           await wsComposable.connectWebSocket({
             onOnlineStatus: (status) => {
               console.log('📊 ClassDashboard: 온라인 상태 업데이트', status)
@@ -537,19 +570,19 @@ onMounted(async () => {
               console.log('💬 ClassDashboard: 채팅 메시지', message)
             }
           })
-          
+
           // 연결 후 온라인 상태 조회
           setTimeout(() => {
             wsComposable.refreshOnlineStatus()
           }, 1000)
-          
+
           // onlineStudents 값 동기화를 위한 watch
           watch(() => wsComposable.onlineStudents.value, (newVal) => {
             onlineStudents.value = newVal
           })
-          
-          // 통계 데이터 로드
-          await loadStatistics()
+
+          // 대시보드 데이터 로드
+          await loadDashboardData()
         } else {
           // 담당 학급이 없으면 학급 생성 유도
           currentClassId.value = null
@@ -570,8 +603,8 @@ onMounted(async () => {
     userType.value = localStorage.getItem('userType') || 'teacher'
   }
 
-  // 통계 데이터 로드
-  await loadStatistics()
+  // 대시보드 데이터 로드
+  await loadDashboardData()
 })
 
 onUnmounted(() => {

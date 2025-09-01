@@ -8,7 +8,10 @@ const classApi = {
   createOrGetAttempt: (examId, classId) => api.post(`/classes/attempt`, { examId, classId }),
   getLiveExam: (examId) => api.get(`/classes/exam/${examId}`),
   getStatsLines: (classId) => api.get(`/classes/statsline/${classId}`),
-  getStatsDetail: (classId) => api.get(`/classes/statsdetail/${classId}`)
+  getStatsDetail: (classId) => api.get(`/classes/statsdetail/${classId}`),
+
+  // 내 학급 목록 조회 (선생님용)
+  getMyClasses: () => api.get('/classes/my-classes')
 }
 
 export default classApi

@@ -98,7 +98,7 @@
               <span>서울특별시 강남구 테헤란로 123</span>
             </div>
           </div>
-          
+
           <!-- System Status -->
           <div class="system-status">
             <h5 class="status-title">시스템 상태</h5>
@@ -168,7 +168,7 @@ export default {
     })
 
     const databaseStatus = ref({
-      class: 'status-online', 
+      class: 'status-online',
       text: '정상'
     })
 
@@ -193,12 +193,17 @@ export default {
       localStorage.setItem('high-contrast', isHighContrast)
     }
 
-    // 페이지 로드 시 접근성 설정 복원
-    if (localStorage.getItem('high-contrast') === 'true') {
-      document.body.classList.add('high-contrast')
-    }
+    // 페이지 로드 시 접근성 설정 복원 - 일단 비활성화
+    // high-contrast 모드가 색상 문제를 일으킬 수 있으므로 임시로 비활성화
+    // if (localStorage.getItem('high-contrast') === 'true') {
+    //   document.body.classList.add('high-contrast')
+    // }
 
-    return { 
+    // localStorage에서 high-contrast 설정 제거
+    localStorage.removeItem('high-contrast')
+    document.body.classList.remove('high-contrast')
+
+    return {
       footerText,
       serverStatus,
       databaseStatus,
@@ -243,7 +248,7 @@ export default {
 .logo-icon {
   width: 32px;
   height: 32px;
-  color: #0053ed;
+  color: #3b82f6;  /* 일관된 파란색으로 변경 */
 }
 
 .brand-name {
@@ -279,7 +284,7 @@ export default {
 }
 
 .social-link:hover {
-  background: #0053ed;
+  background: #3b82f6;  /* 더 밝은 파란색으로 변경 */
   color: white;
   transform: translateY(-2px);
 }
@@ -320,7 +325,7 @@ export default {
 }
 
 .footer-link:hover {
-  color: #0053ed;
+  color: #3b82f6;  /* 더 밝은 파란색으로 변경 */
 }
 
 /* Contact Info */
@@ -341,7 +346,7 @@ export default {
 .contact-icon {
   width: 16px;
   height: 16px;
-  color: #0053ed;
+  color: #3b82f6;  /* 일관된 파란색으로 변경 */
   flex-shrink: 0;
 }
 
@@ -398,7 +403,7 @@ export default {
 .users-icon {
   width: 14px;
   height: 14px;
-  color: #0053ed;
+  color: #3b82f6;  /* 일관된 파란색으로 변경 */
   flex-shrink: 0;
 }
 
@@ -439,7 +444,7 @@ export default {
 }
 
 .legal-link:hover {
-  color: #0053ed;
+  color: #3b82f6;  /* 더 밝은 파란색으로 변경 */
 }
 
 .separator {
@@ -460,7 +465,7 @@ export default {
 }
 
 .accessibility-btn:hover {
-  color: #0053ed;
+  color: #3b82f6;  /* 더 밝은 파란색으로 변경 */
 }
 
 .accessibility-icon {
@@ -492,7 +497,7 @@ export default {
   .footer-main {
     padding: 32px 0;
   }
-  
+
   .container {
     width: 95%;
     display: grid;
@@ -500,19 +505,19 @@ export default {
     gap: 24px;
     text-align: center;
   }
-  
+
   .footer-bottom .container {
     display: flex;
     flex-direction: column;
     gap: 16px;
     text-align: center;
   }
-  
+
   .footer-legal {
     justify-content: center;
     flex-wrap: wrap;
   }
-  
+
   .social-links {
     justify-content: center;
   }
@@ -522,48 +527,35 @@ export default {
   .footer-main {
     padding: 24px 0;
   }
-  
+
   .brand-name {
     font-size: 24px;
   }
-  
+
   .brand-description {
     font-size: 14px;
   }
-  
+
   .section-title {
     font-size: 16px;
     margin-bottom: 16px;
   }
-  
+
   .contact-item {
     justify-content: center;
     gap: 8px;
   }
-  
+
   .system-status {
     margin-top: 20px;
     padding-top: 16px;
   }
-  
+
   .footer-bottom {
     padding: 12px 0;
   }
 }
 
-/* High contrast mode support */
-:global(body.high-contrast) .education-footer {
-  background: #000000;
-  color: #ffffff;
-}
-
-:global(body.high-contrast) .footer-link,
-:global(body.high-contrast) .legal-link {
-  color: #ffffff;
-}
-
-:global(body.high-contrast) .footer-link:hover,
-:global(body.high-contrast) .legal-link:hover {
-  color: #ffff00;
-}
+/* High contrast mode support - scoped 스타일에서는 작동하지 않으므로 제거 */
+/* 필요시 global 스타일시트나 별도 CSS 파일에서 처리 */
 </style>

@@ -1,6 +1,6 @@
 <!--
   Step2 문항 선택 - UI 개선 버전
-  
+
   개선사항:
   - 통합 헤더로 공간 최적화
   - 사이드바 필터 방식으로 변경
@@ -31,12 +31,12 @@
           </div>
         </div>
       </div>
-      
+
       <div class="header-right">
         <!-- 검색바 -->
         <div class="search-wrapper">
           <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" 
+            <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z"
                   stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
           <input
@@ -50,7 +50,7 @@
 
         <!-- 뷰 모드 토글 -->
         <div class="view-toggle">
-          <button 
+          <button
             :class="['view-btn', { active: viewMode === 'grid' }]"
             @click="viewMode = 'grid'"
             title="그리드 보기"
@@ -62,25 +62,25 @@
               <rect x="14" y="14" width="7" height="7" stroke="currentColor" stroke-width="2"/>
             </svg>
           </button>
-          <button 
+          <button
             :class="['view-btn', { active: viewMode === 'list' }]"
             @click="viewMode = 'list'"
             title="리스트 보기"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-              <path d="M8 6H21M8 12H21M8 18H21M3 6H3.01M3 12H3.01M3 18H3.01" 
+              <path d="M8 6H21M8 12H21M8 18H21M3 6H3.01M3 12H3.01M3 18H3.01"
                     stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
           </button>
         </div>
 
         <!-- 선택된 문항 패널 토글 -->
-        <button 
+        <button
           class="btn-selected"
           @click="showSelectedPanel = !showSelectedPanel"
         >
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
-            <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15M9 5C9 6.10457 9.89543 7 11 7H13C14.1046 7 15 6.10457 15 5M9 5C9 3.89543 9.89543 3 11 3H13C14.1046 3 15 3.89543 15 5" 
+            <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15M9 5C9 6.10457 9.89543 7 11 7H13C14.1046 7 15 6.10457 15 5M9 5C9 3.89543 9.89543 3 11 3H13C14.1046 3 15 3.89543 15 5"
                   stroke="currentColor" stroke-width="2"/>
           </svg>
           선택 목록
@@ -95,13 +95,13 @@
       <aside class="filter-sidebar" :class="{ collapsed: filterCollapsed }">
         <div class="sidebar-header">
           <h3>필터</h3>
-          <button 
+          <button
             class="btn-toggle"
             @click="filterCollapsed = !filterCollapsed"
             :title="filterCollapsed ? '필터 열기' : '필터 닫기'"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path :d="filterCollapsed ? 'M9 18L15 12L9 6' : 'M15 18L9 12L15 6'" 
+              <path :d="filterCollapsed ? 'M9 18L15 12L9 6' : 'M15 18L9 12L15 6'"
                     stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
           </button>
@@ -112,13 +112,13 @@
           <div class="filter-section">
             <h4>학년</h4>
             <div class="grade-filters">
-              <label 
+              <label
                 v-for="grade in gradeOptions"
                 :key="grade.code"
                 class="filter-chip"
                 :class="{ active: selectedGrade === grade.code }"
               >
-                <input 
+                <input
                   type="radio"
                   :value="grade.code"
                   v-model="selectedGrade"
@@ -133,13 +133,13 @@
           <div class="filter-section">
             <h4>과목</h4>
             <div class="subject-filters">
-              <label 
+              <label
                 v-for="subject in subjectOptions"
                 :key="subject.code"
                 class="filter-chip"
                 :class="{ active: selectedSubject === subject.code }"
               >
-                <input 
+                <input
                   type="radio"
                   :value="subject.code"
                   v-model="selectedSubject"
@@ -153,15 +153,15 @@
           <!-- 교과서 선택 -->
           <div class="filter-section">
             <h4>교과서</h4>
-            <select 
-              v-model="selectedTextbook" 
+            <select
+              v-model="selectedTextbook"
               @change="handleTextbookChange"
               class="select-input"
               :disabled="!selectedGrade || !selectedSubject"
             >
               <option value="">{{ (!selectedGrade || !selectedSubject) ? '학년과 과목을 먼저 선택하세요' : '전체' }}</option>
-              <option 
-                v-for="textbook in textbooks" 
+              <option
+                v-for="textbook in textbooks"
                 :key="textbook.subjectId"
                 :value="textbook.subjectId"
               >
@@ -174,13 +174,13 @@
           <div class="filter-section" v-if="chapterTree.length > 0">
             <h4>단원</h4>
             <div class="chapter-tree">
-              <div 
-                v-for="chapter in chapterTree" 
+              <div
+                v-for="chapter in chapterTree"
                 :key="chapter.id"
                 class="chapter-node"
               >
                 <label class="chapter-item">
-                  <input 
+                  <input
                     type="checkbox"
                     :value="chapter.id"
                     :checked="isChapterSelected(chapter)"
@@ -189,15 +189,15 @@
                   <span class="chapter-name">{{ chapter.name }}</span>
                   <span class="item-count">{{ chapter.itemCount }}</span>
                 </label>
-                
+
                 <!-- 중단원 -->
                 <div v-if="chapter.children" class="sub-chapters">
-                  <label 
+                  <label
                     v-for="subChapter in chapter.children"
                     :key="subChapter.id"
                     class="chapter-item sub"
                   >
-                    <input 
+                    <input
                       type="checkbox"
                       :value="subChapter.id"
                       v-model="selectedMediumChapters"
@@ -215,13 +215,13 @@
           <div class="filter-section">
             <h4>난이도</h4>
             <div class="difficulty-filters">
-              <label 
+              <label
                 v-for="level in difficultyLevels"
                 :key="level.code"
                 class="filter-chip"
                 :class="{ active: difficultyFilters.includes(level.code) }"
               >
-                <input 
+                <input
                   type="checkbox"
                   :value="level.code"
                   v-model="difficultyFilters"
@@ -236,13 +236,13 @@
           <div class="filter-section">
             <h4>문제 유형</h4>
             <div class="type-filters">
-              <label 
+              <label
                 v-for="type in questionTypes"
                 :key="type.code"
                 class="filter-chip"
                 :class="{ active: questionFormFilters.includes(type.code) }"
               >
-                <input 
+                <input
                   type="checkbox"
                   :value="type.code"
                   v-model="questionFormFilters"
@@ -254,13 +254,13 @@
           </div>
 
           <!-- 필터 초기화 -->
-          <button 
+          <button
             v-if="hasActiveFilters"
             class="btn-reset-filters"
             @click="resetFilters"
           >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M4 12V9C4 5.68629 6.68629 3 10 3H20M20 3L17 6M20 3L17 0M20 12V15C20 18.3137 17.3137 21 14 21H4M4 21L7 18M4 21L7 24" 
+              <path d="M4 12V9C4 5.68629 6.68629 3 10 3H20M20 3L17 6M20 3L17 0M20 12V15C20 18.3137 17.3137 21 14 21H4M4 21L7 18M4 21L7 24"
                     stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
             필터 초기화
@@ -276,23 +276,23 @@
             <span>검색 결과</span>
             <strong>{{ totalItems }}개</strong>
           </div>
-          
+
           <div class="content-actions">
             <label class="select-all">
-              <input 
-                type="checkbox" 
+              <input
+                type="checkbox"
                 @change="toggleSelectAll"
                 :checked="isAllSelected"
               />
               전체 선택
             </label>
-            
-            <button 
+
+            <button
               class="btn-random"
               @click="showRandomGenerator = true"
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M19 3L21 5L19 7M5 12H21M19 17L21 19L19 21M5 19H9M14 5H5" 
+                <path d="M19 3L21 5L19 7M5 12H21M19 17L21 19L19 21M5 19H9M14 5H5"
                       stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
               </svg>
               랜덤 생성
@@ -311,7 +311,7 @@
         <!-- 빈 상태 -->
         <div v-if="!isLoading && items.length === 0" class="empty-state">
           <svg width="64" height="64" viewBox="0 0 24 24" fill="none">
-            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" 
+            <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z"
                   stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
           <h3>검색 결과가 없습니다</h3>
@@ -320,7 +320,7 @@
 
         <!-- 지문 그룹 표시 (passageId가 있는 문제들) -->
         <div v-if="!isLoading && hasPassageGroups && viewMode === 'grid'" class="passage-groups">
-          <div 
+          <div
             v-for="group in passageGroups"
             :key="group.passageId"
             class="passage-group"
@@ -329,7 +329,7 @@
             <div class="passage-section">
               <div class="passage-header">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                  <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15M9 5C9 6.10457 9.89543 7 11 7H13C14.1046 7 15 6.10457 15 5M9 5C9 3.89543 9.89543 3 11 3H13C14.1046 3 15 3.89543 15 5" 
+                  <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15M9 5C9 6.10457 9.89543 7 11 7H13C14.1046 7 15 6.10457 15 5M9 5C9 3.89543 9.89543 3 11 3H13C14.1046 3 15 3.89543 15 5"
                         stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                 </svg>
                 <span>지문</span>
@@ -339,10 +339,10 @@
                 <div v-else-if="group.passageText" class="passage-text">{{ group.passageText }}</div>
               </div>
             </div>
-            
+
             <!-- 오른쪽: 문제 영역 -->
             <div class="passage-items">
-              <div 
+              <div
                 v-for="item in group.items"
                 :key="item.itemId"
                 :class="['item-card', { selected: isSelected(item.itemId) }]"
@@ -364,28 +364,28 @@
                       {{ item.difficulty?.name }}
                     </span>
                     <span class="badge-type">{{ item.questionForm?.name }}</span>
-                    <button 
+                    <button
                       class="btn-similar-items"
                       @click.stop="openSimilarItemsModal(item)"
                       title="유사 문항 조회"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" 
+                        <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z"
                               stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                       </svg>
                       유사문항
                     </button>
                   </div>
                 </div>
-                
+
                 <!-- 카드 내용 -->
                 <div class="card-body">
                   <!-- 문제 내용 -->
                   <div class="question-section">
                     <div v-if="item.questionHtml" class="item-html mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
                     <div v-else-if="item.questionImageUrl" class="item-image">
-                      <img 
-                        :src="item.questionImageUrl" 
+                      <img
+                        :src="item.questionImageUrl"
                         :alt="`문항 ${item.itemId}`"
                         loading="lazy"
                         @click.stop="showImageModal(item.questionImageUrl)"
@@ -420,20 +420,20 @@
                     </div>
                   </div>
                 </div>
-                
+
                 <!-- 카드 푸터 -->
                 <div class="card-footer">
                   <span class="chapter-info">{{ item.chapterName }}</span>
                   <div class="card-actions">
-                    <button 
+                    <button
                       class="btn-icon"
                       @click.stop="showItemDetail(item)"
                       title="상세보기"
                     >
                       <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z" 
+                        <path d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z"
                               stroke="currentColor" stroke-width="2"/>
-                        <path d="M2.45825 12C3.73253 7.94288 7.52281 5 12 5C16.4772 5 20.2675 7.94288 21.5418 12C20.2675 16.0571 16.4772 19 12 19C7.52281 19 3.73253 16.0571 2.45825 12Z" 
+                        <path d="M2.45825 12C3.73253 7.94288 7.52281 5 12 5C16.4772 5 20.2675 7.94288 21.5418 12C20.2675 16.0571 16.4772 19 12 19C7.52281 19 3.73253 16.0571 2.45825 12Z"
                               stroke="currentColor" stroke-width="2"/>
                       </svg>
                     </button>
@@ -468,13 +468,13 @@
                   {{ item.difficulty?.name }}
                 </span>
                 <span class="badge-type">{{ item.questionForm?.name }}</span>
-                <button 
+                <button
                   class="btn-similar-items"
                   @click.stop="openSimilarItemsModal(item)"
                   title="유사 문항 조회"
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z" 
+                    <path d="M21 21L15 15M17 10C17 13.866 13.866 17 10 17C6.13401 17 3 13.866 3 10C3 6.13401 6.13401 3 10 3C13.866 3 17 6.13401 17 10Z"
                           stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                   </svg>
                   유사문항
@@ -488,8 +488,8 @@
               <div class="question-section">
                 <div v-if="item.questionHtml" class="item-html mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
                 <div v-else-if="item.questionImageUrl" class="item-image">
-                  <img 
-                    :src="item.questionImageUrl" 
+                  <img
+                    :src="item.questionImageUrl"
                     :alt="`문항 ${item.itemId}`"
                     loading="lazy"
                     @click.stop="showImageModal(item.questionImageUrl)"
@@ -529,25 +529,25 @@
             <div class="card-footer">
               <span class="chapter-info">{{ item.chapterName }}</span>
               <div class="card-actions">
-                <button 
+                <button
                   class="btn-icon"
                   @click.stop="showItemDetail(item)"
                   title="상세보기"
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z" 
+                    <path d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z"
                           stroke="currentColor" stroke-width="2"/>
-                    <path d="M2.45825 12C3.73253 7.94288 7.52281 5 12 5C16.4772 5 20.2675 7.94288 21.5418 12C20.2675 16.0571 16.4772 19 12 19C7.52281 19 3.73253 16.0571 2.45825 12Z" 
+                    <path d="M2.45825 12C3.73253 7.94288 7.52281 5 12 5C16.4772 5 20.2675 7.94288 21.5418 12C20.2675 16.0571 16.4772 19 12 19C7.52281 19 3.73253 16.0571 2.45825 12Z"
                           stroke="currentColor" stroke-width="2"/>
                   </svg>
                 </button>
-                <button 
+                <button
                   class="btn-icon"
                   @click.stop="findSimilarItems(item)"
                   title="유사문항"
                 >
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                    <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15M9 5C9 6.10457 9.89543 7 11 7H13C14.1046 7 15 6.10457 15 5M9 5C9 3.89543 9.89543 3 11 3H13C14.1046 3 15 3.89543 15 5" 
+                    <path d="M9 5H7C5.89543 5 5 5.89543 5 7V19C5 20.1046 5.89543 21 7 21H17C18.1046 21 19 20.1046 19 19V7C19 5.89543 18.1046 5 17 5H15M9 5C9 6.10457 9.89543 7 11 7H13C14.1046 7 15 6.10457 15 5M9 5C9 3.89543 9.89543 3 11 3H13C14.1046 3 15 3.89543 15 5"
                           stroke="currentColor" stroke-width="2"/>
                   </svg>
                 </button>
@@ -562,8 +562,8 @@
             <thead>
               <tr>
                 <th width="40">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     @change="toggleSelectAll"
                     :checked="isAllSelected"
                   />
@@ -577,7 +577,7 @@
               </tr>
             </thead>
             <tbody>
-              <tr 
+              <tr
                 v-for="item in paginatedItems"
                 :key="item.itemId"
                 :class="{ selected: isSelected(item.itemId) }"
@@ -603,15 +603,15 @@
                 <td class="text-center">{{ item.questionForm?.name }}</td>
                 <td>{{ item.chapterName }}</td>
                 <td class="text-center">
-                  <button 
+                  <button
                     class="btn-icon"
                     @click.stop="showItemDetail(item)"
                     title="상세보기"
                   >
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z" 
+                      <path d="M15 12C15 13.6569 13.6569 15 12 15C10.3431 15 9 13.6569 9 12C9 10.3431 10.3431 9 12 9C13.6569 9 15 10.3431 15 12Z"
                             stroke="currentColor" stroke-width="2"/>
-                      <path d="M2.45825 12C3.73253 7.94288 7.52281 5 12 5C16.4772 5 20.2675 7.94288 21.5418 12C20.2675 16.0571 16.4772 19 12 19C7.52281 19 3.73253 16.0571 2.45825 12Z" 
+                      <path d="M2.45825 12C3.73253 7.94288 7.52281 5 12 5C16.4772 5 20.2675 7.94288 21.5418 12C20.2675 16.0571 16.4772 19 12 19C7.52281 19 3.73253 16.0571 2.45825 12Z"
                             stroke="currentColor" stroke-width="2"/>
                     </svg>
                   </button>
@@ -623,7 +623,7 @@
 
         <!-- 페이지네이션 -->
         <div v-if="totalPages > 1" class="pagination">
-          <button 
+          <button
             class="page-btn"
             @click="currentPage = 1"
             :disabled="currentPage === 1"
@@ -632,7 +632,7 @@
               <path d="M11 17L6 12L11 7M18 17L13 12L18 7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
           </button>
-          <button 
+          <button
             class="page-btn"
             @click="currentPage--"
             :disabled="currentPage === 1"
@@ -641,9 +641,9 @@
               <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
           </button>
-          
+
           <div class="page-numbers">
-            <button 
+            <button
               v-for="page in visiblePages"
               :key="page"
               :class="['page-number', { active: page === currentPage }]"
@@ -652,8 +652,8 @@
               {{ page }}
             </button>
           </div>
-          
-          <button 
+
+          <button
             class="page-btn"
             @click="currentPage++"
             :disabled="currentPage === totalPages"
@@ -662,7 +662,7 @@
               <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
             </svg>
           </button>
-          <button 
+          <button
             class="page-btn"
             @click="currentPage = totalPages"
             :disabled="currentPage === totalPages"
@@ -675,13 +675,13 @@
       </main>
 
       <!-- 오른쪽 선택된 문항 패널 -->
-      <aside 
-        v-if="showSelectedPanel" 
+      <aside
+        v-if="showSelectedPanel"
         class="selected-panel"
       >
         <div class="panel-header">
           <h3>선택된 문항</h3>
-          <button 
+          <button
             class="btn-close"
             @click="showSelectedPanel = false"
           >
@@ -696,7 +696,7 @@
             <span class="label">총 문항:</span>
             <span class="value">{{ selectedItems.length }}개</span>
           </div>
-          <button 
+          <button
             v-if="selectedItems.length > 0"
             class="btn-clear"
             @click="clearSelection"
@@ -705,14 +705,14 @@
           </button>
         </div>
 
-        <div 
+        <div
           class="selected-list"
           @dragover.prevent="handleDragOver"
           @drop="handleDrop"
           @dragleave="handleDragLeave"
         >
           <!-- 지문으로 그룹화된 문항들 -->
-          <div 
+          <div
             v-for="(group, index) in selectedItemGroups"
             :key="group.id"
             class="item-group"
@@ -721,7 +721,7 @@
             @dragend="handleDragEnd"
             @dragover.prevent="handleDragOver"
             @dragenter.prevent="handleDragEnter(index)"
-            :class="{ 
+            :class="{
               dragging: draggedItem?.index === index && draggedItem?.type === 'group',
               'drop-target': dropTargetIndex === index
             }"
@@ -735,10 +735,10 @@
               <span class="group-title">지문 #{{ group.passageId }}</span>
               <span class="group-count">{{ group.items.length }}문항</span>
             </div>
-            
+
             <!-- 그룹 내 문항들 -->
             <div class="group-items">
-              <div 
+              <div
                 v-for="(item, itemIndex) in group.items"
                 :key="item.itemId"
                 class="selected-item"
@@ -762,7 +762,7 @@
                     {{ item.difficulty?.name }}
                   </span>
                 </div>
-                <button 
+                <button
                   class="btn-remove"
                   @click="removeFromSelection(item)"
                   title="제거"
@@ -777,7 +777,7 @@
         </div>
 
         <div class="panel-footer">
-          <button 
+          <button
             class="btn-primary"
             @click="proceedToNext"
             :disabled="selectedItems.length === 0"
@@ -843,6 +843,7 @@ import { useMathJax } from '@/composables/useMathJax'
 import { renderMathJaxParallelHybrid, renderMathJaxSmartHybrid } from '@/utils/mathjax-hybrid'
 // import { renderMathJaxSimple } from '@/utils/mathjax-simple'
 import debugMathJax from '@/utils/mathjax-debug'
+import { convertQuestionsToImages } from '@/utils/question-to-image-converter'
 
 // Props & Emits
 const props = defineProps({
@@ -937,7 +938,7 @@ const totalPages = computed(() => Math.ceil(totalItems.value / itemsPerPage))
 // 지문이 있는 문제들만 그룹화
 const passageGroups = computed(() => {
   const groups = new Map()
-  
+
   paginatedItems.value.forEach(item => {
     if (item.passageId) {
       if (!groups.has(item.passageId)) {
@@ -951,7 +952,7 @@ const passageGroups = computed(() => {
       groups.get(item.passageId).items.push(item)
     }
   })
-  
+
   return Array.from(groups.values())
 })
 
@@ -975,18 +976,18 @@ const visiblePages = computed(() => {
   const total = totalPages.value
   const current = currentPage.value
   const maxVisible = 5
-  
+
   let start = Math.max(1, current - Math.floor(maxVisible / 2))
   let end = Math.min(total, start + maxVisible - 1)
-  
+
   if (end - start < maxVisible - 1) {
     start = Math.max(1, end - maxVisible + 1)
   }
-  
+
   for (let i = start; i <= end; i++) {
     pages.push(i)
   }
-  
+
   return pages
 })
 
@@ -995,10 +996,10 @@ const isAllSelected = computed(() => {
 })
 
 const hasActiveFilters = computed(() => {
-  return selectedTextbook.value || 
-         selectedChapters.value.length > 0 || 
+  return selectedTextbook.value ||
+         selectedChapters.value.length > 0 ||
          selectedMediumChapters.value.length > 0 ||
-         difficultyFilters.value.length > 0 || 
+         difficultyFilters.value.length > 0 ||
          questionFormFilters.value.length > 0
 })
 
@@ -1007,7 +1008,7 @@ const selectedItemGroups = computed(() => {
   const groups = []
   const passageGroups = new Map()
   const regularItems = []
-  
+
   // 지문별로 그룹화
   selectedItems.value.forEach(item => {
     if (item.passageId) {
@@ -1027,15 +1028,15 @@ const selectedItemGroups = computed(() => {
       })
     }
   })
-  
+
   // 지문 그룹 먼저 추가
   passageGroups.forEach(group => {
     groups.push(group)
   })
-  
+
   // 일반 문항 추가
   groups.push(...regularItems)
-  
+
   return groups
 })
 
@@ -1048,12 +1049,12 @@ const loadItems = async () => {
     totalItems.value = 0
     return
   }
-  
+
   // 로딩 시작 시 기존 항목 즉시 지우기
   isLoading.value = true
   items.value = [] // 기존 문항 즉시 클리어
   totalItems.value = 0 // 총 개수도 초기화
-  
+
   try {
     // itemStore를 통한 검색 실행
     const searchParams = {
@@ -1065,15 +1066,15 @@ const loadItems = async () => {
       difficulties: difficultyFilters.value,
       categories: questionFormFilters.value // 문제유형 필터 적용
     }
-    
+
     console.log('검색 파라미터:', searchParams)
-    
+
     await itemStore.searchItems(searchParams)
-    
+
     // store에서 데이터 가져오기 - 서버에서 이미 페이지네이션된 데이터를 받음
     items.value = itemStore.items || []
     totalItems.value = itemStore.totalItems || 0
-    
+
     console.log(`페이지 ${currentPage.value} 검색 완료: ${itemStore.items?.length}개 문항 찾음, 전체: ${totalItems.value}개`)
   } catch (error) {
     console.error('Failed to load items:', error)
@@ -1100,27 +1101,27 @@ const loadItems = async () => {
 const loadSubjectsAndTextbooks = async () => {
   try {
     isLoadingTextbooks.value = true
-    
+
     // Step1에서 선택한 gradeCode와 areaCode로 필터링된 교과서 로드
     const gradeCode = props.examInfo?.gradeCode || props.examInfo?.grade
     const areaCode = props.examInfo?.areaCode // MA, KO, EN, SC, SO 등
-    
+
     console.log('=== 교과서 로드 시작 ===')
     console.log('전체 examInfo:', props.examInfo)
     console.log('gradeCode:', gradeCode, 'areaCode:', areaCode)
-    
+
     // itemStore의 loadSubjects를 gradeCode와 areaCode 옵션과 함께 호출
     await itemStore.loadSubjects({
       gradeCode: gradeCode,
       areaCode: areaCode,
       includeTextbooks: true
     })
-    
+
     // subjects 데이터를 textbooks 형태로 변환
     // API에서 이미 gradeCode와 areaCode로 필터링된 데이터를 받음
     const subjects = itemStore.subjects
     console.log('Store에서 가져온 subjects (이미 필터링됨):', subjects)
-    
+
     if (subjects && subjects.length > 0) {
       // 이미 API에서 필터링된 데이터이므로 바로 textbooks 형태로 변환
       textbooks.value = subjects.map(subject => ({
@@ -1133,9 +1134,9 @@ const loadSubjectsAndTextbooks = async () => {
         areaCode: subject.areaCode || subject.area,
         itemCount: subject.itemCount || 0
       }))
-      
+
       console.log('필터링된 textbooks:', textbooks.value)
-      
+
       // 교과서가 하나만 있으면 자동 선택
       if (textbooks.value.length === 1) {
         selectedTextbook.value = textbooks.value[0].id || textbooks.value[0].subjectId
@@ -1157,21 +1158,21 @@ const loadChapters = async () => {
     chapterTree.value = []
     return
   }
-  
+
   try {
     console.log('챕터 트리 로드 시작 - textbookId:', selectedTextbook.value)
     // chapterApi를 사용하여 챕터 트리 로드
     const response = await chapterApi.getChapterTree(selectedTextbook.value)
-    
+
     console.log('챕터 API 응답:', response)
-    
+
     if (response.success && response.data) {
       chapterTree.value = response.data
       console.log('챕터 트리 로드 성공:', chapterTree.value)
-      
+
       // Store에도 챕터 정보 저장
       itemStore.setChapters(response.data)
-      
+
       // 첫 번째 대단원 자동 확장
       if (chapterTree.value.length > 0) {
         expandedChapters.value = [chapterTree.value[0].id]
@@ -1180,10 +1181,10 @@ const loadChapters = async () => {
       // response.data 안에 success가 있는 경우
       chapterTree.value = response.data.data
       console.log('챕터 트리 로드 성공 (nested):', chapterTree.value)
-      
+
       // Store에도 챕터 정보 저장
       itemStore.setChapters(response.data.data)
-      
+
       // 첫 번째 대단원 자동 확장
       if (chapterTree.value.length > 0) {
         expandedChapters.value = [chapterTree.value[0].id]
@@ -1211,7 +1212,7 @@ const handleGradeChange = () => {
   selectedMediumChapters.value = []
   chapterTree.value = []
   textbooks.value = []
-  
+
   // 학년과 과목이 모두 선택되면 교과서 로드
   if (selectedGrade.value && selectedSubject.value) {
     loadSubjectsAndTextbooks()
@@ -1226,7 +1227,7 @@ const handleSubjectChange = () => {
   selectedMediumChapters.value = []
   chapterTree.value = []
   textbooks.value = []
-  
+
   // 학년과 과목이 모두 선택되면 교과서 로드
   if (selectedGrade.value && selectedSubject.value) {
     // examInfo 업데이트 (loadSubjectsAndTextbooks에서 사용)
@@ -1245,7 +1246,7 @@ const handleTextbookChange = () => {
 // 대단원 체크박스 변경 처리
 const handleLargeChapterChange = (chapter, event) => {
   const isChecked = event.target.checked
-  
+
   if (isChecked) {
     // 대단원 선택 시 모든 중단원 선택
     if (chapter.children) {
@@ -1275,7 +1276,7 @@ const handleLargeChapterChange = (chapter, event) => {
       selectedChapters.value.splice(chapterIndex, 1)
     }
   }
-  
+
   loadItems()
 }
 
@@ -1289,9 +1290,9 @@ const isChapterSelected = (chapter) => {
   if (!chapter.children || chapter.children.length === 0) {
     return selectedChapters.value.includes(chapter.id)
   }
-  
+
   // 모든 중단원이 선택되었는지 확인
-  return chapter.children.every(subChapter => 
+  return chapter.children.every(subChapter =>
     selectedMediumChapters.value.includes(subChapter.id)
   )
 }
@@ -1374,7 +1375,7 @@ const removeFromSelection = (item) => {
 }
 
 const hasChoices = (item) => {
-  return item.choice1Html || item.choice2Html || item.choice3Html || 
+  return item.choice1Html || item.choice2Html || item.choice3Html ||
          item.choice4Html || item.choice5Html ||
          item.choice1Text || item.choice2Text || item.choice3Text ||
          item.choice4Text || item.choice5Text
@@ -1431,23 +1432,23 @@ const getCurrentFilters = () => {
 
 const handleRandomGenerate = async (config) => {
   console.log('랜덤 문항 생성 설정:', config)
-  
+
   try {
     isLoading.value = true
-    
+
     // 랜덤 문항 생성 API 호출
     const searchParams = {
       subjects: [selectedSubject.value].filter(Boolean),
       chapterIds: selectedMediumChapters.value,
-      difficulties: config.difficultyDistribution ? 
+      difficulties: config.difficultyDistribution ?
         Object.keys(config.difficultyDistribution).map(k => parseInt(k)) : [],
       categories: questionFormFilters.value,
       size: config.totalCount || 20,
       random: true // 랜덤 선택 플래그
     }
-    
+
     const result = await itemApiService.searchItems(searchParams)
-    
+
     if (result.success && result.data) {
       // 랜덤으로 선택된 문항들을 선택 목록에 추가
       result.data.forEach(item => {
@@ -1456,7 +1457,7 @@ const handleRandomGenerate = async (config) => {
           itemStore.selectItem(item)
         }
       })
-      
+
       console.log(`${result.data.length}개 문항이 랜덤으로 선택되었습니다.`)
     }
   } catch (error) {
@@ -1484,12 +1485,12 @@ const handleAddSimilarItems = (similarItems) => {
   if (similarItems && similarItems.length > 0) {
     // 기존 선택된 아이템 ID들
     const existingIds = selectedItems.value.map(item => item.itemId)
-    
+
     // 중복되지 않는 새 아이템만 필터링
-    const newItems = similarItems.filter(item => 
+    const newItems = similarItems.filter(item =>
       !existingIds.includes(item.itemId || item.item_id)
     )
-    
+
     if (newItems.length > 0) {
       selectedItems.value.push(...newItems)
       console.log(`Added ${newItems.length} similar items to selection`)
@@ -1499,12 +1500,102 @@ const handleAddSimilarItems = (similarItems) => {
   }
 }
 
-const proceedToNext = () => {
-  // itemStore에 선택된 아이템 저장
-  selectedItems.value.forEach(item => {
-    itemStore.selectItem(item)
-  })
-  emit('next')
+const proceedToNext = async () => {
+  // 로딩 상태 표시
+  const loadingEl = document.createElement('div')
+  loadingEl.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    color: white;
+    font-size: 18px;
+  `
+  loadingEl.innerHTML = `
+    <div style="text-align: center;">
+      <div style="margin-bottom: 20px;">
+        <svg width="50" height="50" viewBox="0 0 50 50" style="animation: spin 1s linear infinite;">
+          <circle cx="25" cy="25" r="20" stroke="white" stroke-width="4" fill="none" stroke-dasharray="80" stroke-dashoffset="60"></circle>
+        </svg>
+      </div>
+      <div>문제를 이미지로 변환 중...</div>
+      <div id="conversion-progress" style="margin-top: 10px; font-size: 14px;">0%</div>
+    </div>
+    <style>
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  `
+  document.body.appendChild(loadingEl)
+
+  try {
+    // 디버깅: 선택된 아이템 데이터 구조 확인
+    console.log('=== 이미지 변환 시작 ===')
+    console.log('선택된 아이템 수:', selectedItems.value.length)
+    if (selectedItems.value.length > 0) {
+      console.log('첫 번째 아이템 구조:', {
+        itemId: selectedItems.value[0].itemId,
+        hasQuestionHtml: !!selectedItems.value[0].questionHtml,
+        hasItemHtml: !!selectedItems.value[0].itemHtml,
+        hasPassageHtml: !!selectedItems.value[0].passageHtml,
+        hasChoice1Html: !!selectedItems.value[0].choice1Html,
+        allKeys: Object.keys(selectedItems.value[0])
+      })
+      console.log('첫 번째 아이템 전체:', selectedItems.value[0])
+    }
+
+    // 선택된 문제들을 이미지로 변환
+    const images = await convertQuestionsToImages(
+      selectedItems.value,
+      (progress) => {
+        const progressEl = document.getElementById('conversion-progress')
+        if (progressEl) {
+          progressEl.textContent = `${progress.percentage}% - ${progress.message}`
+        }
+      }
+    )
+
+    // itemStore에 선택된 아이템과 이미지 저장
+    selectedItems.value.forEach((item, index) => {
+      itemStore.selectItem(item)
+      // 이미지 데이터도 함께 저장
+      if (images[index]) {
+        item.imageData = images[index]
+      }
+    })
+
+    // 이미지 데이터를 store에 저장
+    console.log('[Step2ItemSelection] 변환된 이미지 수:', images.length)
+    if (images.length > 0) {
+      console.log('[Step2ItemSelection] 첫 번째 이미지 확인:', {
+        hasDataUrl: !!images[0].dataUrl,
+        dataUrlLength: images[0].dataUrl?.length,
+        type: images[0].type,
+        questionNumber: images[0].questionNumber
+      })
+    }
+    itemStore.setConvertedImages(images)
+
+    // Store에 제대로 저장되었는지 확인
+    const storedImages = itemStore.getConvertedImages()
+    console.log('[Step2ItemSelection] Store에 저장된 이미지 수:', storedImages?.length || 0)
+
+    emit('next')
+  } catch (error) {
+    console.error('이미지 변환 실패:', error)
+    alert('문제를 이미지로 변환하는 중 오류가 발생했습니다. 다시 시도해주세요.')
+  } finally {
+    // 로딩 제거
+    document.body.removeChild(loadingEl)
+  }
 }
 
 // 드래그 앤 드롭 관련 메서드
@@ -1542,16 +1633,16 @@ const handleDragLeave = () => {
 
 const handleDrop = (event) => {
   event.preventDefault()
-  
+
   if (!draggedItem.value) return
-  
+
   // 드롭 위치 계산
   const dropTarget = dropTargetIndex.value !== null ? dropTargetIndex.value : findDropTarget(event)
-  
+
   if (dropTarget !== null && dropTarget !== draggedItem.value.index) {
     reorderItems(draggedItem.value.index, dropTarget)
   }
-  
+
   draggedItem.value = null
   dropTargetIndex.value = null
 }
@@ -1559,35 +1650,35 @@ const handleDrop = (event) => {
 const findDropTarget = (event) => {
   const items = document.querySelectorAll('.item-group')
   const dropY = event.clientY
-  
+
   // 마우스 위치에 가장 가까운 아이템 찾기
   for (let i = 0; i < items.length; i++) {
     const item = items[i]
     const rect = item.getBoundingClientRect()
-    
+
     // 드래그 중인 아이템은 건너뜀
     if (draggedItem.value && i === draggedItem.value.index) continue
-    
+
     // 마우스가 아이템의 상단 절반에 있으면 그 위치에 삽입
     if (dropY < rect.top + rect.height / 2) {
       return i > draggedItem.value.index ? i - 1 : i
     }
   }
-  
+
   // 마지막 위치에 드롭
   return items.length - 1
 }
 
 const reorderItems = (fromIndex, toIndex) => {
   if (fromIndex === toIndex) return
-  
+
   // 현재 그룹 배열 복사
   const groups = [...selectedItemGroups.value]
   const draggedGroup = groups[fromIndex]
-  
+
   // 새로운 그룹 배열 생성
   const newGroups = []
-  
+
   if (fromIndex < toIndex) {
     // 아래로 이동
     for (let i = 0; i < groups.length; i++) {
@@ -1607,13 +1698,13 @@ const reorderItems = (fromIndex, toIndex) => {
       newGroups.push(groups[i])
     }
   }
-  
+
   // 새로운 순서로 selectedItems 재구성
   const newItems = []
   newGroups.forEach(group => {
     group.items.forEach(item => newItems.push(item))
   })
-  
+
   // selectedItems 업데이트
   selectedItems.value = newItems
 }
@@ -1622,25 +1713,25 @@ const reorderItems = (fromIndex, toIndex) => {
 const loadExamItems = async (examId) => {
   try {
     console.log('시험지 문항 로드 시작 - examId:', examId)
-    
+
     const response = await examApi.getExamItems(examId)
     console.log('시험지 문항 API 전체 응답:', response)
-    
+
     // API 응답에서 itemIds 추출
     if (response.data?.success && response.data?.data) {
       const examData = response.data.data
       console.log('시험지 데이터:', examData)
-      
+
       // itemIds가 있는 경우 각 문항의 상세 정보를 가져옴
       if (examData.itemIds && Array.isArray(examData.itemIds) && examData.itemIds.length > 0) {
         console.log(`${examData.itemIds.length}개 문항 ID 발견:`, examData.itemIds)
-        
+
         // 시험지 정보를 저장 (교과서 정보 업데이트)
         if (examData.subjectId) {
           selectedTextbook.value = examData.subjectId
           await loadChapters() // 챕터 트리 로드
         }
-        
+
         // 각 itemId로 문항 상세 정보 가져오기
         const itemPromises = examData.itemIds.map(async (itemId) => {
           try {
@@ -1654,13 +1745,13 @@ const loadExamItems = async (examId) => {
             return null
           }
         })
-        
+
         // 모든 문항 정보 가져오기
         const items = await Promise.all(itemPromises)
         const validItems = items.filter(item => item !== null)
-        
+
         console.log(`${validItems.length}개 문항 상세 정보 로드 완료`)
-        
+
         if (validItems.length > 0) {
           // 불러온 문항들을 자동으로 선택
           validItems.forEach(item => {
@@ -1669,17 +1760,17 @@ const loadExamItems = async (examId) => {
               itemStore.selectItem(item)
             }
           })
-          
+
           // 선택된 패널 자동으로 열기
           showSelectedPanel.value = true
-          
+
           return validItems
         }
       } else {
         console.log('시험지에 문항이 없습니다.')
       }
     }
-    
+
     return []
   } catch (error) {
     console.error('시험지 문항 로드 실패:', error)
@@ -1690,11 +1781,11 @@ const loadExamItems = async (examId) => {
 // HTML 정리 함수 (수식은 보존하면서 위험한 요소만 제거)
 const sanitizeHtml = (html) => {
   if (!html) return ''
-  
+
   // MathJax 수식을 임시로 보호
   const mathPatterns = []
   let mathIndex = 0
-  
+
   // LaTeX 수식 패턴들을 임시 플레이스홀더로 교체
   let cleaned = html
     // Display math $$ ... $$ 보호
@@ -1717,19 +1808,19 @@ const sanitizeHtml = (html) => {
       mathPatterns.push(match)
       return `__MATH_${mathIndex++}__`
     })
-  
+
   // 위험한 요소 제거 (수식 이미지는 제거하되 일반 이미지는 유지 가능)
   cleaned = cleaned
     .replace(/<img[^>]*class="[^"]*mathjax[^"]*"[^>]*>/gi, '') // MathJax 관련 이미지만 제거
     .replace(/<script(?! type="math\/tex)[^>]*>[\s\S]*?<\/script>/gi, '') // 위험한 스크립트 제거
     .replace(/on\w+="[^"]*"/g, '') // 이벤트 핸들러 제거
     .replace(/on\w+='[^']*'/g, '')
-  
+
   // 보호했던 수식들을 다시 복원
   mathPatterns.forEach((pattern, index) => {
     cleaned = cleaned.replace(`__MATH_${index}__`, pattern)
   })
-  
+
   return cleaned
 }
 
@@ -1737,7 +1828,7 @@ const sanitizeHtml = (html) => {
 // Lifecycle
 onMounted(async () => {
   console.log('Step2 onMounted - examInfo:', props.examInfo)
-  
+
   // Store 초기화 - 기존 선택된 아이템이 있으면 유지
   if (itemStore.resetFilters) {
     itemStore.resetFilters()
@@ -1746,7 +1837,7 @@ onMounted(async () => {
   if (itemStore.setSelectedItems && !props.examInfo?.selectedItems?.length) {
     itemStore.setSelectedItems([])
   }
-  
+
   // 초기 MathJax 하이브리드 스마트 렌더링
   await nextTick()
   const container = document.querySelector('.items-container') || document.body
@@ -1754,7 +1845,7 @@ onMounted(async () => {
     hideBeforeRender: true,
     clearFirst: false
   })
-  
+
   // 편집 모드 또는 기존 문항이 있는 경우: 기존 시험지 정보 사용
   // mode가 'edit'이거나 selectedItems가 있으면 기존 시험지 편집으로 처리
   if (props.examInfo?.mode === 'edit' || props.examInfo?.selectedItems?.length > 0) {
@@ -1765,12 +1856,12 @@ onMounted(async () => {
     if (props.examInfo.areaCode) {
       selectedSubject.value = props.examInfo.areaCode
     }
-    
+
     // 과목 및 교과서 정보 로드
     if (selectedGrade.value && selectedSubject.value) {
       await loadSubjectsAndTextbooks()
     }
-    
+
     // examId가 있으면 해당 시험지의 문항들을 불러오기
     if (props.examInfo?.examId && !props.examInfo?.selectedItems?.length) {
       console.log('편집 모드 - 기존 시험지 문항 로드')
@@ -1831,7 +1922,7 @@ watch(items, async (newItems, oldItems) => {
     // 이미 렌더링된 MathJax 개수 확인
     const existingContainers = document.querySelectorAll('mjx-container').length
     console.log(`items 변경 감지 - 기존 mjx-containers: ${existingContainers}`)
-    
+
     await nextTick()
     // requestAnimationFrame을 사용하여 렌더링 최적화
     requestAnimationFrame(async () => {
@@ -1840,7 +1931,7 @@ watch(items, async (newItems, oldItems) => {
       if (elements.length > 0) {
         await renderMathJaxParallelHybrid(elements)
       }
-        
+
       // 렌더링 후 확인
       const newContainers = document.querySelectorAll('mjx-container').length
       console.log(`items 변경 후 mjx-containers: ${newContainers}`)
@@ -3023,7 +3114,7 @@ watch(items, async (newItems, oldItems) => {
   .items-grid {
     grid-template-columns: repeat(2, 1fr); /* 태블릿에서는 2열 */
   }
-  
+
   .selected-panel {
     width: 280px;
   }
@@ -3034,12 +3125,12 @@ watch(items, async (newItems, oldItems) => {
     flex-wrap: wrap;
     gap: 0.5rem;
   }
-  
+
   .search-wrapper {
     width: 100%;
     order: 2;
   }
-  
+
   .filter-sidebar {
     position: fixed;
     left: 0;
@@ -3048,15 +3139,15 @@ watch(items, async (newItems, oldItems) => {
     z-index: 100;
     box-shadow: 2px 0 8px rgba(0, 0, 0, 0.1);
   }
-  
+
   .filter-sidebar.collapsed {
     left: -260px;
   }
-  
+
   .items-grid {
     grid-template-columns: 1fr; /* 모바일에서는 1열 */
   }
-  
+
   .selected-panel {
     position: fixed;
     right: 0;
