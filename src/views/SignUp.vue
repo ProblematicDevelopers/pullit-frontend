@@ -33,7 +33,6 @@
                     </div>
                     <div class="step-content">
                       <div class="step-title">약관동의</div>
-                      <div class="step-subtitle">이용약관</div>
                     </div>
                   </div>
 
@@ -49,7 +48,6 @@
                     </div>
                     <div class="step-content">
                       <div class="step-title">유형선택</div>
-                      <div class="step-subtitle">선생님/학생</div>
                     </div>
                   </div>
 
@@ -84,7 +82,6 @@
                     </div>
                     <div class="step-content">
                       <div class="step-title">정보 입력</div>
-                      <div class="step-subtitle">회원정보</div>
                     </div>
                   </div>
                 </div>
@@ -319,270 +316,295 @@
                 </div>
               </div>
 
+
+
               <h5 class="section-title mb-4">
-                회원 정보 입력
+                {{ infoInputStep === 1 ? '계정 정보 입력' : infoInputStep === 2 ? '개인 정보 입력' : '학교 정보 입력' }}
               </h5>
 
               <form @submit.prevent="handleSignup">
-                <!-- 아이디 입력 -->
-                <div class="mb-3">
-                  <label for="username" class="form-label fw-bold">아이디</label>
-                  <div class="input-group">
-                    <input
-                      type="text"
-                      class="form-control"
-                      id="username"
-                      v-model="signupForm.username"
-                      @input="checkUsernameAvailability"
-                      placeholder="영문, 숫자 조합 4-20자"
-                      required
-                      minlength="4"
-                      maxlength="20"
-                    >
-                    <button
-                      type="button"
-                      class="btn"
-                      :class="usernameAvailable ? 'btn-success' : 'btn-outline-primary'"
-                      @click="checkUsernameAvailability"
-                      :disabled="usernameAvailable"
-                    >
-                      {{ usernameAvailable ? '확인완료' : '중복확인' }}
-                    </button>
+                <!-- Step 4-1: 계정정보 입력 -->
+                <div v-if="infoInputStep === 1">
+                  <!-- 아이디 입력 -->
+                  <div class="mb-3">
+                    <label for="username" class="form-label fw-bold">아이디</label>
+                    <div class="input-group">
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="username"
+                        v-model="signupForm.username"
+                        @input="checkUsernameAvailability"
+                        placeholder="영문, 숫자 조합 4-20자"
+                        required
+                        minlength="4"
+                        maxlength="20"
+                      >
+                      <button
+                        type="button"
+                        class="btn"
+                        :class="usernameAvailable ? 'btn-success' : 'btn-outline-primary'"
+                        @click="checkUsernameAvailability"
+                        :disabled="usernameAvailable"
+                      >
+                        {{ usernameAvailable ? '확인완료' : '중복확인' }}
+                      </button>
+                    </div>
+                    <div v-if="usernameCheckMessage" class="form-text" :class="usernameAvailable ? 'text-success' : 'text-danger'">
+                      {{ usernameCheckMessage }}
+                    </div>
                   </div>
-                  <div v-if="usernameCheckMessage" class="form-text" :class="usernameAvailable ? 'text-success' : 'text-danger'">
-                    {{ usernameCheckMessage }}
-                  </div>
-                </div>
 
-                                <!-- 비밀번호 입력 -->
-                <div class="mb-3" v-if="!signupForm.isOAuth2User">
-                  <label for="password" class="form-label fw-bold">비밀번호</label>
-                  <div class="input-group">
-                    <input
-                      :type="showPassword ? 'text' : 'password'"
-                      class="form-control"
-                      id="password"
-                      v-model="signupForm.password"
-                      @input="checkPasswordStrength"
-                      placeholder="영문(대+소), 숫자, 특수문자 조합 9-20자"
-                      required
-                      minlength="9"
-                      maxlength="20"
-                    >
-                    <button
-                      type="button"
-                      class="btn btn-outline-secondary"
-                      @click="togglePasswordVisibility"
-                      title="비밀번호 보기/숨기기"
-                    >
-                      {{ showPassword ? '숨기기' : '보기' }}
-                    </button>
-                  </div>
-                  <div v-if="passwordStrength" class="mt-2">
-                    <div class="d-flex align-items-center">
-                      <span class="me-2">보안도:</span>
-                      <div class="progress flex-grow-1 me-2" style="height: 8px;">
-                        <div
-                          class="progress-bar"
-                          :class="passwordStrengthClass"
-                          :style="{ width: passwordStrengthWidth }"
-                        ></div>
+                  <!-- 비밀번호 입력 -->
+                  <div class="mb-3" v-if="!signupForm.isOAuth2User">
+                    <label for="password" class="form-label fw-bold">비밀번호</label>
+                    <div class="input-group">
+                      <input
+                        :type="showPassword ? 'text' : 'password'"
+                        class="form-control"
+                        id="password"
+                        v-model="signupForm.password"
+                        @input="checkPasswordStrength"
+                        placeholder="영문(대+소), 숫자, 특수문자 조합 9-20자"
+                        required
+                        minlength="9"
+                        maxlength="20"
+                      >
+                      <button
+                        type="button"
+                        class="btn btn-outline-secondary"
+                        @click="togglePasswordVisibility"
+                        title="비밀번호 보기/숨기기"
+                      >
+                        {{ showPassword ? '숨기기' : '보기' }}
+                      </button>
+                    </div>
+                    <div v-if="passwordStrength" class="mt-2">
+                      <div class="d-flex align-items-center">
+                        <span class="me-2">보안도:</span>
+                        <div class="progress flex-grow-1 me-2" style="height: 8px;">
+                          <div
+                            class="progress-bar"
+                            :class="passwordStrengthClass"
+                            :style="{ width: passwordStrengthWidth }"
+                          ></div>
+                        </div>
+                        <small class="text-muted">{{ passwordStrengthText }}</small>
                       </div>
-                      <small class="text-muted">{{ passwordStrengthText }}</small>
                     </div>
                   </div>
-                </div>
 
-                <!-- 소셜 로그인 사용자 휴대폰번호 입력 -->
-                <div class="mb-3" v-if="signupForm.isOAuth2User">
-                  <label for="phoneNumber" class="form-label fw-bold">휴대폰번호</label>
-                  <input
-                    type="tel"
-                    class="form-control"
-                    id="phoneNumber"
-                    v-model="signupForm.phoneNumber"
-                    placeholder="010-0000-0000"
-                    required
-                  >
-                  <!-- <div class="form-text text-muted">
-                    <i class="bi bi-info-circle me-1"></i>
-                    휴대폰번호는 필수입니다. 010-0000-0000, 01000000000 등 어떤 형식으로 입력해도 됩니다.
-                  </div> -->
-                </div>
-
-
-
-                <!-- 비밀번호 확인 -->
-                <div class="mb-3" v-if="!signupForm.isOAuth2User">
-                  <label for="passwordConfirm" class="form-label fw-bold">비밀번호 확인</label>
-                  <div class="input-group">
+                  <!-- 소셜 로그인 사용자 휴대폰번호 입력 -->
+                  <div class="mb-3" v-if="signupForm.isOAuth2User">
+                    <label for="phoneNumber" class="form-label fw-bold">휴대폰번호</label>
                     <input
-                      :type="showPasswordConfirm ? 'text' : 'password'"
+                      type="tel"
                       class="form-control"
-                      id="passwordConfirm"
-                      v-model="signupForm.passwordConfirm"
-                      placeholder="비밀번호를 다시 입력하세요"
+                      id="phoneNumber"
+                      v-model="signupForm.phoneNumber"
+                      placeholder="010-0000-0000"
                       required
                     >
-                    <button
-                      type="button"
-                      class="btn btn-outline-secondary"
-                      @click="togglePasswordConfirmVisibility"
-                      title="비밀번호 보기/숨기기"
-                    >
-                      {{ showPasswordConfirm ? '숨기기' : '보기' }}
+                  </div>
+
+                  <!-- 비밀번호 확인 -->
+                  <div class="mb-4" v-if="!signupForm.isOAuth2User">
+                    <label for="passwordConfirm" class="form-label fw-bold">비밀번호 확인</label>
+                    <div class="input-group">
+                      <input
+                        :type="showPasswordConfirm ? 'text' : 'password'"
+                        class="form-control"
+                        id="passwordConfirm"
+                        v-model="signupForm.passwordConfirm"
+                        placeholder="비밀번호를 다시 입력하세요"
+                        required
+                      >
+                      <button
+                        type="button"
+                        class="btn btn-outline-secondary"
+                        @click="togglePasswordConfirmVisibility"
+                        title="비밀번호 보기/숨기기"
+                      >
+                        {{ showPasswordConfirm ? '숨기기' : '보기' }}
+                      </button>
+                    </div>
+                    <div v-if="signupForm.passwordConfirm" class="form-text" :class="passwordsMatch ? 'text-success' : 'text-danger'">
+                      {{ passwordsMatch ? '비밀번호가 일치합니다' : '비밀번호가 일치하지 않습니다' }}
+                    </div>
+                  </div>
+
+                  <!-- 다음 단계 버튼 -->
+                  <div class="d-flex gap-3">
+                    <button type="button" @click="prevStep" class="btn btn-secondary flex-fill">
+                      이전
+                    </button>
+                    <button type="button" @click="nextInfoStep" class="btn btn-primary flex-fill" :disabled="!canProceedToNextInfoStep">
+                      다음 단계
                     </button>
                   </div>
-                  <div v-if="signupForm.passwordConfirm" class="form-text" :class="passwordsMatch ? 'text-success' : 'text-danger'">
-                    {{ passwordsMatch ? '비밀번호가 일치합니다' : '비밀번호가 일치하지 않습니다' }}
-                  </div>
                 </div>
 
-                <!-- 이름 입력 -->
-                <div class="mb-3">
-                  <label for="fullName" class="form-label fw-bold">이름</label>
-                  <input
-                    type="text"
-                    class="form-control"
-                    :class="{'is-invalid': !nameValid && nameErrorMessage, 'is-valid': nameValid}"
-                    id="fullName"
-                    v-model="signupForm.fullName"
-                    @blur="checkNameFormat"
-                    @input="checkNameFormat"
-                    placeholder="이름을 입력하세요"
-                    required
-                    maxlength="20"
-                  >
-                  <div v-if="nameErrorMessage" class="invalid-feedback">{{ nameErrorMessage }}</div>
-                  <div v-else-if="nameValid" class="valid-feedback">올바른 이름 형식입니다.</div>
-                </div>
-
-                <!-- 이메일 입력 -->
-                <div class="mb-3">
-                  <label for="email" class="form-label fw-bold">이메일</label>
-                  <input
-                    type="email"
-                    class="form-control"
-                    :class="{'is-invalid': !emailValid && emailErrorMessage, 'is-valid': emailValid}"
-                    id="email"
-                    v-model="signupForm.email"
-                    @blur="checkEmailFormat"
-                    @input="checkEmailFormat"
-                    placeholder="example@email.com"
-                    required
-                  >
-                  <div v-if="emailErrorMessage" class="invalid-feedback">{{ emailErrorMessage }}</div>
-                  <div v-else-if="emailValid" class="valid-feedback">올바른 이메일 형식입니다.</div>
-                </div>
-
-                <!-- 생년월일 입력 -->
-                <div class="mb-3">
-                  <label for="birthDate" class="form-label fw-bold">생년월일</label>
-                  <div class="row g-2">
-                    <div class="col-4">
-                      <select
-                        class="form-select"
-                        v-model="birthYear"
-                        @change="updateBirthDate"
-                        required
-                      >
-                        <option value="">연도</option>
-                        <option v-for="year in birthYears" :key="year" :value="year">{{ year }}년</option>
-                      </select>
-                    </div>
-                    <div class="col-4">
-                      <select
-                        class="form-select"
-                        v-model="birthMonth"
-                        @change="updateBirthDateAndDays"
-                        required
-                      >
-                        <option value="">월</option>
-                        <option v-for="month in birthMonths" :key="month" :value="month">{{ month }}월</option>
-                      </select>
-                    </div>
-                    <div class="col-4">
-                      <select
-                        class="form-select"
-                        v-model="birthDay"
-                        @change="updateBirthDate"
-                        required
-                      >
-                        <option value="">일</option>
-                        <option v-for="day in birthDays" :key="day" :value="day">{{ day }}일</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- 선생님인 경우 과목 선택 -->
-                <div class="mb-3" v-if="signupForm.userType === 'teacher'">
-                  <label for="subject" class="form-label fw-bold">담당 과목</label>
-                  <select
-                    class="form-select"
-                    id="subject"
-                    v-model="signupForm.subject"
-                    required
-                  >
-                    <option value="">과목을 선택하세요</option>
-                    <option value="MA">수학</option>
-                    <option value="KO">국어</option>
-                    <option value="EN">영어</option>
-                    <option value="SC">과학</option>
-                    <option value="SO">사회</option>
-                  </select>
-                </div>
-
-                <!-- 학생인 경우 학년 선택 -->
-                <div class="mb-3" v-if="signupForm.userType === 'student'">
-                  <label for="grade" class="form-label fw-bold">학년 (선택사항)</label>
-                  <select
-                    class="form-select"
-                    id="grade"
-                    v-model="signupForm.grade"
-                  >
-                    <option :value="null">학년을 선택하세요</option>
-                    <option :value="{ code: '07', name: '중학교 1학년' }">중학교 1학년</option>
-                    <option :value="{ code: '08', name: '중학교 2학년' }">중학교 2학년</option>
-                    <option :value="{ code: '09', name: '중학교 3학년' }">중학교 3학년</option>
-                  </select>
-                  <div class="form-text">나중에 선생님이 반에 초대할 때 설정할 수도 있습니다.</div>
-                </div>
-
-                <!-- 학교 검색 -->
-                <div class="mb-4">
-                  <label for="school" class="form-label fw-bold">학교 정보</label>
-                  <div class="input-group">
+                <!-- Step 4-2: 개인정보 입력 -->
+                <div v-if="infoInputStep === 2">
+                  <!-- 이름 입력 -->
+                  <div class="mb-3">
+                    <label for="fullName" class="form-label fw-bold">이름</label>
                     <input
                       type="text"
                       class="form-control"
-                      id="school"
-                      v-model="signupForm.school"
-                      placeholder="학교명을 입력하세요"
-                      readonly
+                      :class="{'is-invalid': !nameValid && nameErrorMessage, 'is-valid': nameValid}"
+                      id="fullName"
+                      v-model="signupForm.fullName"
+                      @blur="checkNameFormat"
+                      @input="checkNameFormat"
+                      placeholder="이름을 입력하세요"
+                      required
+                      maxlength="20"
+                    >
+                    <div v-if="nameErrorMessage" class="invalid-feedback">{{ nameErrorMessage }}</div>
+                    <div v-else-if="nameValid" class="valid-feedback">올바른 이름 형식입니다.</div>
+                  </div>
+
+                  <!-- 이메일 입력 -->
+                  <div class="mb-3">
+                    <label for="email" class="form-label fw-bold">이메일</label>
+                    <input
+                      type="email"
+                      class="form-control"
+                      :class="{'is-invalid': !emailValid && emailErrorMessage, 'is-valid': emailValid}"
+                      id="email"
+                      v-model="signupForm.email"
+                      @blur="checkEmailFormat"
+                      @input="checkEmailFormat"
+                      placeholder="example@email.com"
                       required
                     >
-                                      <button
-                    class="btn btn-outline-primary"
-                    type="button"
-                    @click="openSchoolSearchModal"
-                  >
-                    학교 검색
-                  </button>
+                    <div v-if="emailErrorMessage" class="invalid-feedback">{{ emailErrorMessage }}</div>
+                    <div v-else-if="emailValid" class="valid-feedback">올바른 이메일 형식입니다.</div>
                   </div>
-                  <small v-if="schoolSearchResults.length > 0" class="text-muted">
-                    검색 결과: {{ schoolSearchResults.length }}개 학교
-                  </small>
+
+                  <!-- 생년월일 입력 -->
+                  <div class="mb-4">
+                    <label for="birthDate" class="form-label fw-bold">생년월일</label>
+                    <div class="row g-2">
+                      <div class="col-4">
+                        <select
+                          class="form-select"
+                          v-model="birthYear"
+                          @change="updateBirthDate"
+                          required
+                        >
+                          <option value="">연도</option>
+                          <option v-for="year in birthYears" :key="year" :value="year">{{ year }}년</option>
+                        </select>
+                      </div>
+                      <div class="col-4">
+                        <select
+                          class="form-select"
+                          v-model="birthMonth"
+                          @change="updateBirthDateAndDays"
+                          required
+                        >
+                          <option value="">월</option>
+                          <option v-for="month in birthMonths" :key="month" :value="month">{{ month }}월</option>
+                        </select>
+                      </div>
+                      <div class="col-4">
+                        <select
+                          class="form-select"
+                          v-model="birthDay"
+                          @change="updateBirthDate"
+                          required
+                        >
+                          <option value="">일</option>
+                          <option v-for="day in birthDays" :key="day" :value="day">{{ day }}일</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 단계 이동 버튼 -->
+                  <div class="d-flex gap-3">
+                    <button type="button" @click="prevInfoStep" class="btn btn-secondary flex-fill">
+                      이전
+                    </button>
+                    <button type="button" @click="nextInfoStep" class="btn btn-primary flex-fill" :disabled="!canProceedToNextInfoStep">
+                      다음 단계
+                    </button>
+                  </div>
                 </div>
 
-                <!-- 가입완료 버튼 -->
-                <div class="d-flex gap-3">
-                  <button type="button" @click="prevStep" class="btn btn-secondary flex-fill">
-                    이전
-                  </button>
-                  <button type="submit" class="btn btn-primary flex-fill">
-                    {{ signupForm.isOAuth2User ? '간편 회원가입' : '가입완료' }}
-                  </button>
+                <!-- Step 4-3: 학교정보 입력 -->
+                <div v-if="infoInputStep === 3">
+                  <!-- 선생님인 경우 과목 선택 -->
+                  <div class="mb-3" v-if="signupForm.userType === 'teacher'">
+                    <label for="subject" class="form-label fw-bold">담당 과목</label>
+                    <select
+                      class="form-select"
+                      id="subject"
+                      v-model="signupForm.subject"
+                      required
+                    >
+                      <option value="">과목을 선택하세요</option>
+                      <option value="MA">수학</option>
+                      <option value="KO">국어</option>
+                      <option value="EN">영어</option>
+                      <option value="SC">과학</option>
+                      <option value="SO">사회</option>
+                    </select>
+                  </div>
+
+                  <!-- 학생인 경우 학년 선택 -->
+                  <div class="mb-3" v-if="signupForm.userType === 'student'">
+                    <label for="grade" class="form-label fw-bold">학년 (선택사항)</label>
+                    <select
+                      class="form-select"
+                      id="grade"
+                      v-model="signupForm.grade"
+                    >
+                      <option :value="null">학년을 선택하세요</option>
+                      <option :value="{ code: '07', name: '중학교 1학년' }">중학교 1학년</option>
+                      <option :value="{ code: '08', name: '중학교 2학년' }">중학교 2학년</option>
+                      <option :value="{ code: '09', name: '중학교 3학년' }">중학교 3학년</option>
+                    </select>
+                    <div class="form-text">나중에 선생님이 반에 초대할 때 설정할 수도 있습니다.</div>
+                  </div>
+
+                  <!-- 학교 검색 -->
+                  <div class="mb-4">
+                    <label for="school" class="form-label fw-bold">학교 정보</label>
+                    <div class="input-group">
+                      <input
+                        type="text"
+                        class="form-control"
+                        id="school"
+                        v-model="signupForm.school"
+                        placeholder="학교명을 입력하세요"
+                        readonly
+                        required
+                      >
+                      <button
+                        class="btn btn-outline-primary"
+                        type="button"
+                        @click="openSchoolSearchModal"
+                      >
+                        학교 검색
+                      </button>
+                    </div>
+                    <small v-if="schoolSearchResults.length > 0" class="text-muted">
+                      검색 결과: {{ schoolSearchResults.length }}개 학교
+                    </small>
+                  </div>
+
+                  <!-- 가입완료 버튼 -->
+                  <div class="d-flex gap-3">
+                    <button type="button" @click="prevInfoStep" class="btn btn-secondary flex-fill">
+                      이전
+                    </button>
+                    <button type="submit" class="btn btn-primary flex-fill">
+                      {{ signupForm.isOAuth2User ? '간편 회원가입' : '가입완료' }}
+                    </button>
+                  </div>
                 </div>
               </form>
             </div>
@@ -805,6 +827,7 @@ const router = useRouter()
 
 // 반응형 데이터
 const signupStep = ref(1)
+const infoInputStep = ref(1) // Step 4 내에서의 하위 단계 (1: 계정정보, 2: 개인정보, 3: 학교정보)
 
 // 회원가입 폼
 const signupForm = ref({
@@ -885,6 +908,24 @@ const apiBaseUrl = 'http://localhost:8080/api'
 // computed properties
 const canProceedToStep2 = computed(() => {
   return agreements.value.terms && agreements.value.privacy
+})
+
+const canProceedToNextInfoStep = computed(() => {
+  if (infoInputStep.value === 1) {
+    // 계정정보 단계: 아이디 중복확인 완료, 비밀번호 일치 확인
+    if (!usernameAvailable.value) return false
+    if (!signupForm.value.isOAuth2User) {
+      if (!signupForm.value.password || !signupForm.value.passwordConfirm) return false
+      if (!passwordsMatch.value) return false
+    }
+    return true
+  } else if (infoInputStep.value === 2) {
+    // 개인정보 단계: 이름, 이메일, 생년월일 모두 입력
+    if (!nameValid.value || !emailValid.value) return false
+    if (!birthYear.value || !birthMonth.value || !birthDay.value) return false
+    return true
+  }
+  return true
 })
 
 const isValidPhone = computed(() => {
@@ -1233,6 +1274,7 @@ const nextStep = () => {
     if (signupForm.value.isOAuth2User) {
       // OAuth2 사용자는 휴대폰 인증 건너뛰고 바로 정보 입력 단계로
       signupStep.value = 4
+      infoInputStep.value = 1 // 하위 단계 초기화
       console.log('OAuth2 사용자: 휴대폰 인증 건너뛰고 정보 입력 단계로 이동')
     } else {
       // 일반 사용자는 휴대폰 인증 단계로
@@ -1241,12 +1283,28 @@ const nextStep = () => {
   } else if (signupStep.value === 3) {
     // Step 3 (휴대폰 인증) → Step 4 (정보 입력)
     signupStep.value = 4
+    infoInputStep.value = 1 // 하위 단계 초기화
   }
 }
 
 const prevStep = () => {
   if (signupStep.value > 1) {
     signupStep.value--
+  }
+}
+
+const nextInfoStep = () => {
+  if (infoInputStep.value < 3) {
+    infoInputStep.value++
+  }
+}
+
+const prevInfoStep = () => {
+  if (infoInputStep.value > 1) {
+    infoInputStep.value--
+  } else {
+    // Step 4의 첫 번째 하위 단계에서 이전 버튼을 누르면 Step 3으로 이동
+    prevStep()
   }
 }
 
@@ -1499,6 +1557,133 @@ onUnmounted(() => {
 .step-indicator {
   margin-bottom: 3rem;
   position: relative;
+}
+
+/* 하위 단계 표시 스타일 */
+.sub-step-indicator {
+  margin-bottom: 2rem;
+  position: relative;
+}
+
+.sub-step-progress {
+  position: absolute;
+  top: 1.5rem;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: #e9ecef;
+  z-index: 1;
+}
+
+.sub-step-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background: #0d6efd;
+  width: 0;
+  transition: width 0.6s ease;
+  border-radius: 1px;
+}
+
+.sub-step-line.completed {
+  width: 100%;
+}
+
+.sub-steps-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  position: relative;
+  z-index: 2;
+}
+
+.sub-step-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  flex: 1;
+  max-width: 150px;
+  position: relative;
+}
+
+.sub-step-icon {
+  position: relative;
+  width: 3rem;
+  height: 3rem;
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.sub-step-item.active .sub-step-icon {
+  background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);
+  border-color: #0d6efd;
+  transform: scale(1.1);
+  box-shadow: 0 6px 20px rgba(13, 110, 253, 0.3);
+}
+
+.sub-step-item.completed .sub-step-icon {
+  background: linear-gradient(135deg, #198754 0%, #146c43 100%);
+  border-color: #198754;
+  transform: scale(1.05);
+  box-shadow: 0 4px 15px rgba(25, 135, 84, 0.3);
+}
+
+.sub-step-number {
+  font-weight: 600;
+  font-size: 1rem;
+  color: #6c757d;
+  transition: all 0.3s ease;
+}
+
+.sub-step-item.active .sub-step-number {
+  color: white;
+}
+
+.sub-step-item.completed .sub-step-number {
+  color: white;
+}
+
+.sub-step-check {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  color: white;
+  font-size: 1.25rem;
+  animation: checkIn 0.4s ease-out;
+}
+
+.sub-step-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.sub-step-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+  color: #495057;
+  transition: color 0.3s ease;
+}
+
+.sub-step-item.active .sub-step-title {
+  color: #0d6efd;
+  font-weight: 700;
+}
+
+.sub-step-item.completed .sub-step-title {
+  color: #198754;
+  font-weight: 600;
 }
 
 .step-progress {
@@ -2015,6 +2200,23 @@ body {
 
   .step-skip {
     font-size: 1rem;
+  }
+
+  .sub-step-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .sub-step-number {
+    font-size: 0.875rem;
+  }
+
+  .sub-step-check {
+    font-size: 1rem;
+  }
+
+  .sub-step-title {
+    font-size: 0.75rem;
   }
 
   .user-type-card {
