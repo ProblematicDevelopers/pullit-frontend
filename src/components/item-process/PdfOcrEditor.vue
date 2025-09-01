@@ -1296,7 +1296,7 @@ export default {
               passageHtml: itemData.editedTexts?.passage || itemData.editedTexts?.question || null,
               questionHtml: itemData.editedTexts?.problem || null,
               choicesHtml: parseChoicesFromOptions(itemData.editedTexts?.options),
-              answerHtml: itemData.answer ? `<span>${itemData.answer}</span>` : null,
+              answerHtml: itemData.answer || null,
               explainHtml: itemData.editedTexts?.explanation || itemData.explanation || null
             }
 
@@ -1306,6 +1306,7 @@ export default {
               passageHtml: !!htmlPayload.passageHtml,
               questionHtml: !!htmlPayload.questionHtml,
               choicesCount: htmlPayload.choicesHtml?.length || 0,
+              choices: htmlPayload.choicesHtml,
               answerHtml: !!htmlPayload.answerHtml,
               explainHtml: !!htmlPayload.explainHtml
             })
