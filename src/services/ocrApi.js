@@ -289,5 +289,144 @@ export const ocrApi = {
       }
       throw new Error('완료된 OCR 영역 조회에 실패했습니다: ' + (error.response?.data?.message || error.message))
     }
+  },
+
+  /**
+   * OCR 영역 일괄 저장 (모달 진입 전)
+   * @param {Object} bulkData - 일괄 저장 데이터
+   * @returns {Promise<Object>} 저장된 OCR 히스토리 ID 목록
+   */
+  async bulkSaveOcrHistories(bulkData) {
+    try {
+      console.log('📤 [ocrApi] bulkSaveOcrHistories 호출:', bulkData)
+
+      const response = await api.post('/ocr-history/bulk', bulkData)
+
+      console.log('✅ [ocrApi] bulkSaveOcrHistories 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ [ocrApi] bulkSaveOcrHistories 실패:', error)
+      if (error.response) {
+        console.error('📡 [ocrApi] 서버 응답 상태:', error.response.status)
+        console.error('📡 [ocrApi] 서버 응답 데이터:', error.response.data)
+      }
+      throw new Error('OCR 영역 일괄 저장에 실패했습니다: ' + (error.response?.data?.message || error.message))
+    }
+  },
+
+  /**
+   * ProcessedItem의 OCR 히스토리 조회
+   * @param {number} processedItemId - ProcessedItem ID
+   * @returns {Promise<Object>} OCR 히스토리 목록
+   */
+  async getOcrHistoriesByProcessedItemId(processedItemId) {
+    try {
+      console.log('📤 [ocrApi] getOcrHistoriesByProcessedItemId 호출:', processedItemId)
+
+      const response = await api.get(`/ocr-history/processed-item/${processedItemId}`)
+
+      console.log('✅ [ocrApi] getOcrHistoriesByProcessedItemId 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ [ocrApi] getOcrHistoriesByProcessedItemId 실패:', error)
+      if (error.response) {
+        console.error('📡 [ocrApi] 서버 응답 상태:', error.response.status)
+        console.error('📡 [ocrApi] 서버 응답 데이터:', error.response.data)
+      }
+      throw new Error('OCR 히스토리 조회에 실패했습니다: ' + (error.response?.data?.message || error.message))
+    }
+  },
+
+  /**
+   * PdfImage의 OCR 히스토리 조회
+   * @param {number} pdfImageId - PdfImage ID
+   * @returns {Promise<Object>} OCR 히스토리 목록
+   */
+  async getOcrHistoriesByPdfImageId(pdfImageId) {
+    try {
+      console.log('📤 [ocrApi] getOcrHistoriesByPdfImageId 호출:', pdfImageId)
+
+      const response = await api.get(`/ocr-history/pdf-image/${pdfImageId}`)
+
+      console.log('✅ [ocrApi] getOcrHistoriesByPdfImageId 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ [ocrApi] getOcrHistoriesByPdfImageId 실패:', error)
+      if (error.response) {
+        console.error('📡 [ocrApi] 서버 응답 상태:', error.response.status)
+        console.error('📡 [ocrApi] 서버 응답 데이터:', error.response.data)
+      }
+      throw new Error('OCR 히스토리 조회에 실패했습니다: ' + (error.response?.data?.message || error.message))
+    }
+  },
+
+  /**
+   * 임시 OCR 히스토리 정리 (모달에서 나갈 때)
+   * @param {number} pdfImageId - PdfImage ID
+   * @returns {Promise<Object>} 삭제된 항목 수
+   */
+  async cleanupTemporaryOcrHistories(pdfImageId) {
+    try {
+      console.log('🧹 [ocrApi] cleanupTemporaryOcrHistories 호출:', pdfImageId)
+
+      const response = await api.delete(`/ocr-history/temporary/${pdfImageId}`)
+
+      console.log('✅ [ocrApi] cleanupTemporaryOcrHistories 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ [ocrApi] cleanupTemporaryOcrHistories 실패:', error)
+      if (error.response) {
+        console.error('📡 [ocrApi] 서버 응답 상태:', error.response.status)
+        console.error('📡 [ocrApi] 서버 응답 데이터:', error.response.data)
+      }
+      throw new Error('임시 OCR 히스토리 정리에 실패했습니다: ' + (error.response?.data?.message || error.message))
+    }
+  },
+
+  /**
+   * OCR 히스토리 확정 저장 (ProcessedItem 저장 완료 후)
+   * @param {number} pdfImageId - PdfImage ID
+   * @param {number} processedItemId - ProcessedItem ID
+   * @returns {Promise<Object>} 확정된 항목 수
+   */
+  async confirmOcrHistories(pdfImageId, processedItemId) {
+    try {
+      console.log('✅ [ocrApi] confirmOcrHistories 호출:', { pdfImageId, processedItemId })
+
+      const response = await api.patch(`/ocr-history/confirm/${pdfImageId}/${processedItemId}`)
+
+      console.log('✅ [ocrApi] confirmOcrHistories 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ [ocrApi] confirmOcrHistories 실패:', error)
+      if (error.response) {
+        console.error('📡 [ocrApi] 서버 응답 상태:', error.response.status)
+        console.error('📡 [ocrApi] 서버 응답 데이터:', error.response.data)
+      }
+      throw new Error('OCR 히스토리 확정에 실패했습니다: ' + (error.response?.data?.message || error.message))
+    }
+  },
+
+  /**
+   * 임시 OCR 히스토리 조회
+   * @param {number} pdfImageId - PdfImage ID
+   * @returns {Promise<Object>} 임시 OCR 히스토리 목록
+   */
+  async getTemporaryOcrHistories(pdfImageId) {
+    try {
+      console.log('📤 [ocrApi] getTemporaryOcrHistories 호출:', pdfImageId)
+
+      const response = await api.get(`/ocr-history/temporary/${pdfImageId}`)
+
+      console.log('✅ [ocrApi] getTemporaryOcrHistories 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ [ocrApi] getTemporaryOcrHistories 실패:', error)
+      if (error.response) {
+        console.error('📡 [ocrApi] 서버 응답 상태:', error.response.status)
+        console.error('📡 [ocrApi] 서버 응답 데이터:', error.response.data)
+      }
+      throw new Error('임시 OCR 히스토리 조회에 실패했습니다: ' + (error.response?.data?.message || error.message))
+    }
   }
 }

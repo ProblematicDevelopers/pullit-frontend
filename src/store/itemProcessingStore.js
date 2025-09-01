@@ -195,6 +195,20 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
      */
     setPdfPages(pages) {
       this.pdfPages = pages
+      
+      // 페이지가 설정된 후 초기 이미지 순서를 서버에 저장 (기존 파일 로드 시)
+      if (this.uploadedPdfInfo?.fileHistoryId && pages && pages.length > 0) {
+        const initialImageOrder = pages.map(page => page.originalPage || 0).join(',')
+        console.log('📤 기존 파일 이미지 순서 설정:', {
+          fileHistoryId: this.uploadedPdfInfo.fileHistoryId,
+          imageOrder: initialImageOrder
+        })
+        
+        // 비동기 처리하지만 에러가 나더라도 UI 블록하지 않음
+        fileHistoryAPI.updateImageOrder(this.uploadedPdfInfo.fileHistoryId, initialImageOrder)
+          .then(() => console.log('✅ 기존 파일 이미지 순서 설정 완료'))
+          .catch(error => console.warn('⚠️ 기존 파일 이미지 순서 설정 실패:', error))
+      }
     },
 
     /**
@@ -725,6 +739,22 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
 
         // 삭제된 페이지 인덱스 초기화 (새로운 PDF 처리 시)
         this.deletedPageIndexes = []
+
+        // 초기 이미지 순서를 서버에 저장
+        if (this.uploadedPdfInfo?.fileHistoryId && this.pdfPages.length > 0) {
+          const initialImageOrder = this.pdfPages.map(page => page.originalPage || 0).join(',')
+          console.log('📤 초기 이미지 순서 설정:', {
+            fileHistoryId: this.uploadedPdfInfo.fileHistoryId,
+            imageOrder: initialImageOrder
+          })
+          
+          try {
+            await fileHistoryAPI.updateImageOrder(this.uploadedPdfInfo.fileHistoryId, initialImageOrder)
+            console.log('✅ 초기 이미지 순서 설정 완료')
+          } catch (error) {
+            console.warn('⚠️ 초기 이미지 순서 설정 실패:', error)
+          }
+        }
 
       } catch (error) {
         console.error('❌ PDF 이미지 변환 실패:', error)

@@ -13,6 +13,9 @@ export const createCommonEditorConfig = (options = {}) => {
     enableShapeTools = true
   } = options
 
+  // MathJax 렌더링 비활성화 옵션 처리
+  const shouldEnableMathTools = enableMathTools !== false
+
   const config = {
     height,
     min_height: minHeight,
@@ -59,68 +62,85 @@ export const createCommonEditorConfig = (options = {}) => {
     custom_elements: '~math-latex',
 
     setup: (editor) => {
-      // 수식 편집 관리
-      const renderMathInEditor = () => {
-        try {
-          const body = editor.getBody()
-          if (!body) return
-          body.querySelectorAll('span.math-latex').forEach(el => {
-            let latex = el.getAttribute('data-latex')
-            if (!latex) {
-              const raw = (el.textContent || '').trim()
-              const m = raw.match(/^\$(.*)\$$/s)
-              latex = m ? m[1] : raw
-              el.setAttribute('data-latex', latex)
-            }
-            el.innerHTML = katex.renderToString(latex, { throwOnError: false, displayMode: false })
-          })
-        } catch (e) {
-          console.warn('KaTeX 렌더 실패:', e)
+      // MathJax 렌더링 비활성화 옵션 처리
+      if (!shouldEnableMathTools) {
+        // MathJax 렌더링을 비활성화하고 LaTeX 코드만 표시
+        const renderMathInEditor = () => {
+          console.log('에디터 내 MathJax 렌더링 비활성화됨 - LaTeX 코드만 표시')
         }
-      }
 
-      // 수식 편집 모드 진입
-      const enterMathEditMode = (mathElement) => {
-        const mathId = 'math-' + Date.now()
-        mathElement.setAttribute('data-math-id', mathId)
-
-        // 편집 UI 표시 (컴포넌트에서 구현)
-        if (window.mathEditCallback) {
-          window.mathEditCallback(mathElement, mathId)
-        }
-      }
-
-      // 에디터 초기화
-      editor.on('init', () => {
-        renderMathInEditor()
-
-        // 수식 더블클릭 → 편집 모드 진입
-        editor.on('DblClick', (e) => {
-          const target = e.target
-          let mathElement = null
-
-          if (target.classList && target.classList.contains('math-latex')) {
-            mathElement = target
-          } else if (target.closest) {
-            mathElement = target.closest('span.math-latex')
-          }
-
-          if (mathElement) {
-            e.preventDefault()
-            e.stopPropagation()
-            enterMathEditMode(mathElement)
-          }
+        // 에디터 초기화 (렌더링 없음)
+        editor.on('init', () => {
+          console.log('에디터 초기화 - MathJax 렌더링 비활성화')
         })
-      })
 
-      // 내용 변경 시 렌더링
-      editor.on('SetContent keyup change input undo redo', () => {
-        renderMathInEditor()
-      })
+        // 편집 함수들을 에디터에 노출 (빈 함수)
+        editor.renderMath = renderMathInEditor
+        editor.enterMathEditMode = () => {}
+      } else {
+        // 기존 MathJax 렌더링 로직
+        const renderMathInEditor = () => {
+          try {
+            const body = editor.getBody()
+            if (!body) return
+            body.querySelectorAll('span.math-latex').forEach(el => {
+              let latex = el.getAttribute('data-latex')
+              if (!latex) {
+                const raw = (el.textContent || '').trim()
+                const m = raw.match(/^\$(.*)\$$/s)
+                latex = m ? m[1] : raw
+                el.setAttribute('data-latex', latex)
+              }
+              el.innerHTML = katex.renderToString(latex, { throwOnError: false, displayMode: false })
+            })
+          } catch (e) {
+            console.warn('KaTeX 렌더 실패:', e)
+          }
+        }
 
-      // 편집 함수들을 에디터에 노출
-      editor.renderMath = renderMathInEditor
-      editor.enterMathEditMode = enterMathEditMode
+        // 수식 편집 모드 진입
+        const enterMathEditMode = (mathElement) => {
+          const mathId = 'math-' + Date.now()
+          mathElement.setAttribute('data-math-id', mathId)
+
+          // 편집 UI 표시 (컴포넌트에서 구현)
+          if (window.mathEditCallback) {
+            window.mathEditCallback(mathElement, mathId)
+          }
+        }
+
+        // 에디터 초기화
+        editor.on('init', () => {
+          renderMathInEditor()
+
+          // 수식 더블클릭 → 편집 모드 진입
+          editor.on('DblClick', (e) => {
+            const target = e.target
+            let mathElement = null
+
+            if (target.classList && target.classList.contains('math-latex')) {
+              mathElement = target
+            } else if (target.closest) {
+              mathElement = target.closest('span.math-latex')
+            }
+
+            if (mathElement) {
+              e.preventDefault()
+              e.stopPropagation()
+              enterMathEditMode(mathElement)
+            }
+          })
+        })
+
+        // 내용 변경 시 렌더링
+        editor.on('SetContent keyup change input undo redo', () => {
+          renderMathInEditor()
+        })
+
+        // 편집 함수들을 에디터에 노출
+        editor.renderMath = renderMathInEditor
+        editor.enterMathEditMode = enterMathEditMode
+      }
     }
   }
 
