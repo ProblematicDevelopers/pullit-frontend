@@ -5,28 +5,34 @@
       <div class="preview-panel">
         <h5 class="panel-title">작성한 문제 미리보기</h5>
         <div class="preview-content">
-          <!-- 문제 영역 -->
-          <div v-if="editedTexts.problem" class="preview-section problem-section">
-            <h6>문제</h6>
-            <div class="preview-html" v-html="editedTexts.problem"></div>
-          </div>
+          <!-- 실제 문제처럼 표시 -->
+          <div class="problem-display">
+            <!-- 지문 영역 -->
+            <div v-if="editedTexts.question" class="passage-section">
+              <div class="passage-content" v-html="editedTexts.question"></div>
+            </div>
 
-          <!-- 지문 영역 -->
-          <div v-if="editedTexts.question" class="preview-section question-section">
-            <h6>지문</h6>
-            <div class="preview-html" v-html="editedTexts.question"></div>
-          </div>
+            <!-- 문제 영역 -->
+            <div v-if="editedTexts.problem" class="problem-section">
+              <div class="problem-content" v-html="editedTexts.problem"></div>
+            </div>
 
-          <!-- 이미지 영역 -->
-          <div v-if="editedTexts.image" class="preview-section image-section">
-            <h6>이미지</h6>
-            <div class="preview-html" v-html="editedTexts.image"></div>
-          </div>
+            <!-- 이미지 영역 -->
+            <div v-if="hasValidPassageImage" class="image-section">
+              <div class="image-content">
+                <img :src="passage" alt="문제 이미지" class="problem-image" />
+              </div>
+            </div>
 
-          <!-- 보기 영역 -->
-          <div v-if="editedTexts.options" class="preview-section options-section">
-            <h6>보기</h6>
-            <div class="preview-html" v-html="editedTexts.options"></div>
+            <!-- 보기 영역 -->
+            <div v-if="editedTexts.options" class="options-section">
+              <div class="options-content">
+                <div v-for="(option, index) in processedOptionsList" :key="index" class="option-item">
+                  <div class="option-number">({{ index + 1 }})</div>
+                  <div class="option-content" v-html="option"></div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -209,35 +215,18 @@
         </div>
       </div>
 
-      <!-- 네비게이션 -->
-      <div class="navigation-panel">
-        <button @click="prevStep" class="btn btn-secondary">이전</button>
-        <button @click="nextStep" class="btn btn-primary" :disabled="!isFormValid">
-          {{ isFormValid ? '다음' : '필수 항목을 입력하세요' }}
-        </button>
-      </div>
 
-      <!-- 유효성 검사 메시지 -->
-      <div v-if="!isFormValid && showValidationErrors" class="validation-errors">
-        <div class="alert alert-warning">
-          <h6>다음 항목들을 입력해주세요:</h6>
-          <ul class="mb-0">
-            <li v-if="!problemInfo.problemType">문제 형태</li>
-            <li v-if="!problemInfo.difficulty">난이도</li>
-            <li v-if="!problemInfo.answer">정답</li>
-          </ul>
-        </div>
-      </div>
     </div>
   </div>
 </template>
 
 <script>
-import { ref, computed, watch, onMounted } from 'vue'
+import { ref, computed, watch, onMounted, nextTick } from 'vue'
 import Editor from '@tinymce/tinymce-vue'
 import chapterApi from '@/services/chapterApi'
 import { useSubjectStore } from '@/store/subjectStore.js'
 import { fileHistoryAPI } from '@/services/fileHistoryApi.js'
+import { renderMathJax, waitForMathJax } from '@/utils/mathjax'
 
 export default {
   name: 'Step3InfoInput',
@@ -264,13 +253,15 @@ export default {
     selectedFile: {
       type: Object,
       default: null
+    },
+    passage: {
+      type: String,
+      default: ''
     }
   },
   emits: [
     'update:problemInfo',
-    'update:chapters',
-    'prev-step',
-    'next-step'
+    'update:chapters'
   ],
   setup(props, { emit }) {
     // 문제 정보 상태
@@ -289,7 +280,6 @@ export default {
     // 해설 에디터 상태
     const showExplanationEditor = ref(false)
     const explanationEditorKey = ref(0)
-    const showValidationErrors = ref(false)
 
     // 챕터 데이터 상태
     const majorChapters = ref([])
@@ -298,6 +288,90 @@ export default {
     const topicChapters = ref([])
     const chaptersLoading = ref(false)
     const chaptersError = ref(null)
+
+    // 보기 텍스트를 항목별로 분리하는 함수
+    const splitOptions = (optionsText) => {
+      if (!optionsText) return []
+
+      // (1), (2), (3) 패턴으로 자동 분리
+      const parts = optionsText.split(/\(\d+\)/)
+      return parts.filter(part => part.trim()).map(part => part.trim())
+    }
+
+    // 처리된 보기 목록
+    const processedOptionsList = computed(() => {
+      return splitOptions(props.editedTexts.options)
+    })
+
+    // 유효한 지문 이미지가 있는지 확인
+    const hasValidPassageImage = computed(() => {
+      // selectedAreas에 question 영역이 있고, passage가 유효한 이미지 데이터인지 확인
+      return props.selectedAreas?.question &&
+             props.passage &&
+             props.passage.trim() !== '' &&
+             (props.passage.startsWith('data:image/') || props.passage.startsWith('http'))
+    })
+
+    // MathJax 렌더링 함수
+    const renderPreviewMathJax = async () => {
+      try {
+        // MathJax 로드 대기
+        await waitForMathJax()
+
+        console.log('Step3 미리보기 MathJax 렌더링 시작')
+
+        // DOM이 완전히 업데이트될 때까지 대기
+        await nextTick()
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // 미리보기 영역 요소들 찾기
+        const previewElements = document.querySelectorAll('.passage-content, .problem-content, .image-content, .option-content')
+        console.log(`Step3 미리보기 영역 ${previewElements.length}개 발견:`, Array.from(previewElements).map(el => el.className))
+
+        for (const element of previewElements) {
+          console.log('Step3 미리보기 영역 요소 검사:', element.className, element.innerHTML.substring(0, 100))
+
+          if (element.innerHTML && (element.innerHTML.includes('$') || element.innerHTML.includes('\\'))) {
+            console.log('Step3 미리보기 영역 렌더링 시작:', element.className)
+
+            // MathJax 설정 재확인
+            if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+              // MathJax 문서 업데이트
+              window.MathJax.startup.document.updateDocument()
+
+              // 강제 렌더링 시도
+              try {
+                await window.MathJax.typesetPromise([element])
+                console.log('Step3 미리보기 영역 MathJax 강제 렌더링 성공:', element.className)
+              } catch (error) {
+                console.warn('Step3 미리보기 영역 MathJax 강제 렌더링 실패, 기본 렌더링 시도:', error)
+                await renderMathJax(element, { clearFirst: false })
+              }
+            } else {
+              await renderMathJax(element, { clearFirst: false })
+            }
+          } else {
+            console.log('Step3 미리보기 영역 요소에 LaTeX 없음:', element.className)
+          }
+        }
+
+        // 전체 미리보기 컨테이너도 렌더링
+        const previewContainer = document.querySelector('.problem-display')
+        if (previewContainer) {
+          console.log('Step3 미리보기 컨테이너 렌더링 시도')
+          try {
+            await renderMathJax(previewContainer, { clearFirst: false })
+            console.log('Step3 미리보기 컨테이너 렌더링 성공')
+          } catch (error) {
+            console.warn('Step3 미리보기 컨테이너 렌더링 실패:', error)
+          }
+        }
+
+        console.log('Step3 미리보기 MathJax 렌더링 완료')
+      } catch (error) {
+        console.error('Step3 미리보기 MathJax 렌더링 중 오류:', error)
+      }
+    }
 
     // 폼 유효성 검사
     const isFormValid = computed(() => {
@@ -715,46 +789,7 @@ export default {
       console.log('✅ [Step3InfoInput] 문제 정보 업데이트 완료 - 부모 컴포넌트로 전달됨')
     }
 
-    // 다음 단계로
-    const nextStep = () => {
-      console.log('🚀 [Step3InfoInput] nextStep 호출됨')
-      console.log('📋 [Step3InfoInput] 현재 폼 상태:', {
-        isFormValid: isFormValid.value,
-        problemType: problemInfo.value.problemType,
-        difficulty: problemInfo.value.difficulty,
-        hasAnswer: !!problemInfo.value.answer?.trim(),
-        answer: problemInfo.value.answer,
-        majorChapter: problemInfo.value.majorChapter,
-        middleChapter: problemInfo.value.middleChapter,
-        minorChapter: problemInfo.value.minorChapter,
-        topicChapter: problemInfo.value.topicChapter
-      })
 
-      if (isFormValid.value) {
-        console.log('✅ [Step3InfoInput] 폼 유효성 검사 통과, 다음 단계로 이동')
-        updateProblemInfo()
-        emit('next-step')
-        console.log('✅ [Step3InfoInput] next-step 이벤트 발생 완료')
-      } else {
-        console.log('❌ [Step3InfoInput] 폼 유효성 검사 실패, 에러 표시')
-        console.log('❌ [Step3InfoInput] 실패 원인:', {
-          missingProblemType: !problemInfo.value.problemType,
-          missingDifficulty: !problemInfo.value.difficulty,
-          missingAnswer: !problemInfo.value.answer?.trim()
-        })
-        showValidationErrors.value = true
-      }
-    }
-
-    // 이전 단계로
-    const prevStep = () => {
-      console.log('⬅️ [Step3InfoInput] prevStep 호출됨')
-      console.log('📋 [Step3InfoInput] 현재 문제 정보 상태:', problemInfo.value)
-
-      updateProblemInfo()
-      emit('prev-step')
-      console.log('⬅️ [Step3InfoInput] prev-step 이벤트 발생 완료')
-    }
 
         // 컴포넌트 마운트 시 챕터 데이터 로드
     onMounted(() => {
@@ -785,6 +820,11 @@ export default {
       // 컴포넌트 마운트 시 부모 컴포넌트로 초기 문제 정보 전달
       console.log('📝 [Step3InfoInput] 마운트 시 초기 문제 정보 전달:', problemInfo.value)
       updateProblemInfo()
+
+      // MathJax 렌더링 실행
+      nextTick(() => {
+        renderPreviewMathJax()
+      })
     })
 
         // 교과서 변경 시 챕터 데이터 재로드 (신규 파일)
@@ -852,6 +892,27 @@ export default {
         hasChanged: oldMinorChapter !== newMinorChapter
       })
       onMinorChapterChange()
+    })
+
+    // editedTexts 변경 시 MathJax 렌더링
+    watch(() => props.editedTexts, async (newTexts) => {
+      // LaTeX 패턴이 포함된 텍스트가 있는지 확인
+      const hasLatex = Object.values(newTexts).some(text =>
+        text && (text.includes('$') || text.includes('\\'))
+      )
+
+      if (hasLatex) {
+        await nextTick()
+        await renderPreviewMathJax()
+      }
+    }, { deep: true })
+
+    // processedOptionsList 변경 시 MathJax 렌더링
+    watch(processedOptionsList, async (newOptions) => {
+      if (newOptions.length > 0) {
+        await nextTick()
+        await renderPreviewMathJax()
+      }
     })
 
     // 문제 정보 변경 시 부모 컴포넌트에 전달
@@ -958,7 +1019,6 @@ export default {
       problemInfo,
       showExplanationEditor,
       explanationEditorKey,
-      showValidationErrors,
       isFormValid,
       majorChapters,
       middleChapters,
@@ -968,12 +1028,12 @@ export default {
       chaptersError,
       tinymceApiKey,
       explanationEditorConfig,
+      processedOptionsList,
+      hasValidPassageImage,
       getAnswerPlaceholder,
       toggleExplanationEditor,
       updateExplanation,
       insertMathToExplanation,
-      prevStep,
-      nextStep,
       loadChapters,
       loadMiddleChapters,
       loadMinorChapters,
@@ -1042,6 +1102,109 @@ export default {
   background: white;
   border-radius: 4px;
   border: 1px solid #e9ecef;
+}
+
+/* 실제 문제처럼 표시하는 스타일 */
+.problem-display {
+  background: white;
+  border: none;
+  border-radius: 0;
+  padding: 2rem;
+  box-shadow: none;
+  font-family: 'Noto Sans KR', Arial, sans-serif;
+  line-height: 1.6;
+  color: #333;
+  font-size: 1rem;
+}
+
+.passage-section {
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid #ddd;
+}
+
+.passage-content {
+  font-size: 1rem;
+  line-height: 1.7;
+  color: #333;
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+  border-left: none;
+}
+
+.problem-section {
+  margin-bottom: 2rem;
+}
+
+.problem-content {
+  font-size: 1rem;
+  font-weight: normal;
+  line-height: 1.6;
+  color: #333;
+  margin-bottom: 1.5rem;
+}
+
+.image-section {
+  margin-bottom: 2rem;
+  text-align: center;
+}
+
+.image-content {
+  max-width: 100%;
+  height: auto;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.problem-image {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  margin: 0 auto;
+}
+
+.options-section {
+  margin-top: 2rem;
+}
+
+.options-content {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #333;
+}
+
+/* 객관식 보기 스타일 - 실제 문제처럼 */
+.options-content .option-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+}
+
+.options-content .option-number {
+  font-weight: bold;
+  color: #333;
+  font-size: 1rem;
+  min-width: 2.5rem;
+  text-align: left;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  line-height: 1.6;
+}
+
+.options-content .option-content {
+  flex: 1;
+  line-height: 1.6;
+  color: #333;
+  padding: 0;
+  font-size: 1rem;
 }
 
 .preview-html {

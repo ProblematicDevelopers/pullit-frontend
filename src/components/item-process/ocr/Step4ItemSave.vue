@@ -5,7 +5,7 @@
       <div class="save-header">
         <h3 class="step-title">문제 저장 및 완료</h3>
         <p class="step-description">
-          입력한 정보를 확인하고 문제을 저장하세요.
+          입력한 정보를 확인하고 문제를 저장하세요.
         </p>
       </div>
 
@@ -104,6 +104,39 @@
         </div>
       </div>
 
+      <!-- 문제 미리보기 -->
+      <div class="problem-preview-section">
+        <h5 class="section-title">
+          <i class="bi bi-eye me-2"></i>문제 미리보기
+        </h5>
+        <div class="problem-preview-content">
+          <!-- 문제 영역 -->
+          <div v-if="editedTexts.problem" class="preview-item">
+            <h6>문제</h6>
+            <div class="preview-text" v-html="editedTexts.problem"></div>
+          </div>
+
+          <!-- 이미지 영역 -->
+          <div v-if="passage" class="preview-item">
+            <h6>이미지</h6>
+            <div class="preview-image">
+              <img :src="passage" alt="문제 이미지" class="problem-image" />
+            </div>
+          </div>
+
+          <!-- 보기 영역 -->
+          <div v-if="editedTexts.options" class="preview-item">
+            <h6>보기</h6>
+            <div class="preview-options">
+              <div v-for="(option, index) in processedOptionsList" :key="index" class="option-item">
+                <span class="option-number">({{ index + 1 }})</span>
+                <span class="option-content" v-html="option"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 정답 및 해설 정보 -->
       <div class="answer-explanation-section">
         <h5 class="section-title">
@@ -160,16 +193,7 @@
       </div>
     </div>
 
-    <!-- 네비게이션 버튼 -->
-    <div class="navigation-buttons">
-      <button @click="prevStep" class="btn btn-secondary" :disabled="isSaving">
-        <i class="bi bi-arrow-left-circle me-2"></i>이전 단계
-      </button>
-      <button @click="saveItem" class="btn btn-success" :disabled="!canSave || isSaving">
-        <i class="bi bi-check-circle me-2"></i>
-        {{ isSaving ? '저장 중...' : '문제 저장' }}
-      </button>
-    </div>
+
   </div>
 </template>
 
@@ -206,14 +230,29 @@ export default {
     topicChapters: {
       type: Array,
       default: () => []
+    },
+    passage: {
+      type: String,
+      default: ''
     }
   },
   emits: [
-    'prev-step',
     'save-complete'
   ],
   setup(props, { emit }) {
     const isSaving = ref(false)
+
+    // 보기 텍스트를 항목별로 분리하는 함수
+    const splitOptions = (optionsText) => {
+      if (!optionsText) return []
+      const parts = optionsText.split(/\(\d+\)/)
+      return parts.filter(part => part.trim()).map(part => part.trim())
+    }
+
+    // 처리된 보기 목록
+    const processedOptionsList = computed(() => {
+      return splitOptions(props.editedTexts.options)
+    })
 
     // 사용 가능한 영역 타입들
     const availableAreaTypes = computed(() => {
@@ -244,9 +283,8 @@ export default {
     // 영역 타입별 라벨
     const getAreaTypeLabel = (areaType) => {
       const labels = {
-        question: '지문',
         problem: '문제',
-        image: '이미지',
+        passage: '지문',
         options: '보기'
       }
       return labels[areaType] || areaType
@@ -254,7 +292,7 @@ export default {
 
     // 필수 영역 여부
     const isRequired = (areaType) => {
-      return areaType === 'problem' || areaType === 'options'
+      return areaType === 'problem'
     }
 
     // 문제 유형 라벨
@@ -439,10 +477,7 @@ export default {
       }
     }
 
-    // 이전 단계로
-    const prevStep = () => {
-      emit('prev-step')
-    }
+
 
     // props 변경 시 유효성 검사 실행
     watch([() => props.selectedAreas, () => props.editedTexts, () => props.itemInfo],
@@ -463,7 +498,7 @@ export default {
       getChapterPath,
       getTextPreview,
       saveItem,
-      prevStep
+      processedOptionsList
     }
   }
 }
@@ -678,6 +713,88 @@ export default {
 .text-muted {
   color: #6c757d;
   font-style: italic;
+}
+
+/* 문제 미리보기 스타일 */
+.problem-preview-section {
+  margin: 0 2rem 2rem 2rem;
+}
+
+.problem-preview-content {
+  background: #f8f9fa;
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.preview-item {
+  margin-bottom: 1.5rem;
+}
+
+.preview-item:last-child {
+  margin-bottom: 0;
+}
+
+.preview-item h6 {
+  margin: 0 0 0.75rem 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #495057;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #dee2e6;
+}
+
+.preview-text {
+  background: white;
+  border-radius: 6px;
+  padding: 1rem;
+  border: 1px solid #dee2e6;
+  line-height: 1.6;
+  color: #333;
+}
+
+.preview-image {
+  text-align: center;
+}
+
+.problem-image {
+  max-width: 100%;
+  height: auto;
+  border-radius: 6px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.preview-options {
+  background: white;
+  border-radius: 6px;
+  padding: 1rem;
+  border: 1px solid #dee2e6;
+}
+
+.preview-options .option-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+}
+
+.preview-options .option-item:last-child {
+  margin-bottom: 0;
+}
+
+.preview-options .option-number {
+  font-weight: bold;
+  color: #007bff;
+  font-size: 0.9em;
+  min-width: 2rem;
+}
+
+.preview-options .option-content {
+  flex: 1;
+  line-height: 1.5;
+  color: #333;
 }
 
 

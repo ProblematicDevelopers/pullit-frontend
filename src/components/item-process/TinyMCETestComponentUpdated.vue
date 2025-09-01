@@ -270,10 +270,10 @@ import { fileHistoryAPI } from '@/services/fileHistoryApi'
 
 export default {
   name: 'TinyMCETestComponentUpdated',
-  components: { 
-    TinyMCEEditor, 
-    LivePreview, 
-    MathTools 
+  components: {
+    TinyMCEEditor,
+    LivePreview,
+    MathTools
   },
   props: {
     modelValue: { type: String, default: '' },
@@ -447,7 +447,7 @@ export default {
         this.showEditorNotReadyMessage()
         return
       }
-      
+
       const safe = String(latex || '').trim()
       const html = `<span class="math-latex" data-latex="${safe}">$${safe}$</span>`
       this.editorInstance.insertContent(html)
@@ -597,7 +597,7 @@ export default {
         this.showEditorNotReadyMessage()
         return
       }
-      
+
       try {
         const svg = this.generateShapeSVG()
         let html = `<div class="shape-wrap" contenteditable="false">${svg}</div>`
@@ -692,23 +692,23 @@ export default {
 }
 
 /* 도형 미리보기 */
-.preview-container { 
-  min-height: 100px; 
-  display: flex; 
-  align-items: center; 
-  justify-content: center; 
+.preview-container {
+  min-height: 100px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* 템플릿 아이템 */
-.template-item { 
-  transition: all 0.2s ease; 
+.template-item {
+  transition: all 0.2s ease;
 }
-.template-item:hover { 
-  background-color: #f8f9fa; 
+.template-item:hover {
+  background-color: #f8f9fa;
 }
 
 /* API 키 안내 */
-.api-key-notice { 
-  font-size: 0.875rem; 
+.api-key-notice {
+  font-size: 0.875rem;
 }
 </style>
