@@ -298,10 +298,10 @@ export default {
     // 문제 유형 라벨
     const getItemTypeLabel = (type) => {
       const labels = {
-        multiple_choice: '객관식 (5지 선택)',
-        subjective: '주관식',
-        short_answer: '단답형',
-        essay: '서술형'
+        fiveChoice: '5지 선택',
+        shortAnswerOrdered: '단답 유순형',
+        shortAnswerUnOrdered: '단답 무순형',
+        freeChoice: '자유 선지형'
       }
       return labels[type] || ''
     }
@@ -309,9 +309,9 @@ export default {
     // 난이도 라벨
     const getDifficultyLabel = (difficulty) => {
       const labels = {
-        easy: '쉬움',
-        medium: '보통',
-        hard: '어려움'
+        easy: '하',
+        medium: '중',
+        hard: '상'
       }
       return labels[difficulty] || ''
     }
@@ -432,10 +432,10 @@ export default {
         // 백엔드 ProcessedItem 구조에 맞춘 데이터 준비
         const processedItemData = {
           // 백엔드 enum에 맞춘 문항 정보 (Step3 problemType 사용)
-          type: props.itemInfo.problemType === 'multiple_choice' ? 'multiple' :
-                props.itemInfo.problemType === 'subjective' ? 'subjective' :
-                props.itemInfo.problemType === 'short_answer' ? 'shortAnswer' :
-                props.itemInfo.problemType === 'essay' ? 'essay' : 'multiple',
+          type: props.itemInfo.problemType === 'fiveChoice' ? 'FIVE_CHOICE' :
+                props.itemInfo.problemType === 'shortAnswerOrdered' ? 'SHORT_ANSWER_ORDERED' :
+                props.itemInfo.problemType === 'shortAnswerUnOrdered' ? 'SHORT_ANSWER_UNORDERED' :
+                props.itemInfo.problemType === 'freeChoice' ? 'FREE_CHOICE' : 'FIVE_CHOICE',
 
           difficulty: props.itemInfo.difficulty === 'easy' ? 'easy' :
                      props.itemInfo.difficulty === 'medium' ? 'medium' :
