@@ -1170,6 +1170,32 @@ export default {
       }
     }
 
+        // 선택지 HTML 파싱 함수
+    const parseChoicesFromOptions = (optionsHtml) => {
+      if (!optionsHtml) return []
+
+      try {
+        // HTML에서 (1), (2), (3), (4), (5) 패턴으로 선택지 추출
+        // HTML 태그를 고려한 더 정확한 정규식
+        const choices = []
+        const choicePattern = /\((\d+)\)\s*([\s\S]*?)(?=\(\d+\)|$)/g
+        let match
+
+        while ((match = choicePattern.exec(optionsHtml)) !== null) {
+          const choiceText = match[2].trim()
+          if (choiceText) {
+            choices.push(choiceText)
+          }
+        }
+
+        console.log('파싱된 선택지:', choices)
+        return choices.slice(0, 5) // 최대 5개
+      } catch (error) {
+        console.warn('선택지 파싱 실패:', error)
+        return []
+      }
+    }
+
     const saveOcrResults = async (itemData) => {
       try {
         console.log('문항 저장 시작:', itemData)
@@ -1264,7 +1290,26 @@ export default {
         if (processedItemId) {
           try {
             console.log('문항 변환 시작:', processedItemId)
-            const publishResult = await ocrApi.publishProcessedItem(processedItemId)
+
+                        // HTML 에디터 데이터 구성
+            const htmlPayload = {
+              passageHtml: itemData.editedTexts?.passage || itemData.editedTexts?.question || null,
+              questionHtml: itemData.editedTexts?.problem || null,
+              choicesHtml: parseChoicesFromOptions(itemData.editedTexts?.options),
+              answerHtml: itemData.answer ? `<span>${itemData.answer}</span>` : null,
+              explainHtml: itemData.editedTexts?.explanation || itemData.explanation || null
+            }
+
+            // HTML Payload 검증
+            console.log('HTML Payload:', htmlPayload)
+            console.log('HTML Payload 검증:', {
+              passageHtml: !!htmlPayload.passageHtml,
+              questionHtml: !!htmlPayload.questionHtml,
+              choicesCount: htmlPayload.choicesHtml?.length || 0,
+              answerHtml: !!htmlPayload.answerHtml,
+              explainHtml: !!htmlPayload.explainHtml
+            })
+            const publishResult = await ocrApi.publishProcessedItem(processedItemId, htmlPayload)
             console.log('문항 변환 성공:', publishResult)
             success('문항이 성공적으로 저장되고 변환되었습니다.')
           } catch (publishError) {

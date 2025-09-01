@@ -407,16 +407,17 @@ export const ocrApi = {
     }
   },
 
-  /**
+    /**
    * ProcessedItem을 실제 문항으로 변환 (publish)
    * @param {number} processedItemId - ProcessedItem ID
+   * @param {Object} htmlPayload - HTML 에디터 데이터
    * @returns {Promise<Object>} 변환 결과
    */
-  async publishProcessedItem(processedItemId) {
+  async publishProcessedItem(processedItemId, htmlPayload) {
     try {
-      console.log('📤 [ocrApi] publishProcessedItem 호출 시작:', processedItemId)
+      console.log('📤 [ocrApi] publishProcessedItem 호출 시작:', { processedItemId, htmlPayload })
 
-      const response = await api.post(`/item-process/publish/${processedItemId}`)
+      const response = await api.post(`/item-process/publish/${processedItemId}`, htmlPayload)
 
       console.log('✅ [ocrApi] publishProcessedItem 성공:', response.data)
       return response.data
