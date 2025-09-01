@@ -7,7 +7,7 @@
     </main>
     <!-- 팝업 창이 아닐 때만 푸터 표시 -->
     <Footer v-if="!isPopup" />
-    
+
     <!-- 전역 Toast 컴포넌트 -->
     <Toast />
   </div>
@@ -23,17 +23,16 @@ export default {
   components: { Header, Footer, Toast },
   setup() {
     const route = useRoute()
-    
+
     // 팝업 창인지 확인 (라우터 메타 정보 또는 경로로 판단)
     const isPopup = computed(() => {
       // wizard 경로이거나 메타에 isPopup이 true인 경우
       // 또는 로그인 페이지인 경우 헤더/푸터 숨김
-      return route.path.includes('/exam/wizard') || 
-             route.path.includes('/test-wizard') || 
+      return route.path.includes('/exam/wizard') ||
              route.meta.isPopup === true ||
              route.meta.hideHeader === true
     })
-    
+
     return {
       isPopup
     }

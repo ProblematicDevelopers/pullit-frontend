@@ -533,6 +533,22 @@
                   </select>
                 </div>
 
+                <!-- 학생인 경우 학년 선택 -->
+                <div class="mb-3" v-if="signupForm.userType === 'student'">
+                  <label for="grade" class="form-label fw-bold">학년 (선택사항)</label>
+                  <select
+                    class="form-select"
+                    id="grade"
+                    v-model="signupForm.grade"
+                  >
+                    <option :value="null">학년을 선택하세요</option>
+                    <option :value="{ code: '07', name: '중학교 1학년' }">중학교 1학년</option>
+                    <option :value="{ code: '08', name: '중학교 2학년' }">중학교 2학년</option>
+                    <option :value="{ code: '09', name: '중학교 3학년' }">중학교 3학년</option>
+                  </select>
+                  <div class="form-text">나중에 선생님이 반에 초대할 때 설정할 수도 있습니다.</div>
+                </div>
+
                 <!-- 학교 검색 -->
                 <div class="mb-4">
                   <label for="school" class="form-label fw-bold">학교 정보</label>
@@ -781,7 +797,7 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import { authAPI } from '@/services/api'
 import Header from '@/components/common/Header.vue'
 import Footer from '@/components/common/Footer.vue'
 
@@ -802,6 +818,7 @@ const signupForm = ref({
   birthDate: '',
   school: '',
   subject: '',  // 과목 추가
+  grade: null, // 학년 추가 (학생용)
   fullName: '',
   socialProvider: '',
   socialProviderId: '',
@@ -991,9 +1008,7 @@ const sendVerificationCode = async () => {
   }
 
   try {
-    const response = await axios.post(`${apiBaseUrl}/auth/phone/send`, {
-      phone: signupForm.value.phone
-    })
+    const response = await authAPI.sendVerificationCode(signupForm.value.phone)
 
     if (response.data.success) {
       verificationSent.value = true
@@ -1026,15 +1041,14 @@ const verifyPhone = async () => {
   }
 
   try {
-    const response = await axios.post(`${apiBaseUrl}/auth/phone/verify`, {
-      phone: signupForm.value.phone,
-      code: verificationCode.value
-    })
+    const response = await authAPI.verifyCode(signupForm.value.phone, verificationCode.value)
 
-    if (response.data.success) {
+    if (response.data.success && response.data.verified) {
       phoneVerified.value = true
       clearInterval(timerInterval)
       alert('휴대폰 인증이 완료되었습니다.')
+    } else {
+      alert('인증 실패: ' + (response.data.message || '잘못된 인증번호입니다.'))
     }
   } catch (error) {
     alert('인증 실패: ' + (error.response?.data?.message || '잘못된 인증번호입니다.'))
@@ -1403,16 +1417,18 @@ const handleSignup = async () => {
     // Student인 경우 studentInfo 추가
     if (signupForm.value.userType === 'student') {
       signupData.studentInfo = {
-        classGroupId: null, // 추후 구현
-        studentNo: null, // 추후 구현
-        grade: null // 추후 구현
+        classGroupId: null, // 선생님이 나중에 초대할 때 설정
+        studentNo: null, // 선생님이 나중에 설정
+        grade: signupForm.value.grade ? {
+          code: signupForm.value.grade.code,
+          name: signupForm.value.grade.name
+        } : null // 학년 선택 (선택사항)
       }
     }
 
     console.log('회원가입 데이터:', signupData)
-    console.log('API 엔드포인트:', `${apiBaseUrl}/auth/register`)
 
-    const response = await axios.post(`${apiBaseUrl}/auth/register`, signupData)
+    const response = await api.post('/auth/register', signupData)
 
     console.log('회원가입 응답:', response.data)
 

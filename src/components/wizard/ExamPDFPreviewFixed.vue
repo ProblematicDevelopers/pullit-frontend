@@ -128,8 +128,72 @@
 
     <!-- Preview Container -->
     <div class="preview-container" :style="{ transform: `scale(${zoomLevel / 100})` }">
-      <!-- Single Page Display for Preview -->
-      <div class="a4-page" v-if="!isGeneratingPDF">
+      <!-- Debug Info -->
+      <div v-if="true" style="position: fixed; top: 10px; right: 10px; background: yellow; padding: 10px; z-index: 9999; color: black; font-size: 12px; border: 2px solid #000; border-radius: 4px; box-shadow: 0 2px 8px rgba(0,0,0,0.3);">
+        <strong>Debug Panel</strong><br>
+        Total Images: {{ previewImages.length }}<br>
+        Current Page: {{ currentPage }}<br>
+        Total Pages: {{ totalPages }}<br>
+        Current Page Images: {{ currentPageImages.length }}<br>
+        Layout Mode: {{ layoutMode }}
+      </div>
+
+      <!-- Image-based Preview (if available) -->
+      <div v-if="previewImages.length > 0 && !isGeneratingPDF" class="image-preview-container">
+        <div class="a4-page image-based">
+          <!-- Header (First Page Only) -->
+          <div v-if="currentPage === 1" class="page-header">
+            <h1 class="exam-title">{{ examTitle || '2024학년도 중간고사' }}</h1>
+            <div class="exam-info">
+              <span>과목: {{ subject || '수학' }}</span>
+              <span>시간: {{ duration || '50' }}분</span>
+              <span>총점: {{ totalScore || '100' }}점</span>
+            </div>
+          </div>
+
+          <!-- Image Content -->
+          <div class="page-content" :class="`layout-${layoutMode}`">
+            <div v-if="currentPageImages.length === 0" class="no-images-message">
+              이미지가 없습니다. (currentPageImages.length = 0)
+            </div>
+            <div v-else class="images-wrapper">
+              <!-- Debug info (remove in production) -->
+              <div class="debug-info">
+                현재 페이지 이미지 수: {{ currentPageImages.length }}
+              </div>
+
+              <!-- Images Grid -->
+              <div class="images-grid" :class="`cols-${layoutMode === 'double' ? 2 : 1}`">
+                <div v-for="(image, idx) in currentPageImages" :key="`img-${idx}`" class="image-container">
+                  <!-- Debug info for each image -->
+                  <div class="image-debug">
+                    이미지 {{ idx + 1 }}: {{ image.type }}
+                    <span v-if="image.questionNumber">(문제 {{ image.questionNumber }})</span>
+                  </div>
+
+                  <!-- Actual Image -->
+                  <img
+                    v-if="image.dataUrl"
+                    :src="image.dataUrl"
+                    :alt="`${image.type === 'passage' ? '지문' : '문제'} ${image.questionNumber || idx + 1}`"
+                    class="converted-question-image"
+                    @load="onImageLoad(idx, image)"
+                    @error="onImageError(idx, image)"
+                  />
+
+                  <!-- Error fallback -->
+                  <div v-else class="image-error">
+                    이미지 데이터를 불러올 수 없습니다.
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Original HTML-based Preview (fallback) -->
+      <div class="a4-page" v-else-if="!isGeneratingPDF">
         <!-- Header (First Page Only) -->
         <div v-if="currentPage === 1" class="page-header">
           <h1 class="exam-title">{{ examTitle || '2024학년도 중간고사' }}</h1>
@@ -433,8 +497,8 @@
         </div>
       </div>
 
-      <!-- All Pages for PDF Generation (Hidden) -->
-      <div v-show="isGeneratingPDF" ref="pdfContent" class="pdf-pages">
+      <!-- All Pages for PDF Generation (Hidden) - HTML 기반 PDF 생성용 -->
+      <div v-if="!previewImages.length && isGeneratingPDF" v-show="isGeneratingPDF" ref="pdfContent" class="pdf-pages">
         <div v-for="pageNum in totalPages" :key="pageNum" class="a4-page pdf-page">
           <!-- Header (First Page Only) -->
           <div v-if="pageNum === 1" class="page-header">
@@ -616,6 +680,7 @@
 <script setup>
 import { ref, computed, onMounted, nextTick, watch } from 'vue'
 import { useItemSelectionStore } from '@/stores/itemSelection'
+import { useTestBankStore } from '@/stores/testBank'
 import { renderMathJaxSmartHybrid, renderMathJaxParallelHybrid } from '@/utils/mathjax-hybrid'
 // 이미지 기반 PDF 생성 시스템
 import {
@@ -859,6 +924,12 @@ watch([allQuestions, layoutMode], async () => {
 
 // Total pages from dynamic calculation
 const totalPages = computed(() => {
+  // 이미지 기반 미리보기일 때
+  if (previewImages.value.length > 0) {
+    const imagesPerPage = layoutMode.value === 'double' ? 6 : 3
+    return Math.max(1, Math.ceil(previewImages.value.length / imagesPerPage))
+  }
+  // 기존 HTML 기반 미리보기
   return Math.max(1, pageContents.value.length)
 })
 
@@ -869,6 +940,66 @@ const currentPageGroups = computed(() => {
   // For single column layout or preview, merge columns
   return [...(page.column1 || []), ...(page.column2 || [])]
 })
+
+// 이미지 미리보기 데이터
+const previewImages = computed(() => {
+  const itemStore = useItemSelectionStore()
+  const images = itemStore.getConvertedImages() || []
+  console.log('previewImages computed:', images.length, images)
+  return images
+})
+
+// 현재 페이지에 표시할 이미지들
+const currentPageImages = computed(() => {
+  if (previewImages.value.length === 0) {
+    console.log('No preview images available')
+    return []
+  }
+
+  // 페이지당 이미지 수 계산 (레이아웃에 따라)
+  const imagesPerPage = layoutMode.value === 'double' ? 6 : 3 // 예시 값
+  const startIdx = (currentPage.value - 1) * imagesPerPage
+  const endIdx = startIdx + imagesPerPage
+
+  const pageImages = previewImages.value.slice(startIdx, endIdx)
+  console.log('currentPageImages:', {
+    count: pageImages.length,
+    startIdx,
+    endIdx,
+    images: pageImages,
+    firstImage: pageImages[0],
+    hasDataUrl: pageImages[0]?.dataUrl ? 'YES' : 'NO'
+  })
+  return pageImages
+})
+
+// Image load/error handlers for debugging
+const onImageLoad = (idx, image) => {
+  console.log('✅ Image loaded successfully:', {
+    index: idx,
+    type: image.type,
+    questionNumber: image.questionNumber,
+    dimensions: {
+      naturalWidth: image.naturalWidth,
+      naturalHeight: image.naturalHeight,
+      width: image.width,
+      height: image.height
+    },
+    dataUrlLength: image.dataUrl?.length || 0,
+    dataUrlPreview: image.dataUrl?.substring(0, 50) + '...'
+  })
+}
+
+const onImageError = (idx, image) => {
+  console.error('❌ Image failed to load:', {
+    index: idx,
+    type: image.type,
+    questionNumber: image.questionNumber,
+    hasDataUrl: !!image.dataUrl,
+    dataUrlLength: image.dataUrl?.length || 0,
+    error: 'Failed to render image element'
+  })
+}
 
 // Render page content as HTML string
 const renderPageContent = (groups, layout) => {
@@ -1062,12 +1193,19 @@ const sanitizeHtml = (html) => {
 // Generate PDF and save to S3
 const generateAndSavePDF = async () => {
   try {
-    const pdfBlob = await downloadPDF(true)
-    emit('save', {
-      pdfBlob: pdfBlob,
-      examTitle: examTitle.value,
-      filename: `${examTitle.value}_${new Date().toISOString().split('T')[0]}.pdf`
-    })
+    console.log('generateAndSavePDF 호출됨')
+    let pdfBlob = null
+
+    try {
+      // PDF 생성 시도 (실패해도 계속 진행)
+      pdfBlob = await downloadPDF(true)
+      console.log('PDF 생성 성공:', pdfBlob)
+    } catch (pdfError) {
+      console.warn('PDF 생성 실패, 하지만 계속 진행:', pdfError)
+      // PDF 생성 실패해도 null로 계속 진행
+    }
+
+    // PDF 성공 여부와 관계없이 반환
     return pdfBlob
   } catch (error) {
     console.error('PDF 저장 오류:', error)
@@ -1084,12 +1222,48 @@ const downloadPDF = async (returnBlob = false) => {
 
     console.log('새로운 이미지 기반 PDF 생성 시작')
 
+    // Store에서 이미지 데이터 가져오기
+    const itemStore = useItemSelectionStore()
+    const storedImages = itemStore.getConvertedImages()
+
+    if (storedImages && storedImages.length > 0) {
+      // 이미 변환된 이미지가 있으면 바로 PDF 생성
+      console.log('Store에 저장된 이미지 사용:', storedImages.length)
+
+      const { generatePDFFromImages, pdfToBlob, downloadPDF } = await import('@/utils/pdf-from-images')
+
+      const pdf = await generatePDFFromImages(storedImages, {
+        examTitle: examTitle.value || '2024학년도 중간고사',
+        subject: subject.value || '수학',
+        grade: selectedGrade.value || '',
+        duration: duration.value || '50',
+        totalScore: totalScore.value || '100',
+        layoutMode: layoutMode.value,
+        showPageNumbers: true,
+        onProgress: (progress) => {
+          console.log('PDF 생성 진행:', progress.message)
+        }
+      })
+
+      if (returnBlob) {
+        return pdfToBlob(pdf)
+      } else {
+        downloadPDF(pdf, `${examTitle.value || 'exam'}_${new Date().toISOString().split('T')[0]}.pdf`)
+      }
+
+      console.log('이미지 기반 PDF 생성 완료')
+      return pdf
+    }
+
+    // 이미지가 없으면 기존 방식으로 fallback
+    console.log('Store에 이미지가 없어 기존 방식 사용')
+
     // 문제 그룹 생성 (ContentGrouper 사용)
     const groups = ContentGrouper.createGroups(allQuestions.value)
     console.log('생성된 그룹:', groups.length, groups)
 
     // 새로운 방식: 각 그룹을 개별 이미지로 변환 후 PDF 생성
-    const pdf = await generateImageBasedPDF(groups, {
+    const result = await generateImageBasedPDF(groups, {
       filename: `${examTitle.value || 'exam'}_${new Date().toISOString().split('T')[0]}.pdf`,
       examTitle: examTitle.value || '2024학년도 중간고사',
       subject: subject.value || '수학',
@@ -1105,15 +1279,15 @@ const downloadPDF = async (returnBlob = false) => {
 
     console.log('PDF 생성 완료')
 
-    if (returnBlob) {
-      return pdf.output('blob')
-    }
-
-    return pdf
+    // generateImageBasedPDF가 returnBlob이 true일 때 이미 blob을 반환함
+    return result
 
   } catch (error) {
     console.error('PDF 생성 오류:', error)
-    alert('PDF 생성 중 오류가 발생했습니다.')
+    console.error('에러 스택:', error.stack)
+    console.error('에러 메시지:', error.message)
+    alert(`PDF 생성 중 오류가 발생했습니다.\n${error.message || '알 수 없는 오류'}`)
+    throw error  // 에러를 다시 던져서 상위에서 처리할 수 있도록
   } finally {
     isGeneratingPDF.value = false
   }
@@ -1258,16 +1432,23 @@ const downloadPDF_OLD = async (returnBlob = false) => {
 
 // Save PDF handler for footer button (기존 함수명 변경)
 const handleSavePDF = () => {
-  // Emit save event to parent component (Step3ExamSave)
-  emit('save', {
+  // Emit save event to parent component (Step3ExamSave) with actual exam data
+  const examData = {
     examTitle: examTitle.value,
     gradeCode: selectedGrade.value,
     gradeName: gradeMapping[selectedGrade.value],
     areaCode: selectedSubject.value,
     areaName: subjectMapping[selectedSubject.value],
     duration: duration.value,
-    totalScore: totalScore.value
-  })
+    totalScore: totalScore.value,
+    // 실제 문항 데이터 포함
+    items: allQuestions.value,
+    totalQuestions: allQuestions.value.length,
+    createdAt: new Date().toISOString()
+  }
+
+  console.log('Saving exam data with items:', examData)
+  emit('save', examData)
 }
 
 // Expose method for parent component
@@ -1364,10 +1545,17 @@ onMounted(async () => {
   // Calculate initial pagination
   calculateDynamicPagination()
 
+  // Check for converted images
+  const itemStore = useItemSelectionStore()
+  const convertedImages = itemStore.getConvertedImages()
+  console.log('Converted images on mount:', convertedImages)
+
   // Debug logging
   console.log('ExamPDFPreviewFixed mounted:', {
     selectedItems: props.selectedItems,
     allQuestions: allQuestions.value,
+    convertedImages: convertedImages,
+    previewImagesLength: previewImages.value.length,
     totalPages: totalPages.value,
     currentPage: currentPage.value
   })
@@ -1694,6 +1882,134 @@ watch(layoutMode, async () => {
   overflow: visible; /* hidden에서 visible로 변경 */
   position: relative;
   box-sizing: border-box;
+}
+
+/* 이미지 기반 미리보기 스타일 */
+.image-preview-container {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+.a4-page.image-based {
+  width: 210mm;
+  min-height: 297mm;
+  max-height: 297mm;
+  margin: 0 auto;
+  background: white;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.a4-page.image-based .page-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.a4-page.image-based .page-content.layout-double {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: space-between;
+}
+
+.image-item {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.image-item img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
+
+/* Image Grid Layout */
+.images-wrapper {
+  padding: 20px;
+  width: 100%;
+}
+
+.debug-info {
+  background: #f0f0f0;
+  padding: 10px;
+  margin-bottom: 15px;
+  border-radius: 4px;
+  font-size: 14px;
+  color: #666;
+}
+
+.images-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+  width: 100%;
+}
+
+.images-grid.cols-1 {
+  flex-direction: column;
+}
+
+.images-grid.cols-2 {
+  flex-direction: row;
+  justify-content: space-between;
+}
+
+.images-grid.cols-2 .image-container {
+  width: calc(50% - 10px);
+}
+
+.image-container {
+  width: 100%;
+  margin-bottom: 20px;
+}
+
+.image-debug {
+  background: #e8f4f8;
+  padding: 8px;
+  margin-bottom: 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #555;
+  border-left: 3px solid #007bff;
+}
+
+/* 변환된 문제 이미지 스타일 */
+.converted-question-image {
+  width: 100% !important;
+  max-width: 100% !important;
+  height: auto !important;
+  display: block !important;
+  margin-bottom: 0 !important;
+  border: 2px solid #007bff !important;
+  border-radius: 4px !important;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1) !important;
+  background: white !important;
+}
+
+.image-error {
+  background: #fee;
+  color: #c00;
+  padding: 20px;
+  text-align: center;
+  border: 2px dashed #c00;
+  border-radius: 4px;
+}
+
+.no-images-message {
+  padding: 40px;
+  text-align: center;
+  color: #999;
+  font-size: 16px;
+  background: #f9f9f9;
+  border: 2px dashed #ddd;
+  border-radius: 8px;
+  margin: 20px;
 }
 
 .pdf-page {

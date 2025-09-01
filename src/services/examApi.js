@@ -12,7 +12,7 @@ const examApi = {
   put: (url, data, config) => api.put(`/exams${url}`, data, config),
   delete: (url, config) => api.delete(`/exams${url}`, config),
   patch: (url, data, config) => api.patch(`/exams${url}`, data, config),
-  
+
   // 명시적 API 메서드들
   getExams: (params) => api.get('/exams', { params }),
   getExam: (examId) => api.get(`/exams/${examId}`),
@@ -27,9 +27,18 @@ const examApi = {
   getStudentResults: (examId) => api.get(`/exams/${examId}/results`),
   downloadExamPDF: (examId) => api.get(`/exams/${examId}/download/pdf`, { responseType: 'blob' }),
   downloadAnswerSheet: (examId) => api.get(`/exams/${examId}/download/answer`, { responseType: 'blob' }),
-  
+
   // 시험지의 문항 목록 가져오기
-  getExamItems: (examId) => api.get(`/exams/${examId}/items`)
+  getExamItems: (examId) => api.get(`/exams/${examId}/items`),
+
+  // 내가 생성한 시험지 목록 가져오기
+  getMyExams: (params) => api.get('/exams/my', { params }),
+
+  // 시험지 복사
+  duplicateExam: (examId) => api.post(`/exams/${examId}/duplicate`),
+
+  // 학급에 시험 출제
+  assignExamToClasses: (data) => api.post('/exams/assign', data)
 }
 
 export default examApi;

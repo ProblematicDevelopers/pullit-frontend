@@ -1,6 +1,6 @@
 /**
  * 팝업 창 관리 유틸리티
- * 
+ *
  * 새창 팝업을 열고 관리하는 유틸리티 함수들을 제공합니다.
  * 팝업 창 간의 데이터 통신은 localStorage를 통해 이루어집니다.
  */
@@ -8,7 +8,7 @@
 /**
  * 시험지 마법사 팝업 열기
  * @param {Object} options - 팝업 옵션
- * @param {string} options.subject - 선택된 과목 정보 
+ * @param {string} options.subject - 선택된 과목 정보
  * @param {number} options.width - 팝업 가로 크기 (기본값: 1200)
  * @param {number} options.height - 팝업 세로 크기 (기본값: 800)
  * @param {boolean} options.center - 화면 중앙 위치 여부 (기본값: true)
@@ -28,14 +28,14 @@ export function openTestWizardPopup(options = {}) {
     directories: 'no',
     status: 'no'
   }
-  
+
   // 전달받은 옵션과 기본값 병합
   const config = { ...defaultOptions, ...options }
-  
+
   // 화면 중앙 위치 계산
   let left = 0
   let top = 0
-  
+
   if (config.center) {
     // 사용자 화면의 중앙에 팝업 위치 계산
     const screenWidth = window.screen.availWidth
@@ -43,7 +43,7 @@ export function openTestWizardPopup(options = {}) {
     left = Math.round((screenWidth - config.width) / 2)
     top = Math.round((screenHeight - config.height) / 2)
   }
-  
+
   // 팝업 창 옵션 문자열 생성
   const features = [
     `width=${config.width}`,
@@ -58,29 +58,29 @@ export function openTestWizardPopup(options = {}) {
     `directories=${config.directories}`,
     `status=${config.status}`
   ].join(',')
-  
+
   try {
     // 팝업 열기 전에 현재 상태를 localStorage에 저장
     // 이렇게 하면 팝업 창에서 부모 창의 데이터에 접근할 수 있습니다
     if (options.subject) {
       localStorage.setItem('wizard_subject_data', JSON.stringify(options.subject))
     }
-    
+
     // 팝업 창 열기
     const popup = window.open(
-      '/test-wizard', // 팝업에서 로드할 경로
+      '/exam/wizard', // 팝업에서 로드할 경로
       'testWizardPopup', // 창 이름 (같은 이름으로 다시 열면 기존 창을 재사용)
       features
     )
-    
+
     // 팝업이 성공적으로 열렸는지 확인
     if (!popup) {
       throw new Error('팝업이 차단되었습니다. 브라우저의 팝업 차단을 해제해주세요.')
     }
-    
+
     // 팝업 창에 포커스 설정
     popup.focus()
-    
+
     // 팝업 창이 닫힐 때 이벤트 리스너 등록
     const checkClosed = setInterval(() => {
       if (popup.closed) {
@@ -91,9 +91,9 @@ export function openTestWizardPopup(options = {}) {
         handlePopupClosed()
       }
     }, 1000)
-    
+
     return popup
-    
+
   } catch (error) {
     console.error('팝업 열기 실패:', error)
     alert('팝업을 열 수 없습니다. 브라우저 설정을 확인해주세요.')
@@ -113,7 +113,7 @@ export function openQuestionBankPopup(options = {}) {
     center: true,
     ...options
   }
-  
+
   return openTestWizardPopup({
     ...config,
     // 문제 은행 전용 경로로 설정 (향후 구현)
@@ -134,10 +134,10 @@ export function openExamPreviewPopup(examData, options = {}) {
     center: true,
     ...options
   }
-  
+
   // 시험지 데이터를 localStorage에 저장
   localStorage.setItem('exam_preview_data', JSON.stringify(examData))
-  
+
   return openTestWizardPopup({
     ...config,
     // 미리보기 전용 경로로 설정 (향후 구현)
@@ -198,15 +198,15 @@ export function listenToPopupMessages(callback) {
     if (event.origin !== window.location.origin) {
       return
     }
-    
+
     // 팝업에서 온 메시지인지 확인
     if (event.data && event.data.type === 'POPUP_EVENT') {
       callback(event.data.eventType, event.data.data)
     }
   }
-  
+
   window.addEventListener('message', messageHandler)
-  
+
   // 이벤트 리스너 제거 함수 반환
   return () => {
     window.removeEventListener('message', messageHandler)
@@ -220,19 +220,19 @@ export function listenToPopupMessages(callback) {
 function handlePopupClosed() {
   // 팝업에서 저장된 결과 데이터가 있는지 확인
   const wizardResult = localStorage.getItem('wizard_result_data')
-  
+
   if (wizardResult) {
     try {
       const result = JSON.parse(wizardResult)
-      
+
       // 사용자 정의 이벤트 발생으로 다른 컴포넌트에 알림
       window.dispatchEvent(new CustomEvent('wizardCompleted', {
         detail: result
       }))
-      
+
       // 결과 데이터 정리
       localStorage.removeItem('wizard_result_data')
-      
+
     } catch (error) {
       console.error('마법사 결과 처리 실패:', error)
     }
@@ -258,10 +258,10 @@ export function closePopup(result = null) {
     if (result) {
       localStorage.setItem('wizard_result_data', JSON.stringify(result))
     }
-    
+
     // 부모 창에 닫힘 알림
     sendToParent('POPUP_CLOSING', result)
-    
+
     // 창 닫기
     window.close()
   }
@@ -276,7 +276,7 @@ export function checkPopupBlocked() {
     try {
       // 작은 테스트 팝업을 열어서 차단 여부 확인
       const testPopup = window.open('', 'popupTest', 'width=1,height=1,left=0,top=0')
-      
+
       if (!testPopup) {
         resolve(true) // 팝업 차단됨
       } else {
@@ -298,15 +298,15 @@ export function checkPopupBlocked() {
 export function calculateResponsivePopupSize(preferredSize = {}) {
   const screenWidth = window.screen.availWidth
   const screenHeight = window.screen.availHeight
-  
+
   // 기본값 설정
   const defaultSize = { width: 1200, height: 800 }
   const desired = { ...defaultSize, ...preferredSize }
-  
+
   // 화면 크기의 90%를 최대값으로 설정
   const maxWidth = Math.floor(screenWidth * 0.9)
   const maxHeight = Math.floor(screenHeight * 0.9)
-  
+
   return {
     width: Math.min(desired.width, maxWidth),
     height: Math.min(desired.height, maxHeight)
