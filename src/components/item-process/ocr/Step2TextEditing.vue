@@ -236,7 +236,7 @@
             <!-- 보기 내용 (단순화된 구조) -->
             <div class="options-content">
               <!-- 객관식일 때 번호와 함께 표시 -->
-              <div v-if="questionType === 'multiple-choice'" class="multiple-choice-options">
+              <div v-if="questionType === 'fiveChoice'" class="multiple-choice-options">
                 <div v-for="(option, index) in optionsList" :key="index" class="option-item">
                   <span class="option-number">({{ index + 1 }})</span>
                   <span class="option-content" v-html="option"></span>
@@ -332,7 +332,7 @@ export default {
     // 문제 유형 자동 감지
     const detectQuestionType = (questionText, optionsText) => {
       if (!optionsText || optionsText.trim() === '') {
-        return 'subjective' // 보기가 없으면 주관식
+        return 'freeChoice' // 보기가 없으면 자유 선지형
       }
 
       // 객관식 패턴 감지
