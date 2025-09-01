@@ -613,9 +613,14 @@ export default {
           itemProcessingStore.selectTextbook(selectedTextbook.value)
         }
 
-        // 선택된 파일의 이미지들을 pdfPages로 설정
+        // Store에 파일 히스토리 정보 설정 (이미지 순서 업데이트를 위해 필요)
+        await itemProcessingStore.setUploadedPdfInfo({
+          fileHistoryId: fileHistory.id
+        })
+
+        // 선택된 파일의 이미지들을 store를 통해 설정
         if (fileHistory.pdfImages && fileHistory.pdfImages.length > 0) {
-          pdfPages.value = fileHistory.pdfImages.map((image, index) => {
+          const pages = fileHistory.pdfImages.map((image, index) => {
             // S3 URL인 경우 프록시 URL로 변경
             let previewUrl = image.imageUrl
             if (previewUrl && previewUrl.includes('s3.ap-northeast-2.amazonaws.com')) {
@@ -635,12 +640,12 @@ export default {
               pdfImageId: image.id
             }
           })
+          
+          // Store를 통해 페이지 설정 (img_order 초기화 포함)
+          itemProcessingStore.setPdfPages(pages)
+          // 로컬 ref도 동기화
+          pdfPages.value = pages
         }
-
-        // Store에 파일 히스토리 정보 설정 (이미지 순서 업데이트를 위해 필요)
-        await itemProcessingStore.setUploadedPdfInfo({
-          fileHistoryId: fileHistory.id
-        })
 
         // 바로 편집 모드로 진행
         console.log('기존 파일 선택 완료:', fileHistory)
