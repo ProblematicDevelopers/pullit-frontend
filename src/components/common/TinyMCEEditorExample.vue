@@ -2,7 +2,7 @@
   <div class="tinymce-example">
     <div class="container py-4">
       <h2 class="mb-4">TinyMCE 공통 컴포넌트 사용 예시</h2>
-      
+
       <!-- 기본 사용법 -->
       <div class="row mb-4">
         <div class="col-md-6">
@@ -21,7 +21,7 @@
             </div>
           </div>
         </div>
-        
+
         <div class="col-md-6">
           <div class="card">
             <div class="card-header">
@@ -33,7 +33,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- 고급 사용법 -->
       <div class="row mb-4">
         <div class="col-md-8">
@@ -54,7 +54,7 @@
             </div>
           </div>
         </div>
-        
+
         <div class="col-md-4">
           <div class="card">
             <div class="card-header">
@@ -62,51 +62,51 @@
             </div>
             <div class="card-body">
               <div class="d-grid gap-2">
-                <button 
+                <button
                   @click="insertSampleMath"
                   class="btn btn-outline-primary btn-sm"
                 >
                   샘플 수식 삽입
                 </button>
-                <button 
+                <button
                   @click="getEditorContent"
                   class="btn btn-outline-secondary btn-sm"
                 >
                   콘텐츠 가져오기
                 </button>
-                <button 
+                <button
                   @click="setSampleContent"
                   class="btn btn-outline-success btn-sm"
                 >
                   샘플 콘텐츠 설정
                 </button>
-                <button 
+                <button
                   @click="toggleReadonly"
                   class="btn btn-outline-warning btn-sm"
                 >
                   읽기 전용 토글
                 </button>
               </div>
-              
+
               <hr class="my-3">
-              
+
               <div class="form-check">
-                <input 
-                  v-model="showMathToolbar" 
-                  type="checkbox" 
-                  class="form-check-input" 
+                <input
+                  v-model="showMathToolbar"
+                  type="checkbox"
+                  class="form-check-input"
                   id="showMathToolbar"
                 >
                 <label class="form-check-label" for="showMathToolbar">
                   수식 도구 표시
                 </label>
               </div>
-              
+
               <div class="form-check">
-                <input 
-                  v-model="isDisabled" 
-                  type="checkbox" 
-                  class="form-check-input" 
+                <input
+                  v-model="isDisabled"
+                  type="checkbox"
+                  class="form-check-input"
                   id="isDisabled"
                 >
                 <label class="form-check-label" for="isDisabled">
@@ -117,7 +117,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- 읽기 전용 모드 -->
       <div class="row mb-4">
         <div class="col-12">
@@ -136,7 +136,7 @@
           </div>
         </div>
       </div>
-      
+
       <!-- 상태 정보 -->
       <div class="row">
         <div class="col-12">
@@ -180,18 +180,18 @@ export default {
     return {
       // 기본 에디터
       basicContent: '<p>기본 에디터입니다. 수식 버튼을 클릭하거나 <strong>Cmd+E</strong>를 눌러 수식을 삽입할 수 있습니다.</p>',
-      
+
       // 고급 에디터
       advancedContent: '<p>고급 에디터입니다. 커스텀 설정과 다양한 기능을 사용할 수 있습니다.</p>',
       advancedEditorReady: false,
-      
+
       // 읽기 전용 에디터
       readonlyContent: '<p>이것은 읽기 전용 모드입니다. 편집할 수 없습니다.</p><p>수식 예시: <span class="math-latex" data-latex="\\frac{a}{b}">\\frac{a}{b}</span></p>',
-      
+
       // 설정
       showMathToolbar: true,
       isDisabled: false,
-      
+
       // 커스텀 에디터 설정
       customEditorConfig: {
         plugins: [
@@ -236,7 +236,7 @@ export default {
       // 동적으로 수식 도구 표시/숨김 (실제로는 컴포넌트 재렌더링이 필요할 수 있음)
       console.log('수식 도구 표시:', newVal)
     },
-    
+
     isDisabled(newVal) {
       // 동적으로 비활성화 상태 변경
       console.log('에디터 비활성화:', newVal)
@@ -247,45 +247,45 @@ export default {
     onEditorReady(editor) {
       console.log('기본 에디터 준비 완료:', editor)
     },
-    
+
     onEditorChange(content) {
       console.log('에디터 내용 변경:', content.length, '문자')
     },
-    
+
     onMathInserted(latex) {
       console.log('수식 삽입됨:', latex)
       this.$toast?.success(`수식이 삽입되었습니다: ${latex}`)
     },
-    
+
     // 고급 에디터 이벤트
     onAdvancedEditorReady(editor) {
       console.log('고급 에디터 준비 완료:', editor)
       this.advancedEditorReady = true
     },
-    
+
     onEditorError(error) {
       console.error('에디터 오류:', error)
       this.$toast?.error('에디터 오류가 발생했습니다.')
     },
-    
+
     // 도구 메서드
     insertSampleMath() {
       const sampleLatex = '\\frac{-b \\pm \\sqrt{b^2 - 4ac}}{2a}'
       const success = this.$refs.advancedEditor?.insertMathFromExternal(sampleLatex)
-      
+
       if (success) {
         this.$toast?.success('샘플 수식이 삽입되었습니다.')
       } else {
         this.$toast?.error('수식 삽입에 실패했습니다.')
       }
     },
-    
+
     getEditorContent() {
       const content = this.$refs.advancedEditor?.getContent()
       console.log('현재 에디터 콘텐츠:', content)
       this.$toast?.info('콘솔에서 콘텐츠를 확인하세요.')
     },
-    
+
     setSampleContent() {
       const sampleContent = `
         <h2>샘플 콘텐츠</h2>
@@ -297,11 +297,11 @@ export default {
         </ul>
         <p>수식 예시: <span class="math-latex" data-latex="\\int_0^1 x^2 dx">\\int_0^1 x^2 dx</span></p>
       `
-      
+
       this.$refs.advancedEditor?.setContent(sampleContent)
       this.$toast?.success('샘플 콘텐츠가 설정되었습니다.')
     },
-    
+
     toggleReadonly() {
       // readonly 속성은 컴포넌트에서 직접 변경할 수 없으므로
       // 실제 구현에서는 별도의 상태 관리가 필요할 수 있습니다

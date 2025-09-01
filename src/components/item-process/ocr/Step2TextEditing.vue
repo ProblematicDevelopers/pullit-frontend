@@ -38,25 +38,15 @@
         <h6 class="panel-subtitle">OCR 텍스트 변환</h6>
         <div class="ocr-content">
 
-          <div v-if="editedTexts[currentEditingArea] && editedTexts[currentEditingArea].trim()" class="ocr-text">
+          <div v-if="localEditedTexts[currentEditingArea] && localEditedTexts[currentEditingArea].trim()" class="ocr-text">
             <!-- LaTeX 렌더링이 적용된 텍스트 표시 -->
             <div v-html="renderedOcrText"></div>
 
-            <!-- 디버깅: 원본 텍스트와 렌더링된 텍스트 비교 -->
-            <div class="debug-latex mt-3 p-2 bg-light border rounded">
-              <small class="text-muted">
-                <strong>LaTeX 디버깅:</strong><br>
-                원본 텍스트: <code>{{ editedTexts[currentEditingArea] }}</code><br>
-                LaTeX 패턴 포함: {{ editedTexts[currentEditingArea].includes('$') ? '예' : '아니오' }}<br>
-                MathJax v3 로드 상태: {{ mathJaxLoaded ? '로드됨' : '로드되지 않음' }}<br>
-                <button @click="forceRerender" class="btn btn-sm btn-outline-warning mt-1">강제 재렌더링</button>
-              </small>
-            </div>
           </div>
           <div v-else class="no-ocr">
             OCR 결과가 없습니다.
             <br><small class="text-muted">현재 편집 영역: {{ currentEditingArea || '없음' }}</small>
-            <br><small class="text-muted">editedTexts 내용: {{ editedTexts[currentEditingArea] || '빈 문자열' }}</small>
+            <br><small class="text-muted">editedTexts 내용: {{ localEditedTexts[currentEditingArea] || '빈 문자열' }}</small>
           </div>
 
 
@@ -64,10 +54,17 @@
         <div class="ocr-actions">
           <button
             @click="copyOcrToEditor"
-            class="btn btn-primary btn-sm"
-            :disabled="!editedTexts[currentEditingArea]"
+            class="btn btn-primary btn-sm me-2"
+            :disabled="!localEditedTexts[currentEditingArea]"
           >
-            에디터 새로고침
+            <i class="bi bi-arrow-clockwise me-1"></i>에디터 새로고침
+          </button>
+          <button
+            @click="syncEditorToPreview"
+            class="btn btn-success btn-sm"
+            :disabled="!editorInstance"
+          >
+            <i class="bi bi-arrow-down-circle me-1"></i>미리보기 동기화
           </button>
         </div>
       </div>
@@ -87,7 +84,7 @@
             <Editor
               id="tm-editor-main"
               :api-key="tinymceApiKey"
-              :model-value="editedTexts[currentEditingArea] || ''"
+              :model-value="localEditedTexts[currentEditingArea] || ''"
               @update:model-value="updateEditedText"
               :init="editorConfig"
               class="tinymce-editor"
@@ -227,61 +224,42 @@
           </button>
         </h6>
         <div v-if="showPreview" class="preview-content">
-          <!-- 문제 영역 -->
-          <div v-if="editedTexts.problem" class="preview-section">
+                    <!-- 문제 영역 -->
+          <div v-if="localEditedTexts.problem" class="preview-section">
             <h6>문제</h6>
             <div class="preview-html" v-html="problemPreview"></div>
           </div>
           <!-- 보기 영역 -->
-          <div v-if="editedTexts.options" class="preview-section">
+          <div v-if="localEditedTexts.options" class="preview-section">
             <h6>보기</h6>
 
-            <!-- 문제 유형 표시 -->
-            <div class="question-type-badge" :class="questionType">
-              {{ questionType === 'multiple-choice' ? '객관식' : '주관식' }}
-            </div>
-
-            <!-- 보기 항목들 (객관식일 때만) -->
-            <div v-if="questionType === 'multiple-choice'" class="options-list">
-              <div v-for="(option, index) in optionsList" :key="index" class="option-item">
-                <!-- 체크박스 -->
-                <input
-                  type="checkbox"
-                  :id="`option-${index}`"
-                  v-model="selectedOptions[index]"
-                  class="option-checkbox"
-                />
-
-                <!-- 라벨 -->
-                <label :for="`option-${index}`" class="option-label">
+            <!-- 보기 내용 (단순화된 구조) -->
+            <div class="options-content">
+              <!-- 객관식일 때 번호와 함께 표시 -->
+              <div v-if="questionType === 'multiple-choice'" class="multiple-choice-options">
+                <div v-for="(option, index) in optionsList" :key="index" class="option-item">
                   <span class="option-number">({{ index + 1 }})</span>
-                  <span class="option-text" v-html="option"></span>
-                </label>
-
-                <!-- MathJax 렌더링 영역 -->
-                <div class="option-preview" v-html="option"></div>
+                  <span class="option-content" v-html="option"></span>
+                </div>
               </div>
-            </div>
 
-            <!-- 주관식일 때 보기 텍스트만 표시 -->
-            <div v-else class="subjective-options">
-              <div class="options-text" v-html="optionsPreview"></div>
-            </div>
-
-            <!-- 선택된 보기 표시 (객관식일 때만) -->
-            <div v-if="questionType === 'multiple-choice'" class="selected-options-summary">
-              선택된 보기: {{ selectedOptions.filter(Boolean).map((_, i) => i + 1).join(', ') }}
+              <!-- 주관식일 때 일반 텍스트로 표시 -->
+              <div v-else class="subjective-options">
+                <div class="options-text" v-html="optionsPreview"></div>
+              </div>
             </div>
           </div>
           <!-- 지문 영역 -->
-          <div v-if="editedTexts.question" class="preview-section">
+          <div v-if="localEditedTexts.question" class="preview-section">
             <h6>지문</h6>
             <div class="preview-html" v-html="questionPreview"></div>
           </div>
-          <!-- 이미지 영역 -->
-          <div v-if="editedTexts.image" class="preview-section">
-            <h6>이미지</h6>
-            <div class="preview-html" v-html="imagePreview"></div>
+          <!-- 이미지 영역 - 사용자가 실제로 image 타입을 선택했을 때만 표시 -->
+          <div v-if="currentEditingArea === 'image' && getCurrentAreaImage()" class="preview-section">
+            <h6>선택된 이미지 영역</h6>
+            <div class="preview-html">
+              <img :src="getCurrentAreaImage()" alt="선택된 이미지 영역" class="problem-image" />
+            </div>
           </div>
         </div>
       </div>
@@ -318,6 +296,10 @@ export default {
     currentEditingArea: {
       type: String,
       required: true
+    },
+    passage: {
+      type: String,
+      default: ''
     }
   },
   emits: [
@@ -380,8 +362,15 @@ export default {
 
     // 보기 목록 computed
     const optionsList = computed(() => {
-      const optionsText = props.editedTexts.options
-      return splitOptions(optionsText)
+      const optionsText = localEditedTexts.value.options
+      const result = splitOptions(optionsText)
+
+      // optionsList가 변경될 때 MathJax 렌더링 실행
+      nextTick(() => {
+        renderOptionsMathJax()
+      })
+
+      return result
     })
 
     // 선택된 보기 텍스트
@@ -417,16 +406,50 @@ export default {
       { id: 8, name: '평균', latex: '\\bar{x} = \\frac{1}{n}\\sum_{i=1}^{n} x_i', preview: 'x̄ = (1/n)Σxᵢ', category: 'statistics' }
     ])
 
-    // TinyMCE 설정
+    // TinyMCE 설정 (에디터 내 MathJax 렌더링 비활성화)
     const tinymceApiKey = getTinyMCEApiKey()
     const editorConfig = createCommonEditorConfig({
+      enableMathTools: false, // MathJax 렌더링 비활성화
       setup: (editor) => {
-        // 변화 감지
-        editor.on('change input undo redo', () => {
+        // MathJax 렌더링 비활성화 - 에디터 내에서는 LaTeX 코드만 표시
+        editor.on('init', () => {
+          // 기존의 renderMathInEditor 함수를 오버라이드하여 아무것도 하지 않음
+          editor.renderMathInEditor = () => {
+            console.log('에디터 내 MathJax 렌더링 비활성화됨')
+          }
+        })
+
+        // 변화 감지 - 더 즉각적으로 반응
+        editor.on('input keyup change undo redo paste cut', () => {
           if (editor.removed !== true && editor.getContent && typeof editor.getContent === 'function') {
             try {
               const content = editor.getContent()
+
+              // 로컬 상태 즉시 업데이트 (미리보기 즉시 반영) - 완전히 새로 할당
+              localEditedTexts.value = {
+                ...localEditedTexts.value,
+                [props.currentEditingArea]: content
+              }
+
+              console.log('로컬 상태 업데이트:', {
+                area: props.currentEditingArea,
+                content: content.substring(0, 100) + '...',
+                localEditedTexts: localEditedTexts.value
+              })
+
+              // 즉시 emit하여 부모 컴포넌트에 반영
               emitEdited(props.currentEditingArea, content)
+
+              // MathJax 렌더링도 즉시 업데이트 (미리보기에서만)
+              nextTick(async () => {
+                await reRenderMathJax()
+                // 보기 영역이 현재 편집 중인 경우 추가 렌더링
+                if (props.currentEditingArea === 'options') {
+                  await renderOptionsMathJax()
+                }
+                // 미리보기 영역 렌더링
+                await renderPreviewMathJax()
+              })
             } catch (getContentError) {
               console.warn('⚠️ 에디터 내용 가져오기 실패:', getContentError)
             }
@@ -441,14 +464,34 @@ export default {
 
 
 
-    // editedTexts가 변경될 때 LaTeX 렌더링 강제 업데이트 (post-flush로 동시성 충돌 방지)
-    watch(() => props.editedTexts, async () => {
+    // editedTexts가 변경될 때 LaTeX 렌더링 강제 업데이트 및 에디터 동기화
+    watch(() => props.editedTexts, async (newTexts, oldTexts) => {
       try {
         // 다음 tick에서 DOM 업데이트를 기다린 후 강제로 렌더링 다시 실행
         await nextTick()
 
+        // 현재 편집 영역의 내용이 변경되었는지 확인
+        const currentArea = props.currentEditingArea
+        if (currentArea && newTexts[currentArea] !== oldTexts?.[currentArea]) {
+          // 에디터 내용을 업데이트된 내용으로 동기화
+          if (editorInstance.value && !editorInstance.value.destroyed) {
+            try {
+              const currentEditorContent = editorInstance.value.getContent()
+              const newContent = newTexts[currentArea] || ''
+
+              // 에디터 내용과 새로운 내용이 다르면 업데이트
+              if (currentEditorContent !== newContent) {
+                editorInstance.value.setContent(newContent)
+                console.log('에디터 내용 동기화 완료:', currentArea)
+              }
+            } catch (error) {
+              console.warn('에디터 내용 동기화 실패:', error)
+            }
+          }
+        }
+
         // LaTeX 렌더링이 자동으로 업데이트되도록 강제 리렌더링
-        // editorKey 변경은 하지 않음 (불필요한 에디터 재생성 방지)
+        await reRenderMathJax()
       } catch (error) {
         console.error('editedTexts 변경 감지 중 오류:', error)
       }
@@ -560,6 +603,48 @@ export default {
       }
     }
 
+    // 에디터 내용을 미리보기에 강제 동기화
+    const syncEditorToPreview = async () => {
+      try {
+        if (!editorInstance.value || editorInstance.value.destroyed) {
+          console.warn('에디터 인스턴스가 유효하지 않습니다.')
+          return
+        }
+
+        // 에디터에서 현재 내용 가져오기
+        const editorContent = editorInstance.value.getContent()
+        console.log('에디터에서 내용 가져옴:', {
+          area: props.currentEditingArea,
+          content: editorContent.substring(0, 100) + '...'
+        })
+
+        // 로컬 상태 강제 업데이트
+        localEditedTexts.value = {
+          ...localEditedTexts.value,
+          [props.currentEditingArea]: editorContent
+        }
+
+        // 부모 컴포넌트에도 업데이트
+        emitEdited(props.currentEditingArea, editorContent)
+
+        // MathJax 렌더링 강제 실행
+        await nextTick()
+        await reRenderMathJax()
+        if (props.currentEditingArea === 'options') {
+          await renderOptionsMathJax()
+        }
+        // 미리보기 영역 렌더링
+        await renderPreviewMathJax()
+
+        console.log('미리보기 동기화 완료:', {
+          area: props.currentEditingArea,
+          localEditedTexts: localEditedTexts.value
+        })
+      } catch (error) {
+        console.error('미리보기 동기화 중 오류:', error)
+      }
+    }
+
     // 편집 내용 업데이트 (emitEdited 사용)
     const updateEditedText = (content) => {
       emitEdited(props.currentEditingArea, content)
@@ -570,6 +655,16 @@ export default {
         contentPreview: content.substring(0, 100) + '...'
       })
     }
+
+    // 로컬 editedTexts 상태 (즉시 미리보기 반영용)
+    const localEditedTexts = ref({ ...props.editedTexts })
+
+    // props.editedTexts가 변경될 때 로컬 상태 동기화
+    watch(() => props.editedTexts, (newTexts) => {
+      localEditedTexts.value = { ...newTexts }
+    }, { deep: true, immediate: true })
+
+
 
     // TinyMCE 에디터 인스턴스 참조
     const editorInstance = ref(null)
@@ -798,8 +893,14 @@ export default {
     }
 
     // 미리보기 토글
-    const togglePreview = () => {
+    const togglePreview = async () => {
       showPreview.value = !showPreview.value
+
+      // 미리보기가 열릴 때 MathJax 렌더링 실행
+      if (showPreview.value) {
+        await nextTick()
+        await renderPreviewMathJax()
+      }
     }
 
     // 이전 단계로
@@ -953,6 +1054,128 @@ export default {
 
 
 
+    // 보기 영역 전용 MathJax 렌더링 함수
+    const renderOptionsMathJax = async () => {
+      try {
+        // MathJax 로드 대기
+        await waitForMathJax()
+
+        console.log('보기 영역 전용 MathJax 렌더링 시작')
+
+        // DOM이 완전히 업데이트될 때까지 대기
+        await nextTick()
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // 보기 영역 요소들 찾기 (더 포괄적으로)
+        const optionsElements = document.querySelectorAll('.option-content, .options-text, .multiple-choice-options, .subjective-options')
+        console.log(`보기 영역 ${optionsElements.length}개 발견:`, Array.from(optionsElements).map(el => el.className))
+
+        for (const element of optionsElements) {
+          console.log('보기 영역 요소 검사:', element.className, element.innerHTML.substring(0, 100))
+
+          if (element.innerHTML && (element.innerHTML.includes('$') || element.innerHTML.includes('\\'))) {
+            console.log('보기 영역 렌더링 시작:', element.className)
+
+            // MathJax 설정 재확인
+            if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+              // MathJax 문서 업데이트
+              window.MathJax.startup.document.updateDocument()
+
+              // 강제 렌더링 시도
+              try {
+                await window.MathJax.typesetPromise([element])
+                console.log('보기 영역 MathJax 강제 렌더링 성공:', element.className)
+              } catch (error) {
+                console.warn('보기 영역 MathJax 강제 렌더링 실패, 기본 렌더링 시도:', error)
+                await renderMathJax(element, { clearFirst: false })
+              }
+            } else {
+              await renderMathJax(element, { clearFirst: false })
+            }
+          } else {
+            console.log('보기 영역 요소에 LaTeX 없음:', element.className)
+          }
+        }
+
+        // 추가로 전체 보기 컨테이너도 렌더링
+        const optionsContainer = document.querySelector('.options-content')
+        if (optionsContainer) {
+          console.log('보기 컨테이너 렌더링 시도')
+          try {
+            await renderMathJax(optionsContainer, { clearFirst: false })
+            console.log('보기 컨테이너 렌더링 성공')
+          } catch (error) {
+            console.warn('보기 컨테이너 렌더링 실패:', error)
+          }
+        }
+
+        console.log('보기 영역 MathJax 렌더링 완료')
+      } catch (error) {
+        console.error('보기 영역 MathJax 렌더링 중 오류:', error)
+      }
+    }
+
+    // 미리보기 영역 전용 MathJax 렌더링 함수
+    const renderPreviewMathJax = async () => {
+      try {
+        // MathJax 로드 대기
+        await waitForMathJax()
+
+        console.log('미리보기 영역 전용 MathJax 렌더링 시작')
+
+        // DOM이 완전히 업데이트될 때까지 대기
+        await nextTick()
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // 미리보기 영역 요소들 찾기
+        const previewElements = document.querySelectorAll('.preview-html, .preview-content')
+        console.log(`미리보기 영역 ${previewElements.length}개 발견:`, Array.from(previewElements).map(el => el.className))
+
+        for (const element of previewElements) {
+          console.log('미리보기 영역 요소 검사:', element.className, element.innerHTML.substring(0, 100))
+
+          if (element.innerHTML && (element.innerHTML.includes('$') || element.innerHTML.includes('\\'))) {
+            console.log('미리보기 영역 렌더링 시작:', element.className)
+
+            // MathJax 설정 재확인
+            if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+              // MathJax 문서 업데이트
+              window.MathJax.startup.document.updateDocument()
+
+              // 강제 렌더링 시도
+              try {
+                await window.MathJax.typesetPromise([element])
+                console.log('미리보기 영역 MathJax 강제 렌더링 성공:', element.className)
+              } catch (error) {
+                console.warn('미리보기 영역 MathJax 강제 렌더링 실패, 기본 렌더링 시도:', error)
+                await renderMathJax(element, { clearFirst: false })
+              }
+            } else {
+              await renderMathJax(element, { clearFirst: false })
+            }
+          } else {
+            console.log('미리보기 영역 요소에 LaTeX 없음:', element.className)
+          }
+        }
+
+        // 전체 미리보기 컨테이너도 렌더링
+        const previewContainer = document.querySelector('.preview-content')
+        if (previewContainer) {
+          console.log('미리보기 컨테이너 렌더링 시도')
+          try {
+            await renderMathJax(previewContainer, { clearFirst: false })
+            console.log('미리보기 컨테이너 렌더링 성공')
+          } catch (error) {
+            console.warn('미리보기 컨테이너 렌더링 실패:', error)
+          }
+        }
+
+        console.log('미리보기 영역 MathJax 렌더링 완료')
+      } catch (error) {
+        console.error('미리보기 영역 MathJax 렌더링 중 오류:', error)
+      }
+    }
+
     // MathJax로 수식 재렌더링 (기존 시스템 사용)
     const reRenderMathJax = async () => {
       try {
@@ -980,30 +1203,32 @@ export default {
             // 원본 LaTeX 텍스트가 이미 있으므로 별도 복원 불필요
             console.log('원본 LaTeX 텍스트로 렌더링 진행')
 
-                    // MathJax 설정 재확인
-        if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
-          console.log('MathJax 상태 확인:', {
-            config: window.MathJax.config,
-            tex: window.MathJax.config?.tex,
-            inlineMath: window.MathJax.config?.tex?.inlineMath
-          })
+            // MathJax 설정 재확인
+            if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+              console.log('MathJax 상태 확인:', {
+                config: window.MathJax.config,
+                tex: window.MathJax.config?.tex,
+                inlineMath: window.MathJax.config?.tex?.inlineMath
+              })
 
-          // MathJax 문서 업데이트
-          window.MathJax.startup.document.updateDocument()
+              // MathJax 문서 업데이트
+              window.MathJax.startup.document.updateDocument()
 
-          // 강제 렌더링 시도
-          try {
-            await window.MathJax.typesetPromise([element])
-            console.log('MathJax 강제 렌더링 성공:', element)
-          } catch (error) {
-            console.warn('MathJax 강제 렌더링 실패, 기본 렌더링 시도:', error)
-            await renderMathJax(element, { clearFirst: false })
+              // 강제 렌더링 시도
+              try {
+                await window.MathJax.typesetPromise([element])
+                console.log('MathJax 강제 렌더링 성공:', element)
+              } catch (error) {
+                console.warn('MathJax 강제 렌더링 실패, 기본 렌더링 시도:', error)
+                await renderMathJax(element, { clearFirst: false })
+              }
+            } else {
+              await renderMathJax(element, { clearFirst: false })
+            }
           }
-        } else {
-          await renderMathJax(element, { clearFirst: false })
         }
-          }
-        }
+
+        // 보기 영역은 별도 함수에서 처리하므로 여기서는 제거
 
         console.log('MathJax 재렌더링 완료')
       } catch (error) {
@@ -1013,7 +1238,7 @@ export default {
 
     // OCR 텍스트 렌더링 (computed로 반응형 처리)
     const renderedOcrText = computed(() => {
-      const currentText = props.editedTexts[props.currentEditingArea]
+      const currentText = localEditedTexts.value[props.currentEditingArea]
       console.log('renderedOcrText computed 실행:', {
         currentText,
         area: props.currentEditingArea,
@@ -1046,30 +1271,42 @@ export default {
       }
     })
 
-    // 각 영역별 미리보기 computed (원본 LaTeX 텍스트 반환)
+    // 각 영역별 미리보기 computed (로컬 상태 사용으로 즉시 반영)
     const problemPreview = computed(() => {
-      const text = props.editedTexts.problem
+      const text = localEditedTexts.value.problem
+      console.log('problemPreview computed 실행:', {
+        text: text ? text.substring(0, 100) : '없음',
+        localEditedTexts: localEditedTexts.value
+      })
       if (!text) return ''
-      console.log('problemPreview computed 실행:', { text: text.substring(0, 100) })
       return text // 원본 LaTeX 텍스트 반환
     })
 
     const optionsPreview = computed(() => {
-      const text = props.editedTexts.options
+      const text = localEditedTexts.value.options
+      console.log('optionsPreview computed 실행:', {
+        text: text ? text.substring(0, 100) : '없음',
+        localEditedTexts: localEditedTexts.value
+      })
       if (!text) return ''
       return text // 원본 LaTeX 텍스트 반환
     })
 
     const questionPreview = computed(() => {
-      const text = props.editedTexts.question
+      const text = localEditedTexts.value.question
       if (!text) return ''
       return text // 원본 LaTeX 텍스트 반환
     })
 
     const imagePreview = computed(() => {
-      const text = props.editedTexts.image
+      const text = localEditedTexts.value.image
       if (!text) return ''
       return text // 원본 LaTeX 텍스트 반환
+    })
+
+    // 안전한 passage 접근 - 보존용 전체 캡쳐
+    const fullCaptureImage = computed(() => {
+      return props.passage || ''
     })
 
         // MathJax 렌더링을 위한 watch 추가 (더 포괄적으로)
@@ -1082,13 +1319,21 @@ export default {
       if (hasLatex) {
         await nextTick()
         await reRenderMathJax()
+
+        // 추가로 보기 영역만 특별히 렌더링
+        await nextTick()
+        await renderOptionsMathJax()
       }
     }, { deep: true })
 
-    // 보기 텍스트 변경 시 선택 상태 초기화
-    watch(() => props.editedTexts.options, (newOptions) => {
+    // 보기 텍스트 변경 시 선택 상태 초기화 및 MathJax 렌더링
+    watch(() => props.editedTexts.options, async (newOptions) => {
       if (newOptions) {
         initializeOptionsSelection()
+
+        // 보기 영역 변경 시 강제 MathJax 렌더링
+        await nextTick()
+        await renderOptionsMathJax()
       }
     })
 
@@ -1221,6 +1466,7 @@ LaTeX 수식 예시:
       getCurrentAreaImage,
       selectEditingArea,
       copyOcrToEditor,
+      syncEditorToPreview,
       updateEditedText,
       insertMath,
       insertShape,
@@ -1237,16 +1483,20 @@ LaTeX 수식 예시:
       copyPreviewToEditedTexts,
       mathJaxLoaded,
       reRenderMathJax,
+      renderOptionsMathJax,
+      renderPreviewMathJax,
       styleLatexCode,
       problemPreview,
       optionsPreview,
       questionPreview,
       imagePreview,
+      fullCaptureImage,
       optionsList,
       selectedOptions,
       selectedOptionsText,
       initializeOptionsSelection,
-      questionType
+      questionType,
+      localEditedTexts
     }
   }
 }
@@ -1255,8 +1505,9 @@ LaTeX 수식 예시:
 <style scoped>
 .step2-container {
   display: grid;
-  grid-template-columns: 1fr 2fr;
+  grid-template-columns: minmax(300px, 0.5fr) minmax(500px, 1fr);
   height: 100vh;
+  width: 100%;
   gap: 1rem;
   padding: 1rem;
   background: #f8f9fa;
@@ -1388,7 +1639,7 @@ LaTeX 수식 예시:
 }
 
 .editor-panel {
-  flex: 2;
+  flex: 1;
   display: flex;
   flex-direction: column;
   border-right: 1px solid #e9ecef;
@@ -1396,7 +1647,7 @@ LaTeX 수식 예시:
 }
 
 .right-tools-panel {
-  flex: 1;
+  flex: 0.5;
   background: #f8f9fa;
   padding: 1rem;
   display: flex;
@@ -1678,47 +1929,44 @@ LaTeX 수식 예시:
   box-shadow: 0 2px 4px rgba(0, 123, 255, 0.1);
 }
 
-.option-checkbox {
-  margin-top: 0.25rem;
-  transform: scale(1.2);
+/* 개선된 보기 영역 스타일 */
+.options-content {
+  margin-top: 0.5rem;
 }
 
-.option-label {
+.multiple-choice-options {
   display: flex;
   flex-direction: column;
+  gap: 0.75rem;
+}
+
+.option-item {
+  display: flex;
+  align-items: flex-start;
   gap: 0.5rem;
-  flex: 1;
-  cursor: pointer;
+  padding: 0.75rem;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 0.5rem;
 }
 
 .option-number {
   font-weight: bold;
   color: #007bff;
   font-size: 1.1em;
-}
-
-.option-text {
-  line-height: 1.5;
-  color: #495057;
-}
-
-.option-preview {
-  margin-top: 0.5rem;
-  padding: 0.75rem;
+  min-width: 2rem;
+  text-align: center;
+  padding: 0.25rem 0.5rem;
   background: white;
   border-radius: 0.25rem;
   border: 1px solid #dee2e6;
-  font-size: 0.9em;
 }
 
-.selected-options-summary {
-  margin-top: 1rem;
-  padding: 0.75rem;
-  background: #d4edda;
-  border: 1px solid #c3e6cb;
-  border-radius: 0.25rem;
-  color: #155724;
-  font-weight: 500;
+.option-content {
+  flex: 1;
+  line-height: 1.6;
+  color: #495057;
+  padding: 0.25rem 0;
 }
 
 /* 주관식 보기 스타일 */

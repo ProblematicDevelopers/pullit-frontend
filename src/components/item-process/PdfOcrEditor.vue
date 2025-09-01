@@ -951,8 +951,14 @@ export default {
           throw new Error('캡처된 이미지가 없습니다.')
         }
 
-        capturedImageInfo.value = selectedAreaInfo
-        capturedImageData.value = JSON.stringify(selectedAreaInfo)
+        // 현재 페이지의 pdfImageId 추가
+        const currentPageData = props.pdfPages[currentPage.value]
+        capturedImageInfo.value = {
+          ...selectedAreaInfo,
+          pdfImageId: currentPageData?.pdfImageId || null,
+          pageIndex: currentPage.value
+        }
+        capturedImageData.value = JSON.stringify(capturedImageInfo.value)
 
         // 디버깅: capturedImageBase64 설정 확인
         console.log('=== capturedImageBase64 설정 확인 ===')
@@ -1112,8 +1118,56 @@ export default {
     }
 
     // OCR 모달 관련 함수들
-    const closeOcrModal = () => {
+    const closeOcrModal = async () => {
+      // 모달 닫기 전에 임시 OCR 히스토리 정리
+      await cleanupTemporaryOcrData()
       showOcrModal.value = false
+    }
+
+    // 임시 OCR 데이터 정리 (모달에서 나갈 때)
+    const cleanupTemporaryOcrData = async () => {
+      try {
+        const pdfImageId = capturedImageInfo.value?.pdfImageId
+        if (!pdfImageId) {
+          console.log('🧹 pdfImageId가 없어서 임시 데이터 정리를 건너뜁니다')
+          return
+        }
+
+        const { ocrApi } = await import('@/services/ocrApi')
+        const result = await ocrApi.cleanupTemporaryOcrHistories(pdfImageId)
+
+        if (result?.data > 0) {
+          console.log(`🧹 임시 OCR 데이터 정리 완료: ${result.data}개 항목 삭제`)
+        } else {
+          console.log('🧹 정리할 임시 OCR 데이터가 없습니다')
+        }
+      } catch (error) {
+        console.warn('⚠️ 임시 OCR 데이터 정리 실패 (무시됨):', error.message)
+        // 임시 데이터 정리 실패는 UI 진행을 막지 않음
+      }
+    }
+
+    // OCR 히스토리 확정 저장 (ProcessedItem 저장 완료 후)
+    const confirmOcrHistories = async (processedItemId) => {
+      try {
+        const pdfImageId = capturedImageInfo.value?.pdfImageId
+        if (!pdfImageId || !processedItemId) {
+          console.log('✅ pdfImageId 또는 processedItemId가 없어서 OCR 확정을 건너뜁니다')
+          return
+        }
+
+        const { ocrApi } = await import('@/services/ocrApi')
+        const result = await ocrApi.confirmOcrHistories(pdfImageId, processedItemId)
+
+        if (result?.data > 0) {
+          console.log(`✅ OCR 히스토리 확정 저장 완료: ${result.data}개 항목 확정`)
+        } else {
+          console.log('✅ 확정할 OCR 히스토리가 없습니다')
+        }
+      } catch (error) {
+        console.warn('⚠️ OCR 히스토리 확정 실패 (무시됨):', error.message)
+        // 확정 실패해도 UI 진행을 막지 않음 (이미 ProcessedItem은 저장됨)
+      }
     }
 
     const saveOcrResults = async (itemData) => {
@@ -1154,8 +1208,7 @@ export default {
               pdfImageId: capturedImageInfo.value?.pdfImageId || null,
               areaType: areaType === 'problem' ? 'PROBLEM' :
                        areaType === 'options' ? 'OPTIONS' :
-                       areaType === 'question' ? 'QUESTION' :
-                       areaType === 'image' ? 'IMAGE' : 'PROBLEM',
+                       areaType === 'passage' ? 'PASSAGE' : 'PROBLEM',
               ocrText: ocrResults.value?.[areaType]?.rawText || '',
               editedText: itemData.editedTexts?.[areaType] || '',
               originalImageUrl: capturedImageInfo.value?.imageUrl || null,
@@ -1173,8 +1226,13 @@ export default {
 
         console.log('문항 저장 성공:', result)
 
+        // 저장 성공 시 임시 OCR 히스토리를 확정 저장으로 변환
+        await confirmOcrHistories(result.data?.id)
+
         success('문항이 성공적으로 저장되었습니다.')
-        closeOcrModal()
+
+        // 확정 저장이므로 정리하지 않고 바로 모달 닫기
+        showOcrModal.value = false
 
       } catch (error) {
         console.error('문항 저장 실패:', error)
