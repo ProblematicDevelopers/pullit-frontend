@@ -83,27 +83,16 @@
               <div class="col-md-6">
                 <div class="info-item">
                   <label class="info-label">문제 유형</label>
-                  <div class="info-value">{{ getItemTypeLabel(itemInfo.itemType) || '미선택' }}</div>
+                  <div class="info-value">{{ getItemTypeLabel(itemInfo.problemType) || '미선택' }}</div>
                 </div>
               </div>
               <div class="col-md-6">
                 <div class="info-item">
                   <label class="info-label">난이도</label>
-                  <div class="info-value">{{ getDifficultyLabel(itemInfo.difficulty) || '미선택' }}</div>
+                  <div class="info-value">{{ getDifficultyLabel(itemInfo.difficulty) }}</div>
                 </div>
               </div>
-              <div class="col-md-6">
-                <div class="info-item">
-                  <label class="info-label">배점</label>
-                  <div class="info-value">{{ itemInfo.score || '미입력' }}점</div>
-                </div>
-              </div>
-              <div class="col-md-6">
-                <div class="info-item">
-                  <label class="info-label">예상 소요 시간</label>
-                  <div class="info-value">{{ itemInfo.estimatedTime || '미입력' }}분</div>
-                </div>
-              </div>
+
               <div class="col-12">
                 <div class="info-item">
                   <label class="info-label">선택된 단원</label>
@@ -115,56 +104,30 @@
         </div>
       </div>
 
-      <!-- 저장 옵션 -->
-      <div class="save-options">
+      <!-- 정답 및 해설 정보 -->
+      <div class="answer-explanation-section">
         <h5 class="section-title">
-          <i class="bi bi-gear me-2"></i>저장 옵션
+          <i class="bi bi-lightbulb me-2"></i>정답 및 해설
         </h5>
-
-        <div class="options-grid">
-          <div class="option-item">
-            <div class="form-check">
-              <input
-                v-model="saveOptions.saveToBank"
-                class="form-check-input"
-                type="checkbox"
-                id="saveToBank"
-              />
-              <label class="form-check-label" for="saveToBank">
-                문제은행에 저장
-              </label>
+        <div class="answer-explanation-content">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <div class="info-item">
+                <label class="info-label">정답</label>
+                <div class="info-value">{{ itemInfo.answer || '미입력' }}</div>
+              </div>
             </div>
-            <small class="form-text">선택된 단원의 문제은행에 문제을 저장합니다.</small>
-          </div>
-
-          <div class="option-item">
-            <div class="form-check">
-              <input
-                v-model="saveOptions.createExam"
-                class="form-check-input"
-                type="checkbox"
-                id="createExam"
-              />
-              <label class="form-check-label" for="createExam">
-                시험지 생성
-              </label>
+            <div class="col-12">
+              <div class="info-item">
+                <label class="info-label">해설</label>
+                <div class="info-value">
+                  <div v-if="itemInfo.explanation && itemInfo.explanation.trim()"
+                       class="explanation-content"
+                       v-html="itemInfo.explanation"></div>
+                  <div v-else class="text-muted">해설이 입력되지 않았습니다.</div>
+                </div>
+              </div>
             </div>
-            <small class="form-text">이 문제을 포함한 시험지를 자동으로 생성합니다.</small>
-          </div>
-
-          <div class="option-item">
-            <div class="form-check">
-              <input
-                v-model="saveOptions.sendNotification"
-                class="form-check-input"
-                type="checkbox"
-                id="sendNotification"
-              />
-              <label class="form-check-label" for="sendNotification">
-                알림 발송
-              </label>
-            </div>
-            <small class="form-text">문제 저장 완료 시 관련자에게 알림을 발송합니다.</small>
           </div>
         </div>
       </div>
@@ -227,6 +190,22 @@ export default {
     itemInfo: {
       type: Object,
       required: true
+    },
+    majorChapters: {
+      type: Array,
+      default: () => []
+    },
+    middleChapters: {
+      type: Array,
+      default: () => []
+    },
+    minorChapters: {
+      type: Array,
+      default: () => []
+    },
+    topicChapters: {
+      type: Array,
+      default: () => []
     }
   },
   emits: [
@@ -235,11 +214,6 @@ export default {
   ],
   setup(props, { emit }) {
     const isSaving = ref(false)
-    const saveOptions = ref({
-      saveToBank: true,
-      createExam: false,
-      sendNotification: false
-    })
 
     // 사용 가능한 영역 타입들
     const availableAreaTypes = computed(() => {
@@ -286,9 +260,9 @@ export default {
     // 문제 유형 라벨
     const getItemTypeLabel = (type) => {
       const labels = {
-        multiple: '객관식',
+        multiple_choice: '객관식 (5지 선택)',
         subjective: '주관식',
-        shortAnswer: '단답형',
+        short_answer: '단답형',
         essay: '서술형'
       }
       return labels[type] || ''
@@ -306,21 +280,68 @@ export default {
 
     // 단원 경로 문자열 생성
     const getChapterPath = () => {
-      // 실제 단원 정보에서 경로 생성
-      if (props.itemInfo?.chapter) {
-        const chapter = props.itemInfo.chapter
+      console.log('🔍 [Step4ItemSave] getChapterPath 호출됨')
+      console.log('🔍 [Step4ItemSave] itemInfo:', props.itemInfo)
+      console.log('🔍 [Step4ItemSave] majorChapters:', props.majorChapters)
+      console.log('🔍 [Step4ItemSave] middleChapters:', props.middleChapters)
+      console.log('🔍 [Step4ItemSave] minorChapters:', props.minorChapters)
+      console.log('🔍 [Step4ItemSave] topicChapters:', props.topicChapters)
+
+      // Step3InfoInput에서 전달받은 단원 정보로 경로 생성
+      if (props.itemInfo?.majorChapter || props.itemInfo?.middleChapter || props.itemInfo?.minorChapter || props.itemInfo?.topicChapter) {
         let path = ''
-        
-        if (chapter.subject) path += chapter.subject
-        if (chapter.mainChapter) path += ` > ${chapter.mainChapter}`
-        if (chapter.subChapter) path += ` > ${chapter.subChapter}`
-        if (chapter.section) path += ` > ${chapter.section}`
-        
-        return path || '단원 정보 없음'
+
+        // 대단원
+        if (props.itemInfo.majorChapter) {
+          const majorChapter = props.majorChapters.find(ch => ch.id === props.itemInfo.majorChapter)
+          console.log('🔍 [Step4ItemSave] 대단원 검색:', {
+            searchId: props.itemInfo.majorChapter,
+            foundChapter: majorChapter,
+            allMajorChapters: props.majorChapters
+          })
+          path += `대단원 ${majorChapter?.name || props.itemInfo.majorChapter}`
+        }
+
+        // 중단원
+        if (props.itemInfo.middleChapter) {
+          const middleChapter = props.middleChapters.find(ch => ch.id === props.itemInfo.middleChapter)
+          console.log('🔍 [Step4ItemSave] 중단원 검색:', {
+            searchId: props.itemInfo.middleChapter,
+            foundChapter: middleChapter,
+            allMiddleChapters: props.middleChapters
+          })
+          path += ` > 중단원 ${middleChapter?.name || props.itemInfo.middleChapter}`
+        }
+
+        // 소단원
+        if (props.itemInfo.minorChapter) {
+          const minorChapter = props.minorChapters.find(ch => ch.id === props.itemInfo.minorChapter)
+          console.log('🔍 [Step4ItemSave] 소단원 검색:', {
+            searchId: props.itemInfo.minorChapter,
+            foundChapter: minorChapter,
+            allMinorChapters: props.minorChapters
+          })
+          path += ` > 소단원 ${minorChapter?.name || props.itemInfo.minorChapter}`
+        }
+
+        // 토픽
+        if (props.itemInfo.topicChapter) {
+          const topicChapter = props.topicChapters.find(ch => ch.id === props.itemInfo.topicChapter)
+          console.log('🔍 [Step4ItemSave] 토픽 검색:', {
+            searchId: props.itemInfo.topicChapter,
+            foundChapter: topicChapter,
+            allTopicChapters: props.topicChapters
+          })
+          path += ` > 토픽 ${topicChapter?.name || props.itemInfo.topicChapter}`
+        }
+
+        console.log('🔍 [Step4ItemSave] 최종 경로:', path)
+        return path
       }
-      
-      // 단원 정보가 없는 경우 기본값
-      return props.itemInfo?.subject || '과목 정보 없음'
+
+      // 단원 정보가 없는 경우
+      console.log('🔍 [Step4ItemSave] 단원 정보 없음')
+      return '단원 정보 없음'
     }
 
     // 텍스트 미리보기 생성
@@ -341,15 +362,15 @@ export default {
         errors.push('보기 영역을 선택해야 합니다.')
       }
 
-      // 필수 문제 정보 검사
-      if (!props.itemInfo.itemType) {
+      // 필수 문제 정보 검사 (Step3 구조에 맞춤)
+      if (!props.itemInfo.problemType) {
         errors.push('문제 유형을 선택해야 합니다.')
       }
       if (!props.itemInfo.difficulty) {
         errors.push('난이도를 선택해야 합니다.')
       }
-      if (!props.itemInfo.score || props.itemInfo.score < 1) {
-        errors.push('배점을 입력해야 합니다.')
+      if (!props.itemInfo.answer || props.itemInfo.answer.trim() === '') {
+        errors.push('정답을 입력해야 합니다.')
       }
 
       // 편집된 텍스트 검사
@@ -372,31 +393,29 @@ export default {
 
         // 백엔드 ProcessedItem 구조에 맞춘 데이터 준비
         const processedItemData = {
-          // 백엔드 enum에 맞춘 문항 정보
-          type: props.itemInfo.itemType === 'multiple_choice' ? 'multiple' : 
-                props.itemInfo.itemType === 'subjective' ? 'subjective' :
-                props.itemInfo.itemType === 'short_answer' ? 'shortAnswer' :
-                props.itemInfo.itemType === 'essay' ? 'essay' : 'multiple',
-          
+          // 백엔드 enum에 맞춘 문항 정보 (Step3 problemType 사용)
+          type: props.itemInfo.problemType === 'multiple_choice' ? 'multiple' :
+                props.itemInfo.problemType === 'subjective' ? 'subjective' :
+                props.itemInfo.problemType === 'short_answer' ? 'shortAnswer' :
+                props.itemInfo.problemType === 'essay' ? 'essay' : 'multiple',
+
           difficulty: props.itemInfo.difficulty === 'easy' ? 'easy' :
                      props.itemInfo.difficulty === 'medium' ? 'medium' :
                      props.itemInfo.difficulty === 'hard' ? 'hard' : 'medium',
-          
-          score: props.itemInfo.score || 1,
-          
+
           // 백엔드 필드명에 맞춤
           answer: props.editedTexts.problem || '',
           solution: props.editedTexts.options || '',
           explanation: props.editedTexts.explanation || '',
-          
+
           // 단원 정보 (Step3에서 설정된 값 사용)
-          majorChapterId: props.itemInfo.majorChapterId || null,
-          middleChapterId: props.itemInfo.middleChapterId || null,
-          minorChapterId: props.itemInfo.minorChapterId || null,
-          
+          majorChapterId: props.itemInfo.majorChapter || null,
+          middleChapterId: props.itemInfo.middleChapter || null,
+          minorChapterId: props.itemInfo.minorChapter || null,
+
           // 지문 그룹 정보
           passageId: props.itemInfo.passageId || null,
-          
+
           // OCR 히스토리는 이미 저장된 상태이므로 빈 배열
           ocrHistories: []
         }
@@ -433,7 +452,6 @@ export default {
 
     return {
       isSaving,
-      saveOptions,
       availableAreaTypes,
       validationErrors,
       canSave,
@@ -638,38 +656,31 @@ export default {
   font-weight: 500;
 }
 
-.save-options {
+.answer-explanation-section {
   padding: 0 2rem 2rem 2rem;
 }
 
-.options-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 1.5rem;
-  margin-top: 1.5rem;
-}
-
-.option-item {
+.answer-explanation-content {
   background: #f8f9fa;
-  border-radius: 6px;
+  border-radius: 8px;
   padding: 1.5rem;
+}
+
+.explanation-content {
+  background: white;
+  border-radius: 6px;
+  padding: 1rem;
   border: 1px solid #dee2e6;
+  max-height: 200px;
+  overflow-y: auto;
 }
 
-.form-check {
-  margin-bottom: 0.5rem;
-}
-
-.form-check-label {
-  font-weight: 600;
-  color: #495057;
-}
-
-.form-text {
-  font-size: 0.85rem;
+.text-muted {
   color: #6c757d;
-  margin: 0;
+  font-style: italic;
 }
+
+
 
 .validation-errors {
   margin: 0 2rem 2rem 2rem;

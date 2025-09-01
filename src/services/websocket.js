@@ -31,6 +31,7 @@ class WebSocketService {
         })
 
         this.stompClient.onConnect = () => {
+          console.log('🔗 STOMP onConnect 호출됨!')
           this.connected = true
 
           // 채널 채팅 구독 (입장 메시지 포함)
@@ -54,6 +55,9 @@ class WebSocketService {
             (message) => {
               try {
                 const onlineStatusResponse = JSON.parse(message.body)
+                console.log('📨 Online status received:', onlineStatusResponse)
+                console.log('📊 Has onlineUsers array?', !!onlineStatusResponse.onlineUsers)
+                console.log('📊 OnlineUsers count:', onlineStatusResponse.onlineUsers?.length || 0)
 
                 // OnlineStatusResponse에서 전체 온라인 사용자 목록 처리
                 if (
@@ -61,11 +65,16 @@ class WebSocketService {
                   Array.isArray(onlineStatusResponse.onlineUsers)
                 ) {
                   // 전체 온라인 사용자 목록을 한 번에 전달
+                  console.log('👥 Full online users list:', onlineStatusResponse.onlineUsers)
+                  console.log('🎓 Students in list:', onlineStatusResponse.onlineUsers.filter(u => u.userRole === 'STUDENT'))
+                  console.log('👨‍🏫 Teachers in list:', onlineStatusResponse.onlineUsers.filter(u => u.userRole === 'TEACHER'))
+                  
                   if (callbacks.onOnlineStatus) {
                     callbacks.onOnlineStatus(onlineStatusResponse)
                   }
                 } else {
                   // 단일 사용자 상태인 경우 (기존 형식)
+                  console.log('👤 Single user status update:', onlineStatusResponse)
                   if (callbacks.onOnlineStatus) {
                     callbacks.onOnlineStatus(onlineStatusResponse)
                   }
@@ -246,6 +255,8 @@ class WebSocketService {
   }
 
   getOnlineStatus(channelName, userId) {
+    console.log('📊 getOnlineStatus 호출:', { channelName, userId, connected: this.connected })
+    
     if (this.connected && this.stompClient) {
       try {
         const requestData = {
@@ -253,16 +264,21 @@ class WebSocketService {
           userId: userId,
           timestamp: new Date().toISOString(),
         }
+        
+        console.log('📤 온라인 상태 요청 전송:', requestData)
 
         this.stompClient.publish({
           destination: `/app/online.getStatus`,
           body: JSON.stringify(requestData),
         })
       } catch (error) {
-        console.error('Error requesting online status:', error)
+        console.error('❌ Error requesting online status:', error)
       }
     } else {
-      console.warn('WebSocket not connected')
+      console.warn('⚠️ WebSocket not connected:', { 
+        connected: this.connected, 
+        hasStompClient: !!this.stompClient 
+      })
     }
   }
 

@@ -14,6 +14,8 @@ export const ocrApi = {
    */
   async processImage(imageBase64, areaCode) {
     try {
+      console.log('📤 [ocrApi] processImage 호출 시작:', { areaCode, imageSize: imageBase64?.length })
+
       // 이미지 데이터 유효성 검증
       if (!imageBase64 || imageBase64.length === 0) {
         throw new Error('이미지 데이터가 비어있습니다.')
@@ -30,7 +32,7 @@ export const ocrApi = {
       }
 
       const dataSize = Math.ceil((base64Data.length * 3) / 4)
-      console.log('이미지 데이터 크기:', dataSize, 'bytes')
+      console.log('📊 [ocrApi] 이미지 데이터 크기:', dataSize, 'bytes')
 
       if (dataSize < 1024) {
         throw new Error(`이미지가 너무 작습니다. (${dataSize} bytes, 최소 1KB 필요)`)
@@ -50,7 +52,7 @@ export const ocrApi = {
         throw new Error('이미지 Blob 생성에 실패했습니다.')
       }
 
-      console.log('Blob 생성 성공:', {
+      console.log('✅ [ocrApi] Blob 생성 성공:', {
         size: imageBlob.size,
         type: imageBlob.type
       })
@@ -59,14 +61,14 @@ export const ocrApi = {
       formData.append('areaCode', areaCode)
       formData.append('file', imageBlob, 'selected_area.png')
 
-      console.log('OCR API 호출 시작:', {
+      console.log('🚀 [ocrApi] OCR API 호출 시작:', {
         areaCode,
         imageSize: imageBlob.size,
         imageType: imageBlob.type
       })
 
       // FormData 내용 확인
-      console.log('FormData 내용:')
+      console.log('📋 [ocrApi] FormData 내용:')
       for (let [key, value] of formData.entries()) {
         if (value instanceof Blob) {
           console.log(`- ${key}: Blob(${value.size} bytes, ${value.type})`)
@@ -81,15 +83,15 @@ export const ocrApi = {
         }
       })
 
-      console.log('OCR API 응답 성공:', response.data)
+      console.log('✅ [ocrApi] processImage 성공:', response.data)
       return response.data
     } catch (error) {
-      console.error('OCR 처리 API 오류:', error)
+      console.error('❌ [ocrApi] processImage 실패:', error)
 
       // 서버 응답이 있는 경우 더 자세한 에러 정보 제공
       if (error.response) {
-        console.error('서버 응답 상태:', error.response.status)
-        console.error('서버 응답 데이터:', error.response.data)
+        console.error('📡 [ocrApi] 서버 응답 상태:', error.response.status)
+        console.error('📡 [ocrApi] 서버 응답 데이터:', error.response.data)
 
         const errorCode = error.response.data?.code
         const errorMessage = error.response.data?.message
@@ -104,10 +106,10 @@ export const ocrApi = {
 
         throw new Error(`${userMessage} (${error.response.status}: ${errorMessage || '알 수 없는 오류'})`)
       } else if (error.request) {
-        console.error('서버 연결 실패:', error.request)
+        console.error('❌ [ocrApi] 서버 연결 실패:', error.request)
         throw new Error('OCR 서버에 연결할 수 없습니다.')
       } else {
-        console.error('요청 설정 오류:', error.message)
+        console.error('❌ [ocrApi] 요청 설정 오류:', error.message)
         throw new Error(`OCR 처리 중 오류가 발생했습니다: ${error.message}`)
       }
     }
@@ -120,11 +122,15 @@ export const ocrApi = {
    */
   async uploadAreaImage(imageBase64) {
     try {
+      console.log('📤 [ocrApi] uploadAreaImage 호출 시작:', { imageSize: imageBase64?.length })
+
       const formData = new FormData()
 
       // Base64를 Blob으로 변환
       const imageBlob = await fetch(imageBase64).then(res => res.blob())
       formData.append('file', imageBlob, 'area_image.png')
+
+      console.log('🚀 [ocrApi] S3 업로드 API 호출:', { imageSize: imageBlob.size, imageType: imageBlob.type })
 
       const response = await api.post('/item-process/upload-area-image', formData, {
         headers: {
@@ -132,9 +138,10 @@ export const ocrApi = {
         }
       })
 
+      console.log('✅ [ocrApi] uploadAreaImage 성공:', response.data)
       return response.data.data // S3 URL 반환
     } catch (error) {
-      console.error('이미지 업로드 API 오류:', error)
+      console.error('❌ [ocrApi] uploadAreaImage 실패:', error)
       throw new Error('이미지 업로드에 실패했습니다.')
     }
   },
@@ -146,20 +153,141 @@ export const ocrApi = {
    */
   async saveProcessedItem(processedItemData) {
     try {
+      console.log('📤 [ocrApi] saveProcessedItem 호출 시작:', processedItemData)
+
       const response = await api.post('/item-process/save-processed-item', processedItemData, {
         headers: {
           'Content-Type': 'application/json'
         }
       })
 
+      console.log('✅ [ocrApi] saveProcessedItem 성공:', response.data)
       return response.data
     } catch (error) {
-      console.error('문항 저장 API 오류:', error)
+      console.error('❌ [ocrApi] saveProcessedItem 실패:', error)
       if (error.response) {
-        console.error('서버 응답 상태:', error.response.status)
-        console.error('서버 응답 데이터:', error.response.data)
+        console.error('📡 [ocrApi] 서버 응답 상태:', error.response.status)
+        console.error('📡 [ocrApi] 서버 응답 데이터:', error.response.data)
       }
       throw new Error('문항 저장에 실패했습니다: ' + (error.response?.data?.message || error.message))
+    }
+  },
+
+  /**
+   * 저장된 처리된 문항 목록 조회
+   * @param {Object} params - 조회 조건
+   * @param {number} params.page - 페이지 번호 (기본값: 0)
+   * @param {number} params.size - 페이지 크기 (기본값: 20)
+   * @param {string} params.subjectCode - 과목 코드 (선택사항)
+   * @returns {Promise<Object>} 저장된 문항 목록
+   */
+  async getProcessedItems(params = {}) {
+    try {
+      console.log('📤 [ocrApi] getProcessedItems 호출 시작:', params)
+
+      const queryParams = {
+        page: params.page || 0,
+        size: params.size || 20
+      }
+
+      if (params.subjectCode) {
+        queryParams.subjectCode = params.subjectCode
+      }
+
+      const response = await api.get('/item-process/get-processed-items', {
+        params: queryParams
+      })
+
+      console.log('✅ [ocrApi] getProcessedItems 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ [ocrApi] getProcessedItems 실패:', error)
+      if (error.response) {
+        console.error('📡 [ocrApi] 서버 응답 상태:', error.response.status)
+        console.error('📡 [ocrApi] 서버 응답 데이터:', error.response.data)
+      }
+      throw new Error('저장된 문항 조회에 실패했습니다: ' + (error.response?.data?.message || error.message))
+    }
+  },
+
+  /**
+   * 특정 문항의 상세 정보 조회
+   * @param {string|number} itemId - 문항 ID
+   * @returns {Promise<Object>} 문항 상세 정보
+   */
+  async getProcessedItem(itemId) {
+    try {
+      console.log('📤 [ocrApi] getProcessedItem 호출 시작:', { itemId })
+
+      if (!itemId) {
+        throw new Error('문항 ID가 필요합니다.')
+      }
+
+      const response = await api.get(`/item-process/get-processed-item/${itemId}`)
+
+      console.log('✅ [ocrApi] getProcessedItem 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ [ocrApi] getProcessedItem 실패:', error)
+      if (error.response) {
+        console.error('📡 [ocrApi] 서버 응답 상태:', error.response.status)
+        console.error('📡 [ocrApi] 서버 응답 데이터:', error.response.data)
+      }
+      throw new Error('문항 상세 정보 조회에 실패했습니다: ' + (error.response?.data?.message || error.message))
+    }
+  },
+
+  /**
+   * 특정 파일의 OCR 히스토리 조회
+   * @param {string|number} fileId - PDF 파일 ID 또는 pdfImageId
+   * @returns {Promise<Object>} OCR 히스토리 목록
+   */
+  async getOcrHistory(fileId) {
+    try {
+      console.log('📤 [ocrApi] getOcrHistory 호출 시작:', { fileId })
+
+      if (!fileId) {
+        throw new Error('파일 ID가 필요합니다.')
+      }
+
+      const response = await api.get(`/item-process/get-ocr-history/${fileId}`)
+
+      console.log('✅ [ocrApi] getOcrHistory 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ [ocrApi] getOcrHistory 실패:', error)
+      if (error.response) {
+        console.error('📡 [ocrApi] 서버 응답 상태:', error.response.status)
+        console.error('📡 [ocrApi] 서버 응답 데이터:', error.response.data)
+      }
+      throw new Error('OCR 히스토리 조회에 실패했습니다: ' + (error.response?.data?.message || error.message))
+    }
+  },
+
+  /**
+   * 파일의 완료된 OCR 영역 조회 (위치 정보 포함)
+   * @param {string|number} fileId - PDF 파일 ID
+   * @returns {Promise<Array>} 완료된 OCR 영역 목록 (positionX, positionY, sizeX, sizeY 포함)
+   */
+  async getCompletedOcrRegions(fileId) {
+    try {
+      console.log('📤 [ocrApi] getCompletedOcrRegions 호출 시작:', { fileId })
+
+      if (!fileId) {
+        throw new Error('파일 ID가 필요합니다.')
+      }
+
+      const response = await api.get(`/item-process/get-completed-regions/${fileId}`)
+
+      console.log('✅ [ocrApi] getCompletedOcrRegions 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ [ocrApi] getCompletedOcrRegions 실패:', error)
+      if (error.response) {
+        console.error('📡 [ocrApi] 서버 응답 상태:', error.response.status)
+        console.error('📡 [ocrApi] 서버 응답 데이터:', error.response.data)
+      }
+      throw new Error('완료된 OCR 영역 조회에 실패했습니다: ' + (error.response?.data?.message || error.message))
     }
   }
 }
