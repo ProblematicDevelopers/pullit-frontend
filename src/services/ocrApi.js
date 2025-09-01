@@ -393,7 +393,7 @@ export const ocrApi = {
     try {
       console.log('✅ [ocrApi] confirmOcrHistories 호출:', { pdfImageId, processedItemId })
 
-      const response = await api.patch(`/ocr-history/confirm/${pdfImageId}/${processedItemId}`)
+      const response = await api.put(`/ocr-history/confirm/${pdfImageId}/${processedItemId}`)
 
       console.log('✅ [ocrApi] confirmOcrHistories 성공:', response.data)
       return response.data
@@ -404,6 +404,29 @@ export const ocrApi = {
         console.error('📡 [ocrApi] 서버 응답 데이터:', error.response.data)
       }
       throw new Error('OCR 히스토리 확정에 실패했습니다: ' + (error.response?.data?.message || error.message))
+    }
+  },
+
+  /**
+   * ProcessedItem을 실제 문항으로 변환 (publish)
+   * @param {number} processedItemId - ProcessedItem ID
+   * @returns {Promise<Object>} 변환 결과
+   */
+  async publishProcessedItem(processedItemId) {
+    try {
+      console.log('📤 [ocrApi] publishProcessedItem 호출 시작:', processedItemId)
+
+      const response = await api.post(`/item-process/publish/${processedItemId}`)
+
+      console.log('✅ [ocrApi] publishProcessedItem 성공:', response.data)
+      return response.data
+    } catch (error) {
+      console.error('❌ [ocrApi] publishProcessedItem 실패:', error)
+      if (error.response) {
+        console.error('📡 [ocrApi] 서버 응답 상태:', error.response.status)
+        console.error('📡 [ocrApi] 서버 응답 데이터:', error.response.data)
+      }
+      throw new Error(`문항 변환에 실패했습니다: ${error.response?.data?.message || error.message}`)
     }
   },
 

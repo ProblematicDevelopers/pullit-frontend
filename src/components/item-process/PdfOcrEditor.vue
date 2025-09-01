@@ -1177,10 +1177,10 @@ export default {
         // 백엔드 ProcessedItem 엔티티 구조에 맞춘 데이터 준비
         const processedItemData = {
           // 기본 문항 정보 (백엔드 enum에 맞춤)
-          type: itemData.itemType === 'multiple_choice' ? 'multiple' :
-                itemData.itemType === 'subjective' ? 'subjective' :
-                itemData.itemType === 'short_answer' ? 'shortAnswer' :
-                itemData.itemType === 'essay' ? 'essay' : 'multiple',
+          type: itemData.itemType === 'fiveChoice' ? 'FIVE_CHOICE' :
+                itemData.itemType === 'shortAnswerOrdered' ? 'SHORT_ANSWER_ORDERED' :
+                itemData.itemType === 'shortAnswerUnOrdered' ? 'SHORT_ANSWER_UNORDERED' :
+                itemData.itemType === 'freeChoice' ? 'FREE_CHOICE' : 'FIVE_CHOICE',
 
           difficulty: itemData.difficulty === 'easy' ? 'easy' :
                      itemData.difficulty === 'medium' ? 'medium' :
@@ -1193,10 +1193,11 @@ export default {
           solution: itemData.editedTexts?.options || itemData.ocrResults?.optionsText || '',
           explanation: itemData.editedTexts?.explanation || itemData.explanation || '',
 
-          // 단원 정보 (현재는 null, 추후 Step3에서 설정)
-          majorChapterId: null,
-          middleChapterId: null,
-          minorChapterId: null,
+          // 단원 정보 (Step3에서 설정된 값 사용)
+          majorChapterId: itemData.majorChapter || null,
+          middleChapterId: itemData.middleChapter || null,
+          minorChapterId: itemData.minorChapter || null,
+          topicChapterId: itemData.topicChapter || null,
 
           // 지문 그룹 (해당하는 경우)
           passageId: itemData.passageGroup ? parseInt(itemData.passageGroup) : null,
@@ -1204,19 +1205,51 @@ export default {
           // OCR 히스토리 데이터 (백엔드 AreaType enum에 맞춤)
           ocrHistories: Object.entries(itemData.selectedAreas || {})
             .filter(([, areaInfo]) => areaInfo !== null && areaInfo !== undefined && typeof areaInfo === 'object')
-            .map(([areaType, areaInfo]) => ({
-              pdfImageId: capturedImageInfo.value?.pdfImageId || null,
-              areaType: areaType === 'problem' ? 'PROBLEM' :
-                       areaType === 'options' ? 'OPTIONS' :
-                       areaType === 'passage' ? 'PASSAGE' : 'PROBLEM',
-              ocrText: ocrResults.value?.[areaType]?.rawText || '',
-              editedText: itemData.editedTexts?.[areaType] || '',
-              originalImageUrl: capturedImageInfo.value?.imageUrl || null,
-              positionX: (areaInfo?.x !== null && areaInfo?.x !== undefined) ? areaInfo.x.toString() : '0',
-              positionY: (areaInfo?.y !== null && areaInfo?.y !== undefined) ? areaInfo.y.toString() : '0',
-              sizeX: (areaInfo?.width !== null && areaInfo?.width !== undefined) ? areaInfo.width.toString() : '0',
-              sizeY: (areaInfo?.height !== null && areaInfo?.height !== undefined) ? areaInfo.height.toString() : '0'
-            }))
+            .map(([areaType, areaInfo]) => {
+              // 정규화 좌표 계산 (0~1 범위)
+              const normalizedX = areaInfo?.x && capturedImageInfo.value?.naturalWidth
+                ? areaInfo.x / capturedImageInfo.value.naturalWidth
+                : 0
+              const normalizedY = areaInfo?.y && capturedImageInfo.value?.naturalHeight
+                ? areaInfo.y / capturedImageInfo.value.naturalHeight
+                : 0
+              const normalizedWidth = areaInfo?.width && capturedImageInfo.value?.naturalWidth
+                ? areaInfo.width / capturedImageInfo.value.naturalWidth
+                : 0
+              const normalizedHeight = areaInfo?.height && capturedImageInfo.value?.naturalHeight
+                ? areaInfo.height / capturedImageInfo.value.naturalHeight
+                : 0
+
+              return {
+                pdfImageId: capturedImageInfo.value?.pdfImageId || null,
+                areaType: areaType === 'problem' ? 'PROBLEM' :
+                         areaType === 'options' ? 'OPTIONS' :
+                         areaType === 'passage' ? 'PASSAGE' : 'PROBLEM',
+                ocrText: ocrResults.value?.[areaType]?.rawText || '',
+                editedText: itemData.editedTexts?.[areaType] || '',
+                originalImageUrl: capturedImageInfo.value?.imageUrl || null,
+                positionX: (areaInfo?.x !== null && areaInfo?.x !== undefined) ? areaInfo.x.toString() : '0',
+                positionY: (areaInfo?.y !== null && areaInfo?.y !== undefined) ? areaInfo.y.toString() : '0',
+                sizeX: (areaInfo?.width !== null && areaInfo?.width !== undefined) ? areaInfo.width.toString() : '0',
+                sizeY: (areaInfo?.height !== null && areaInfo?.height !== undefined) ? areaInfo.height.toString() : '0',
+                // BoundingBox 데이터 추가
+                boundingBox: {
+                  normalizedX,
+                  normalizedY,
+                  normalizedWidth,
+                  normalizedHeight,
+                  pageNo: capturedImageInfo.value?.pageIndex || 0,
+                  scale: capturedImageInfo.value?.scaleX || 1.0,
+                  rotation: 0.0,
+                  canvasWidth: capturedImageInfo.value?.naturalWidth || 0,
+                  canvasHeight: capturedImageInfo.value?.naturalHeight || 0,
+                  pixelX: areaInfo?.x || 0,
+                  pixelY: areaInfo?.y || 0,
+                  pixelWidth: areaInfo?.width || 0,
+                  pixelHeight: areaInfo?.height || 0
+                }
+              }
+            })
         }
 
         console.log('API 호출 데이터:', processedItemData)
@@ -1226,10 +1259,22 @@ export default {
 
         console.log('문항 저장 성공:', result)
 
+        // 저장 성공 시 ProcessedItem을 실제 문항으로 변환
+        const processedItemId = result.data?.id
+        if (processedItemId) {
+          try {
+            console.log('문항 변환 시작:', processedItemId)
+            const publishResult = await ocrApi.publishProcessedItem(processedItemId)
+            console.log('문항 변환 성공:', publishResult)
+            success('문항이 성공적으로 저장되고 변환되었습니다.')
+          } catch (publishError) {
+            console.error('문항 변환 실패:', publishError)
+            showError('문항 저장은 성공했지만 변환에 실패했습니다: ' + publishError.message)
+          }
+        }
+
         // 저장 성공 시 임시 OCR 히스토리를 확정 저장으로 변환
         await confirmOcrHistories(result.data?.id)
-
-        success('문항이 성공적으로 저장되었습니다.')
 
         // 확정 저장이므로 정리하지 않고 바로 모달 닫기
         showOcrModal.value = false

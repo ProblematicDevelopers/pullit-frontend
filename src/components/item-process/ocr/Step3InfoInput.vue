@@ -53,10 +53,10 @@
               <label class="form-label">문제 형태</label>
               <select v-model="problemInfo.problemType" class="form-select">
                 <option value="">선택 값</option>
-                <option value="multiple_choice">객관식 (5지 선택)</option>
-                <option value="short_answer">단답형</option>
-                <option value="subjective">주관식</option>
-                <option value="essay">서술형</option>
+                <option value="fiveChoice">5지 선택</option>
+                <option value="shortAnswerOrdered">단답 유순형</option>
+                <option value="shortAnswerUnOrdered">단답 무순형</option>
+                <option value="freeChoice">자유 선지형</option>
               </select>
             </div>
 
@@ -64,9 +64,9 @@
               <label class="form-label">난이도</label>
               <select v-model="problemInfo.difficulty" class="form-select" @change="updateProblemInfo">
                 <option value="">선택 값</option>
-                <option value="easy">쉬움</option>
-                <option value="medium">보통</option>
-                <option value="hard">어려움</option>
+                <option value="easy">하</option>
+                <option value="medium">중</option>
+                <option value="hard">상</option>
               </select>
             </div>
 
@@ -270,7 +270,7 @@ export default {
       middleChapter: '',
       minorChapter: '',
       topicChapter: '',
-      problemType: 'multiple_choice', // 기본값 설정
+      problemType: 'fiveChoice', // 기본값 설정
       difficulty: 'medium', // 기본값 설정
       hasPassage: !!props.selectedAreas.question,
       answer: '',
@@ -451,7 +451,8 @@ export default {
           name: topic.name
         }))
         console.log('📚 [Step3InfoInput] 토픽 로드 완료:', topicChapters.value.length)
-        problemInfo.value.topicChapter = minorChapterId
+        // topicChapter는 초기화만 하고 사용자가 선택하도록 함
+        problemInfo.value.topicChapter = ''
 
         // 문제 정보 업데이트
         updateProblemInfo()
@@ -987,12 +988,14 @@ export default {
     // 정답 플레이스홀더
     const getAnswerPlaceholder = () => {
       switch (problemInfo.value.problemType) {
-        case 'multiple_choice':
+        case 'fiveChoice':
           return '예: 4'
-        case 'short_answer':
+        case 'shortAnswerOrdered':
           return '예: 12'
-        case 'subjective':
-          return '주관식 답안'
+        case 'shortAnswerUnOrdered':
+          return '예: 12'
+        case 'freeChoice':
+          return '자유 선지형 답안'
         default:
           return '정답을 입력하세요'
       }
