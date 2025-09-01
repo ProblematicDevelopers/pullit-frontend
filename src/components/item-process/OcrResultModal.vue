@@ -40,6 +40,7 @@
           :ocr-results="ocrResults"
           :edited-texts="editedTexts"
           :current-editing-area="currentEditingArea"
+          :passage="capturedImage"
           @update:edited-texts="onEditedTextsUpdate"
           @update:current-editing-area="currentEditingArea = $event"
           @prev-step="prevStep"
@@ -54,10 +55,9 @@
           :selected-textbook="selectedTextbook"
           :is-new-file="isNewFile"
           :selected-file="selectedFile"
+          :passage="capturedImage"
           @update:problemInfo="itemInfo = $event"
           @update:chapters="updateChapters"
-          @prev-step="prevStep"
-          @next-step="nextStep"
         />
 
 
@@ -71,7 +71,7 @@
           :middle-chapters="middleChapters"
           :minor-chapters="minorChapters"
           :topic-chapters="topicChapters"
-          @prev-step="prevStep"
+          :passage="capturedImage"
           @save-complete="handleSaveComplete"
         />
       </div>

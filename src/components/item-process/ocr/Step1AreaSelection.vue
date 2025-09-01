@@ -212,7 +212,7 @@ export default {
       default: () => ({
         question: null,
         problem: null,
-        image: null,
+        fullCaptureImage: null,
         options: null
       })
     },
@@ -281,12 +281,12 @@ export default {
     const selectedPassageGroup = ref('')
     const showPassageGroupSection = computed(() => true) // 임시
 
-    // 영역 타입 정의
+    // 영역 타입 정의 (백엔드 AreaType enum에 맞춤)
     const areaTypes = ref([
       { key: 'problem', label: '문제', icon: 'bi bi-question-circle', required: true },
       { key: 'options', label: '보기', icon: 'bi bi-list-ul', required: true },
       { key: 'image', label: '이미지', icon: 'bi bi-image', required: false },
-      { key: 'question', label: '지문', icon: 'bi bi-file-text', required: false },
+      { key: 'passage', label: '지문', icon: 'bi bi-file-text', required: false },
     ])
 
     // 계산된 속성
@@ -493,6 +493,9 @@ export default {
         timestamp: new Date().toISOString()
       }
 
+      // 서버에 즉시 저장 (A안: 모달 진입 전 선저장)
+      await saveAreaToServer(areaType, areaInfo)
+
       // 선택된 영역 업데이트
       const newSelectedAreas = { ...(selectedAreas.value || {}) }
       newSelectedAreas[areaType] = areaInfo
@@ -505,6 +508,76 @@ export default {
       emit('update:captureMode', false)
       // activeSelectionType을 null로 설정하지 않고 기본값 유지
       // emit('update:activeSelectionType', null)
+    }
+
+    // 서버에 영역 정보 저장 (A안: 모달 진입 전 선저장)
+    const saveAreaToServer = async (areaType, areaInfo) => {
+      try {
+        // ocrApi import
+        const { ocrApi } = await import('@/services/ocrApi')
+
+        // 정규화 좌표 계산 (0~1 범위)
+        const imageEl = document.querySelector('.pdf-image')
+        if (!imageEl) {
+          throw new Error('PDF 이미지 요소를 찾을 수 없습니다')
+        }
+
+        const normalizedX = areaInfo.x / imageEl.clientWidth
+        const normalizedY = areaInfo.y / imageEl.clientHeight
+        const normalizedWidth = areaInfo.width / imageEl.clientWidth
+        const normalizedHeight = areaInfo.height / imageEl.clientHeight
+
+        // 현재 페이지의 pdfImageId 가져오기
+        const currentPageData = props.capturedImageInfo
+        const pdfImageId = currentPageData?.pdfImageId
+
+        if (!pdfImageId) {
+          console.warn('pdfImageId가 없어서 서버 저장을 건너뜁니다')
+          return
+        }
+
+        // bulk save 요청 데이터 준비
+        const bulkData = {
+          processedItemId: null, // 아직 ProcessedItem 생성 전
+          pdfImageId: pdfImageId,
+          areas: [{
+            areaType: areaType, // question, options, problem, etc.
+            pageNo: currentPageData?.pageIndex || 0,
+
+            // 정규화 좌표
+            x: normalizedX,
+            y: normalizedY,
+            width: normalizedWidth,
+            height: normalizedHeight,
+
+            // 렌더 컨텍스트
+            scale: 1.0,
+            rotation: 0,
+            canvasWidth: imageEl.clientWidth,
+            canvasHeight: imageEl.clientHeight,
+
+            // 픽셀 좌표 (원본)
+            pixelX: areaInfo.x,
+            pixelY: areaInfo.y,
+            pixelWidth: areaInfo.width,
+            pixelHeight: areaInfo.height,
+
+            // 이미지 URL
+            originalImageUrl: areaInfo.imageData,
+
+            // OCR 텍스트 (나중에 추가)
+            ocrText: null
+          }]
+        }
+
+        console.log('📡 서버에 영역 저장 중:', bulkData)
+        const result = await ocrApi.bulkSaveOcrHistories(bulkData)
+        console.log('✅ 영역 서버 저장 완료:', result)
+
+      } catch (error) {
+        console.error('❌ 영역 서버 저장 실패:', error)
+        // 실패해도 UI는 계속 진행 (서버 저장은 부가 기능)
+      }
     }
 
     // 선택된 영역을 이미지로 캡처
