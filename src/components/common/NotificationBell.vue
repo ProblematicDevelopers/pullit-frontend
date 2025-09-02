@@ -256,10 +256,13 @@ export default {
           notifications.value.unshift(data.data)
           unreadCount.value++
 
-          // 토스트 알림 표시
+          // 토스트 알림 표시 (클릭 시 해당 알림 라우팅)
           toast.info(data.data.title, {
             duration: 5000,
-            onClick: () => handleNotificationClick(data.data)
+            onClick: () => handleNotificationClick(data.data),
+            // targetUrl이 있으면 액션 버튼도 표시
+            actionText: data.data?.targetUrl ? '바로가기' : null,
+            route: data.data?.targetUrl || null
           })
           break
 
@@ -324,6 +327,8 @@ export default {
       updateUnreadCount()
       connectWebSocket()
       document.addEventListener('click', handleClickOutside)
+      // 외부 이벤트를 통해 강제 갱신 트리거 (예: 실시간 시험 브로드캐스트 후)
+      window.addEventListener('notifications:refresh', updateUnreadCount)
     })
 
     onUnmounted(() => {
@@ -331,6 +336,7 @@ export default {
         websocket.value.close()
       }
       document.removeEventListener('click', handleClickOutside)
+      window.removeEventListener('notifications:refresh', updateUnreadCount)
     })
 
     return {

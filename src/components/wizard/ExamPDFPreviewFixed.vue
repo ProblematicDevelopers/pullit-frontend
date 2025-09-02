@@ -348,8 +348,61 @@
             </template>
           </div>
 
-          <!-- Two column layout for preview with CSS columns -->
-          <div v-if="layoutMode === 'double'" class="two-column-wrapper">
+          <!-- Two column layout (manual columns) -->
+          <div v-if="layoutMode === 'double'" class="two-column-manual">
+            <div class="column">
+              <template v-for="(group, gIndex) in getPageColumn(currentPage, 1)" :key="`col1-${gIndex}`">
+                <div v-if="group.type === 'passage-with-questions' || group.type === 'passage-only'" class="passage-group">
+                  <div class="passage-section">
+                    <div class="passage-header">[{{ group.questionNumbers }}] 다음 글을 읽고 물음에 답하시오.</div>
+                    <div class="passage-content mathjax-content" v-html="sanitizeHtml(group.passageHtml)" data-mathjax-pending="true"></div>
+                  </div>
+                </div>
+                <div v-else-if="group.type === 'questions-only' || group.type === 'standalone-question'" class="questions-only-group">
+                  <div v-for="item in group.questions" :key="item.id" class="question-item">
+                    <div class="question-header">
+                      <span class="question-number">{{ item.displayNumber }}.</span>
+                      <span class="question-points">({{ item.points || 5 }}점)</span>
+                    </div>
+                    <div class="question-text mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
+                    <div v-if="item.choices && item.choices.length" class="choices">
+                      <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
+                        <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
+                        <span class="choice-text mathjax-content" v-html="sanitizeHtml(choice)" data-mathjax-pending="true"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+            <div class="column">
+              <template v-for="(group, gIndex) in getPageColumn(currentPage, 2)" :key="`col2-${gIndex}`">
+                <div v-if="group.type === 'passage-with-questions' || group.type === 'passage-only'" class="passage-group">
+                  <div class="passage-section">
+                    <div class="passage-header">[{{ group.questionNumbers }}] 다음 글을 읽고 물음에 답하시오.</div>
+                    <div class="passage-content mathjax-content" v-html="sanitizeHtml(group.passageHtml)" data-mathjax-pending="true"></div>
+                  </div>
+                </div>
+                <div v-else-if="group.type === 'questions-only' || group.type === 'standalone-question'" class="questions-only-group">
+                  <div v-for="item in group.questions" :key="item.id" class="question-item">
+                    <div class="question-header">
+                      <span class="question-number">{{ item.displayNumber }}.</span>
+                      <span class="question-points">({{ item.points || 5 }}점)</span>
+                    </div>
+                    <div class="question-text mathjax-content" v-html="sanitizeHtml(item.questionHtml)" data-mathjax-pending="true"></div>
+                    <div v-if="item.choices && item.choices.length" class="choices">
+                      <div v-for="(choice, idx) in item.choices" :key="idx" class="choice">
+                        <span class="choice-number">{{ getChoiceNumber(idx) }}</span>
+                        <span class="choice-text mathjax-content" v-html="sanitizeHtml(choice)" data-mathjax-pending="true"></span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+          <!-- Two column layout for preview with CSS columns (disabled) -->
+          <div v-if="false" class="two-column-wrapper">
             <template v-for="(group, gIndex) in currentPageGroups" :key="`group-${gIndex}`">
               <!-- 지문과 문제가 함께 있는 그룹 -->
               <div v-if="group.type === 'passage-with-questions'" class="passage-group">
@@ -804,6 +857,7 @@ const allQuestions = computed(() => {
     displayNumber: item.displayNumber || index + 1,
     questionHtml: item.questionHtml || item.questionText || item.question || '',
     passageHtml: item.passageHtml || item.passage || '',
+    passageText: item.passageText || item.passage_text || '',
     passageId: item.passageId || null,
     choices: [
       item.choice1Html || item.choice1,
@@ -2097,6 +2151,18 @@ watch(layoutMode, async () => {
   break-inside: avoid;
   margin-bottom: 0.75rem;
   display: block;
+}
+
+/* Manual two-column layout */
+.two-column-manual {
+  display: flex;
+  gap: 2rem;
+}
+.two-column-manual .column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
 }
 
 /* Passage Group */

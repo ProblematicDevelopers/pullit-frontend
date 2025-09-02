@@ -97,17 +97,7 @@
                       <span class="info-label">학생 수</span>
                       <span class="info-value">{{ classInfo.totalStudents || 0 }}명</span>
                     </div>
-                    <div class="info-item" v-if="classInfo.invitationCode">
-                      <span class="info-label">초대 코드</span>
-                      <div class="invitation-code">
-                        <span class="code-text">{{ classInfo.invitationCode }}</span>
-                        <button class="copy-btn" @click="copyInvitationCode" title="복사">
-                          <svg viewBox="0 0 24 24" fill="currentColor">
-                            <path d="M19 21H8V7H19M19 5H8C6.9 5 6 5.9 6 7V21C6 22.1 6.9 23 8 23H19C20.1 23 21 22.1 21 21V7C21 5.9 20.1 5 19 5M16 1H4C2.9 1 2 1.9 2 3V17H4V3H16V1Z" />
-                          </svg>
-                        </button>
-                      </div>
-                    </div>
+                    
                   </div>
                 </div>
               </div>
@@ -248,12 +238,7 @@ const getInitials = (name) => {
   return name.slice(0, 2)
 }
 
-const copyInvitationCode = () => {
-  if (classInfo.value?.invitationCode) {
-    navigator.clipboard.writeText(classInfo.value.invitationCode)
-    showToast('초대 코드가 복사되었습니다.', 'success')
-  }
-}
+
 
 const showCreateClass = () => {
   close()
