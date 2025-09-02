@@ -167,11 +167,11 @@ const fetchStudentInfo = async () => {
         // data.data.grade에서 학년 가져오기
         const grade = data?.data?.grade
 
-        studentGrade.value = grade ?? '-'
+        studentGrade.value = grade?.name ?? '-'
 
         // grade를 localStorage에 저장
         if (grade) {
-          const updatedUserInfo = { ...userInfo, grade: grade }
+          const updatedUserInfo = { ...userInfo, grade: grade.name }
           localStorage.setItem('userInfo', JSON.stringify(updatedUserInfo))
         }
       } catch {
