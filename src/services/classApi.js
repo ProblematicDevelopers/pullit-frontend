@@ -11,7 +11,10 @@ const classApi = {
   getStatsDetail: (classId) => api.get(`/classes/statsdetail/${classId}`),
 
   // 내 학급 목록 조회 (선생님용)
-  getMyClasses: () => api.get('/classes/my-classes')
+  getMyClasses: () => api.get('/classes/my-classes'),
+
+  // 학급의 시험 목록 조회
+  getClassExams: (classId) => api.get(`/classes/${classId}/exams`)
 }
 
 export default classApi

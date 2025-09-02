@@ -703,6 +703,7 @@ import {
   ContentGrouper,
   PageSplitter
 } from '@/utils/pdf-paginator-v2'
+// HTML 기반 PDF 생성기 (html2pdf.js 사용)
 
 // Props
 const props = defineProps({
@@ -1528,12 +1529,21 @@ const initializeExamInfo = () => {
     }
 
     // Set exam title if available
-    if (examInfo.title || examInfo.examName) {
-      examTitle.value = examInfo.title || examInfo.examName
-    }
+  if (examInfo.title || examInfo.examName) {
+    examTitle.value = examInfo.title || examInfo.examName
+  }
 
-    // Update subject display name
+  // Update subject display name
+  if (examInfo.areaName) {
+    subject.value = examInfo.areaName
+  } else {
     updateSubjectInfo()
+  }
+
+  // 총점 동기화 (store에 값이 있으면 우선 적용)
+  if (typeof examInfo.totalPoints === 'number' && !isNaN(examInfo.totalPoints)) {
+    totalScore.value = examInfo.totalPoints
+  }
   }
 }
 

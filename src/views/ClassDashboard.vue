@@ -107,6 +107,58 @@
 
           <!-- Sidebar -->
           <div class="content-sidebar">
+            <!-- Chat Section -->
+            <div class="content-card">
+              <div class="card-header">
+                <h3 class="card-title">학급 채팅</h3>
+                <span class="chat-badge">{{ chatMessages.length }}개 메시지</span>
+              </div>
+              <div class="chat-container">
+                <div ref="chatContainerRef" class="chat-messages">
+                  <div
+                    v-for="message in chatMessages"
+                    :key="message.id"
+                    class="chat-message"
+                    :class="{
+                      'is-mine': message.senderId === currentUserId &&
+                                 message.messageType !== 'JOIN' &&
+                                 message.messageType !== 'LEAVE',
+                      'is-system': message.messageType === 'JOIN' ||
+                                   message.messageType === 'LEAVE'
+                    }"
+                  >
+                    <!-- System Messages -->
+                    <div v-if="message.messageType === 'JOIN' || message.messageType === 'LEAVE'"
+                         class="system-message">
+                      {{ message.content }}
+                    </div>
+
+                    <!-- Regular Messages -->
+                    <div v-else class="message-bubble">
+                      <div class="message-header">
+                        <span class="sender-name">{{ message.senderName }}</span>
+                        <span class="message-time">{{ formatTime(message.timestamp) }}</span>
+                      </div>
+                      <div class="message-content">{{ message.content }}</div>
+                    </div>
+                  </div>
+                </div>
+                <div class="chat-input">
+                  <input
+                    v-model="newMessage"
+                    type="text"
+                    placeholder="메시지를 입력하세요..."
+                    @keyup.enter="sendMessage"
+                  />
+                  <button @click="sendMessage" :disabled="!newMessage.trim()">
+                    <svg viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M2 21L23 12L2 3V10L17 12L2 14V21Z"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+
             <!-- Upcoming Events -->
             <div class="content-card">
               <div class="card-header">
@@ -181,6 +233,30 @@
       @close="showExamAssignModal = false"
       @assigned="handleExamAssigned"
     />
+
+    <!-- Live Exam Control Modal -->
+    <LiveExamControlModal
+      :isOpen="showLiveExamControlModal"
+      :classId="currentClassId"
+      @close="showLiveExamControlModal = false"
+      @exam-started="handleExamStarted"
+      @exam-ended="handleExamEnded"
+    />
+
+    <!-- Grade Stats Modal -->
+    <GradeStatsModal
+      :isOpen="showGradeStatsModal"
+      :classId="currentClassId"
+      @close="showGradeStatsModal = false"
+    />
+
+    <!-- Assignment Management Modal -->
+    <AssignmentManagementModal
+      :isOpen="showAssignmentManagementModal"
+      :classId="currentClassId"
+      @close="showAssignmentManagementModal = false"
+      @assignment-created="handleAssignmentCreated"
+    />
   </div>
 </template>
 
@@ -193,6 +269,9 @@ import ClassManagementModal from '@/components/ClassManagementModal.vue'
 import CalendarModal from '@/components/CalendarModal.vue'
 import MyExamsModal from '@/components/MyExamsModal.vue'
 import ExamAssignModal from '@/components/ExamAssignModal.vue'
+import LiveExamControlModal from '@/components/LiveExamControlModal.vue'
+import GradeStatsModal from '@/components/teacher/GradeStatsModal.vue'
+import AssignmentManagementModal from '@/components/assignment/AssignmentManagementModal.vue'
 import authService from '@/services/auth'
 import examApi from '@/services/examApi'
 import dashboardApi from '@/services/dashboardApi'
@@ -211,6 +290,9 @@ const showClassManagementModal = ref(false)
 const showCalendarModal = ref(false)
 const showMyExamsModal = ref(false)
 const showExamAssignModal = ref(false)
+const showLiveExamControlModal = ref(false)
+const showGradeStatsModal = ref(false)
+const showAssignmentManagementModal = ref(false)
 const currentClassId = ref(null)
 const selectedExamForAssign = ref(null)
 
@@ -269,6 +351,12 @@ const UserPlusIcon = markRaw({
   ])
 })
 
+const ClipboardListIcon = markRaw({
+  render: () => h('svg', { viewBox: '0 0 24 24', fill: 'currentColor' }, [
+    h('path', { d: 'M19 3H14.82C14.4 1.84 13.3 1 12 1S9.6 1.84 9.18 3H5C3.9 3 3 3.9 3 5V19C3 20.1 3.9 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3M12 3C12.55 3 13 3.45 13 4S12.55 5 12 5 11 4.55 11 4 11.45 3 12 3M7 7H17V5H19V19H5V5H7V7M12 9V13.5L17 11L12 9Z' })
+  ])
+})
+
 // 통계 데이터
 const stats = ref({
   totalStudents: 156,
@@ -316,16 +404,28 @@ const displayStats = computed(() => [
 // Quick actions
 const quickActions = ref([
   {
+    title: '과제 관리',
+    description: '학생들에게 과제를 출제하고 현황을 확인하세요',
+    icon: ClipboardListIcon,
+    action: 'assignment-management'
+  },
+  {
     title: '시험 출제',
     description: '내 시험지로 학생들에게 시험을 출제하세요',
     icon: BookOpenIcon,
     action: 'assign-exam'
   },
   {
-    title: '성적 관리',
+    title: '실시간 시험 관리',
+    description: 'CBT 시험을 실시간으로 관리하세요',
+    icon: CalendarIcon,
+    action: 'live-exam-control'
+  },
+  {
+    title: '성적 통계',
     description: '학생 성적을 확인하고 분석하세요',
     icon: BarChart3Icon,
-    action: 'manage-grades'
+    action: 'grade-stats'
   },
   {
     title: '학급 관리',
@@ -351,11 +451,17 @@ const upcomingEvents = ref([])
 // Handle action click
 const handleActionClick = (action) => {
   switch(action.action) {
+    case 'assignment-management':
+      showAssignmentManagementModal.value = true  // 과제 관리 모달 열기
+      break
     case 'assign-exam':
       showMyExamsModal.value = true  // 내 시험지 목록 모달 열기
       break
-    case 'manage-grades':
-      router.push('/class-report')
+    case 'live-exam-control':
+      showLiveExamControlModal.value = true  // 실시간 시험 관리 모달 열기
+      break
+    case 'grade-stats':
+      showGradeStatsModal.value = true  // 성적 통계 모달 열기
       break
     case 'class-management':
       showClassManagementModal.value = true
@@ -443,6 +549,15 @@ const handleClassCreated = (createdClass) => {
   }, 500)
 }
 
+// 과제 생성 완료 핸들러
+const handleAssignmentCreated = (assignment) => {
+  console.log('과제 생성 완료:', assignment)
+  // 최근 활동 목록 업데이트
+  loadDashboardData()
+  // 알림 표시
+  alert('과제가 성공적으로 생성되었습니다!')
+}
+
 // 대시보드 데이터 로드
 const loadDashboardData = async () => {
   try {
@@ -498,6 +613,45 @@ const handleScheduleAdded = () => {
   loadDashboardData()
 }
 
+// 실시간 시험 시작 핸들러
+const handleExamStarted = (exam) => {
+  console.log('실시간 시험 시작됨:', exam)
+  // 필요한 경우 추가 작업 수행
+}
+
+// 실시간 시험 종료 핸들러
+const handleExamEnded = (exam) => {
+  console.log('실시간 시험 종료됨:', exam)
+  // 필요한 경우 추가 작업 수행
+}
+
+// 채팅 메시지 전송
+const sendMessage = () => {
+  if (!newMessage.value.trim() || !wsComposable) return
+
+  wsComposable.sendChatMessage(newMessage.value.trim())
+  newMessage.value = ''
+}
+
+// 시간 포맷팅
+const formatTime = (timestamp) => {
+  if (!timestamp) return ''
+  const date = new Date(timestamp)
+  return date.toLocaleTimeString('ko-KR', {
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+// 채팅 스크롤 하단 이동
+const scrollToBottom = () => {
+  nextTick(() => {
+    if (chatContainerRef.value) {
+      chatContainerRef.value.scrollTop = chatContainerRef.value.scrollHeight
+    }
+  })
+}
+
 // 시험 출제 모달 열기
 const openExamAssignModal = async () => {
   // 내 시험지 목록을 먼저 조회
@@ -524,6 +678,11 @@ const openExamAssignModal = async () => {
 let wsComposable = null
 const onlineStudents = ref(0)
 
+// 채팅 관련 변수
+const chatMessages = ref([])
+const newMessage = ref('')
+const chatContainerRef = ref(null)
+
 onMounted(async () => {
   const user = authService.getCurrentUser()
   if (user) {
@@ -548,7 +707,7 @@ onMounted(async () => {
             currentUserId.value,
             currentUserName.value,
             currentUserRole.value,
-            null, // scrollToBottom 함수 (채팅이 없으므로 null)
+            scrollToBottom, // 채팅 스크롤 함수 전달
             channelName,
           )
 
@@ -568,6 +727,9 @@ onMounted(async () => {
             },
             onChatMessage: (message) => {
               console.log('💬 ClassDashboard: 채팅 메시지', message)
+              // 채팅 메시지 처리
+              chatMessages.value = wsComposable.chatMessages.value
+              scrollToBottom()
             }
           })
 
@@ -576,9 +738,14 @@ onMounted(async () => {
             wsComposable.refreshOnlineStatus()
           }, 1000)
 
-          // onlineStudents 값 동기화를 위한 watch
+          // onlineStudents와 chatMessages 값 동기화를 위한 watch
           watch(() => wsComposable.onlineStudents.value, (newVal) => {
             onlineStudents.value = newVal
+          })
+
+          watch(() => wsComposable.chatMessages.value, (newVal) => {
+            chatMessages.value = newVal
+            scrollToBottom()
           })
 
           // 대시보드 데이터 로드
@@ -1092,6 +1259,141 @@ onUnmounted(() => {
   font-weight: 500;
 }
 
+
+/* Chat Styles */
+.chat-badge {
+  background: #f1f5f9;
+  color: #475569;
+  padding: 0.25rem 0.625rem;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+.chat-container {
+  display: flex;
+  flex-direction: column;
+  height: 400px;
+}
+
+.chat-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 1rem;
+  background: #f8fafc;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+}
+
+.chat-message {
+  margin-bottom: 1rem;
+}
+
+.chat-message.is-mine .message-bubble {
+  background: #2563eb;
+  color: white;
+  margin-left: auto;
+  max-width: 70%;
+}
+
+.chat-message.is-system {
+  text-align: center;
+  margin: 1rem 0;
+}
+
+.system-message {
+  display: inline-block;
+  background: #e2e8f0;
+  color: #64748b;
+  padding: 0.5rem 1rem;
+  border-radius: 12px;
+  font-size: 0.875rem;
+}
+
+.message-bubble {
+  background: white;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 0.75rem;
+  max-width: 70%;
+}
+
+.message-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.sender-name {
+  font-weight: 600;
+  color: #475569;
+}
+
+.chat-message.is-mine .sender-name {
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.message-time {
+  color: #94a3b8;
+}
+
+.chat-message.is-mine .message-time {
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.message-content {
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+.chat-input {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.chat-input input {
+  flex: 1;
+  padding: 0.625rem 1rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.chat-input input:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.chat-input button {
+  padding: 0.625rem 1rem;
+  background: #2563eb;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-input button:hover:not(:disabled) {
+  background: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+.chat-input button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.chat-input button svg {
+  width: 18px;
+  height: 18px;
+  fill: white;
+}
 
 /* Responsive */
 @media (max-width: 1024px) {
