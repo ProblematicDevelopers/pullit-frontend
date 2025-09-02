@@ -27,38 +27,8 @@ export const convertHtmlToPdf = async (element, filename = 'report.pdf') => {
     }
 
     // HTML을 캔버스로 변환
-    // 폰트가 모두 로드될 때까지 대기 (웹폰트 줄바꿈/깨짐 방지)
-    try {
-      if (document.fonts && document.fonts.ready) {
-        await document.fonts.ready
-      }
-    } catch (err) {
-      console.debug('fonts.ready 대기 중 예외(무시 가능):', err)
-    }
-
-    // 이미지 선로딩 (CORS 및 지연 로딩으로 인한 빈칸 방지)
-    try {
-      const imgs = Array.from(element.querySelectorAll('img'))
-      const loadImage = (img) => new Promise((resolve) => {
-        if (img.complete && img.naturalWidth > 0) return resolve()
-        const onDone = () => {
-          img.removeEventListener('load', onDone)
-          img.removeEventListener('error', onDone)
-          resolve()
-        }
-        img.addEventListener('load', onDone, { once: true })
-        img.addEventListener('error', onDone, { once: true })
-      })
-      await Promise.race([
-        Promise.all(imgs.map(loadImage)),
-        new Promise((r) => setTimeout(r, 5000)),
-      ])
-    } catch (err) {
-      console.debug('이미지 선로딩 중 예외(무시 가능):', err)
-    }
-
     const canvas = await html2canvas(element, {
-      scale: 2.0,
+      scale: 1.5, // 메모리 절약을 위해 2.0 → 1.5로 조정
       useCORS: true,
       allowTaint: true,
       backgroundColor: '#ffffff',
@@ -73,12 +43,12 @@ export const convertHtmlToPdf = async (element, filename = 'report.pdf') => {
       onclone: (clonedDoc) => {
         console.log('PDF용 문서 복제 시작')
 
-        // 메인 컨테이너 설정
+        // 메인 컨테이너 설정 (메모리 절약을 위한 크기 조정)
         const clonedElement = clonedDoc.querySelector(element.tagName.toLowerCase())
         if (clonedElement) {
-          clonedElement.style.width = '1600px'
-          clonedElement.style.maxWidth = '1600px'
-          clonedElement.style.minWidth = '1600px'
+          clonedElement.style.width = '1200px' // 메모리 절약을 위해 1600 → 1200으로 조정
+          clonedElement.style.maxWidth = '1200px' // 메모리 절약을 위해 1600 → 1200으로 조정
+          clonedElement.style.minWidth = '1200px' // 메모리 절약을 위해 1600 → 1200으로 조정
           clonedElement.style.backgroundColor = '#ffffff'
           clonedElement.style.boxSizing = 'border-box'
           clonedElement.style.margin = '0 auto'
@@ -174,17 +144,7 @@ export const convertHtmlToPdf = async (element, filename = 'report.pdf') => {
            }
          })
 
-        // 이미지 crossOrigin 설정 (tainted canvas 방지)
-        const clonedImages = clonedDoc.querySelectorAll('img')
-        clonedImages.forEach((img) => {
-          try {
-            if (!img.crossOrigin) img.crossOrigin = 'anonymous'
-            // 이미 로드된 경우에도 스냅샷 시점을 맞추기 위해 decoding 힌트
-            if ('decoding' in img) img.decoding = 'sync'
-          } catch (err) {
-            console.debug('이미지 crossOrigin/decoding 설정 실패(무시 가능):', err)
-          }
-        })
+
 
         // 차트 재렌더링
         const clonedCharts = clonedDoc.querySelectorAll('canvas')
@@ -201,10 +161,11 @@ export const convertHtmlToPdf = async (element, filename = 'report.pdf') => {
                   clonedCanvas.chart.destroy()
                 }
 
-                // 문제 수에 따른 동적 크기 계산
+                // 문제 수에 따른 동적 크기 계산 (메모리 절약을 위한 크기 제한)
                 const questionCount = originalCanvas.chart?.data?.labels?.length || 0
-                const dynamicWidth = 1600
-                const dynamicHeight = Math.max(600, questionCount * 50 + 200)
+                const dynamicWidth = 1200 // 메모리 절약을 위해 1600 → 1200으로 조정
+                // 문제가 많을 때 높이 제한으로 안정성 확보
+                const dynamicHeight = Math.min(1500, Math.max(400, questionCount * 30 + 150))
 
                 // 캔버스 크기 설정
                 clonedCanvas.width = dynamicWidth
@@ -229,8 +190,8 @@ export const convertHtmlToPdf = async (element, filename = 'report.pdf') => {
                 chartConfig.options.height = dynamicHeight
                 chartConfig.options.layout = { padding: { top: 20, right: 20, bottom: 20, left: 20 } }
 
-                                                  // 폰트 크기 동적 조정
-                 const fontSize = questionCount <= 20 ? 18 : questionCount <= 50 ? 16 : 14
+                                                  // 폰트 크기 동적 조정 (문제가 많을 때 가독성 향상)
+                 const fontSize = questionCount <= 20 ? 18 : questionCount <= 50 ? 16 : questionCount <= 100 ? 14 : 12
                  if (chartConfig.options.scales) {
                    if (chartConfig.options.scales.x?.ticks) {
                      chartConfig.options.scales.x.ticks.font = { size: fontSize, weight: '600' }
@@ -271,9 +232,14 @@ export const convertHtmlToPdf = async (element, filename = 'report.pdf') => {
       }
     })
 
-    // 모든 차트 렌더링 완료 대기
+    // 모든 차트 렌더링 완료 대기 (문제가 많을 때 안정성을 위한 대기 시간 조정)
     console.log('차트 렌더링 완료 대기 중...')
-    await new Promise((resolve) => setTimeout(resolve, 3000))
+    const questionCount = element.querySelectorAll('canvas').length > 0 ?
+      Math.max(...Array.from(element.querySelectorAll('canvas')).map(canvas =>
+        canvas.chart?.data?.labels?.length || 0
+      )) : 0
+    const waitTime = questionCount > 100 ? 5000 : questionCount > 50 ? 4000 : 3000
+    await new Promise((resolve) => setTimeout(resolve, waitTime))
 
     // 캔버스를 이미지로 변환
     const imgData = canvas.toDataURL('image/png', 1.0)
@@ -294,7 +260,7 @@ export const convertHtmlToPdf = async (element, filename = 'report.pdf') => {
       compress: true,
     })
 
-    // 이미지 추가
+        // 이미지 추가
     pdf.addImage(imgData, 'PNG', margin, margin, originalWidth, originalHeight)
 
     // PDF 다운로드
