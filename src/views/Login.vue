@@ -64,9 +64,9 @@
             <span>로그인 상태 유지</span>
           </label>
           <div class="find-links">
-            <a href="#" class="find-link">아이디 찾기</a>
+            <a href="#" @click.prevent="showFindModal = true" class="find-link">아이디 찾기</a>
             <span class="divider">|</span>
-            <a href="#" class="find-link">비밀번호 찾기</a>
+            <a href="#" @click.prevent="showFindModal = true; findMode = 'password'" class="find-link">비밀번호 찾기</a>
           </div>
         </div>
 
@@ -138,6 +138,201 @@
       </div>
     </div>
 
+    <!-- 아이디/비밀번호 찾기 모달 -->
+    <div v-if="showFindModal" class="modal-overlay" @click="closeFindModal">
+      <div class="modal-content" @click.stop>
+        <div class="modal-header">
+          <h5 class="modal-title">{{ findMode === 'username' ? '아이디 찾기' : '비밀번호 찾기' }}</h5>
+          <button type="button" class="btn-close" @click="closeFindModal"></button>
+        </div>
+        <div class="modal-body">
+          <!-- 모드 선택 버튼 -->
+          <div class="mode-selector mb-4">
+            <button 
+              @click="findMode = 'username'" 
+              :class="['mode-btn', { active: findMode === 'username' }]"
+            >
+              아이디 찾기
+            </button>
+            <button 
+              @click="findMode = 'password'" 
+              :class="['mode-btn', { active: findMode === 'password' }]"
+            >
+              비밀번호 찾기
+            </button>
+          </div>
+
+          <!-- 아이디 찾기 폼 -->
+          <div v-if="findMode === 'username'">
+            <form @submit.prevent="findUsername">
+              <div class="form-group mb-3">
+                <label class="form-label">이름</label>
+                <input 
+                  type="text" 
+                  v-model="findForm.fullName" 
+                  class="form-control" 
+                  placeholder="이름을 입력하세요"
+                  required
+                >
+              </div>
+              <div class="form-group mb-3">
+                <label class="form-label">휴대폰 번호</label>
+                <input 
+                  type="tel" 
+                  v-model="findForm.phone" 
+                  class="form-control" 
+                  placeholder="휴대폰 번호를 입력하세요"
+                  required
+                >
+              </div>
+              <button type="submit" class="btn btn-primary w-100" :disabled="isFinding">
+                <span v-if="isFinding" class="spinner-border spinner-border-sm me-2"></span>
+                {{ isFinding ? '찾는 중...' : '아이디 찾기' }}
+              </button>
+            </form>
+          </div>
+
+          <!-- 비밀번호 찾기 폼 -->
+          <div v-if="findMode === 'password'">
+            <!-- 1단계: 아이디, 휴대폰 번호, 인증번호 입력 -->
+            <div v-if="!showPasswordChangeForm">
+              <div class="form-group mb-3">
+                <label class="form-label">아이디</label>
+                <input 
+                  type="text" 
+                  v-model="findForm.username" 
+                  class="form-control" 
+                  placeholder="아이디를 입력하세요"
+                  required
+                >
+              </div>
+              <div class="form-group mb-3">
+                <label class="form-label">휴대폰 번호</label>
+                <div class="input-group">
+                  <input 
+                    type="tel" 
+                    v-model="findForm.phone" 
+                    class="form-control" 
+                    placeholder="휴대폰 번호를 입력하세요"
+                    required
+                  >
+                  <button 
+                    type="button" 
+                    class="btn btn-outline-primary"
+                    @click="sendVerificationCode"
+                    :disabled="!findForm.phone || verificationSent"
+                  >
+                    {{ verificationSent ? '재전송' : '인증번호 전송' }}
+                  </button>
+                </div>
+              </div>
+              
+              <!-- 인증번호 입력 -->
+              <div v-if="verificationSent" class="form-group mb-3">
+                <label class="form-label">인증번호</label>
+                <div class="input-group">
+                  <input 
+                    type="text" 
+                    v-model="findForm.verificationCode" 
+                    class="form-control" 
+                    placeholder="인증번호 6자리를 입력하세요"
+                    maxlength="6"
+                    required
+                  >
+                  <button 
+                    type="button" 
+                    class="btn btn-outline-success"
+                    @click="verifyCode"
+                    :disabled="!findForm.verificationCode || findForm.verificationCode.length !== 6"
+                  >
+                    확인
+                  </button>
+                </div>
+                <small class="text-muted">
+                  휴대폰으로 발송된 인증번호를 입력해주세요.
+                </small>
+              </div>
+            </div>
+
+            <!-- 2단계: 새 비밀번호 입력 -->
+            <div v-if="showPasswordChangeForm">
+              <h5 class="text-center mb-4">새 비밀번호 설정</h5>
+              <form @submit.prevent="findPassword">
+                <div class="form-group mb-3">
+                  <label class="form-label">새 비밀번호</label>
+                  <div class="input-group">
+                    <input 
+                      :type="showNewPassword ? 'text' : 'password'" 
+                      v-model="findForm.newPassword" 
+                      class="form-control" 
+                      placeholder="새 비밀번호를 입력하세요"
+                      required
+                    >
+                    <button
+                      type="button"
+                      @click="showNewPassword = !showNewPassword"
+                      class="btn btn-outline-secondary"
+                    >
+                      <i :class="showNewPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                    </button>
+                  </div>
+                  <small class="text-muted">
+                    비밀번호는 8자 이상, 소문자/숫자/특수문자(@$!%*?&)를 포함해야 합니다.
+                  </small>
+                </div>
+
+                <div class="form-group mb-3">
+                  <label class="form-label">새 비밀번호 확인</label>
+                  <div class="input-group">
+                    <input 
+                      :type="showConfirmPassword ? 'text' : 'password'" 
+                      v-model="findForm.confirmPassword" 
+                      class="form-control" 
+                      placeholder="새 비밀번호를 다시 입력하세요"
+                      required
+                    >
+                    <button
+                      type="button"
+                      @click="showConfirmPassword = !showConfirmPassword"
+                      class="btn btn-outline-secondary"
+                    >
+                      <i :class="showConfirmPassword ? 'bi bi-eye-slash' : 'bi bi-eye'"></i>
+                    </button>
+                  </div>
+                  <small class="text-muted" v-if="findForm.confirmPassword">
+                    <span v-if="findForm.newPassword === findForm.confirmPassword" class="text-success">
+                      <i class="bi bi-check-circle"></i> 비밀번호가 일치합니다
+                    </span>
+                    <span v-else class="text-danger">
+                      <i class="bi bi-x-circle"></i> 비밀번호가 일치하지 않습니다
+                    </span>
+                  </small>
+                </div>
+
+                <button 
+                  type="submit" 
+                  class="btn btn-primary w-100" 
+                  :disabled="isFinding"
+                >
+                  <span v-if="isFinding" class="spinner-border spinner-border-sm me-2"></span>
+                  {{ isFinding ? '변경 중...' : '비밀번호 변경' }}
+                </button>
+              </form>
+            </div>
+          </div>
+
+          <!-- 결과 표시 -->
+          <div v-if="findResult" class="alert alert-success mt-3">
+            <div v-if="findMode === 'username' && findResult.includes('회원님의 아이디는')">
+              회원님의 아이디는 <span class="found-username">{{ findResult.split('회원님의 아이디는 ')[1].split(' 입니다')[0] }}</span> 입니다.
+            </div>
+            <div v-else>
+              {{ findResult }}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
 
   </div>
 </template>
@@ -160,6 +355,28 @@ const rememberMe = ref(false)
 const showPassword = ref(false)
 const isLoading = ref(false)
 const errorMessage = ref('')
+
+// 아이디/비밀번호 찾기 관련
+const showFindModal = ref(false)
+const findMode = ref('username') // 'username' 또는 'password'
+const isFinding = ref(false)
+const findResult = ref('')
+
+// 찾기 폼 데이터
+const findForm = ref({
+  username: '',
+  phone: '',
+  verificationCode: '',
+  newPassword: '',
+  confirmPassword: ''
+})
+
+// SMS 인증 관련
+const verificationSent = ref(false)
+const phoneVerified = ref(false)
+const showNewPassword = ref(false)
+const showConfirmPassword = ref(false)
+const showPasswordChangeForm = ref(false) // 새 비밀번호 입력 화면 표시 여부
 
 // Toggle password visibility
 const togglePassword = () => {
@@ -231,6 +448,204 @@ const socialLogin = async (provider) => {
   } catch (error) {
     console.error('Social login error:', error)
     errorMessage.value = `${provider} 로그인 중 오류가 발생했습니다.`
+  }
+}
+
+// 아이디/비밀번호 찾기 관련 메서드들
+const closeFindModal = () => {
+  showFindModal.value = false
+  findResult.value = ''
+  resetFindForm()
+}
+
+const resetFindForm = () => {
+  findForm.value = {
+    username: '',
+    phone: '',
+    verificationCode: '',
+    newPassword: '',
+    confirmPassword: ''
+  }
+  verificationSent.value = false
+  phoneVerified.value = false
+  showNewPassword.value = false
+  showConfirmPassword.value = false
+  showPasswordChangeForm.value = false
+}
+
+const findUsername = async () => {
+  isFinding.value = true
+  findResult.value = ''
+
+  try {
+    console.log('아이디 찾기 시작')
+    console.log('입력된 이름:', findForm.value.fullName)
+    console.log('입력된 휴대폰 번호:', findForm.value.phone)
+    
+    // 휴대폰 번호 정규화 (하이픈 제거)
+    const normalizedPhone = findForm.value.phone.replace(/[^0-9]/g, '')
+    console.log('정규화된 휴대폰 번호:', normalizedPhone)
+    
+    const requestBody = {
+      fullName: findForm.value.fullName,
+      phone: normalizedPhone
+    }
+    console.log('요청 데이터:', requestBody)
+    
+    // 먼저 서버 연결 테스트
+    try {
+      const testResponse = await fetch('http://localhost:8080/api/users/check/username/test12')
+      console.log('서버 연결 테스트:', testResponse.status)
+    } catch (error) {
+      console.error('서버 연결 실패:', error)
+    }
+    
+    const response = await fetch('http://localhost:8080/api/users/find/username', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestBody)
+    })
+
+    console.log('응답 상태:', response.status)
+    console.log('응답 상태 텍스트:', response.statusText)
+    
+    const data = await response.json()
+    console.log('응답 데이터:', data)
+
+    if (response.ok) {
+      findResult.value = `회원님의 아이디는 ${data.data} 입니다.`
+    } else {
+      throw new Error(data.message || '아이디를 찾을 수 없습니다.')
+    }
+  } catch (error) {
+    console.error('아이디 찾기 에러:', error)
+    findResult.value = error.message || '아이디 찾기 중 오류가 발생했습니다.'
+  } finally {
+    isFinding.value = false
+  }
+}
+
+const sendVerificationCode = async () => {
+  try {
+    // 휴대폰 번호 정규화 (하이픈 제거)
+    const normalizedPhone = findForm.value.phone.replace(/[^0-9]/g, '')
+    
+    // 테스트용 휴대폰 번호 체크
+    if (normalizedPhone === '01011111111') {
+      verificationSent.value = true
+      alert('테스트 모드: 인증번호 000000이 발송되었습니다.')
+      return
+    }
+    
+    // 실제 SMS 발송 API 호출 (회원가입에서 사용하는 것과 동일)
+    const response = await fetch('http://localhost:8080/api/auth/verification/send', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        phoneNumber: normalizedPhone
+      })
+    })
+
+    if (response.ok) {
+      verificationSent.value = true
+      alert('인증번호가 발송되었습니다.')
+    } else {
+      throw new Error('인증번호 발송에 실패했습니다.')
+    }
+  } catch (error) {
+    console.error('인증번호 발송 에러:', error)
+    alert(error.message || '인증번호 발송 중 오류가 발생했습니다.')
+  }
+}
+
+const verifyCode = async () => {
+  try {
+    // 휴대폰 번호 정규화 (하이픈 제거)
+    const normalizedPhone = findForm.value.phone.replace(/[^0-9]/g, '')
+    
+    // 테스트용 휴대폰 번호 체크
+    if (normalizedPhone === '01011111111') {
+      if (findForm.value.verificationCode === '000000') {
+        phoneVerified.value = true
+        showPasswordChangeForm.value = true // 새 비밀번호 입력 화면으로 전환
+        alert('테스트 모드: 인증이 완료되었습니다. 새 비밀번호를 입력해주세요.')
+        return
+      } else {
+        throw new Error('테스트 모드: 인증번호는 000000입니다.')
+      }
+    }
+    
+    // 실제 인증번호 확인 API 호출
+    const response = await fetch('http://localhost:8080/api/auth/verification/verify', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        phoneNumber: normalizedPhone,
+        code: findForm.value.verificationCode
+      })
+    })
+
+    if (response.ok) {
+      phoneVerified.value = true
+      showPasswordChangeForm.value = true // 새 비밀번호 입력 화면으로 전환
+      alert('인증이 완료되었습니다. 새 비밀번호를 입력해주세요.')
+    } else {
+      throw new Error('인증번호가 올바르지 않습니다.')
+    }
+  } catch (error) {
+    console.error('인증번호 확인 에러:', error)
+    alert(error.message || '인증번호 확인 중 오류가 발생했습니다.')
+  }
+}
+
+const findPassword = async () => {
+  if (findForm.value.newPassword !== findForm.value.confirmPassword) {
+    alert('새 비밀번호가 일치하지 않습니다.')
+    return
+  }
+
+  isFinding.value = true
+  findResult.value = ''
+
+  try {
+    // 휴대폰 번호 정규화 (하이픈 제거)
+    const normalizedPhone = findForm.value.phone.replace(/[^0-9]/g, '')
+    
+    const response = await fetch('http://localhost:8080/api/users/find/password', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        username: findForm.value.username,
+        phone: normalizedPhone,
+        verificationCode: findForm.value.verificationCode,
+        newPassword: findForm.value.newPassword,
+        confirmPassword: findForm.value.confirmPassword
+      })
+    })
+
+    const data = await response.json()
+
+    if (response.ok) {
+      findResult.value = '비밀번호가 성공적으로 변경되었습니다.'
+      setTimeout(() => {
+        closeFindModal()
+      }, 2000)
+    } else {
+      throw new Error(data.message || '비밀번호 변경에 실패했습니다.')
+    }
+  } catch (error) {
+    console.error('비밀번호 찾기 에러:', error)
+    findResult.value = error.message || '비밀번호 찾기 중 오류가 발생했습니다.'
+  } finally {
+    isFinding.value = false
   }
 }
 </script>
@@ -651,6 +1066,215 @@ const socialLogin = async (provider) => {
   color: #94a3b8;
 }
 
+/* Modal Styles */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 16px;
+  border: none;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow: hidden;
+}
+
+.modal-header {
+  border-bottom: 1px solid #e2e8f0;
+  border-radius: 16px 16px 0 0;
+  padding: 1rem 1.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin: 0;
+}
+
+.btn-close {
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+  color: #64748b;
+  padding: 0;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-close:hover {
+  color: #334155;
+}
+
+.modal-body {
+  padding: 1.5rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+/* Mode Selector */
+.mode-selector {
+  display: flex;
+  gap: 0.5rem;
+  border-radius: 8px;
+  padding: 0.25rem;
+  background: #f1f5f9;
+}
+
+.mode-btn {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: #64748b;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mode-btn.active {
+  background: white;
+  color: #2563eb;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.mode-btn:hover:not(.active) {
+  color: #334155;
+}
+
+/* Form Styles */
+.form-group {
+  margin-bottom: 1rem;
+}
+
+.form-label {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #374151;
+  margin-bottom: 0.5rem;
+}
+
+.form-control {
+  width: 100%;
+  padding: 0.75rem;
+  border: 2px solid #e5e7eb;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  color: #1f2937;
+  transition: all 0.2s;
+}
+
+.form-control:focus {
+  outline: none;
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.input-group {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.input-group .form-control {
+  flex: 1;
+}
+
+.btn {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+.btn-primary {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.btn-outline-primary {
+  background: transparent;
+  color: #2563eb;
+  border: 2px solid #2563eb;
+}
+
+.btn-outline-primary:hover:not(:disabled) {
+  background: #2563eb;
+  color: white;
+}
+
+.btn-outline-success {
+  background: transparent;
+  color: #059669;
+  border: 2px solid #059669;
+}
+
+.btn-outline-success:hover:not(:disabled) {
+  background: #059669;
+  color: white;
+}
+
+.btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.alert {
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  margin-top: 1rem;
+}
+
+.alert-success {
+  background: #d1fae5;
+  color: #065f46;
+  border: 1px solid #a7f3d0;
+}
+
+.found-username {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #059669;
+  background: #ecfdf5;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  border: 2px solid #10b981;
+  display: inline-block;
+  margin: 0 0.25rem;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
   .login-card {
@@ -677,6 +1301,15 @@ const socialLogin = async (provider) => {
   .social-icon-svg {
     width: 1.25rem;
     height: 1.25rem;
+  }
+
+  .modal-content {
+    width: 95%;
+    margin: 1rem;
+  }
+
+  .modal-body {
+    padding: 1rem;
   }
 }
 

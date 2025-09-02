@@ -36,6 +36,8 @@ import TinyMCETestView from '@/views/TinyMCETestView.vue'
 import { requireAuth, preventAuthenticated } from './guards'
 import SignUp from '@/views/SignUp.vue'
 import SignUpModern from '@/views/SignUpModern.vue'
+import Profile from '@/views/Profile.vue'
+import ChangePassword from '@/views/ChangePassword.vue'
 
 // OAuth2 관련 컴포넌트 import
 import OAuth2Callback from '@/components/oauth2/OAuth2Callback.vue'
@@ -63,6 +65,26 @@ const routes = [
     meta: {
       hideHeader: true,
       hideFooter: true,
+    },
+  },
+
+  // 프로필 페이지
+  {
+    path: '/profile',
+    name: 'Profile',
+    component: Profile,
+    beforeEnter: requireAuth,
+    meta: {
+      requiresAuth: true,
+    },
+  },
+  {
+    path: '/change-password',
+    name: 'ChangePassword',
+    component: ChangePassword,
+    beforeEnter: requireAuth,
+    meta: {
+      requiresAuth: true,
     },
   },
 
