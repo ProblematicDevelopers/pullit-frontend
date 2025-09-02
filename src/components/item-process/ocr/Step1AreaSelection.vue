@@ -927,13 +927,15 @@ export default {
   position: absolute;
   top: -25px;
   left: 0;
-  background: #1e293b;
-  color: white;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1e293b;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* 현재 선택 중인 영역 */
