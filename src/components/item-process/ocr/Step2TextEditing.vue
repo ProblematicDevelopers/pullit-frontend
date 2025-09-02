@@ -26,15 +26,6 @@
         <div class="image-container">
           <div v-if="getCurrentAreaImage()" class="area-image">
             <img :src="getCurrentAreaImage()" :alt="`${getAreaTypeLabel(currentEditingArea)} 영역`" />
-            <!-- 좌표 정보 표시 -->
-            <div v-if="getCurrentAreaInfo()" class="coordinate-info">
-              <small class="text-muted">
-                <strong>좌표 정보:</strong><br>
-                화면: {{ getCurrentAreaInfo().x }}×{{ getCurrentAreaInfo().y }} ({{ getCurrentAreaInfo().width }}×{{ getCurrentAreaInfo().height }})<br>
-                원본: {{ getCurrentAreaInfo().originalX }}×{{ getCurrentAreaInfo().originalY }} ({{ getCurrentAreaInfo().originalWidth }}×{{ getCurrentAreaInfo().originalHeight }})<br>
-                줌: {{ getCurrentAreaInfo().zoomLevel }}x
-              </small>
-            </div>
           </div>
           <div v-else class="no-image">
             선택한 유형의 이미지들
@@ -49,7 +40,7 @@
 
           <div v-if="localEditedTexts[currentEditingArea] && localEditedTexts[currentEditingArea].trim()" class="ocr-text">
             <!-- LaTeX 렌더링이 적용된 텍스트 표시 -->
-            <div v-html="renderedOcrText"></div>
+            <div class="ocr-text-content tex2jax_process" v-html="renderedOcrText"></div>
 
           </div>
           <div v-else class="no-ocr">
@@ -63,17 +54,17 @@
         <div class="ocr-actions">
           <button
             @click="copyOcrToEditor"
-            class="btn btn-primary btn-sm me-2"
+            class="btn btn-primary btn-sm me-2 mb-2 w-50"
             :disabled="!localEditedTexts[currentEditingArea]"
           >
-            <i class="bi bi-arrow-clockwise me-1"></i>에디터 새로고침
+            <i class="bi bi-arrow-clockwise me-1 "></i>에디터 새로고침
           </button>
           <button
             @click="syncEditorToPreview"
-            class="btn btn-success btn-sm"
+            class="btn btn-success btn-sm mb-2 w-50"
             :disabled="!editorInstance"
           >
-            <i class="bi bi-arrow-down-circle me-1"></i>미리보기 동기화
+            <i class="bi bi-arrow-down-circle me-1 "></i>미리보기 동기화
           </button>
         </div>
       </div>
@@ -364,9 +355,26 @@ export default {
     const splitOptions = (optionsText) => {
       if (!optionsText) return []
 
-      // (1), (2), (3) 패턴으로 자동 분리
-      const parts = optionsText.split(/\(\d+\)/)
-      return parts.filter(part => part.trim()).map(part => part.trim())
+      // (1), (2), (3) 패턴으로 분리하되, 번호와 내용을 함께 유지
+      const matches = optionsText.match(/\(\d+\)[^()]*/g)
+      if (!matches) return []
+
+      return matches.map(match => {
+        // (1) 1 형태에서 내용 부분만 추출
+        const content = match.replace(/\(\d+\)\s*/, '').trim()
+        return content
+      }).filter(content => content) // 빈 내용 제거
+    }
+
+    // 보기 텍스트를 줄바꿈이 포함된 형태로 변환하는 함수
+    const formatOptionsWithLineBreaks = (optionsText) => {
+      if (!optionsText) return ''
+
+      // (1), (2), (3) 패턴 앞에 줄바꿈 추가 (첫 번째 제외)
+      return optionsText.replace(/\(\d+\)/g, (match, offset) => {
+        // 첫 번째 (1)이 아니면 앞에 줄바꿈 추가
+        return offset > 0 ? `\n${match}` : match
+      })
     }
 
     // 보기 목록 computed
@@ -1215,11 +1223,24 @@ export default {
         console.log('MathJax 재렌더링 시작')
 
         // OCR 텍스트 영역 찾기
-        const ocrTextElement = document.querySelector('.ocr-text > div') ||
+        const ocrTextElement = document.querySelector('.ocr-text-content') ||
+                               document.querySelector('.ocr-text > div') ||
                                document.querySelector('.ocr-text')
         if (ocrTextElement) {
           console.log('OCR 텍스트 영역 렌더링:', ocrTextElement)
-          await renderMathJax(ocrTextElement, { clearFirst: false })
+
+          // MathJax가 로드된 경우 강제 렌더링
+          if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+            try {
+              await window.MathJax.typesetPromise([ocrTextElement])
+              console.log('OCR 텍스트 영역 MathJax 강제 렌더링 성공')
+            } catch (error) {
+              console.warn('OCR 텍스트 영역 MathJax 강제 렌더링 실패, 기본 렌더링 시도:', error)
+              await renderMathJax(ocrTextElement, { clearFirst: false })
+            }
+          } else {
+            await renderMathJax(ocrTextElement, { clearFirst: false })
+          }
         }
 
         // 미리보기 영역들 찾기 (더 정확한 선택자)
@@ -1286,18 +1307,27 @@ export default {
 
       console.log('renderedOcrText: 텍스트 렌더링 시작')
 
-      // 동기적으로 처리하고 Promise가 아닌 문자열 반환 보장
-      try {
-        const styledResult = styleLatexCode(currentText)
-        // Promise인지 확인
-        if (styledResult instanceof Promise) {
-          console.warn('styleLatexCode가 Promise를 반환함')
-          return currentText // Promise인 경우 원본 텍스트 반환
+      // 보기 영역이고 주관식인 경우 줄바꿈 처리 적용
+      let textToProcess = currentText
+      if (props.currentEditingArea === 'options' && questionType.value === 'subjective') {
+        textToProcess = formatOptionsWithLineBreaks(currentText)
+        console.log('OCR 텍스트에 줄바꿈 처리 적용:', textToProcess)
+      }
+
+      // MathJax가 로드된 경우 LaTeX 코드를 그대로 반환 (렌더링은 별도로 처리)
+      if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+        console.log('MathJax가 로드됨, LaTeX 코드 반환:', textToProcess)
+        return textToProcess
+      } else {
+        // MathJax가 로드되지 않은 경우 스타일링된 코드 반환
+        console.log('MathJax가 로드되지 않음, 스타일링된 코드 반환')
+        try {
+          const styledResult = styleLatexCode(textToProcess)
+          return styledResult
+        } catch (error) {
+          console.error('styleLatexCode 오류:', error)
+          return textToProcess
         }
-        return styledResult
-      } catch (error) {
-        console.error('styleLatexCode 오류:', error)
-        return currentText // 오류 시 원본 텍스트 반환
       }
     })
 
@@ -1319,6 +1349,12 @@ export default {
         localEditedTexts: localEditedTexts.value
       })
       if (!text) return ''
+
+      // 주관식 보기인 경우 줄바꿈이 포함된 형태로 변환
+      if (questionType.value === 'subjective') {
+        return formatOptionsWithLineBreaks(text)
+      }
+
       return text // 원본 LaTeX 텍스트 반환
     })
 
@@ -1364,6 +1400,30 @@ export default {
         // 보기 영역 변경 시 강제 MathJax 렌더링
         await nextTick()
         await renderOptionsMathJax()
+      }
+    })
+
+    // OCR 텍스트 변경 시 MathJax 렌더링
+    watch(() => localEditedTexts.value[props.currentEditingArea], async (newText) => {
+      if (newText && (newText.includes('$') || newText.includes('\\'))) {
+        console.log('OCR 텍스트 변경 감지, MathJax 렌더링 실행:', newText.substring(0, 100))
+
+        // DOM 업데이트 대기
+        await nextTick()
+
+        // OCR 텍스트 영역에 MathJax 렌더링 적용
+        const ocrTextElement = document.querySelector('.ocr-text-content') ||
+                               document.querySelector('.ocr-text > div') ||
+                               document.querySelector('.ocr-text')
+        if (ocrTextElement) {
+          console.log('OCR 텍스트 영역 MathJax 렌더링 시작')
+          try {
+            await renderMathJax(ocrTextElement, { clearFirst: false })
+            console.log('OCR 텍스트 영역 MathJax 렌더링 완료')
+          } catch (error) {
+            console.warn('OCR 텍스트 영역 MathJax 렌더링 실패:', error)
+          }
+        }
       }
     })
 
@@ -1527,7 +1587,8 @@ LaTeX 수식 예시:
       selectedOptionsText,
       initializeOptionsSelection,
       questionType,
-      localEditedTexts
+      localEditedTexts,
+      formatOptionsWithLineBreaks
     }
   }
 }
@@ -1647,12 +1708,20 @@ LaTeX 수식 예시:
   font-family: monospace;
   font-size: 0.875rem;
   line-height: 1.4;
-  white-space: pre-wrap;
+  white-space: pre-line; /* 줄바꿈 문자를 실제 줄바꿈으로 표시 */
+  word-break: break-word;
+}
+
+.ocr-text-content {
+  font-family: inherit; /* MathJax 렌더링을 위해 monospace 제거 */
+  white-space: pre-line;
   word-break: break-word;
 }
 
 .ocr-actions {
-  margin-top: 0.75rem;
+  display: flex;
+  align-content: space-around;
+  padding: 1rem;
 }
 
 /* 우측 영역 */
@@ -2020,6 +2089,7 @@ LaTeX 수식 예시:
 .options-text {
   line-height: 1.6;
   color: #495057;
+  white-space: pre-line; /* 줄바꿈 문자를 실제 줄바꿈으로 표시 */
 }
 
 /* MathJax 렌더링 스타일링 (기존 시스템 사용) */

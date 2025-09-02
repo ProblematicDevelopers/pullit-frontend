@@ -40,7 +40,7 @@
           :ocr-results="ocrResults"
           :edited-texts="editedTexts"
           :current-editing-area="currentEditingArea"
-          :passage="capturedImage"
+          :captureFullImg="capturedImage"
           @update:edited-texts="onEditedTextsUpdate"
           @update:current-editing-area="currentEditingArea = $event"
           @prev-step="prevStep"
@@ -55,7 +55,7 @@
           :selected-textbook="selectedTextbook"
           :is-new-file="isNewFile"
           :selected-file="selectedFile"
-          :passage="capturedImage"
+          :captureFullImg="capturedImage"
           @update:problemInfo="itemInfo = $event"
           @update:chapters="updateChapters"
         />
@@ -71,7 +71,7 @@
           :middle-chapters="middleChapters"
           :minor-chapters="minorChapters"
           :topic-chapters="topicChapters"
-          :passage="capturedImage"
+          :captureFullImg="capturedImage"
           @save-complete="handleSaveComplete"
         />
       </div>
@@ -253,10 +253,10 @@ export default {
     })
 
     // 지문 그룹 관리 (국어, 영어, 사회, 역사만)
-    const passageGroups = ref([])
-    const selectedPassageGroup = ref('')
-    const newPassageGroupTitle = ref('')
-    const showPassageGroupSection = computed(() => {
+    const captureFullImgGroups = ref([])
+    const selectedCaptureFullImgGroup = ref('')
+    const newCaptureFullImgGroupTitle = ref('')
+    const showCaptureFullImgGroupSection = computed(() => {
       // 과목 코드에 따라 지문 그룹 섹션 표시 결정
       // 추후 과목 정보를 props로 받아서 처리
       return true // 임시로 true
@@ -270,7 +270,7 @@ export default {
       topicChapter: '',
       problemType: '',
       difficulty: '',
-      hasPassage: false,
+      hasCaptureFullImg: false,
       answer: '',
       explanation: ''
     })
@@ -397,6 +397,29 @@ export default {
       }
     }
 
+    // 컴포넌트 정리 함수 (단계 변경 시 사용)
+    const cleanupComponents = async () => {
+      try {
+        // TinyMCE 에디터 정리
+        await cleanupTinyMCEEditors()
+        
+        // MathJax 정리 (필요한 경우)
+        if (window.MathJax && window.MathJax.startup) {
+          try {
+            // MathJax 큐 정리
+            window.MathJax.startup.document.clear()
+          } catch (error) {
+            console.warn('MathJax 정리 중 오류:', error)
+          }
+        }
+        
+        // 추가 대기 시간
+        await new Promise(resolve => setTimeout(resolve, 50))
+      } catch (error) {
+        console.warn('컴포넌트 정리 중 오류:', error)
+      }
+    }
+
     // 단계 네비게이션
     const nextStep = async () => {
       try {
@@ -410,6 +433,11 @@ export default {
 
                 if (currentStep.value < steps.value.length) {
           const previousStep = currentStep.value
+          
+          // 현재 단계의 컴포넌트 정리
+          await cleanupTinyMCEEditors()
+          
+          // 단계 변경
           currentStep.value++
           console.log('✅ [OcrResultModal] 단계 이동:', previousStep, '→', currentStep.value)
 
@@ -425,6 +453,9 @@ export default {
 
             // 추가 DOM 업데이트 대기
             await nextTick()
+            
+            // 추가 대기 시간을 주어 DOM이 완전히 업데이트되도록 함
+            await new Promise(resolve => setTimeout(resolve, 100))
 
             // DOM 요소가 여전히 유효한지 확인
             if (!imageCanvas.value || !selectionCanvas.value) {
@@ -449,11 +480,20 @@ export default {
 
         if (currentStep.value > 1) {
           const previousStep = currentStep.value
+          
+          // 현재 단계의 컴포넌트 정리
+          await cleanupTinyMCEEditors()
+          
+          // 단계 변경
           currentStep.value--
           console.log('✅ [OcrResultModal] 단계 이동:', previousStep, '→', currentStep.value)
 
           // DOM 업데이트를 기다린 후 추가 작업 수행
           await nextTick()
+          
+          // 추가 대기 시간을 주어 DOM이 완전히 업데이트되도록 함
+          await new Promise(resolve => setTimeout(resolve, 100))
+          
           console.log('✅ [OcrResultModal] prevStep 완료')
         }
       } catch (error) {
@@ -586,7 +626,7 @@ export default {
     }
 
     // 지문 그룹 변경 처리
-    const onPassageGroupChange = (newValue) => {
+    const onCaptureFullImgGroupChange = (newValue) => {
       console.log('지문 그룹 변경:', newValue)
       // 필요한 경우 추가 로직 구현
     }
@@ -1325,8 +1365,8 @@ export default {
         editedTexts: editedTexts.value,
 
         // 지문 그룹 (해당하는 경우)
-        passageGroup: selectedPassageGroup.value,
-        newPassageGroupTitle: newPassageGroupTitle.value
+        captureFullImgGroup: selectedCaptureFullImgGroup.value,
+        newCaptureFullImgGroupTitle: newCaptureFullImgGroupTitle.value
       }
 
       emit('save', itemData)
@@ -1689,10 +1729,10 @@ export default {
       }
     })
 
-    // selectedAreas 변경 시 hasPassage 업데이트
+    // selectedAreas 변경 시 hasCaptureFullImg 업데이트
     watch(selectedAreas, (newAreas) => {
       if (itemInfo.value) {
-        itemInfo.value.hasPassage = !!newAreas?.question
+        itemInfo.value.hasCaptureFullImg = !!newAreas?.question
       }
     }, { deep: true })
 
@@ -1784,6 +1824,7 @@ export default {
       currentEditingArea,
       availableAreaTypes,
       editedTexts,
+      onEditedTextsUpdate,
       selectEditingArea,
       copyOcrToEditor,
       clearEditor,
@@ -1791,10 +1832,10 @@ export default {
 
       // 문제 정보
       itemInfo,
-      passageGroups,
-      selectedPassageGroup,
-      newPassageGroupTitle,
-      showPassageGroupSection,
+      captureFullImgGroups,
+      selectedCaptureFullImgGroup,
+      newCaptureFullImgGroupTitle,
+      showCaptureFullImgGroupSection,
 
       // 단원 정보
       majorChapters,
@@ -1814,7 +1855,7 @@ export default {
       zoomOut,
       startCapture,
       saveItem,
-      onPassageGroupChange,
+      onCaptureFullImgGroupChange,
       handleSaveComplete,
 
       // Canvas 관리
@@ -2524,7 +2565,7 @@ export default {
   box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
 }
 
-.passage-group-controls {
+.captureFullImgGroupControls {
   display: flex;
   flex-direction: column;
   gap: 1rem;
@@ -2620,7 +2661,7 @@ export default {
   padding: 1.5rem;
 }
 
-.item-passage,
+.itemCaptureFullImg,
 .item-problem,
 .item-image,
 .item-options,
@@ -2630,7 +2671,7 @@ export default {
   margin-bottom: 1.5rem;
 }
 
-.item-passage h5,
+.itemCaptureFullImg h5,
 .item-problem h5,
 .item-image h5,
 .item-options h5,
@@ -2724,7 +2765,7 @@ export default {
 }
 
 /* 지문 그룹 관리 섹션 */
-.passage-group-section {
+.captureFullImgGroupSection {
   margin-top: 1rem;
   margin-bottom: 1rem;
   padding: 1rem;
@@ -2733,7 +2774,7 @@ export default {
   border-radius: 8px;
 }
 
-.passage-group-section .section-subtitle {
+.captureFullImgGroupSection .section-subtitle {
   font-size: 0.875rem;
   font-weight: 600;
   color: #1e293b;
@@ -2742,18 +2783,18 @@ export default {
   align-items: center;
 }
 
-.passage-group-controls .form-group {
+.captureFullImgGroupControls .form-group {
   margin-bottom: 0;
 }
 
-.passage-group-controls .form-label {
+.captureFullImgGroupControls .form-label {
   font-size: 0.8rem;
   font-weight: 500;
   color: #64748b;
   margin-bottom: 0.5rem;
 }
 
-.passage-group-controls .form-select {
+.captureFullImgGroupControls .form-select {
   font-size: 0.875rem;
   padding: 0.5rem 0.75rem;
   border: 1px solid #d1d5db;
@@ -2817,7 +2858,7 @@ export default {
 }
 
 /* 지문 그룹 관리 섹션 */
-.passage-group-section {
+.captureFullImgGroupSection {
   margin-bottom: 1.5rem;
   padding: 1rem;
   background-color: #f8fafc;
@@ -2825,7 +2866,7 @@ export default {
   border-radius: 8px;
 }
 
-.passage-group-section .section-subtitle {
+.captureFullImgGroupSection .section-subtitle {
   font-size: 0.875rem;
   font-weight: 600;
   color: #1e293b;
@@ -2834,18 +2875,18 @@ export default {
   align-items: center;
 }
 
-.passage-group-controls .form-group {
+.captureFullImgGroupControls .form-group {
   margin-bottom: 0;
 }
 
-.passage-group-controls .form-label {
+.captureFullImgGroupControls .form-label {
   font-size: 0.8rem;
   font-weight: 500;
   color: #64748b;
   margin-bottom: 0.5rem;
 }
 
-.passage-group-controls .form-select {
+.captureFullImgGroupControls .form-select {
   font-size: 0.875rem;
   padding: 0.5rem 0.75rem;
   border: 1px solid #d1d5db;
