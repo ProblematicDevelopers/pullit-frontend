@@ -526,7 +526,6 @@ export default {
       const labels = {
         question: '지문',
         problem: '문제',
-        image: '이미지',
         options: '보기'
       }
       return labels[areaType] || areaType

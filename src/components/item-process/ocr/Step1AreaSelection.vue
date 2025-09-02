@@ -283,7 +283,7 @@ export default {
     // 영역 타입 정의 (백엔드 AreaType enum에 맞춤)
     const areaTypes = ref([
       { key: 'problem', label: '문제', icon: 'bi bi-question-circle', required: true },
-      { key: 'options', label: '보기', icon: 'bi bi-list-ul', required: true },
+      { key: 'options', label: '보기', icon: 'bi bi-list-ul', required: false },
       { key: 'passage', label: '지문', icon: 'bi bi-file-text', required: false },
     ])
 
