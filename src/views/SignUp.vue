@@ -334,7 +334,6 @@
                         class="form-control"
                         id="username"
                         v-model="signupForm.username"
-                        @input="checkUsernameAvailability"
                         placeholder="영문, 숫자 조합 4-20자"
                         required
                         minlength="4"
@@ -1104,8 +1103,16 @@ const checkUsernameAvailability = async () => {
   }
 
   try {
-    const response = await axios.get(`${apiBaseUrl}/users/check/username/${signupForm.value.username}`)
-    const isAvailable = response?.data?.data === true
+    const response = await fetch(`${apiBaseUrl}/users/check/username/${signupForm.value.username}`)
+    const data = await response.json()
+    
+    console.log('아이디 중복확인 응답:', data)
+    
+    // 백엔드 응답 구조에 맞게 확인
+    // success: true이고 data: true이면 사용 가능
+    // success: true이고 data: false이면 중복
+    const isAvailable = data.success && data.data === true
+    
     if (isAvailable) {
       usernameCheckMessage.value = '사용 가능한 아이디입니다.'
       usernameAvailable.value = true
@@ -1113,7 +1120,8 @@ const checkUsernameAvailability = async () => {
       usernameCheckMessage.value = '이미 사용중인 아이디입니다.'
       usernameAvailable.value = false
     }
-  } catch {
+  } catch (error) {
+    console.error('아이디 중복확인 에러:', error)
     usernameCheckMessage.value = '중복 확인 실패'
     usernameAvailable.value = false
   }
@@ -1246,9 +1254,10 @@ const searchSchools = async () => {
     console.log('검색 키워드 길이:', keyword.length)
     console.log('검색 키워드 바이트:', new TextEncoder().encode(keyword))
 
-    const response = await axios.get(`http://localhost:8080/api/schools/search?keyword=${encodeURIComponent(keyword)}`)
-    console.log('검색 결과:', response.data)
-    schoolSearchResults.value = response.data
+    const response = await fetch(`http://localhost:8080/api/schools/search?keyword=${encodeURIComponent(keyword)}`)
+    const data = await response.json()
+    console.log('검색 결과:', data)
+    schoolSearchResults.value = data
   } catch (error) {
     console.error('학교 검색 실패:', error)
     console.error('에러 상세:', error.response?.data)
@@ -1480,36 +1489,38 @@ const handleSignup = async () => {
         grade: signupForm.value.grade ? {
           code: signupForm.value.grade.code,
           name: signupForm.value.grade.name
-        } : null // 학년 선택 (선택사항)
+        } : null, // 학년 선택 (선택사항)
+        schoolName: signupForm.value.school // 학교명 추가
       }
     }
 
     console.log('회원가입 데이터:', signupData)
 
-    const response = await api.post('/auth/register', signupData)
+    const response = await fetch(`${apiBaseUrl}/auth/register`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(signupData)
+    })
 
-    console.log('회원가입 응답:', response.data)
+    const responseData = await response.json()
+    console.log('회원가입 응답:', responseData)
 
     // 백엔드 응답 구조에 따라 성공 여부 확인
-    if (response.status === 201 || response.data.success || response.data.code === '200') {
+    if (response.status === 201 || responseData.success || responseData.code === '200') {
       alert('회원가입이 완료되었습니다. 로그인 페이지로 이동합니다.')
       router.push('/login')
     } else {
-      alert('회원가입에 실패했습니다: ' + (response.data.message || '알 수 없는 오류'))
+      alert('회원가입에 실패했습니다: ' + (responseData.message || '알 수 없는 오류'))
     }
   } catch (error) {
     console.error('회원가입 에러:', error)
-    console.error('에러 응답:', error.response?.data)
-    console.error('에러 상태:', error.response?.status)
-
-    if (error.response?.status === 400) {
-      alert('입력 정보를 확인해주세요: ' + (error.response.data.message || '잘못된 요청입니다.'))
-    } else if (error.response?.status === 409) {
-      alert('이미 존재하는 사용자입니다: ' + (error.response.data.message || '아이디나 이메일이 중복됩니다.'))
-    } else if (error.response?.status === 500) {
-      alert('서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.')
+    
+    if (error.name === 'TypeError' && error.message.includes('fetch')) {
+      alert('서버에 연결할 수 없습니다. 잠시 후 다시 시도해주세요.')
     } else {
-      alert('회원가입 실패: ' + (error.response?.data?.message || '알 수 없는 오류가 발생했습니다.'))
+      alert('회원가입 실패: ' + (error.message || '알 수 없는 오류가 발생했습니다.'))
     }
   }
 }
