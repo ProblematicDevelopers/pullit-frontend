@@ -103,6 +103,7 @@ import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import notificationApi from '@/services/notificationApi'
 import { useToast } from '@/composables/useToast'
+import api from '@/services/api.js'
 
 export default {
   name: 'NotificationBell',
@@ -219,7 +220,12 @@ export default {
       const user = JSON.parse(localStorage.getItem('userInfo') || '{}')
       if (!user.id) return
 
-      const wsUrl = `ws://localhost:8080/ws/notifications?userId=${user.id}`
+      // api.js 기준으로 ORIGIN을 가져와 WS URL 구성
+      // baseURL이 절대/상대 모두 올 수 있으므로 URL로 정규화
+      const base = api.defaults.baseURL || '/api'
+      const origin = new URL(base, window.location.origin).origin
+      const wsBase = origin.replace(/^http/, 'ws')
+      const wsUrl = `${wsBase}/ws/notifications?userId=${user.id}`
       websocket.value = new WebSocket(wsUrl)
 
       websocket.value.onopen = () => {
