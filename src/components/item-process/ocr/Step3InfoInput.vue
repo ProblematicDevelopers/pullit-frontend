@@ -297,21 +297,44 @@ export default {
     const splitOptions = (optionsText) => {
       if (!optionsText) return []
 
-      // 옵션을 수동으로 분리하는 방법
-      const options = []
-      const parts = optionsText.split(/(?=\(\d+\))/g) // (숫자) 앞에서 분리
+      try {
+        console.log('splitOptions 입력:', optionsText)
 
-      for (const part of parts) {
-        if (part.trim()) {
-          // (숫자) 부분을 제거하고 나머지 내용만 추출
-          const content = part.replace(/\(\d+\)\s*/, '').trim()
-          if (content) {
-            options.push(content)
+        // 옵션을 수동으로 분리하는 방법
+        const options = []
+
+        // 여러 패턴 시도
+        const patterns = [
+          /\((\d+)\)\s*([\s\S]*?)(?=\(\d+\)|$)/g,  // (1) 텍스트 (2) 텍스트
+          /(\d+)\.\s*([\s\S]*?)(?=\d+\.|$)/g,       // 1. 텍스트 2. 텍스트
+          /(\d+)\)\s*([\s\S]*?)(?=\d+\)|$)/g        // 1) 텍스트 2) 텍스트
+        ]
+
+        for (const pattern of patterns) {
+          let match
+          pattern.lastIndex = 0 // 정규식 인덱스 리셋
+
+          while ((match = pattern.exec(optionsText)) !== null) {
+            const choiceNumber = match[1]
+            const choiceText = match[2]?.trim()
+
+            // 1-5번까지만 처리 (6번 이상은 무시)
+            if (choiceNumber && parseInt(choiceNumber) <= 5 && choiceText && choiceText.length > 0) {
+              options.push(choiceText)
+            }
+          }
+
+          if (options.length > 0) {
+            break // 패턴이 매치되면 다른 패턴은 시도하지 않음
           }
         }
-      }
 
-      return options
+        console.log('splitOptions 결과:', options)
+        return options
+      } catch (error) {
+        console.warn('선택지 파싱 실패:', error)
+        return []
+      }
     }
 
         // 보기 텍스트를 줄바꿈이 포함된 형태로 변환하는 함수
