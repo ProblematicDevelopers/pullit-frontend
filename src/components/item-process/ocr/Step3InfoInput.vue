@@ -20,7 +20,7 @@
             <!-- 이미지 영역 -->
             <div v-if="hasValidPassageImage" class="image-section">
               <div class="image-content">
-                <img :src="passage" alt="문제 이미지" class="problem-image" />
+                <img :src="capture-full-img" alt="문제 이미지" class="problem-image" />
               </div>
             </div>
 
@@ -293,9 +293,15 @@ export default {
     const splitOptions = (optionsText) => {
       if (!optionsText) return []
 
-      // (1), (2), (3) 패턴으로 자동 분리
-      const parts = optionsText.split(/\(\d+\)/)
-      return parts.filter(part => part.trim()).map(part => part.trim())
+      // (1), (2), (3) 패턴으로 분리하되, 번호와 내용을 함께 유지
+      const matches = optionsText.match(/\(\d+\)[^()]*/g)
+      if (!matches) return []
+
+      return matches.map(match => {
+        // (1) 1 형태에서 내용 부분만 추출
+        const content = match.replace(/\(\d+\)\s*/, '').trim()
+        return content
+      }).filter(content => content) // 빈 내용 제거
     }
 
     // 처리된 보기 목록
@@ -325,7 +331,7 @@ export default {
         await new Promise(resolve => setTimeout(resolve, 100))
 
         // 미리보기 영역 요소들 찾기
-        const previewElements = document.querySelectorAll('.passage-content, .problem-content, .image-content, .option-content')
+        const previewElements = document.querySelectorAll('.passage-content, .problem-content, .option-content')
         console.log(`Step3 미리보기 영역 ${previewElements.length}개 발견:`, Array.from(previewElements).map(el => el.className))
 
         for (const element of previewElements) {

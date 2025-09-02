@@ -54,9 +54,8 @@
       <div class="passage-selection" v-if="showPassageGroupSection">
         <label class="form-label">현재 활성 지문</label>
         <select class="form-select" v-model="selectedPassageGroup">
-          <option value="">지문 1 (ID = 1)</option>
-          <option value="group2">지문 2 (ID = 2)</option>
-          <option value="none">|| Not Exist</option>
+          <option value="">없음</option>
+
         </select>
       </div>
 
@@ -285,7 +284,6 @@ export default {
     const areaTypes = ref([
       { key: 'problem', label: '문제', icon: 'bi bi-question-circle', required: true },
       { key: 'options', label: '보기', icon: 'bi bi-list-ul', required: true },
-      { key: 'image', label: '이미지', icon: 'bi bi-image', required: false },
       { key: 'passage', label: '지문', icon: 'bi bi-file-text', required: false },
     ])
 
@@ -458,6 +456,12 @@ export default {
         return
       }
 
+      // 이미 드래그 중이면 무시
+      if (currentSelection.value.isDragging) {
+        console.log('이미 드래그 중이므로 클릭 무시')
+        return
+      }
+
       startDrag(event)
     }
 
@@ -529,6 +533,9 @@ export default {
     const onMouseUp = () => {
       if (!currentSelection.value.isDragging) return
 
+      console.log('드래그 완료:', currentSelection.value)
+
+      // 드래그 상태 먼저 비활성화
       currentSelection.value.isDragging = false
 
       // 이벤트 리스너 제거
@@ -537,6 +544,19 @@ export default {
 
       // 선택된 영역 처리
       processSelectedArea()
+
+      // 드래그 완료 후 약간의 지연을 두고 상태 완전 초기화
+      setTimeout(() => {
+        currentSelection.value = {
+          active: false,
+          startX: 0,
+          startY: 0,
+          endX: 0,
+          endY: 0,
+          isDragging: false
+        }
+        console.log('드래그 상태 완전 초기화 완료')
+      }, 100)
     }
 
     // 선택된 영역 처리
@@ -741,6 +761,10 @@ export default {
 
     // 선택 초기화
     const clearCurrentSelection = () => {
+      // 이벤트 리스너도 제거
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+
       currentSelection.value = {
         active: false,
         startX: 0,
@@ -749,6 +773,8 @@ export default {
         endY: 0,
         isDragging: false
       }
+
+      console.log('선택 영역 초기화 완료')
     }
 
     // 이미지 로드/에러 핸들러
@@ -788,7 +814,8 @@ export default {
       onImageClick,
       onImageLoad,
       onImageError,
-      nextStep
+      nextStep,
+      clearCurrentSelection
     }
   }
 }
