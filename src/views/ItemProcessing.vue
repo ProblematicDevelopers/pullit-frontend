@@ -365,8 +365,6 @@ export default {
           subjectStore.fetchSubjects()
         ])
 
-        // 🔧 OCR API 테스트 - 저장된 문항들 조회 테스트
-        await testOcrApiFunctions()
       } catch (error) {
         errorHandler.handleGeneralError(error, '교과서 목록 로드')
       }
@@ -640,7 +638,7 @@ export default {
               pdfImageId: image.id
             }
           })
-          
+
           // Store를 통해 페이지 설정 (img_order 초기화 포함)
           itemProcessingStore.setPdfPages(pages)
           // 로컬 ref도 동기화
@@ -907,12 +905,18 @@ export default {
     // Store의 pdfPages 변경을 감지하여 로컬 상태 동기화
     watch(() => itemProcessingStore.pdfPages, (newPages) => {
       if (newPages && Array.isArray(newPages)) {
-        // 페이지 인덱스 재정렬 (삭제 후 인덱스 꼬임 방지)
+        // originalPage 순서 유지하면서 index만 업데이트
         const updatedPages = newPages.map((page, newIndex) => ({
           ...page,
           index: newIndex,
           pageNumber: newIndex + 1
+          // originalPage는 그대로 유지 (순서 변경 방지)
         }))
+
+        console.log('📋 pdfPages 업데이트:', {
+          originalOrder: newPages.map(p => p.originalPage),
+          updatedOrder: updatedPages.map(p => p.originalPage)
+        })
 
         pdfPages.value = updatedPages
       }
