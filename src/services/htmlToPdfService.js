@@ -27,6 +27,36 @@ export const convertHtmlToPdf = async (element, filename = 'report.pdf') => {
     }
 
     // HTML을 캔버스로 변환
+    // 폰트가 모두 로드될 때까지 대기 (웹폰트 줄바꿈/깨짐 방지)
+    try {
+      if (document.fonts && document.fonts.ready) {
+        await document.fonts.ready
+      }
+    } catch (err) {
+      console.debug('fonts.ready 대기 중 예외(무시 가능):', err)
+    }
+
+    // 이미지 선로딩 (CORS 및 지연 로딩으로 인한 빈칸 방지)
+    try {
+      const imgs = Array.from(element.querySelectorAll('img'))
+      const loadImage = (img) => new Promise((resolve) => {
+        if (img.complete && img.naturalWidth > 0) return resolve()
+        const onDone = () => {
+          img.removeEventListener('load', onDone)
+          img.removeEventListener('error', onDone)
+          resolve()
+        }
+        img.addEventListener('load', onDone, { once: true })
+        img.addEventListener('error', onDone, { once: true })
+      })
+      await Promise.race([
+        Promise.all(imgs.map(loadImage)),
+        new Promise((r) => setTimeout(r, 5000)),
+      ])
+    } catch (err) {
+      console.debug('이미지 선로딩 중 예외(무시 가능):', err)
+    }
+
     const canvas = await html2canvas(element, {
       scale: 2.0,
       useCORS: true,
@@ -143,6 +173,18 @@ export const convertHtmlToPdf = async (element, filename = 'report.pdf') => {
              element.style.textAlign = 'center'
            }
          })
+
+        // 이미지 crossOrigin 설정 (tainted canvas 방지)
+        const clonedImages = clonedDoc.querySelectorAll('img')
+        clonedImages.forEach((img) => {
+          try {
+            if (!img.crossOrigin) img.crossOrigin = 'anonymous'
+            // 이미 로드된 경우에도 스냅샷 시점을 맞추기 위해 decoding 힌트
+            if ('decoding' in img) img.decoding = 'sync'
+          } catch (err) {
+            console.debug('이미지 crossOrigin/decoding 설정 실패(무시 가능):', err)
+          }
+        })
 
         // 차트 재렌더링
         const clonedCharts = clonedDoc.querySelectorAll('canvas')
