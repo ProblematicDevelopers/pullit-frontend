@@ -77,9 +77,12 @@ function createChart() {
     chart.destroy()
   }
 
-  // Canvas 크기 명시적 설정
+  // Canvas 크기 명시적 설정 (문제 수에 따라 동적 조정)
+  const questionCount = errataData.value.length
+  const dynamicHeight = Math.max(600, questionCount * 50 + 200) // 문제당 50px + 여백 200px
+
   chartCanvas.value.width = 900
-  chartCanvas.value.height = 400
+  chartCanvas.value.height = dynamicHeight
 
   // 문제 번호와 평균 정답률 데이터 추출
   const labels = errataData.value.map((question) => `문제 ${question.itemOrder}`)
@@ -88,7 +91,7 @@ function createChart() {
 
   console.log('차트 데이터:', { labels, accuracyData, isCorrectData })
 
-  // 차트 생성
+    // 차트 생성
   chart = new Chart(chartCanvas.value, {
     type: 'bar',
     data: {
@@ -110,11 +113,12 @@ function createChart() {
       ],
     },
     options: {
+      indexAxis: 'y', // 가로 막대 그래프로 설정
       responsive: false, // PDF에서는 반응형 비활성화
       maintainAspectRatio: false,
-      // 차트 크기 명시적 설정 (PDF에서도 유지)
+      // 차트 크기 명시적 설정 (문제 수에 따라 동적 조정)
       width: 900,
-      height: 400,
+      height: dynamicHeight,
       plugins: {
         legend: {
           display: false,
@@ -142,22 +146,6 @@ function createChart() {
       },
       scales: {
         x: {
-          grid: {
-            display: false,
-          },
-          ticks: {
-            font: {
-              size: 12,
-              weight: '500',
-              style: 'normal',
-            },
-            color: '#6b7280',
-          },
-          border: {
-            display: false,
-          },
-        },
-        y: {
           beginAtZero: true,
           max: 100,
           grid: {
@@ -180,10 +168,34 @@ function createChart() {
             display: false,
           },
         },
+        y: {
+          grid: {
+            display: false,
+          },
+          ticks: {
+            font: {
+              size: errataData.value.length > 30 ? 10 : 12, // 문제가 많을 때 폰트 크기 줄임
+              weight: '500',
+              style: 'normal',
+            },
+            color: '#6b7280',
+            // 문제가 많을 때도 모든 라벨을 표시하도록 설정
+            maxTicksLimit: undefined,
+            autoSkip: false, // 자동 건너뛰기 비활성화
+            // 모든 라벨을 강제로 표시
+            callback: function(val) {
+              // 모든 문제 번호를 표시
+              return this.getLabelForValue(val)
+            }
+          },
+          border: {
+            display: false,
+          },
+        },
       },
-      // 막대 두께 조절
+      // 막대 두께 조절 (가로 막대 그래프용, 문제 수에 따라 동적 조정)
       barThickness: 'flex',
-      maxBarThickness: 50,
+      maxBarThickness: errataData.value.length > 50 ? 20 : 30,
       elements: {
         bar: {
           hoverBackgroundColor: function (context) {
@@ -199,6 +211,16 @@ function createChart() {
   if (chartCanvas.value) {
     chartCanvas.value.chart = chart
     console.log('DetailReport 차트 인스턴스 저장됨:', chart)
+
+    // 차트 생성 후 컨테이너 크기 업데이트
+    nextTick(() => {
+      const container = chartCanvas.value.closest('.chart-container')
+      if (container) {
+        const newHeight = Math.max(600, questionCount * 50 + 200)
+        container.style.minHeight = newHeight + 'px'
+        console.log(`컨테이너 크기 업데이트: ${newHeight}px (문제 수: ${questionCount}개)`)
+      }
+    })
   }
 }
 
@@ -706,10 +728,17 @@ async function downloadReport() {
     </table>
 
     <!-- 평균 정답률 차트 -->
-    <div class="statistics-section">
+    <div class="statistics-section" style="margin-bottom: 60px; padding-bottom: 30px;">
       <h2 class="section-title">📊 평균 정답률 분석</h2>
       <div class="chart-section">
-        <div class="chart-container">
+        <div class="chart-container" :style="{
+          height: 'auto',
+          minHeight: Math.max(600, (errataData?.length || 0) * 50 + 200) + 'px',
+          overflow: 'visible',
+          border: '1px solid #e5e7eb',
+          borderRadius: '8px',
+          padding: '20px'
+        }">
           <canvas ref="chartCanvas"></canvas>
         </div>
       </div>

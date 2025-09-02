@@ -157,6 +157,29 @@
         </div>
       </div>
     </div>
+
+    <!-- 빈 목록 안내 모달 -->
+    <div v-if="showEmptyModal" class="fixed inset-0 z-60 flex items-center justify-center">
+      <div class="absolute inset-0 bg-black opacity-30" @click="showEmptyModal = false"></div>
+      <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
+        <div class="flex items-start">
+          <div class="flex-shrink-0 mr-3">
+            <svg class="w-6 h-6 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M11 15H13V17H11V15M11 7H13V13H11V7M11.99 2C6.47 2 2 6.48 2 12C2 17.52 6.47 22 11.99 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 11.99 2Z"/>
+            </svg>
+          </div>
+          <div class="flex-1">
+            <h4 class="text-base font-semibold text-gray-900 mb-1">추가 가능한 학생이 없습니다</h4>
+            <p class="text-sm text-gray-600 mb-4">
+              같은 학교의 학급 미배정 학생이 없습니다. 학생이 아직 가입하지 않았다면, 먼저 학생 회원가입을 안내해 주세요.
+            </p>
+            <div class="flex justify-end gap-2">
+              <button @click="showEmptyModal = false" class="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">확인</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -201,6 +224,8 @@ const selectAll = ref(false)
 const loading = ref(false)
 const inviting = ref(false)
 const invitationResults = ref([])
+const showEmptyModal = ref(false)
+let hasShownEmptyModal = false
 
 // 디바운스 타이머
 let searchTimer = null
@@ -230,6 +255,12 @@ const fetchAvailableStudents = async () => {
     availableStudents.value = response.data.data || []
     console.log('Available students loaded count:', availableStudents.value.length)
     console.log('Available students:', availableStudents.value)
+
+    // 빈 목록 안내 모달: 초기 조회(검색/필터 없음)이며 아직 띄운 적 없을 때만 표시
+    if (!searchQuery.value && !selectedGrade.value && !hasShownEmptyModal && (availableStudents.value.length === 0)) {
+      showEmptyModal.value = true
+      hasShownEmptyModal = true
+    }
   } catch (error) {
     console.error('Failed to fetch available students:', error)
     console.error('Error details:', error.response?.data)
@@ -327,6 +358,8 @@ const close = () => {
   searchQuery.value = ''
   selectedGrade.value = ''
   invitationResults.value = []
+  showEmptyModal.value = false
+  hasShownEmptyModal = false
 }
 
 // 모달이 열릴 때 데이터 로드

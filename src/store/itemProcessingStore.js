@@ -8,6 +8,34 @@ import { defineStore } from 'pinia'
 import { itemProcessingAPI } from '../services/itemProcessApi.js'
 import { fileHistoryAPI } from '../services/fileHistoryApi.js'
 import { useSubjectStore } from './subjectStore.js'
+
+/**
+ * 안정적인 이미지 순서 생성 함수
+ * pageNumber 기반으로 0-based 인덱스를 생성하여 중복 0 문제 해결
+ */
+function buildImageOrder(pages) {
+  // pageNumber는 1-based → 0-based로 전송
+  let order = pages.map(p => {
+    const base = Number.isInteger(p?.pageNumber) ? (p.pageNumber - 1)
+               : Number.isInteger(p?.originalPage) ? p.originalPage
+               : null
+    return base
+  })
+
+  // 방어: null/NaN/범위 밖/중복 정리
+  const n = pages.length
+  const seen = new Set()
+  const fixed = []
+  for (const i of order) {
+    if (Number.isInteger(i) && i >= 0 && i < n && !seen.has(i)) {
+      seen.add(i); fixed.push(i)
+    }
+  }
+  // 누락된 인덱스 보충
+  for (let i = 0; i < n; i++) if (!seen.has(i)) fixed.push(i)
+
+  return fixed.join(',')
+}
 // 과목 정보 정의 (areaCode와 매칭)
 const SUBJECTS = {
   'KO': { name: '국어', color: '#ef4444' },
@@ -194,18 +222,24 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
      * @param {Array} pages - PDF 페이지 배열
      */
     setPdfPages(pages) {
-      this.pdfPages = pages
-      
+      this.pdfPages = pages.map((p, i) => ({
+        ...p,
+        // pageNumber가 있으면 그걸 쓰고, 없으면 i+1
+        pageNumber: Number.isInteger(p.pageNumber) ? p.pageNumber : (i + 1),
+        // originalPage는 pageNumber-1을 기본으로 세팅 (nullish만 대체!)
+        originalPage: (p.originalPage ?? ((p.pageNumber ?? (i + 1)) - 1)),
+      }))
+
       // 페이지가 설정된 후 초기 이미지 순서를 서버에 저장 (기존 파일 로드 시)
-      if (this.uploadedPdfInfo?.fileHistoryId && pages && pages.length > 0) {
-        const initialImageOrder = pages.map(page => page.originalPage || 0).join(',')
+      if (this.uploadedPdfInfo?.fileHistoryId && this.pdfPages.length > 0) {
+        const imageOrder = buildImageOrder(this.pdfPages)
         console.log('📤 기존 파일 이미지 순서 설정:', {
           fileHistoryId: this.uploadedPdfInfo.fileHistoryId,
-          imageOrder: initialImageOrder
+          imageOrder: imageOrder
         })
-        
+
         // 비동기 처리하지만 에러가 나더라도 UI 블록하지 않음
-        fileHistoryAPI.updateImageOrder(this.uploadedPdfInfo.fileHistoryId, initialImageOrder)
+        fileHistoryAPI.updateImageOrder(this.uploadedPdfInfo.fileHistoryId, imageOrder)
           .then(() => console.log('✅ 기존 파일 이미지 순서 설정 완료'))
           .catch(error => console.warn('⚠️ 기존 파일 이미지 순서 설정 실패:', error))
       }
@@ -268,8 +302,7 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
 
           // 서버에 즉시 변경된 순서 전달
           if (this.uploadedPdfInfo?.fileHistoryId) {
-            // 현재 남아있는 페이지들의 원본 인덱스를 순서대로 imgOrder 생성
-            const imageOrder = this.pdfPages.map(page => page.originalPage || 0).join(',')
+            const imageOrder = buildImageOrder(this.pdfPages)
             console.log('📤 서버에 이미지 순서 업데이트 요청:', {
               fileHistoryId: this.uploadedPdfInfo.fileHistoryId,
               imageOrder
@@ -315,24 +348,23 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
               const response = await fileHistoryAPI.removePage(this.uploadedPdfInfo.fileHistoryId, originalIndex)
 
               if (response.data.success) {
-                // 서버에서 반환된 새로운 이미지 목록으로 업데이트
-                const remainingUrls = response.data.data
-                this.pdfPages = remainingUrls.map((imageUrl, index) => {
-                  // 기존 정보는 가능한 유지하되 새로운 URL로 업데이트
-                  const existingPage = this.pdfPages[index] || {}
-                  // 기존 페이지의 originalPage를 유지하거나, 없으면 현재 인덱스 사용
-                  const originalPageValue = existingPage.originalPage !== undefined ? existingPage.originalPage : index
-                  return {
-                    index: index,
-                    pageNumber: index + 1,
-                    preview: imageUrl,
-                    originalPage: originalPageValue,
-                    width: existingPage.width,
-                    height: existingPage.height,
-                    fileSize: existingPage.fileSize,
-                    pdfImageId: existingPage.pdfImageId
-                  }
-                })
+                // A안: 삭제 성공 후 다시 조회해서 메타 포함 리스트로 갱신
+                const imagesRes = await itemProcessingAPI.getFileHistoryImages(this.uploadedPdfInfo.fileHistoryId)
+                if (imagesRes.data?.data) {
+                  this.pdfPages = imagesRes.data.data.map((img, idx) => ({
+                    index: idx,
+                    pageNumber: img.pageNumber,
+                    preview: img.imageUrl,
+                    originalPage: img.pageNumber - 1,
+                    width: img.imageWidth,
+                    height: img.imageHeight,
+                    fileSize: img.fileSize,
+                    pdfImageId: img.id ?? img.pdfImageId
+                  }))
+                  console.log('✅ 삭제 후 이미지 목록 재조회 완료')
+                } else {
+                  throw new Error('삭제 후 이미지 목록 조회 실패')
+                }
 
                 // 서버 페이지 삭제 완료
               } else {
@@ -742,14 +774,14 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
 
         // 초기 이미지 순서를 서버에 저장
         if (this.uploadedPdfInfo?.fileHistoryId && this.pdfPages.length > 0) {
-          const initialImageOrder = this.pdfPages.map(page => page.originalPage || 0).join(',')
+          const imageOrder = buildImageOrder(this.pdfPages)
           console.log('📤 초기 이미지 순서 설정:', {
             fileHistoryId: this.uploadedPdfInfo.fileHistoryId,
-            imageOrder: initialImageOrder
+            imageOrder: imageOrder
           })
-          
+
           try {
-            await fileHistoryAPI.updateImageOrder(this.uploadedPdfInfo.fileHistoryId, initialImageOrder)
+            await fileHistoryAPI.updateImageOrder(this.uploadedPdfInfo.fileHistoryId, imageOrder)
             console.log('✅ 초기 이미지 순서 설정 완료')
           } catch (error) {
             console.warn('⚠️ 초기 이미지 순서 설정 실패:', error)
@@ -915,7 +947,22 @@ export const useItemProcessingStore = defineStore('itemProcessingStore', {
               try {
                 const imagesResponse = await itemProcessingAPI.getFileHistoryImages(fileHistory.id)
                 if (imagesResponse.data && imagesResponse.data.success) {
-                  fileHistory.pdfImages = imagesResponse.data.data || []
+                  const images = imagesResponse.data.data || []
+                  console.log('📋 백엔드에서 받은 이미지 목록 (원본):', images.map(img => ({
+                    id: img.id,
+                    originalPage: img.originalPage,
+                    pageNumber: img.pageNumber
+                  })))
+
+                  // originalPage 순서대로 재정렬
+                  const sortedImages = [...images].sort((a, b) => (a.originalPage || 0) - (b.originalPage || 0))
+                  console.log('📋 originalPage 순서로 재정렬된 이미지 목록:', sortedImages.map(img => ({
+                    id: img.id,
+                    originalPage: img.originalPage,
+                    pageNumber: img.pageNumber
+                  })))
+
+                  fileHistory.pdfImages = sortedImages
                 } else {
                   fileHistory.pdfImages = []
                 }

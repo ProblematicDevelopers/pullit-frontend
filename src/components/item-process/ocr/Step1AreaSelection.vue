@@ -54,9 +54,8 @@
       <div class="passage-selection" v-if="showPassageGroupSection">
         <label class="form-label">현재 활성 지문</label>
         <select class="form-select" v-model="selectedPassageGroup">
-          <option value="">지문 1 (ID = 1)</option>
-          <option value="group2">지문 2 (ID = 2)</option>
-          <option value="none">|| Not Exist</option>
+          <option value="">없음</option>
+
         </select>
       </div>
 
@@ -284,8 +283,7 @@ export default {
     // 영역 타입 정의 (백엔드 AreaType enum에 맞춤)
     const areaTypes = ref([
       { key: 'problem', label: '문제', icon: 'bi bi-question-circle', required: true },
-      { key: 'options', label: '보기', icon: 'bi bi-list-ul', required: true },
-      { key: 'image', label: '이미지', icon: 'bi bi-image', required: false },
+      { key: 'options', label: '보기', icon: 'bi bi-list-ul', required: false },
       { key: 'passage', label: '지문', icon: 'bi bi-file-text', required: false },
     ])
 
@@ -322,17 +320,38 @@ export default {
       const width = Math.abs(endX - startX)
       const height = Math.abs(endY - startY)
 
-      // 줌 레벨을 고려한 스케일링 적용
-      const scaledX = x / zoomLevel.value
-      const scaledY = y / zoomLevel.value
-      const scaledWidth = width / zoomLevel.value
-      const scaledHeight = height / zoomLevel.value
+      // 이미지의 컨테이너 내 오프셋 계산
+      const imageEl = document.querySelector('.pdf-image')
+      const containerEl = imageEl?.parentElement
 
+      if (imageEl && containerEl) {
+        const imageRect = imageEl.getBoundingClientRect()
+        const containerRect = containerEl.getBoundingClientRect()
+
+        // 이미지가 컨테이너 내에서 중앙 정렬되어 있을 때의 오프셋
+        const offsetX = imageRect.left - containerRect.left
+        const offsetY = imageRect.top - containerRect.top
+
+        console.log('드래그 영역 위치 계산:', {
+          원본좌표: { x, y, width, height },
+          이미지오프셋: { offsetX, offsetY },
+          최종좌표: { x: x + offsetX, y: y + offsetY }
+        })
+
+        return {
+          left: `${x + offsetX}px`,
+          top: `${y + offsetY}px`,
+          width: `${width}px`,
+          height: `${height}px`
+        }
+      }
+
+      // 이미지 요소를 찾을 수 없는 경우 원본 좌표 사용
       return {
-        left: `${scaledX}px`,
-        top: `${scaledY}px`,
-        width: `${scaledWidth}px`,
-        height: `${scaledHeight}px`
+        left: `${x}px`,
+        top: `${y}px`,
+        width: `${width}px`,
+        height: `${height}px`
       }
     })
 
@@ -343,15 +362,52 @@ export default {
       return area ? area.label : areaType
     }
 
-    // 줌 레벨을 고려한 영역 스타일 계산
+        // 줌 레벨을 고려한 영역 스타일 계산
     const getScaledAreaStyle = (area) => {
       if (!area) return {}
 
-      // 줌 레벨을 고려한 스케일링 적용
-      const scaledX = area.x / zoomLevel.value
-      const scaledY = area.y / zoomLevel.value
-      const scaledWidth = area.width / zoomLevel.value
-      const scaledHeight = area.height / zoomLevel.value
+      let scaledX, scaledY, scaledWidth, scaledHeight
+
+      // 원본 좌표가 있으면 원본 좌표를 기준으로 현재 zoomLevel에 맞게 변환
+      if (area.originalX !== undefined && area.originalY !== undefined) {
+        // 원본 좌표를 현재 zoomLevel에 맞게 변환
+        scaledX = area.originalX / zoomLevel.value
+        scaledY = area.originalY / zoomLevel.value
+        scaledWidth = area.originalWidth / zoomLevel.value
+        scaledHeight = area.originalHeight / zoomLevel.value
+
+        console.log('원본 좌표 기반 스케일링:', {
+          원본좌표: { x: area.originalX, y: area.originalY, width: area.originalWidth, height: area.originalHeight },
+          현재줌레벨: zoomLevel.value,
+          변환된좌표: { x: scaledX, y: scaledY, width: scaledWidth, height: scaledHeight }
+        })
+      } else {
+        // 기존 방식 (화면 좌표 기준)
+        scaledX = area.x / zoomLevel.value
+        scaledY = area.y / zoomLevel.value
+        scaledWidth = area.width / zoomLevel.value
+        scaledHeight = area.height / zoomLevel.value
+      }
+
+      // 이미지의 컨테이너 내 오프셋 계산
+      const imageEl = document.querySelector('.pdf-image')
+      const containerEl = imageEl?.parentElement
+
+      if (imageEl && containerEl) {
+        const imageRect = imageEl.getBoundingClientRect()
+        const containerRect = containerEl.getBoundingClientRect()
+
+        // 이미지가 컨테이너 내에서 중앙 정렬되어 있을 때의 오프셋
+        const offsetX = imageRect.left - containerRect.left
+        const offsetY = imageRect.top - containerRect.top
+
+        return {
+          left: `${scaledX + offsetX}px`,
+          top: `${scaledY + offsetY}px`,
+          width: `${scaledWidth}px`,
+          height: `${scaledHeight}px`
+        }
+      }
 
       return {
         left: `${scaledX}px`,
@@ -400,14 +456,45 @@ export default {
         return
       }
 
+      // 이미 드래그 중이면 무시
+      if (currentSelection.value.isDragging) {
+        console.log('이미 드래그 중이므로 클릭 무시')
+        return
+      }
+
       startDrag(event)
     }
 
     // 드래그 시작
     const startDrag = (event) => {
-      const rect = event.target.getBoundingClientRect()
+      // PDF 이미지 요소를 기준으로 좌표 계산 (일관성 유지)
+      const imageEl = document.querySelector('.pdf-image')
+      if (!imageEl) {
+        console.error('PDF 이미지 요소를 찾을 수 없습니다')
+        return
+      }
+
+      const rect = imageEl.getBoundingClientRect()
       const x = event.clientX - rect.left
       const y = event.clientY - rect.top
+
+      // 이미지 범위 내에서만 드래그 시작 허용
+      if (x < 0 || x > rect.width || y < 0 || y > rect.height) {
+        console.log('이미지 범위를 벗어난 클릭, 드래그 시작 취소:', { x, y, imageWidth: rect.width, imageHeight: rect.height })
+        return
+      }
+
+      // 이미지 컨테이너 정보도 확인
+      const containerEl = imageEl.parentElement
+      const containerRect = containerEl ? containerEl.getBoundingClientRect() : null
+
+      console.log('드래그 시작:', {
+        클릭위치: { clientX: event.clientX, clientY: event.clientY },
+        이미지위치: { left: rect.left, top: rect.top, width: rect.width, height: rect.height },
+        컨테이너위치: containerRect ? { left: containerRect.left, top: containerRect.top, width: containerRect.width, height: containerRect.height } : null,
+        이미지자연크기: { naturalWidth: imageEl.naturalWidth, naturalHeight: imageEl.naturalHeight },
+        계산된좌표: { x, y }
+      })
 
       currentSelection.value = {
         active: true,
@@ -434,14 +521,21 @@ export default {
       const x = event.clientX - rect.left
       const y = event.clientY - rect.top
 
-      currentSelection.value.endX = x
-      currentSelection.value.endY = y
+      // 이미지 범위 내로 제한
+      const clampedX = Math.max(0, Math.min(x, rect.width))
+      const clampedY = Math.max(0, Math.min(y, rect.height))
+
+      currentSelection.value.endX = clampedX
+      currentSelection.value.endY = clampedY
     }
 
     // 마우스 업 시 드래그 완료
     const onMouseUp = () => {
       if (!currentSelection.value.isDragging) return
 
+      console.log('드래그 완료:', currentSelection.value)
+
+      // 드래그 상태 먼저 비활성화
       currentSelection.value.isDragging = false
 
       // 이벤트 리스너 제거
@@ -450,6 +544,19 @@ export default {
 
       // 선택된 영역 처리
       processSelectedArea()
+
+      // 드래그 완료 후 약간의 지연을 두고 상태 완전 초기화
+      setTimeout(() => {
+        currentSelection.value = {
+          active: false,
+          startX: 0,
+          startY: 0,
+          endX: 0,
+          endY: 0,
+          isDragging: false
+        }
+        console.log('드래그 상태 완전 초기화 완료')
+      }, 100)
     }
 
     // 선택된 영역 처리
@@ -482,14 +589,25 @@ export default {
       // 이미지 데이터 캡처
       const imageData = await captureSelectedArea({ x, y, width, height })
 
+      // 원본 이미지 기준 좌표 계산 (zoomLevel 제거)
+      const originalX = x * zoomLevel.value
+      const originalY = y * zoomLevel.value
+      const originalWidth = width * zoomLevel.value
+      const originalHeight = height * zoomLevel.value
+
       // 영역 정보 생성 (화면 좌표와 원본 좌표 모두 저장)
       const areaInfo = {
-        // 화면 좌표 (UI 표시용)
+        // 화면 좌표 (UI 표시용) - zoomLevel 적용된 상태
         x, y, width, height,
+        // 원본 이미지 기준 좌표 (zoomLevel 제거된 상태)
+        originalX, originalY, originalWidth, originalHeight,
         // 이미지 데이터
         imageData,
+        // 줌 레벨 정보
+        zoomLevel: zoomLevel.value,
         // 디버깅을 위한 추가 정보
         screenCoordinates: { x, y, width, height },
+        originalCoordinates: { x: originalX, y: originalY, width: originalWidth, height: originalHeight },
         timestamp: new Date().toISOString()
       }
 
@@ -643,6 +761,10 @@ export default {
 
     // 선택 초기화
     const clearCurrentSelection = () => {
+      // 이벤트 리스너도 제거
+      document.removeEventListener('mousemove', onMouseMove)
+      document.removeEventListener('mouseup', onMouseUp)
+
       currentSelection.value = {
         active: false,
         startX: 0,
@@ -651,6 +773,8 @@ export default {
         endY: 0,
         isDragging: false
       }
+
+      console.log('선택 영역 초기화 완료')
     }
 
     // 이미지 로드/에러 핸들러
@@ -690,7 +814,8 @@ export default {
       onImageClick,
       onImageLoad,
       onImageError,
-      nextStep
+      nextStep,
+      clearCurrentSelection
     }
   }
 }
@@ -802,13 +927,15 @@ export default {
   position: absolute;
   top: -25px;
   left: 0;
-  background: #1e293b;
-  color: white;
+  background: rgba(255, 255, 255, 0.9);
+  color: #1e293b;
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
   font-weight: 600;
   white-space: nowrap;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
 }
 
 /* 현재 선택 중인 영역 */

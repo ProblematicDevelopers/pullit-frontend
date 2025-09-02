@@ -777,16 +777,27 @@
         </div>
 
         <div class="panel-footer">
-          <button
-            class="btn-primary"
-            @click="proceedToNext"
-            :disabled="selectedItems.length === 0"
-          >
-            다음 단계
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            </svg>
-          </button>
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <button
+              class="btn-primary"
+              @click="goNextFast"
+              :disabled="selectedItems.length === 0"
+            >
+              다음 단계 (빠르게)
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </button>
+
+            <button
+              class="btn-secondary"
+              @click="proceedToNext"
+              :disabled="selectedItems.length === 0"
+              title="수식/복잡한 HTML을 이미지로 변환하여 고품질 미리보기 (느림)"
+            >
+              이미지 변환 후 다음 (고급)
+            </button>
+          </div>
         </div>
       </aside>
     </div>
@@ -1602,6 +1613,22 @@ const proceedToNext = async () => {
   } finally {
     // 로딩 제거
     document.body.removeChild(loadingEl)
+  }
+}
+
+// 빠른 이동: 이미지 변환 건너뛰고 HTML 미리보기 사용
+const goNextFast = () => {
+  try {
+    // 선택된 문항을 store에 반영
+    itemStore.setSelectedItems([...selectedItems.value])
+
+    // 이전 변환 결과가 있으면 비워서 Step3가 HTML 미리보기를 사용하도록 유도
+    itemStore.setConvertedImages([])
+
+    emit('next')
+  } catch (e) {
+    console.error('빠른 이동 중 오류:', e)
+    alert('다음 단계로 이동 중 문제가 발생했습니다. 다시 시도해주세요.')
   }
 }
 
