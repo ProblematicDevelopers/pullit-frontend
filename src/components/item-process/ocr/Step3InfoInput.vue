@@ -20,7 +20,7 @@
             <!-- 이미지 영역 -->
             <div v-if="hasValidPassageImage" class="image-section">
               <div class="image-content">
-                <img :src="passage" alt="문제 이미지" class="problem-image" />
+                <img :src="captureFullImg" alt="문제 이미지" class="problem-image" />
               </div>
             </div>
 
@@ -257,6 +257,10 @@ export default {
     passage: {
       type: String,
       default: ''
+    },
+    captureFullImg: {
+      type: String,
+      default: ''
     }
   },
   emits: [
@@ -293,23 +297,62 @@ export default {
     const splitOptions = (optionsText) => {
       if (!optionsText) return []
 
-      // (1), (2), (3) 패턴으로 자동 분리
-      const parts = optionsText.split(/\(\d+\)/)
-      return parts.filter(part => part.trim()).map(part => part.trim())
+      // 옵션을 수동으로 분리하는 방법
+      const options = []
+      const parts = optionsText.split(/(?=\(\d+\))/g) // (숫자) 앞에서 분리
+
+      for (const part of parts) {
+        if (part.trim()) {
+          // (숫자) 부분을 제거하고 나머지 내용만 추출
+          const content = part.replace(/\(\d+\)\s*/, '').trim()
+          if (content) {
+            options.push(content)
+          }
+        }
+      }
+
+      return options
+    }
+
+        // 보기 텍스트를 줄바꿈이 포함된 형태로 변환하는 함수
+    const formatOptionsWithLineBreaks = (optionsText) => {
+      if (!optionsText) return ''
+
+      // splitOptions를 사용해서 각 옵션을 분리한 후 줄바꿈으로 연결
+      const options = splitOptions(optionsText)
+      return options.join('\n')
     }
 
     // 처리된 보기 목록
     const processedOptionsList = computed(() => {
-      return splitOptions(props.editedTexts.options)
+      const options = splitOptions(props.editedTexts.options)
+
+      // MathJax가 로드되어 있으면 raw LaTeX 반환, 아니면 스타일링된 LaTeX 반환
+      if (window.MathJax && window.MathJax.startup) {
+        return options // raw LaTeX for MathJax processing
+      } else {
+        // MathJax가 없을 때 LaTeX 스타일링
+        return options.map(option => styleLatexCode(option))
+      }
     })
+
+    // LaTeX 코드 스타일링 함수 (MathJax 없을 때)
+    const styleLatexCode = (text) => {
+      if (!text) return text
+
+      // LaTeX 패턴 감지 및 스타일링
+      return text.replace(/\$([^$]+)\$/g, '<span class="latex-code-display">$1</span>')
+                 .replace(/\\([a-zA-Z]+)/g, '<span class="latex-command">\\$1</span>')
+    }
 
     // 유효한 지문 이미지가 있는지 확인
     const hasValidPassageImage = computed(() => {
-      // selectedAreas에 question 영역이 있고, passage가 유효한 이미지 데이터인지 확인
-      return props.selectedAreas?.question &&
-             props.passage &&
-             props.passage.trim() !== '' &&
-             (props.passage.startsWith('data:image/') || props.passage.startsWith('http'))
+      // passage 텍스트가 있고, captureFullImg prop이 있는지 확인
+      return props.editedTexts.question &&
+             props.editedTexts.question.trim() !== '' &&
+             props.captureFullImg &&
+             props.captureFullImg.trim() !== '' &&
+             (props.captureFullImg.startsWith('data:image/') || props.captureFullImg.startsWith('http'))
     })
 
     // MathJax 렌더링 함수
@@ -325,7 +368,7 @@ export default {
         await new Promise(resolve => setTimeout(resolve, 100))
 
         // 미리보기 영역 요소들 찾기
-        const previewElements = document.querySelectorAll('.passage-content, .problem-content, .image-content, .option-content')
+        const previewElements = document.querySelectorAll('.passage-content, .problem-content, .option-content')
         console.log(`Step3 미리보기 영역 ${previewElements.length}개 발견:`, Array.from(previewElements).map(el => el.className))
 
         for (const element of previewElements) {
@@ -916,6 +959,14 @@ export default {
       }
     })
 
+    // captureFullImg 변경 시 MathJax 렌더링
+    watch(() => props.captureFullImg, async (newImg) => {
+      if (newImg) {
+        await nextTick()
+        await renderPreviewMathJax()
+      }
+    })
+
     // 문제 정보 변경 시 부모 컴포넌트에 전달
     watch(problemInfo, (newProblemInfo, oldProblemInfo) => {
       console.log('🔄 [Step3InfoInput] 문제 정보 변경 감지')
@@ -1040,7 +1091,9 @@ export default {
       loadChapters,
       loadMiddleChapters,
       loadMinorChapters,
-      loadTopicChapters
+      loadTopicChapters,
+      styleLatexCode,
+      formatOptionsWithLineBreaks
     }
   }
 }
@@ -1463,6 +1516,25 @@ export default {
   to {
     transform: rotate(360deg);
   }
+}
+
+/* LaTeX 코드 스타일링 (MathJax가 로드되지 않은 경우) */
+.latex-code-display {
+  display: inline-block;
+  font-family: 'Courier New', monospace;
+  background: #f0f8ff;
+  padding: 2px 4px;
+  border-radius: 3px;
+  border: 1px solid #d0e7ff;
+  color: #1e40af;
+  font-size: 0.9em;
+  margin: 0 1px;
+}
+
+.latex-command {
+  color: #dc2626;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
 }
 
 /* 반응형 디자인 */

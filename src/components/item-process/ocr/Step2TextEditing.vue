@@ -40,7 +40,7 @@
 
           <div v-if="localEditedTexts[currentEditingArea] && localEditedTexts[currentEditingArea].trim()" class="ocr-text">
             <!-- LaTeX 렌더링이 적용된 텍스트 표시 -->
-            <div v-html="renderedOcrText"></div>
+            <div class="ocr-text-content tex2jax_process" v-html="renderedOcrText"></div>
 
           </div>
           <div v-else class="no-ocr">
@@ -54,17 +54,17 @@
         <div class="ocr-actions">
           <button
             @click="copyOcrToEditor"
-            class="btn btn-primary btn-sm me-2"
+            class="btn btn-primary btn-sm me-2 mb-2 w-50"
             :disabled="!localEditedTexts[currentEditingArea]"
           >
-            <i class="bi bi-arrow-clockwise me-1"></i>에디터 새로고침
+            <i class="bi bi-arrow-clockwise me-1 "></i>에디터 새로고침
           </button>
           <button
             @click="syncEditorToPreview"
-            class="btn btn-success btn-sm"
+            class="btn btn-success btn-sm mb-2 w-50"
             :disabled="!editorInstance"
           >
-            <i class="bi bi-arrow-down-circle me-1"></i>미리보기 동기화
+            <i class="bi bi-arrow-down-circle me-1 "></i>미리보기 동기화
           </button>
         </div>
       </div>
@@ -108,12 +108,7 @@
             >
               도형
             </button>
-            <button
-              @click="activeToolTab = 'templates'"
-              :class="['tool-tab', { active: activeToolTab === 'templates' }]"
-            >
-              템플릿
-            </button>
+
           </div>
 
           <div class="tool-content-container">
@@ -164,8 +159,27 @@
             <!-- 도형 도구 -->
             <div v-if="activeToolTab === 'shapes'" class="tool-content shape-tools">
               <div class="tool-sections">
+                <!-- LaTeX 기반 도형 (수정 가능) -->
                 <div class="tool-section">
-                  <h6>도형타입</h6>
+                  <h6>LaTeX 도형 (수정 가능)</h6>
+                  <div class="shape-buttons">
+                    <button @click="insertMath('\\bigcirc')" class="shape-btn">원 ○</button>
+                    <button @click="insertMath('\\triangle')" class="shape-btn">삼각형 △</button>
+                    <button @click="insertMath('\\square')" class="shape-btn">사각형 □</button>
+                    <button @click="insertMath('\\diamond')" class="shape-btn">다이아몬드 ◇</button>
+                    <button @click="insertMath('\\overline{AB}')" class="shape-btn">직선 AB</button>
+                    <button @click="insertMath('\\angle ABC')" class="shape-btn">각도 ∠ABC</button>
+                    <button @click="insertMath('AB \\parallel CD')" class="shape-btn">평행선 ∥</button>
+                    <button @click="insertMath('AB \\perp CD')" class="shape-btn">수직선 ⊥</button>
+                  </div>
+                  <div class="mt-2">
+                    <small class="text-muted">※ LaTeX 도형은 에디터에서 직접 수정 가능합니다</small>
+                  </div>
+                </div>
+
+                <!-- 기존 도형 도구 (수정 불가) -->
+                <div class="tool-section">
+                  <h6>기존 도형 도구 (수정 불가)</h6>
                   <select v-model="selectedShapeType" class="form-select form-select-sm">
                     <option value="circle">원</option>
                     <option value="rectangle">사각형</option>
@@ -183,14 +197,13 @@
                 <div class="tool-section">
                   <h6>텍스트 / 수식</h6>
                   <input v-model="shapeText" placeholder="텍스트" class="form-control form-control-sm mb-2" />
-                  <input v-model="shapeLatex" placeholder="LaTeX 수식" class="form-control form-control-sm" />
+                  <input v-model="shapeLatex" placeholder="예: \\triangle ABC, \\angle A, \\frac{a}{b}" class="form-control form-control-sm" />
                 </div>
                 <div class="tool-section">
                   <h6>(LaTeX) 미리보기</h6>
                   <div class="shape-preview" v-html="shapePreviewHtml"></div>
                   <div class="shape-actions">
-                    <button @click="insertShape" class="btn btn-success btn-sm">도형 삽입</button>
-                    <button @click="exportShape" class="btn btn-outline-primary btn-sm">내보내기</button>
+                    <button @click="exportShapeAsSvg" class="btn btn-primary btn-sm">SVG 내보내기</button>
                   </div>
                 </div>
               </div>
@@ -324,7 +337,90 @@ export default {
     const shapeStrokeWidth = ref(2)
     const shapeText = ref('')
     const shapeLatex = ref('')
-    const shapePreviewHtml = ref('')
+
+        // 도형 미리보기 (computed로 변경)
+    const shapePreviewHtml = computed(() => {
+      if (!shapeLatex.value && !shapeText.value && !selectedShapeType.value) {
+        return '<div class="text-muted">미리보기</div>'
+      }
+
+      let previewContent = ''
+
+      // 실제 도형 시각화 추가
+      const shapeStyle = `
+        width: ${shapeSize.value}px;
+        height: ${shapeSize.value}px;
+        border: ${shapeStrokeWidth.value}px solid ${shapeColor.value};
+        background-color: ${shapeColor.value}20;
+        margin: 0 auto 1rem auto;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      `
+
+      // 선택된 도형 타입에 따른 시각적 표현
+      let shapeElement = ''
+      const textContent = shapeText.value ? `<span style="color: ${shapeColor.value}; font-weight: bold;">${shapeText.value}</span>` : ''
+
+      switch (selectedShapeType.value) {
+        case 'circle':
+          shapeElement = `<div class="shape-visual circle" style="${shapeStyle} border-radius: 50%;">${textContent}</div>`
+          break
+        case 'rectangle':
+          shapeElement = `<div class="shape-visual rectangle" style="${shapeStyle} border-radius: 4px;">${textContent}</div>`
+          break
+        case 'triangle': {
+          // 삼각형을 SVG로 그려서 색상 제어
+          const triangleSize = shapeSize.value
+          const strokeWidth = shapeStrokeWidth.value
+          shapeElement = `
+            <div class="shape-visual triangle" style="margin: 0 auto 1rem auto; position: relative;">
+              <svg width="${triangleSize}" height="${triangleSize}" viewBox="0 0 ${triangleSize} ${triangleSize}">
+                <polygon
+                  points="${triangleSize/2},${strokeWidth} ${strokeWidth},${triangleSize-strokeWidth} ${triangleSize-strokeWidth},${triangleSize-strokeWidth}"
+                  fill="${shapeColor.value}20"
+                  stroke="${shapeColor.value}"
+                  stroke-width="${strokeWidth}"
+                />
+              </svg>
+            </div>
+          `
+          if (textContent) {
+            shapeElement += `<div style="text-align: center; margin-top: -${triangleSize/2}px; color: ${shapeColor.value}; font-weight: bold;">${textContent}</div>`
+          }
+          break
+        }
+        default:
+          shapeElement = `<div class="shape-visual default" style="${shapeStyle} border-radius: 4px;">${textContent}</div>`
+      }
+
+      previewContent += shapeElement
+
+      // LaTeX 수식이 있으면 렌더링 (텍스트와 별도로)
+      if (shapeLatex.value) {
+        previewContent += `<div class="shape-latex-preview">$${shapeLatex.value}$</div>`
+      } else if (selectedShapeType.value) {
+        // LaTeX 수식이 없을 때 예시 표시
+        let exampleLatex = ''
+        switch (selectedShapeType.value) {
+          case 'circle':
+            exampleLatex = '\\bigcirc'
+            break
+          case 'rectangle':
+            exampleLatex = '\\square'
+            break
+          case 'triangle':
+            exampleLatex = '\\triangle ABC'
+            break
+          default:
+            exampleLatex = '\\square'
+        }
+        previewContent += `<div class="shape-latex-preview ">예시: $${exampleLatex}$</div>`
+      }
+
+      return previewContent
+    })
 
     // 보기 선택 기능
     const selectedOptions = ref([true, false, false, false, false]) // 첫 번째는 기본 선택
@@ -351,14 +447,37 @@ export default {
       return detectQuestionType(props.editedTexts.question, props.editedTexts.options)
     })
 
-    // 보기 텍스트를 항목별로 분리하는 함수
+        // 보기 텍스트를 항목별로 분리하는 함수
     const splitOptions = (optionsText) => {
       if (!optionsText) return []
 
-      // (1), (2), (3) 패턴으로 자동 분리
-      const parts = optionsText.split(/\(\d+\)/)
-      return parts.filter(part => part.trim()).map(part => part.trim())
+      // 옵션을 수동으로 분리하는 방법
+      const options = []
+      const parts = optionsText.split(/(?=\(\d+\))/g) // (숫자) 앞에서 분리
+
+      for (const part of parts) {
+        if (part.trim()) {
+          // (숫자) 부분을 제거하고 나머지 내용만 추출
+          const content = part.replace(/\(\d+\)\s*/, '').trim()
+          if (content) {
+            options.push(content)
+          }
+        }
+      }
+
+      return options
     }
+
+    // 보기 텍스트를 줄바꿈이 포함된 형태로 변환하는 함수 (새로운 방식)
+    const formatOptionsWithLineBreaks = (optionsText) => {
+      if (!optionsText) return ''
+
+      // splitOptions를 사용해서 각 옵션을 분리한 후 줄바꿈으로 연결
+      const options = splitOptions(optionsText)
+      return options.join('\n')
+    }
+
+
 
     // 보기 목록 computed
     const optionsList = computed(() => {
@@ -403,7 +522,16 @@ export default {
       { id: 5, name: '원의 넓이', latex: 'A = \\pi r^2', preview: 'A = πr²', category: 'geometry' },
       { id: 6, name: '미분', latex: '\\frac{d}{dx}f(x)', preview: 'd/dx f(x)', category: 'calculus' },
       { id: 7, name: '적분', latex: '\\int_a^b f(x) dx', preview: '∫ₐᵇ f(x) dx', category: 'calculus' },
-      { id: 8, name: '평균', latex: '\\bar{x} = \\frac{1}{n}\\sum_{i=1}^{n} x_i', preview: 'x̄ = (1/n)Σxᵢ', category: 'statistics' }
+      { id: 8, name: '평균', latex: '\\bar{x} = \\frac{1}{n}\\sum_{i=1}^{n} x_i', preview: 'x̄ = (1/n)Σxᵢ', category: 'statistics' },
+      // 도형 LaTeX 템플릿 추가
+      { id: 9, name: '원', latex: '\\bigcirc', preview: '○', category: 'shapes' },
+      { id: 10, name: '삼각형', latex: '\\triangle', preview: '△', category: 'shapes' },
+      { id: 11, name: '사각형', latex: '\\square', preview: '□', category: 'shapes' },
+      { id: 12, name: '다이아몬드', latex: '\\diamond', preview: '◇', category: 'shapes' },
+      { id: 13, name: '직선', latex: '\\overline{AB}', preview: 'AB', category: 'shapes' },
+      { id: 14, name: '각도', latex: '\\angle ABC', preview: '∠ABC', category: 'shapes' },
+      { id: 15, name: '평행선', latex: 'AB \\parallel CD', preview: 'AB ∥ CD', category: 'shapes' },
+      { id: 16, name: '수직선', latex: 'AB \\perp CD', preview: 'AB ⊥ CD', category: 'shapes' }
     ])
 
     // TinyMCE 설정 (에디터 내 MathJax 렌더링 비활성화)
@@ -509,7 +637,6 @@ export default {
       const labels = {
         question: '지문',
         problem: '문제',
-        image: '이미지',
         options: '보기'
       }
       return labels[areaType] || areaType
@@ -522,7 +649,28 @@ export default {
       }
 
       const currentArea = props.selectedAreas[props.currentEditingArea]
+
+      // 좌표 정보 디버깅
+      console.log('Step2 - 현재 영역 정보:', {
+        areaType: props.currentEditingArea,
+        area: currentArea,
+        좌표정보: {
+          화면좌표: { x: currentArea.x, y: currentArea.y, width: currentArea.width, height: currentArea.height },
+          원본좌표: { x: currentArea.originalX, y: currentArea.originalY, width: currentArea.originalWidth, height: currentArea.originalHeight },
+          줌레벨: currentArea.zoomLevel
+        }
+      })
+
       return currentArea.imageData || null
+    }
+
+    // 현재 영역의 정보 가져오기
+    const getCurrentAreaInfo = () => {
+      if (!props.currentEditingArea || !props.selectedAreas[props.currentEditingArea]) {
+        return null
+      }
+
+      return props.selectedAreas[props.currentEditingArea]
     }
 
     // 편집 영역 전환 상태 (중복 호출 방지)
@@ -880,9 +1028,106 @@ export default {
       }
     }
 
-    // 도형 내보내기
-    const exportShape = () => {
-      // 도형 내보내기 로직
+    // 도형 SVG 내보내기
+    const exportShapeAsSvg = () => {
+      if (!selectedShapeType.value) {
+        alert('도형을 먼저 선택해주세요.')
+        return
+      }
+
+      try {
+        // 도형 정보 수집
+        const shapeData = {
+          type: selectedShapeType.value,
+          color: shapeColor.value,
+          size: shapeSize.value,
+          strokeWidth: shapeStrokeWidth.value,
+          text: shapeText.value,
+          latex: shapeLatex.value
+        }
+
+        // SVG 생성
+        let svgContent = ''
+        const padding = 20
+        const totalSize = shapeData.size + (padding * 2)
+
+        if (shapeData.type === 'triangle') {
+          // 삼각형 SVG
+          svgContent = `
+            <svg width="${totalSize}" height="${totalSize}" viewBox="0 0 ${totalSize} ${totalSize}" xmlns="http://www.w3.org/2000/svg">
+              <polygon
+                points="${totalSize/2},${padding + shapeData.strokeWidth} ${padding + shapeData.strokeWidth},${totalSize - padding - shapeData.strokeWidth} ${totalSize - padding - shapeData.strokeWidth},${totalSize - padding - shapeData.strokeWidth}"
+                fill="${shapeData.color}20"
+                stroke="${shapeData.color}"
+                stroke-width="${shapeData.strokeWidth}"
+              />
+              ${shapeData.text ? `<text x="${totalSize/2}" y="${totalSize/2 + 5}" text-anchor="middle" fill="${shapeData.color}" font-family="Arial, sans-serif" font-weight="bold" font-size="14">${shapeData.text}</text>` : ''}
+              ${shapeData.latex ? `<text x="${totalSize/2}" y="${totalSize - 5}" text-anchor="middle" fill="${shapeData.color}" font-family="Arial, sans-serif" font-size="12">${shapeData.latex}</text>` : ''}
+            </svg>
+          `
+        } else if (shapeData.type === 'circle') {
+          // 원 SVG
+          const centerX = totalSize / 2
+          const centerY = totalSize / 2
+          const radius = (shapeData.size - shapeData.strokeWidth) / 2
+
+          svgContent = `
+            <svg width="${totalSize}" height="${totalSize}" viewBox="0 0 ${totalSize} ${totalSize}" xmlns="http://www.w3.org/2000/svg">
+              <circle
+                cx="${centerX}"
+                cy="${centerY}"
+                r="${radius}"
+                fill="${shapeData.color}20"
+                stroke="${shapeData.color}"
+                stroke-width="${shapeData.strokeWidth}"
+              />
+              ${shapeData.text ? `<text x="${centerX}" y="${centerY + 5}" text-anchor="middle" fill="${shapeData.color}" font-family="Arial, sans-serif" font-weight="bold" font-size="14">${shapeData.text}</text>` : ''}
+              ${shapeData.latex ? `<text x="${centerX}" y="${totalSize - 5}" text-anchor="middle" fill="${shapeData.color}" font-family="Arial, sans-serif" font-size="12">${shapeData.latex}</text>` : ''}
+            </svg>
+          `
+        } else {
+          // 사각형 SVG
+          const rectX = padding + shapeData.strokeWidth / 2
+          const rectY = padding + shapeData.strokeWidth / 2
+          const rectWidth = shapeData.size - shapeData.strokeWidth
+          const rectHeight = shapeData.size - shapeData.strokeWidth
+
+          svgContent = `
+            <svg width="${totalSize}" height="${totalSize}" viewBox="0 0 ${totalSize} ${totalSize}" xmlns="http://www.w3.org/2000/svg">
+              <rect
+                x="${rectX}"
+                y="${rectY}"
+                width="${rectWidth}"
+                height="${rectHeight}"
+                fill="${shapeData.color}20"
+                stroke="${shapeData.color}"
+                stroke-width="${shapeData.strokeWidth}"
+                rx="4"
+              />
+              ${shapeData.text ? `<text x="${totalSize/2}" y="${totalSize/2 + 5}" text-anchor="middle" fill="${shapeData.color}" font-family="Arial, sans-serif" font-weight="bold" font-size="14">${shapeData.text}</text>` : ''}
+              ${shapeData.latex ? `<text x="${totalSize/2}" y="${totalSize - 5}" text-anchor="middle" fill="${shapeData.color}" font-family="Arial, sans-serif" font-size="12">${shapeData.latex}</text>` : ''}
+            </svg>
+          `
+        }
+
+        // SVG 파일 다운로드
+        const blob = new Blob([svgContent], { type: 'image/svg+xml' })
+        const url = URL.createObjectURL(blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `shape_${shapeData.type}_${Date.now()}.svg`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+        URL.revokeObjectURL(url)
+
+        console.log('SVG 내보내기 성공:', shapeData)
+        alert('SVG 파일이 다운로드되었습니다.')
+
+      } catch (error) {
+        console.error('SVG 내보내기 실패:', error)
+        alert('SVG 내보내기에 실패했습니다.')
+      }
     }
 
     // 템플릿 로드
@@ -1185,11 +1430,24 @@ export default {
         console.log('MathJax 재렌더링 시작')
 
         // OCR 텍스트 영역 찾기
-        const ocrTextElement = document.querySelector('.ocr-text > div') ||
+        const ocrTextElement = document.querySelector('.ocr-text-content') ||
+                               document.querySelector('.ocr-text > div') ||
                                document.querySelector('.ocr-text')
         if (ocrTextElement) {
           console.log('OCR 텍스트 영역 렌더링:', ocrTextElement)
-          await renderMathJax(ocrTextElement, { clearFirst: false })
+
+          // MathJax가 로드된 경우 강제 렌더링
+          if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+            try {
+              await window.MathJax.typesetPromise([ocrTextElement])
+              console.log('OCR 텍스트 영역 MathJax 강제 렌더링 성공')
+            } catch (error) {
+              console.warn('OCR 텍스트 영역 MathJax 강제 렌더링 실패, 기본 렌더링 시도:', error)
+              await renderMathJax(ocrTextElement, { clearFirst: false })
+            }
+          } else {
+            await renderMathJax(ocrTextElement, { clearFirst: false })
+          }
         }
 
         // 미리보기 영역들 찾기 (더 정확한 선택자)
@@ -1256,18 +1514,27 @@ export default {
 
       console.log('renderedOcrText: 텍스트 렌더링 시작')
 
-      // 동기적으로 처리하고 Promise가 아닌 문자열 반환 보장
-      try {
-        const styledResult = styleLatexCode(currentText)
-        // Promise인지 확인
-        if (styledResult instanceof Promise) {
-          console.warn('styleLatexCode가 Promise를 반환함')
-          return currentText // Promise인 경우 원본 텍스트 반환
+      // 보기 영역이고 주관식인 경우 줄바꿈 처리 적용
+      let textToProcess = currentText
+      if (props.currentEditingArea === 'options' && questionType.value === 'subjective') {
+        textToProcess = formatOptionsWithLineBreaks(currentText)
+        console.log('OCR 텍스트에 줄바꿈 처리 적용:', textToProcess)
+      }
+
+      // MathJax가 로드된 경우 LaTeX 코드를 그대로 반환 (렌더링은 별도로 처리)
+      if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+        console.log('MathJax가 로드됨, LaTeX 코드 반환:', textToProcess)
+        return textToProcess
+      } else {
+        // MathJax가 로드되지 않은 경우 스타일링된 코드 반환
+        console.log('MathJax가 로드되지 않음, 스타일링된 코드 반환')
+        try {
+          const styledResult = styleLatexCode(textToProcess)
+          return styledResult
+        } catch (error) {
+          console.error('styleLatexCode 오류:', error)
+          return textToProcess
         }
-        return styledResult
-      } catch (error) {
-        console.error('styleLatexCode 오류:', error)
-        return currentText // 오류 시 원본 텍스트 반환
       }
     })
 
@@ -1289,6 +1556,12 @@ export default {
         localEditedTexts: localEditedTexts.value
       })
       if (!text) return ''
+
+      // 주관식 보기인 경우 줄바꿈이 포함된 형태로 변환
+      if (questionType.value === 'subjective') {
+        return formatOptionsWithLineBreaks(text)
+      }
+
       return text // 원본 LaTeX 텍스트 반환
     })
 
@@ -1334,6 +1607,49 @@ export default {
         // 보기 영역 변경 시 강제 MathJax 렌더링
         await nextTick()
         await renderOptionsMathJax()
+      }
+    })
+
+    // 도형 LaTeX 변경 시 미리보기 렌더링
+    watch([shapeLatex, shapeText, selectedShapeType], async () => {
+      await nextTick()
+      const previewElement = document.querySelector('.shape-preview')
+      if (previewElement) {
+        try {
+          // MathJax가 로드되어 있으면 렌더링
+          if (window.MathJax && window.MathJax.typesetPromise) {
+            await window.MathJax.typesetPromise([previewElement])
+          } else {
+            // MathJax가 없으면 기본 렌더링
+            await renderLatexContent(previewElement.innerHTML)
+          }
+        } catch (error) {
+          console.warn('도형 미리보기 렌더링 실패:', error)
+        }
+      }
+    })
+
+    // OCR 텍스트 변경 시 MathJax 렌더링
+    watch(() => localEditedTexts.value[props.currentEditingArea], async (newText) => {
+      if (newText && (newText.includes('$') || newText.includes('\\'))) {
+        console.log('OCR 텍스트 변경 감지, MathJax 렌더링 실행:', newText.substring(0, 100))
+
+        // DOM 업데이트 대기
+        await nextTick()
+
+        // OCR 텍스트 영역에 MathJax 렌더링 적용
+        const ocrTextElement = document.querySelector('.ocr-text-content') ||
+                               document.querySelector('.ocr-text > div') ||
+                               document.querySelector('.ocr-text')
+        if (ocrTextElement) {
+          console.log('OCR 텍스트 영역 MathJax 렌더링 시작')
+          try {
+            await renderMathJax(ocrTextElement, { clearFirst: false })
+            console.log('OCR 텍스트 영역 MathJax 렌더링 완료')
+          } catch (error) {
+            console.warn('OCR 텍스트 영역 MathJax 렌더링 실패:', error)
+          }
+        }
       }
     })
 
@@ -1464,13 +1780,14 @@ LaTeX 수식 예시:
             ensureMathJaxLoaded,
       getAreaTypeLabel,
       getCurrentAreaImage,
+      getCurrentAreaInfo,
       selectEditingArea,
       copyOcrToEditor,
       syncEditorToPreview,
       updateEditedText,
       insertMath,
       insertShape,
-      exportShape,
+      exportShapeAsSvg,
       loadTemplate,
       togglePreview,
       prevStep,
@@ -1496,7 +1813,8 @@ LaTeX 수식 예시:
       selectedOptionsText,
       initializeOptionsSelection,
       questionType,
-      localEditedTexts
+      localEditedTexts,
+      formatOptionsWithLineBreaks
     }
   }
 }
@@ -1589,6 +1907,14 @@ LaTeX 수식 예시:
   border-radius: 4px;
 }
 
+.coordinate-info {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+}
+
 .no-image,
 .no-ocr {
   display: flex;
@@ -1608,12 +1934,20 @@ LaTeX 수식 예시:
   font-family: monospace;
   font-size: 0.875rem;
   line-height: 1.4;
-  white-space: pre-wrap;
+  white-space: pre-line; /* 줄바꿈 문자를 실제 줄바꿈으로 표시 */
+  word-break: break-word;
+}
+
+.ocr-text-content {
+  font-family: inherit; /* MathJax 렌더링을 위해 monospace 제거 */
+  white-space: pre-line;
   word-break: break-word;
 }
 
 .ocr-actions {
-  margin-top: 0.75rem;
+  display: flex;
+  align-content: space-around;
+  padding: 1rem;
 }
 
 /* 우측 영역 */
@@ -1981,6 +2315,7 @@ LaTeX 수식 예시:
 .options-text {
   line-height: 1.6;
   color: #495057;
+  white-space: pre-line; /* 줄바꿈 문자를 실제 줄바꿈으로 표시 */
 }
 
 /* MathJax 렌더링 스타일링 (기존 시스템 사용) */
@@ -2004,6 +2339,74 @@ LaTeX 수식 예시:
   padding: 0.25em 0.5em;
   border-radius: 0.25em;
   font-family: monospace;
+}
+
+/* LaTeX 도형 버튼 스타일 */
+.shape-buttons {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.shape-btn {
+  padding: 0.5rem;
+  border: 1px solid #dee2e6;
+  background: white;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s ease;
+  text-align: center;
+}
+
+.shape-btn:hover {
+  background: #e9ecef;
+  border-color: #007bff;
+}
+
+.shape-btn:active {
+  background: #007bff;
+  color: white;
+}
+
+/* 도형 미리보기 스타일 */
+.shape-preview {
+  min-height: 120px;
+  padding: 1rem;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  background: #f8f9fa;
+  margin-bottom: 1rem;
+  text-align: center;
+}
+
+.shape-visual {
+  transition: all 0.3s ease;
+}
+
+.shape-visual:hover {
+  transform: scale(1.05);
+}
+
+.shape-latex-preview {
+  margin-top: 1rem;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
+}
+
+.shape-latex-preview.placeholder {
+  background: #f8f9fa;
+  border: 1px dashed #dee2e6;
+  color: #6c757d;
+  font-style: italic;
+}
+
+.shape-text-preview {
+  font-size: 0.9rem;
+  color: #495057;
 }
 
 /* LaTeX 코드 스타일링 (KaTeX가 로드되지 않은 경우) */
