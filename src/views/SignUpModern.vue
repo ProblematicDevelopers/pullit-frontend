@@ -1,7 +1,7 @@
 <template>
   <div class="signup-page">
     <Header />
-    
+
     <!-- Animated Background -->
     <div class="background-animation">
       <div class="gradient-sphere sphere-1"></div>
@@ -25,12 +25,12 @@
       <div class="signup-card">
         <!-- Step Indicators -->
         <div class="step-indicators">
-          <div 
-            v-for="step in 3" 
+          <div
+            v-for="step in 3"
             :key="step"
             class="step-indicator"
-            :class="{ 
-              'active': signupStep === step, 
+            :class="{
+              'active': signupStep === step,
               'completed': signupStep > step,
               'oauth-skipped': step === 2 && signupForm.isOAuth2User && signupStep > 1
             }"
@@ -62,8 +62,8 @@
             <!-- Terms Agreement -->
             <div class="terms-section">
               <label class="checkbox-group main-checkbox">
-                <input 
-                  type="checkbox" 
+                <input
+                  type="checkbox"
                   v-model="agreements.all"
                   @change="toggleAllAgreements"
                   class="checkbox-input"
@@ -76,8 +76,8 @@
 
               <div class="terms-list">
                 <label class="checkbox-group">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     v-model="agreements.terms"
                     @change="checkIndividualAgreements"
                     class="checkbox-input"
@@ -90,8 +90,8 @@
                 </label>
 
                 <label class="checkbox-group">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     v-model="agreements.privacy"
                     @change="checkIndividualAgreements"
                     class="checkbox-input"
@@ -104,8 +104,8 @@
                 </label>
 
                 <label class="checkbox-group">
-                  <input 
-                    type="checkbox" 
+                  <input
+                    type="checkbox"
                     v-model="agreements.marketing"
                     @change="checkIndividualAgreements"
                     class="checkbox-input"
@@ -259,9 +259,9 @@
                     @input="checkUsernameAvailability"
                     placeholder="username"
                     class="form-input with-icon"
-                    :class="{ 
-                      'valid': usernameAvailable, 
-                      'invalid': !usernameAvailable && signupForm.username 
+                    :class="{
+                      'valid': usernameAvailable,
+                      'invalid': !usernameAvailable && signupForm.username
                     }"
                     required
                   >
@@ -286,9 +286,9 @@
                     @blur="checkEmailFormat"
                     placeholder="example@email.com"
                     class="form-input with-icon"
-                    :class="{ 
-                      'valid': emailValid, 
-                      'invalid': !emailValid && signupForm.email 
+                    :class="{
+                      'valid': emailValid,
+                      'invalid': !emailValid && signupForm.email
                     }"
                     required
                   >
@@ -441,7 +441,7 @@
                 <X :size="24" />
               </button>
             </div>
-            
+
             <div class="modal-body">
               <div class="search-input-wrapper">
                 <Search :size="20" class="search-icon" />
@@ -505,7 +505,7 @@
               <div class="terms-content">
                 <h4>제1조 (목적)</h4>
                 <p>이 약관은 PullIt(이하 "회사")이 제공하는 교육 서비스의 이용과 관련하여 회사와 회원과의 권리, 의무 및 책임사항, 기타 필요한 사항을 규정함을 목적으로 합니다.</p>
-                
+
                 <h4>제2조 (정의)</h4>
                 <p>1. "서비스"라 함은 회사가 제공하는 교육 관련 서비스를 의미합니다.</p>
                 <p>2. "회원"이라 함은 회사의 서비스에 접속하여 이 약관에 따라 회사와 이용계약을 체결하고 회사가 제공하는 서비스를 이용하는 고객을 의미합니다.</p>
@@ -531,7 +531,7 @@
               <div class="privacy-content">
                 <h4>1. 개인정보의 처리 목적</h4>
                 <p>회사는 다음의 목적을 위하여 개인정보를 처리합니다.</p>
-                
+
                 <h4>2. 개인정보의 처리 및 보유기간</h4>
                 <p>회사는 법령에 따른 개인정보 보유·이용기간 내에서 개인정보를 처리·보유합니다.</p>
               </div>
@@ -549,16 +549,16 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import axios from 'axios'
-import { 
-  User, 
-  Mail, 
-  Phone, 
-  Lock, 
-  Search, 
-  Check, 
-  ArrowRight, 
-  ArrowLeft, 
-  Eye, 
+import {
+  User,
+  Mail,
+  Phone,
+  Lock,
+  Search,
+  Check,
+  ArrowRight,
+  ArrowLeft,
+  Eye,
   EyeOff,
   School,
   UserCheck,
@@ -657,9 +657,9 @@ const canProceedToNextStep = computed(() => {
 
 const canCompleteSignup = computed(() => {
   return signupForm.value.fullName &&
-         signupForm.value.username && 
+         signupForm.value.username &&
          usernameAvailable.value &&
-         signupForm.value.email && 
+         signupForm.value.email &&
          emailValid.value &&
          (signupForm.value.isOAuth2User || signupForm.value.password) &&
          signupForm.value.birthDate &&
@@ -832,7 +832,8 @@ const checkUsernameAvailability = async () => {
 
   try {
     const response = await axios.get(`${apiBaseUrl}/users/check/username/${signupForm.value.username}`)
-    if (response.data.success) {
+    const isAvailable = response?.data?.data === true
+    if (isAvailable) {
       usernameCheckMessage.value = '사용 가능한 아이디입니다'
       usernameAvailable.value = true
     } else {
@@ -966,8 +967,8 @@ const handleSignup = async () => {
       username: signupForm.value.username,
       password: signupForm.value.password || 'SOCIAL_LOGIN_' + Date.now(),
       email: signupForm.value.email,
-      phone: signupForm.value.isOAuth2User ? 
-        formatPhoneForAPI(signupForm.value.phoneNumber || '') : 
+      phone: signupForm.value.isOAuth2User ?
+        formatPhoneForAPI(signupForm.value.phoneNumber || '') :
         formatPhoneForAPI(signupForm.value.phone || ''),
       fullName: signupForm.value.fullName,
       role: signupForm.value.userType.toUpperCase(),
@@ -984,16 +985,16 @@ const handleSignup = async () => {
         'SC': { code: 'SC', name: '과학' },
         'SO': { code: 'SO', name: '사회' }
       }
-      
+
       const selectedSubject = subjectMapping[signupForm.value.subject] || { code: '', name: '' }
-      
+
       signupData.teacherInfo = {
         schoolName: signupForm.value.school,
         areaCode: selectedSubject.code,
         areaName: selectedSubject.name
       }
     }
-    
+
     if (signupForm.value.userType === 'student') {
       signupData.studentInfo = {
         classGroupId: null,
@@ -1017,30 +1018,30 @@ const handleSignup = async () => {
 const checkOAuth2Info = () => {
   const urlParams = new URLSearchParams(window.location.search)
   const isOAuth2 = urlParams.get('oauth2')
-  
+
   if (isOAuth2 === 'true') {
     const provider = urlParams.get('provider')
     const email = urlParams.get('email')
     const name = urlParams.get('name')
     const providerId = urlParams.get('providerId')
     const username = urlParams.get('username')
-    
+
     if (email) {
       signupForm.value.email = email
       checkEmailFormat()
     }
-    
+
     if (name) {
       signupForm.value.fullName = name
     }
-    
+
     if (username) {
       signupForm.value.username = username
       setTimeout(() => {
         checkUsernameAvailability()
       }, 500)
     }
-    
+
     signupForm.value.socialProvider = provider
     signupForm.value.socialProviderId = providerId
     signupForm.value.isOAuth2User = true

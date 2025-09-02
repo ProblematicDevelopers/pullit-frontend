@@ -28,7 +28,7 @@
             <!-- Notification Bell -->
             <NotificationBell />
             <span class="utility-divider">|</span>
-            
+
             <div class="user-welcome">
               <span class="welcome-text">{{ userDisplayName }}</span>
               <div class="user-menu" :class="{ open: isUserMenuOpen }">
@@ -151,9 +151,9 @@
           <!-- Student-specific menu items -->
           <template v-else>
             <router-link
-              to="/student/main"
+              to="/student/dashboard"
               class="nav-item"
-              :class="{ active: isCurrentRoute('/student/main') }"
+              :class="{ active: isCurrentRoute('/student/dashboard') }"
             >
               <svg viewBox="0 0 24 24" class="nav-icon">
                 <path d="M10 20V14H14V20H19V12H22L12 3L2 12H5V20H10Z" />

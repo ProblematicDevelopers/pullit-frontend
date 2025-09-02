@@ -13,18 +13,43 @@ import html2canvas from 'html2canvas'
  * @returns {Promise<Object>} 이미지 데이터 객체
  */
 export async function convertQuestionToImage(element, options = {}) {
+  // 먼저 모든 이미지가 로드될 때까지 대기
+  const images = element.querySelectorAll('img')
+  if (images.length > 0) {
+    console.log(`이미지 ${images.length}개 로드 대기 중...`)
+    await Promise.all(Array.from(images).map(img => {
+      if (img.complete) {
+        return Promise.resolve()
+      }
+      return new Promise((resolve, reject) => {
+        const tempImg = new Image()
+        tempImg.crossOrigin = 'anonymous'
+        tempImg.onload = () => {
+          console.log('이미지 로드 완료:', img.src)
+          resolve()
+        }
+        tempImg.onerror = (err) => {
+          console.error('이미지 로드 실패:', img.src, err)
+          resolve() // 에러가 나도 계속 진행
+        }
+        tempImg.src = img.src
+      })
+    }))
+  }
+
   const defaultOptions = {
     scale: 2, // 고해상도를 위한 스케일
     useCORS: true,
-    allowTaint: true,
+    allowTaint: false, // false로 변경하여 CORS 이미지 처리
     backgroundColor: '#ffffff',
     logging: true, // 디버깅을 위해 활성화
     letterRendering: true,
+    imageTimeout: 15000, // 이미지 로드 타임아웃 15초
     // width와 height를 자동으로 계산하도록 변경
     windowWidth: 794,
     foreignObjectRendering: false, // false로 변경하여 더 나은 호환성
     removeContainer: false, // 컨테이너 유지
-    onclone: (clonedDoc, clonedElement) => {
+    onclone: async (clonedDoc, clonedElement) => {
       // 클론된 요소 스타일 보정
       if (clonedElement) {
         // 클론된 요소가 화면에 보이도록 설정
@@ -33,15 +58,15 @@ export async function convertQuestionToImage(element, options = {}) {
         clonedElement.style.top = '0'
         clonedElement.style.padding = '20px'
         clonedElement.style.fontFamily = "'Noto Sans KR', -apple-system, BlinkMacSystemFont, sans-serif"
-        clonedElement.style.fontSize = '14px'
-        clonedElement.style.lineHeight = '1.8'
+        clonedElement.style.fontSize = '16px'  // 12pt는 16px에 해당
+        clonedElement.style.lineHeight = '2.0'  // 줄간격도 조금 늘림
         clonedElement.style.width = '794px'
         clonedElement.style.boxSizing = 'border-box'
         clonedElement.style.visibility = 'visible'
         clonedElement.style.opacity = '1'
         clonedElement.style.display = 'block'
         clonedElement.style.background = 'white'
-        
+
         // 모든 자식 요소들도 visible로 설정
         const allElements = clonedElement.querySelectorAll('*')
         allElements.forEach(el => {
@@ -52,14 +77,26 @@ export async function convertQuestionToImage(element, options = {}) {
             el.style.display = 'block'
           }
         })
-        
-        // 모든 이미지가 로드되었는지 확인
-        const images = clonedElement.querySelectorAll('img')
-        images.forEach(img => {
+
+        // 클론된 요소의 이미지들 처리
+        const clonedImages = clonedElement.querySelectorAll('img')
+        clonedImages.forEach(img => {
+          // CORS 설정
+          img.crossOrigin = 'anonymous'
+          // 이미지 스타일 보정
+          img.style.maxWidth = '100%'
+          img.style.height = 'auto'
+          img.style.display = 'inline-block'
+
           if (!img.complete) {
-            console.warn('이미지가 아직 로드되지 않음:', img.src)
+            console.warn('클론된 이미지가 아직 로드되지 않음:', img.src)
+          } else {
+            console.log('클론된 이미지 로드 완료:', img.src)
           }
         })
+
+        // 잠시 대기하여 이미지 렌더링 확실히 하기
+        await new Promise(resolve => setTimeout(resolve, 100))
       }
     }
   }
@@ -94,25 +131,25 @@ export async function convertQuestionToImage(element, options = {}) {
     // html2canvas로 이미지 변환
     console.log('html2canvas 시작...')
     const canvas = await html2canvas(element, { ...defaultOptions, ...options })
-    
+
     // 캔버스 생성 결과 확인
     console.log('캔버스 생성 완료:', {
       width: canvas.width,
       height: canvas.height,
       isEmpty: canvas.width === 0 || canvas.height === 0
     })
-    
+
     // 캔버스가 비어있는지 확인
     if (canvas.width === 0 || canvas.height === 0) {
       console.error('경고: 빈 캔버스가 생성되었습니다!')
     }
-    
+
     const dataUrl = canvas.toDataURL('image/png', 1.0)
     console.log('DataURL 생성:', {
       length: dataUrl.length,
       prefix: dataUrl.substring(0, 50)
     })
-    
+
     return {
       canvas: canvas,
       dataUrl: dataUrl,
@@ -136,7 +173,7 @@ export async function convertQuestionToImage(element, options = {}) {
  */
 export async function convertQuestionsToImages(questions, onProgress) {
   console.log('convertQuestionsToImages 시작:', questions)
-  
+
   const images = []
   const tempContainer = document.createElement('div')
   // html2canvas가 화면 밖 요소를 제대로 캡처하지 못하는 문제 해결
@@ -164,7 +201,7 @@ export async function convertQuestionsToImages(questions, onProgress) {
 
     for (let groupIdx = 0; groupIdx < groups.length; groupIdx++) {
       const group = groups[groupIdx]
-      
+
       // 1. 지문이 있으면 지문을 별도 이미지로 변환
       if (group.passage) {
         processedCount++
@@ -179,13 +216,13 @@ export async function convertQuestionsToImages(questions, onProgress) {
 
         const passageElement = createPassageElement(group.passage, group.questionNumbers)
         tempContainer.appendChild(passageElement)
-        
+
         // 요소가 실제로 렌더링되도록 보장
         passageElement.style.visibility = 'visible'
         passageElement.style.opacity = '1'
         passageElement.style.display = 'block'
         passageElement.style.position = 'relative'
-        
+
         // 강제 렌더링을 위한 대기
         await new Promise(resolve => {
           requestAnimationFrame(() => {
@@ -193,7 +230,7 @@ export async function convertQuestionsToImages(questions, onProgress) {
             setTimeout(resolve, 300) // 렌더링 완료 대기 시간 증가
           })
         })
-        
+
         const passageImage = await convertQuestionToImage(passageElement)
         images.push({
           ...passageImage,
@@ -203,7 +240,7 @@ export async function convertQuestionsToImages(questions, onProgress) {
             isPassage: true
           }
         })
-        
+
         tempContainer.removeChild(passageElement)
       }
 
@@ -211,7 +248,7 @@ export async function convertQuestionsToImages(questions, onProgress) {
       for (let i = 0; i < group.questions.length; i++) {
         const question = group.questions[i]
         processedCount++
-        
+
         if (onProgress) {
           onProgress({
             current: processedCount,
@@ -224,13 +261,52 @@ export async function convertQuestionsToImages(questions, onProgress) {
         // 문제와 보기를 함께 포함한 요소 생성
         const questionElement = createQuestionWithChoicesElement(question)
         tempContainer.appendChild(questionElement)
-        
+
         // 요소가 실제로 렌더링되도록 보장
         questionElement.style.visibility = 'visible'
         questionElement.style.opacity = '1'
         questionElement.style.display = 'block'
         questionElement.style.position = 'relative'
-        
+
+        // 문제 요소 내의 모든 이미지 로드 대기
+        const questionImages = questionElement.querySelectorAll('img')
+        if (questionImages.length > 0) {
+          console.log(`문제 ${question.displayNumber}의 이미지 ${questionImages.length}개 로드 대기 중...`)
+
+          // 각 이미지에 대해 처리
+          for (const img of questionImages) {
+            // 이미지 스타일 강제 적용
+            img.style.maxWidth = '100%'
+            img.style.height = 'auto'
+            img.style.display = 'inline-block'
+
+            if (!img.complete) {
+              await new Promise((resolve) => {
+                img.onload = () => {
+                  console.log(`문제 ${question.displayNumber} 이미지 로드 완료:`, img.src)
+                  resolve()
+                }
+                img.onerror = () => {
+                  console.error(`문제 ${question.displayNumber} 이미지 로드 실패:`, img.src)
+                  // 실패한 이미지 대체 처리
+                  img.style.border = '1px solid red'
+                  img.alt = '이미지 로드 실패'
+                  resolve()
+                }
+                // src 재설정
+                const currentSrc = img.src
+                img.src = ''
+                setTimeout(() => {
+                  img.src = currentSrc
+                }, 10)
+              })
+            }
+          }
+
+          // 이미지 로드 후 추가 대기
+          await new Promise(resolve => setTimeout(resolve, 500))
+        }
+
         // 강제 렌더링을 위한 대기
         await new Promise(resolve => {
           requestAnimationFrame(() => {
@@ -241,7 +317,7 @@ export async function convertQuestionsToImages(questions, onProgress) {
 
         // 이미지로 변환
         const imageData = await convertQuestionToImage(questionElement)
-        
+
         // 메타데이터와 함께 저장
         images.push({
           ...imageData,
@@ -262,7 +338,7 @@ export async function convertQuestionsToImages(questions, onProgress) {
     }
 
     console.log('변환된 이미지 수:', images.length)
-    
+
     // 각 이미지 데이터 검증
     images.forEach((img, idx) => {
       console.log(`이미지 ${idx + 1} 검증:`, {
@@ -274,14 +350,14 @@ export async function convertQuestionsToImages(questions, onProgress) {
         width: img.width,
         height: img.height
       })
-      
+
       if (!img.dataUrl) {
         console.error(`❌ 이미지 ${idx + 1}에 dataUrl이 없습니다!`)
       } else if (!img.dataUrl.startsWith('data:image/')) {
         console.error(`❌ 이미지 ${idx + 1}의 dataUrl 형식이 잘못되었습니다!`)
       }
     })
-    
+
     return images
   } catch (error) {
     console.error('이미지 변환 중 오류:', error)
@@ -333,7 +409,7 @@ function groupQuestionsByPassage(questions) {
 function createPassageElement(passageHtml, questionNumbers) {
   const container = document.createElement('div')
   container.className = 'passage-container'
-  
+
   // 임시로 요소를 만들어서 실제 높이 측정
   const tempDiv = document.createElement('div')
   tempDiv.style.cssText = `
@@ -347,14 +423,14 @@ function createPassageElement(passageHtml, questionNumbers) {
   `
   tempDiv.innerHTML = passageHtml
   document.body.appendChild(tempDiv)
-  
+
   // 실제 콘텐츠 높이 측정
   const contentHeight = tempDiv.scrollHeight
   document.body.removeChild(tempDiv)
-  
+
   // 최소 높이는 300px, 최대는 내용에 맞춰 자동 조정
   const calculatedHeight = Math.max(300, contentHeight + 100) // 헤더와 패딩 고려
-  
+
   container.style.cssText = `
     background: white;
     padding: 30px;
@@ -408,10 +484,10 @@ function createQuestionWithChoicesElement(question) {
     border-bottom: 1px solid #e5e7eb;
   `
   questionHeader.innerHTML = `
-    <span style="font-weight: 700; font-size: 20px; color: #1f2937;">
+    <span style="font-weight: 700; font-size: 18px; color: #1f2937;">
       ${question.displayNumber || question.itemNumber || '1'}.
     </span>
-    <span style="color: #6b7280; font-size: 15px;">
+    <span style="color: #6b7280; font-size: 16px;">
       (${question.points || 5}점)
     </span>
   `
@@ -422,18 +498,33 @@ function createQuestionWithChoicesElement(question) {
   questionContent.className = 'question-content mathjax-content'
   questionContent.style.cssText = `
     margin-bottom: 25px;
-    line-height: 1.9;
+    line-height: 2.0;
     color: #374151;
-    font-size: 15px;
+    font-size: 16px;
   `
   // 다양한 속성명 지원을 위한 HTML 콘텐츠 찾기
-  const htmlContent = question.questionHtml || 
-                      question.itemHtml || 
-                      question.html || 
-                      question.questionText || 
+  let htmlContent = question.questionHtml ||
+                      question.itemHtml ||
+                      question.html ||
+                      question.questionText ||
                       question.itemText ||
                       ''
-  
+
+  // 이미지 태그가 있다면 CORS 속성 추가 및 스타일 보정
+  if (htmlContent.includes('<img')) {
+    htmlContent = htmlContent.replace(/<img([^>]*?)>/g, (match, attrs) => {
+      // crossorigin 속성이 없으면 추가
+      if (!attrs.includes('crossorigin')) {
+        attrs += ' crossorigin="anonymous"'
+      }
+      // 스타일 추가 (max-width 설정)
+      if (!attrs.includes('style=')) {
+        attrs += ' style="max-width: 100%; height: auto; display: inline-block; margin: 10px 0;"'
+      }
+      return `<img${attrs}>`
+    })
+  }
+
   // 디버깅 로그
   console.log('Question HTML content:', {
     itemId: question.itemId || question.id,
@@ -445,25 +536,37 @@ function createQuestionWithChoicesElement(question) {
     contentPreview: htmlContent.substring(0, 200),
     fullQuestion: question // 전체 question 객체 확인
   })
-  
+
   // 내용이 없으면 대체 텍스트 표시
   if (!htmlContent || htmlContent.trim() === '') {
     htmlContent = `<div style="color: red; font-weight: bold;">문제 내용이 없습니다. (ID: ${question.itemId || question.id})</div>`
     console.warn('문제 내용이 비어있음:', question)
   }
-  
+
   questionContent.innerHTML = htmlContent
   container.appendChild(questionContent)
 
   // 선택지 (choice1Html ~ choice5Html 형식 또는 choice1Text ~ choice5Text)
   const choices = []
   for (let i = 1; i <= 5; i++) {
-    const choiceHtml = question[`choice${i}Html`] || question[`choice${i}Text`] || question[`choice${i}`]
+    let choiceHtml = question[`choice${i}Html`] || question[`choice${i}Text`] || question[`choice${i}`]
     if (choiceHtml) {
+      // 선택지에도 이미지 태그가 있다면 CORS 속성 및 스타일 추가
+      if (typeof choiceHtml === 'string' && choiceHtml.includes('<img')) {
+        choiceHtml = choiceHtml.replace(/<img([^>]*?)>/g, (match, attrs) => {
+          if (!attrs.includes('crossorigin')) {
+            attrs += ' crossorigin="anonymous"'
+          }
+          if (!attrs.includes('style=')) {
+            attrs += ' style="max-width: 100%; height: auto; display: inline-block; margin: 5px 0;"'
+          }
+          return `<img${attrs}>`
+        })
+      }
       choices.push(choiceHtml)
     }
   }
-  
+
   // 디버깅: 선택지 확인
   console.log('Choices found:', {
     itemId: question.itemId || question.id,
@@ -499,10 +602,10 @@ function createQuestionWithChoicesElement(question) {
         border: 1px solid #e5e7eb;
       `
       choiceElement.innerHTML = `
-        <span style="font-weight: 600; color: #3b82f6; font-size: 15px; min-width: 24px;">
+        <span style="font-weight: 600; color: #3b82f6; font-size: 16px; min-width: 24px;">
           ${['①', '②', '③', '④', '⑤'][idx]}
         </span>
-        <span class="mathjax-content" style="flex: 1; font-size: 15px; line-height: 1.7;">
+        <span class="mathjax-content" style="flex: 1; font-size: 16px; line-height: 2.0;">
           ${choice}
         </span>
       `
@@ -584,7 +687,7 @@ export async function createExamHeaderImage(examInfo) {
     if (grade) infoItems.push(`학년: ${grade}`)
     if (subject) infoItems.push(`과목: ${subject}`)
     if (examDate) infoItems.push(`시험일: ${examDate}`)
-    
+
     if (infoItems.length > 0) {
       infoDiv.innerHTML = infoItems.map(item => `<span>${item}</span>`).join('')
       headerElement.appendChild(infoDiv)
@@ -726,7 +829,7 @@ function createQuestionElement_DEPRECATED(question) {
     line-height: 1.8;
     color: #374151;
   `
-  
+
   // 디버깅: 사용 가능한 HTML 필드 확인
   const htmlContent = question.questionHtml || question.itemHtml || question.html || question.questionText || ''
   console.log('문제 HTML 내용:', {
@@ -738,7 +841,7 @@ function createQuestionElement_DEPRECATED(question) {
     actualContent: htmlContent.substring(0, 100),
     availableFields: Object.keys(question).filter(key => key.toLowerCase().includes('html') || key.toLowerCase().includes('text'))
   })
-  
+
   questionContent.innerHTML = htmlContent
   container.appendChild(questionContent)
 
@@ -755,7 +858,7 @@ function createQuestionElement_DEPRECATED(question) {
   if (!choices.length && question.choices && question.choices.length > 0) {
     choices.push(...question.choices)
   }
-  
+
   console.log('선택지 처리:', {
     questionNumber: question.displayNumber || question.itemNumber,
     choicesCount: choices.length,
@@ -815,10 +918,10 @@ export async function compressImage(dataUrl, quality = 0.8) {
       const canvas = document.createElement('canvas')
       canvas.width = img.width
       canvas.height = img.height
-      
+
       const ctx = canvas.getContext('2d')
       ctx.drawImage(img, 0, 0)
-      
+
       // JPEG로 압축 (PNG보다 작은 파일 크기)
       resolve(canvas.toDataURL('image/jpeg', quality))
     }

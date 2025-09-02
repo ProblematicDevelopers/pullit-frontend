@@ -8,10 +8,10 @@
           <span>◀</span> 이전
         </button>
         <div class="page-info">
-          <input 
-            v-model.number="currentPage" 
-            type="number" 
-            :min="1" 
+          <input
+            v-model.number="currentPage"
+            type="number"
+            :min="1"
             :max="totalPages"
             @change="validatePageNumber"
             class="page-input"
@@ -78,46 +78,58 @@
         </div>
 
         <!-- Image Content -->
-        <div class="page-content" :class="`layout-${layoutMode}`">
-          <!-- 디버그: 현재 페이지 이미지 수 -->
-          <!-- <div style="width: 100%; padding: 10px; background: #e3f2fd; margin-bottom: 20px; border: 1px solid #2196f3;">
-            <strong>디버그 정보</strong><br>
-            현재 페이지: {{ currentPage }} / 전체 페이지: {{ totalPages }}<br>
-            현재 페이지 이미지 수: {{ currentPageImages.length }}<br>
-            전체 이미지 수: {{ previewImages.length }}
-          </div> -->
-          
-          <!-- 각 이미지 렌더링 -->
-          <template v-for="(image, idx) in currentPageImages" :key="`img-${currentPage}-${idx}`">
-            <div class="image-wrapper">
-              <!-- 디버그 정보 (프로덕션에서는 제거) -->
-              <!-- <div class="debug-info">
-                이미지 {{ (currentPage - 1) * IMAGES_PER_PAGE[layoutMode] + idx + 1 }} / {{ previewImages.length }}
-                (문제 #{{ image.questionNumber }}, Type: {{ image.type }})
-              </div> -->
-              
-              <!-- 이미지 표시 -->
-              <img 
-                v-if="image && image.dataUrl"
-                :src="image.dataUrl" 
-                :alt="`Question ${image.questionNumber || idx + 1}`"
-                class="question-image"
-                @load="(e) => handleImageLoad(idx, image, e)"
-                @error="(e) => handleImageError(idx, image, e)"
-              />
-              
-              <!-- 이미지가 없을 때 대체 텍스트 -->
-              <div v-else class="no-image-placeholder">
-                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
-                  <circle cx="8.5" cy="8.5" r="1.5"/>
-                  <polyline points="21 15 16 10 5 21"/>
-                </svg>
-                <p>이미지를 불러올 수 없습니다</p>
-              </div>
+        <div class="page-content layout-double">
+          <!-- 2단 레이아웃으로 이미지 배치 -->
+          <div class="columns-container">
+            <!-- 왼쪽 컬럼 -->
+            <div class="column left-column">
+              <template v-for="image in currentPageImages.filter(img => img.column === 0 || img.column === undefined)" :key="`left-${image.questionNumber}`">
+                <div class="image-wrapper">
+                  <img
+                    v-if="image && image.dataUrl"
+                    :src="image.dataUrl"
+                    :alt="`Question ${image.questionNumber || ''}`"
+                    class="question-image"
+                    @load="(e) => handleImageLoad(0, image, e)"
+                    @error="(e) => handleImageError(0, image, e)"
+                  />
+                  <div v-else class="no-image-placeholder">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                      <circle cx="8.5" cy="8.5" r="1.5"/>
+                      <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    <p>이미지를 불러올 수 없습니다</p>
+                  </div>
+                </div>
+              </template>
             </div>
-          </template>
-          
+
+            <!-- 오른쪽 컬럼 -->
+            <div class="column right-column">
+              <template v-for="image in currentPageImages.filter(img => img.column === 1)" :key="`right-${image.questionNumber}`">
+                <div class="image-wrapper">
+                  <img
+                    v-if="image && image.dataUrl"
+                    :src="image.dataUrl"
+                    :alt="`Question ${image.questionNumber || ''}`"
+                    class="question-image"
+                    @load="(e) => handleImageLoad(1, image, e)"
+                    @error="(e) => handleImageError(1, image, e)"
+                  />
+                  <div v-else class="no-image-placeholder">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2"/>
+                      <circle cx="8.5" cy="8.5" r="1.5"/>
+                      <polyline points="21 15 16 10 5 21"/>
+                    </svg>
+                    <p>이미지를 불러올 수 없습니다</p>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
           <!-- 페이지에 이미지가 없을 때 -->
           <div v-if="currentPageImages.length === 0" style="padding: 40px; text-align: center; background: #f5f5f5;">
             이 페이지에 표시할 이미지가 없습니다.
@@ -132,10 +144,10 @@
     </div>
 
     <!-- Progress Indicator -->
-    <div v-if="isGeneratingPDF" class="progress-overlay">
+    <div v-if="isGeneratingPDF || isSaving" class="progress-overlay">
       <div class="progress-content">
         <div class="spinner"></div>
-        <p>PDF 생성 중...</p>
+        <p>{{ isSaving ? '시험지 저장 중...' : 'PDF 생성 중...' }}</p>
         <p class="progress-text">{{ progressMessage }}</p>
       </div>
     </div>
@@ -146,8 +158,9 @@
 import { ref, computed, onMounted, watch, nextTick } from 'vue'
 import { useItemSelectionStore } from '@/stores/itemSelection'
 import { useTestBankStore } from '@/stores/testBank'
-import { generatePDFFromImages, downloadPDF as downloadGeneratedPDF } from '@/utils/pdf-from-images'
+import { generatePDFFromImages, downloadPDF as downloadGeneratedPDF, pdfToBlob } from '@/utils/pdf-from-images'
 import { createExamHeaderImage } from '@/utils/question-to-image-converter'
+import userExamApi from '@/services/userExamApi'
 
 // Props
 const props = defineProps({
@@ -169,21 +182,44 @@ const isGeneratingPDF = ref(false)
 const isSaving = ref(false)
 const progressMessage = ref('')
 
-// 페이지 높이 임계값 (A4 기준)
-const PAGE_HEIGHT_THRESHOLD = 1000 // px
-const DEFAULT_IMAGES_PER_PAGE = 4
+// A4 페이지 설정 (실제 PDF와 동일하게)
+const A4_CONFIG = {
+  width: 210,  // mm
+  height: 297, // mm
+  margin: {
+    top: 20,
+    bottom: 20,
+    left: 15,
+    right: 15
+  },
+  columnGap: 10 // 2단 레이아웃일 때 컬럼 간격
+}
+
+// 미리보기용 픽셀 변환 (mm to px, 96dpi 기준)
+const MM_TO_PX = 3.7795275591 // 1mm = 3.78px at 96dpi
+const PREVIEW_CONFIG = {
+  width: A4_CONFIG.width * MM_TO_PX,
+  height: A4_CONFIG.height * MM_TO_PX,
+  margin: {
+    top: A4_CONFIG.margin.top * MM_TO_PX,
+    bottom: A4_CONFIG.margin.bottom * MM_TO_PX,
+    left: A4_CONFIG.margin.left * MM_TO_PX,
+    right: A4_CONFIG.margin.right * MM_TO_PX
+  },
+  columnGap: A4_CONFIG.columnGap * MM_TO_PX
+}
 
 // Computed
 const previewImages = computed(() => {
   // Props에서 받은 이미지를 우선 사용, 없으면 store에서 가져오기
-  const images = props.convertedImages?.length > 0 
-    ? props.convertedImages 
+  const images = props.convertedImages?.length > 0
+    ? props.convertedImages
     : (itemStore.getConvertedImages() || [])
-    
-  console.log('[ExamImagePreview] Preview images source:', 
+
+  console.log('[ExamImagePreview] Preview images source:',
     props.convertedImages?.length > 0 ? 'props' : 'store')
   console.log('[ExamImagePreview] Preview images count:', images.length)
-  
+
   // 이미지 데이터 검증
   if (images.length > 0) {
     console.log('[ExamImagePreview] Image data validation:', images.map((img, idx) => ({
@@ -195,47 +231,128 @@ const previewImages = computed(() => {
       questionNumber: img.questionNumber
     })))
   }
-  
+
   return images
 })
 
 const hasImages = computed(() => previewImages.value.length > 0)
 
-// 동적으로 페이지 구성 계산
+// PDF와 동일한 페이징 로직 적용
 const paginatedImages = computed(() => {
   if (!hasImages.value) return []
-  
+
   const pages = []
+  const allImages = [...previewImages.value]
+
+  // 사용 가능한 영역 계산
+  const contentHeight = PREVIEW_CONFIG.height - PREVIEW_CONFIG.margin.top - PREVIEW_CONFIG.margin.bottom
+  const contentWidth = PREVIEW_CONFIG.width - PREVIEW_CONFIG.margin.left - PREVIEW_CONFIG.margin.right
+  const columnWidth = (contentWidth - PREVIEW_CONFIG.columnGap) / 2
+
   let currentPageImages = []
-  let currentPageHeight = 0
-  
-  previewImages.value.forEach((image) => {
-    // 이미지 예상 높이 계산 (2단 레이아웃 고려)
-    const estimatedHeight = image.height ? (image.height / 2) : 250 // 기본 높이
-    
-    // 현재 페이지에 추가 가능한지 확인
-    if (currentPageHeight + estimatedHeight > PAGE_HEIGHT_THRESHOLD && currentPageImages.length > 0) {
-      // 새 페이지 시작
+  let leftColumnY = 0
+  let rightColumnY = 0
+  let currentColumn = 0 // 0: 왼쪽, 1: 오른쪽
+
+  // 각 이미지를 페이지에 배치
+  for (let i = 0; i < allImages.length; i++) {
+    const image = allImages[i]
+    const isHeader = image.type === 'header' || image.isHeader
+
+    // 이미지 높이 계산 (비율 유지)
+    const imgWidth = isHeader ? contentWidth : columnWidth
+    const imgAspectRatio = image.naturalWidth / image.naturalHeight || 1
+    const imgHeight = imgWidth / imgAspectRatio
+
+    // 헤더는 새 페이지에서 시작
+    if (isHeader && currentPageImages.length > 0) {
       pages.push([...currentPageImages])
-      currentPageImages = [image]
-      currentPageHeight = estimatedHeight
-    } else if (currentPageImages.length >= 6) { // 최대 6개 제한
-      // 새 페이지 시작
-      pages.push([...currentPageImages])
-      currentPageImages = [image]
-      currentPageHeight = estimatedHeight
-    } else {
-      // 현재 페이지에 추가
-      currentPageImages.push(image)
-      currentPageHeight += estimatedHeight
+      currentPageImages = []
+      leftColumnY = 0
+      rightColumnY = 0
+      currentColumn = 0
     }
-  })
-  
+
+    // 일반 이미지 처리
+    if (!isHeader && layoutMode.value === 'double') {
+      let currentY = currentColumn === 0 ? leftColumnY : rightColumnY
+
+      // 페이지 넘침 체크
+      if (currentY + imgHeight > contentHeight) {
+        if (currentColumn === 0) {
+          // 왼쪽 컬럼이 가득 -> 오른쪽 컬럼으로
+          currentColumn = 1
+          currentY = rightColumnY
+
+          // 오른쪽 컬럼도 가득 찬 경우 새 페이지
+          if (currentY + imgHeight > contentHeight) {
+            if (currentPageImages.length > 0) {
+              pages.push([...currentPageImages])
+              currentPageImages = []
+            }
+            leftColumnY = 0
+            rightColumnY = 0
+            currentColumn = 0
+            currentY = leftColumnY
+          }
+        } else {
+          // 오른쪽 컬럼이 가득 -> 새 페이지
+          if (currentPageImages.length > 0) {
+            pages.push([...currentPageImages])
+            currentPageImages = []
+          }
+          leftColumnY = 0
+          rightColumnY = 0
+          currentColumn = 0
+          currentY = leftColumnY
+        }
+      }
+
+      // 이미지 추가
+      currentPageImages.push({
+        ...image,
+        column: currentColumn,
+        yPosition: currentY
+      })
+
+      // Y 위치 업데이트
+      const imageSpacing = 10 * MM_TO_PX // 10mm 간격
+      if (currentColumn === 0) {
+        leftColumnY = currentY + imgHeight + imageSpacing
+        // 다음 이미지가 왼쪽 컬럼에 들어갈 수 있는지 확인
+        if (i + 1 < allImages.length) {
+          const nextImage = allImages[i + 1]
+          const nextImgHeight = (columnWidth / (nextImage.naturalWidth || 1)) * (nextImage.naturalHeight || 1)
+          // 왼쪽 컬럼에 공간이 없으면 오른쪽으로
+          if (leftColumnY + nextImgHeight > contentHeight) {
+            currentColumn = 1
+          }
+        }
+      } else {
+        rightColumnY = currentY + imgHeight + imageSpacing
+        currentColumn = 0
+      }
+    } else {
+      // 헤더 또는 단일 컬럼
+      currentPageImages.push(image)
+      if (isHeader) {
+        leftColumnY = imgHeight + (10 * MM_TO_PX)
+        rightColumnY = leftColumnY
+      }
+    }
+  }
+
   // 마지막 페이지 추가
   if (currentPageImages.length > 0) {
     pages.push(currentPageImages)
   }
-  
+
+  console.log('[ExamImagePreview] Pagination result:', {
+    totalImages: allImages.length,
+    totalPages: pages.length,
+    pagesDetail: pages.map((p, idx) => ({ page: idx + 1, imageCount: p.length }))
+  })
+
   return pages
 })
 
@@ -245,23 +362,23 @@ const totalPages = computed(() => {
 
 const currentPageImages = computed(() => {
   if (!hasImages.value || paginatedImages.value.length === 0) return []
-  
+
   const pageIdx = currentPage.value - 1
   const pageImages = paginatedImages.value[pageIdx] || []
-  
+
   console.log('[ExamImagePreview] currentPageImages detail:', {
     page: currentPage.value,
     count: pageImages.length,
     images: pageImages
   })
-  
+
   // 실제 이미지 데이터 확인
   pageImages.forEach((img, idx) => {
     if (!img.dataUrl) {
       console.error(`[ExamImagePreview] Image ${idx} missing dataUrl!`, img)
     }
   })
-  
+
   return pageImages
 })
 
@@ -324,7 +441,7 @@ const handleImageLoad = (idx, image, event) => {
     // getBoundingClientRect를 사용하여 더 정확한 크기 확인
     const rect = imgElement.getBoundingClientRect()
     const computedStyle = window.getComputedStyle(imgElement)
-    
+
     console.log('[ExamImagePreview] ✅ Image loaded successfully:', {
       index: idx,
       type: image.type,
@@ -346,11 +463,11 @@ const handleImageLoad = (idx, image, event) => {
       visible: rect.width > 0 && rect.height > 0,
       src: imgElement.src?.substring(0, 100)
     })
-    
+
     // 이미지가 실제로 보이는지 확인 (getBoundingClientRect 사용)
     if (rect.width === 0 || rect.height === 0) {
       console.warn(`[ExamImagePreview] ⚠️ Image loaded but not visible! Index: ${idx}`)
-      
+
       // 강제로 스타일 재적용
       imgElement.style.display = 'block'
       imgElement.style.visibility = 'visible'
@@ -373,7 +490,7 @@ const handleImageError = (idx, image, event) => {
     dataUrlStart: image.dataUrl?.substring(0, 50),
     error: event?.type
   })
-  
+
   // dataUrl이 있는데도 로드 실패한 경우 더 자세히 확인
   if (image.dataUrl) {
     console.error('[ExamImagePreview] DataURL format check:', {
@@ -391,36 +508,110 @@ const saveExam = async () => {
   }
 
   isSaving.value = true
-  
+  progressMessage.value = 'PDF 생성 중...'
+
   try {
-    // 시험지 데이터 준비
-    const examData = {
-      title: examInfo.value.title,
-      grade: examInfo.value.grade,
+    // 1. PDF 생성
+    console.log('PDF 생성 시작...')
+
+    // 시험 제목 헤더 이미지 생성
+    const headerImage = await createExamHeaderImage(examInfo.value)
+
+    // 헤더 이미지를 포함한 전체 이미지 배열
+    const allImages = [headerImage, ...previewImages.value]
+
+    // PDF 생성
+    const pdf = await generatePDFFromImages(allImages, {
+      examTitle: examInfo.value.title,
       subject: examInfo.value.subject,
+      grade: examInfo.value.grade,
       duration: examInfo.value.duration,
       totalScore: examInfo.value.totalScore,
-      images: previewImages.value,
-      createdAt: new Date().toISOString()
+      layoutMode: layoutMode.value,
+      showPageNumbers: true,
+      onProgress: (progress) => {
+        progressMessage.value = progress.message || 'PDF 생성 중...'
+      }
+    })
+
+    // PDF를 Blob으로 변환
+    const pdfBlob = pdfToBlob(pdf)
+    console.log('PDF Blob 생성 완료:', pdfBlob)
+
+    // 2. 시험지 데이터 준비
+    const selectedItems = itemStore.selectedItems || []
+
+    // UserExam 데이터
+    const examData = {
+      // 기본 정보
+      examName: examInfo.value.title || `${new Date().getFullYear()}년 시험지`,
+      gradeCode: testBankStore.examInfo?.gradeCode || '08',
+      gradeName: testBankStore.examInfo?.gradeName || '중2',
+      termCode: testBankStore.examInfo?.termCode || '1',
+      termName: testBankStore.examInfo?.termName || '1학기',
+      areaCode: testBankStore.examInfo?.areaCode || testBankStore.examInfo?.subjectCode || 'MAT',
+      areaName: testBankStore.examInfo?.areaName || testBankStore.examInfo?.subject || '수학',
+      examType: 'TESTWIZARD',
+
+      // 시험 설정
+      visibility: 'PRIVATE', // 기본값
+      timeLimit: examInfo.value.duration || 50,
+      examDate: new Date().toISOString().split('T')[0],
+      description: `${examInfo.value.title} - ${examInfo.value.subject}`,
+      totalScore: examInfo.value.totalScore || 100,
+
+      // 문항 데이터 (백엔드 items 필드로 매핑)
+      items: selectedItems.map((item, index) => ({
+        itemId: item.itemId || item.id,  // Item 테이블의 ID
+        subjectId: item.subjectId || null,  // 과목 ID 추가
+        itemOrder: index + 1,  // 시험지 내 문제 순서
+        points: item.points || 5  // 문제 배점
+      }))
     }
-    
-    // Store에 저장
-    testBankStore.saveExamData(examData)
-    
-    // LocalStorage에도 백업
-    const savedExams = JSON.parse(localStorage.getItem('savedExams') || '[]')
-    savedExams.push(examData)
-    localStorage.setItem('savedExams', JSON.stringify(savedExams))
-    
-    alert('시험지가 저장되었습니다.')
-    
-    setTimeout(() => {
-      isSaving.value = false
-    }, 1000)
+
+    console.log('시험지 저장 데이터:', examData)
+
+    // 3. FormData 생성 (PDF와 함께 전송)
+    const formData = new FormData()
+    formData.append('examData', JSON.stringify(examData))
+
+    const fileName = `${examData.examName}_${new Date().toISOString().split('T')[0]}.pdf`
+    formData.append('pdfFile', pdfBlob, fileName)
+    console.log('PDF 파일 추가됨:', fileName)
+
+    progressMessage.value = '서버에 저장 중...'
+
+    // 4. API 호출
+    try {
+      console.log('API 호출 시작 - userExamApi.createExamWithPDF')
+      const response = await userExamApi.createExamWithPDF(formData)
+      console.log('API 응답 받음:', response)
+
+      if (response && response.data) {
+        console.log('시험지 및 PDF 저장 성공:', response.data)
+        alert('시험지가 성공적으로 저장되었습니다!')
+
+        // Store 정보 업데이트
+        testBankStore.setExamInfo({
+          savedExamId: response.data.id,
+          pdfUrl: response.data.pdfUrl,
+          savedAt: new Date().toISOString()
+        })
+      } else {
+        throw new Error('응답 데이터가 없습니다')
+      }
+    } catch (apiError) {
+      console.error('시험지 저장 실패:', apiError)
+      alert('시험지 저장에 실패했습니다: ' + apiError.message)
+    }
+
+    isSaving.value = false
+    progressMessage.value = ''
   } catch (error) {
     console.error('[ExamImagePreview] Exam save failed:', error)
     alert('시험지 저장 중 오류가 발생했습니다.')
     isSaving.value = false
+    progressMessage.value = ''
   }
 }
 
@@ -437,10 +628,10 @@ const downloadPDF = async () => {
     // 시험 제목 헤더 이미지 생성
     progressMessage.value = '시험 제목 생성 중...'
     const headerImage = await createExamHeaderImage(examInfo.value)
-    
+
     // 헤더 이미지를 포함한 전체 이미지 배열
     const allImages = [headerImage, ...previewImages.value]
-    
+
     // Generate PDF from images
     const pdf = await generatePDFFromImages(allImages, {
       examTitle: examInfo.value.title,
@@ -515,27 +706,27 @@ const forceRenderImages = async () => {
   const wrappers = document.querySelectorAll('.image-wrapper')
   const a4Page = document.querySelector('.a4-page')
   const previewContainer = document.querySelector('.preview-container')
-  
+
   console.log(`[ExamImagePreview] Force render: ${images.length} images, ${wrappers.length} wrappers`)
-  
+
   // 컨테이너 스타일 확인 및 수정
   if (previewContainer) {
     previewContainer.style.overflow = 'auto'
     console.log('[ExamImagePreview] Preview container overflow set to auto')
   }
-  
+
   if (a4Page) {
     // transform 제거하여 원본 크기로 표시 (디버깅용)
     const currentTransform = a4Page.style.transform
     console.log('[ExamImagePreview] Current A4 page transform:', currentTransform)
-    
+
     // 스크롤 위치 초기화
     if (previewContainer) {
       previewContainer.scrollTop = 0
       previewContainer.scrollLeft = 0
     }
   }
-  
+
   // 래퍼 스타일 강제 적용
   wrappers.forEach((wrapper, idx) => {
     wrapper.style.display = 'block'
@@ -545,7 +736,7 @@ const forceRenderImages = async () => {
     wrapper.style.overflow = 'visible'
     console.log(`[ExamImagePreview] Wrapper ${idx} style applied`)
   })
-  
+
   images.forEach((img, idx) => {
     const rect = img.getBoundingClientRect()
     console.log(`[ExamImagePreview] Force checking image ${idx}:`, {
@@ -557,7 +748,7 @@ const forceRenderImages = async () => {
       parentElement: img.parentElement?.className,
       style: img.style.cssText
     })
-    
+
     // Force display with important - 모든 가능한 숨김 속성 제거
     img.style.setProperty('display', 'block', 'important')
     img.style.setProperty('visibility', 'visible', 'important')
@@ -578,9 +769,9 @@ const forceRenderImages = async () => {
 const addTestImage = () => {
   // 테스트용 1x1 빨간 픽셀 이미지
   const testDataUrl = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFBQIAX8jx0gAAAABJRU5ErkJggg=='
-  
+
   console.log('[ExamImagePreview] Adding test image to verify rendering')
-  
+
   // 임시로 테스트 이미지 추가
   const testImage = {
     dataUrl: testDataUrl,
@@ -588,7 +779,7 @@ const addTestImage = () => {
     questionNumber: 999,
     questionId: 'test-999'
   }
-  
+
   // Store의 이미지 배열 끝에 테스트 이미지 추가
   const currentImages = itemStore.getConvertedImages() || []
   if (currentImages.length > 0 && !currentImages.some(img => img.questionId === 'test-999')) {
@@ -604,7 +795,7 @@ onMounted(async () => {
   console.log('[ExamImagePreview] Props images:', props.convertedImages?.length || 0)
   console.log('[ExamImagePreview] Store images:', itemStore.getConvertedImages()?.length || 0)
   console.log('[ExamImagePreview] Total images available:', previewImages.value.length)
-  
+
   // 이미지 데이터 검증
   if (previewImages.value.length > 0) {
     const firstImg = previewImages.value[0]
@@ -616,13 +807,13 @@ onMounted(async () => {
       questionNumber: firstImg.questionNumber
     })
   }
-  
+
   // 테스트 이미지 추가 (디버깅용) - 실제 이미지가 없을 때만
   if (previewImages.value.length === 0 && !props.convertedImages?.length) {
     console.log('[ExamImagePreview] No images found, adding test image for debugging')
     addTestImage()
   }
-  
+
   if (previewImages.value.length > 0) {
     console.log('[ExamImagePreview] First image sample:', {
       type: previewImages.value[0].type,
@@ -631,9 +822,9 @@ onMounted(async () => {
       dataUrlLength: previewImages.value[0].dataUrl?.length,
       dataUrlStart: previewImages.value[0].dataUrl?.substring(0, 100)
     })
-    
+
     // 데이터 구조 전체 확인
-    console.log('[ExamImagePreview] Full image data structure:', 
+    console.log('[ExamImagePreview] Full image data structure:',
       previewImages.value.map((img, idx) => ({
         index: idx,
         type: img.type,
@@ -644,20 +835,20 @@ onMounted(async () => {
       }))
     )
   }
-  
+
   // Force render after mount
   await nextTick()
   await forceRenderImages()
-  
+
   // Check again after delay
   setTimeout(() => {
     console.log('[ExamImagePreview] Checking images after delay...')
     forceRenderImages()
-    
+
     // DOM에 실제로 이미지가 있는지 확인
     const imgElements = document.querySelectorAll('.image-wrapper img, .exam-image-preview img')
     console.log(`[ExamImagePreview] Found ${imgElements.length} img elements in DOM`)
-    
+
     imgElements.forEach((img, idx) => {
       console.log(`[ExamImagePreview] DOM Image ${idx}:`, {
         src: img.src?.substring(0, 50),
@@ -841,14 +1032,12 @@ onMounted(async () => {
 .preview-container {
   flex: 1;
   overflow: auto;
-  padding: 20px;
+  padding: 30px;
   display: flex;
-  justify-content: flex-start; /* center에서 flex-start로 변경 */
+  justify-content: center;
   align-items: flex-start;
-  transition: transform 0.2s;
-  min-height: 600px; /* 최소 높이 추가 */
-  background: #f5f5f5; /* 배경색 추가로 영역 확인 */
-  position: relative; /* 포지션 추가 */
+  background: #f5f5f5;
+  min-height: 600px;
 }
 
 /* No Images Message */
@@ -878,17 +1067,17 @@ onMounted(async () => {
 
 /* A4 Page */
 .a4-page {
-  width: 794px; /* 210mm를 px로 변경 */
-  min-height: 1123px; /* 297mm를 px로 변경 */
+  width: 794px; /* A4 width at 96dpi */
+  min-height: 1123px; /* A4 height at 96dpi */
   background: white;
   box-shadow: 0 0 20px rgba(0,0,0,0.1);
-  padding: 75px 57px; /* 20mm 15mm를 px로 변경 */
-  margin: 0; /* auto에서 0으로 변경 - 왼쪽 정렬 */
+  padding: 40px 30px; /* 적절한 여백 */
+  margin: 0 auto; /* 중앙 정렬 */
   display: flex;
   flex-direction: column;
   position: relative;
   box-sizing: border-box;
-  overflow: visible; /* overflow 추가 */
+  overflow: visible;
 }
 
 /* Page Header */
@@ -928,24 +1117,49 @@ onMounted(async () => {
 /* Page Content */
 .page-content {
   flex: 1;
-  display: block; /* flex에서 block으로 변경 */
-  min-height: 200mm; /* 최소 높이 보장 */
+  padding: 15px;
   overflow: visible;
-  width: 100%; /* 너비 명시 */
+  width: 100%;
 }
 
-/* Image Wrapper - 이미지 컨테이너 스타일 추가 */
+/* 2단 레이아웃 컨테이너 */
+.columns-container {
+  display: flex;
+  gap: 15px;
+  width: 100%;
+  height: 100%;
+  align-items: flex-start;
+}
+
+/* 각 컬럼 스타일 */
+.column {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.left-column {
+  border-right: 1px dashed #e0e0e0;
+  padding-right: 15px;
+}
+
+.right-column {
+  padding-left: 0;
+}
+
+/* Image Wrapper - 이미지 컨테이너 스타일 */
 .image-wrapper {
   width: 100%;
-  margin-bottom: 20px;
-  padding: 10px;
-  background: white; /* 흰색 배경으로 변경 */
-  border: 1px solid #ddd; /* 일반 테두리로 변경 */
+  margin-bottom: 10px;
+  padding: 5px;
+  background: white;
   box-sizing: border-box;
-  min-height: 200px; /* 최소 높이 증가 */
-  position: relative; /* 포지션 추가 */
-  display: block; /* display 명시 */
-  overflow: visible; /* overflow 추가 */
+  position: relative;
+  display: block;
+  overflow: visible;
+  border: 1px solid #f0f0f0;
+  border-radius: 4px;
 }
 
 .image-wrapper img,
@@ -957,48 +1171,11 @@ onMounted(async () => {
   visibility: visible !important;
   opacity: 1 !important;
   object-fit: contain !important;
-  position: static !important; /* position을 static으로 변경 */
-  z-index: 1 !important; /* z-index 추가 */
-  margin: 0 !important; /* margin 제거 */
-  padding: 0 !important; /* padding 제거 */
+  margin: 0 !important;
+  padding: 0 !important;
 }
 
-.page-content.layout-single {
-  display: block;
-}
-
-.page-content.layout-single .image-wrapper {
-  width: 100%;
-  display: block;
-}
-
-.page-content.layout-double {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 20px;
-  align-content: start;
-}
-
-.page-content.layout-double .image-wrapper {
-  width: 100%;
-  display: block;
-}
-
-/* Image Container */
-.image-container {
-  width: 100%;
-  margin-bottom: 15px;
-  display: block;
-  overflow: visible;
-  background: white; /* 배경색 추가 */
-  padding: 5px; /* 패딩 추가 */
-  border: 1px solid #eee; /* 테두리 추가 */
-}
-
-.layout-double .image-container {
-  width: calc(50% - 10px);
-}
-
+/* Question Image Styles - 통합 */
 .question-image {
   width: 100%;
   max-width: 100%;
@@ -1006,18 +1183,8 @@ onMounted(async () => {
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
-  border: 1px solid #e0e0e0;
-  border-radius: 4px;
-  box-shadow: 0 2px 4px rgba(0,0,0,0.05);
   background-color: white;
   object-fit: contain;
-}
-
-/* 이미지 강제 표시 */
-.image-container img {
-  display: block !important;
-  visibility: visible !important;
-  opacity: 1 !important;
 }
 
 .no-image-placeholder {

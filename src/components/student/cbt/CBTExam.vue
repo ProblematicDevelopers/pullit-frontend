@@ -199,6 +199,8 @@
 import { ref, onMounted, onUnmounted, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { cbtAPI } from '@/store/cbtStore.js'
+import classApi from '@/services/classApi'
+import { useClassWebSocket } from '@/components/student/class-room/composables/useClassWebSocket'
 import katex from 'katex'
 import 'katex/dist/katex.min.css'
 
@@ -239,9 +241,42 @@ const isLoading = ref(true)
 // 타이머
 let timer = null
 
+// WebSocket (진행 상황 전송용)
+const channelName = ref('')
+const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
+const currentUserId = ref(userInfo.value.id)
+const currentUserName = ref(userInfo.value.fullName)
+const currentUserRole = ref(userInfo.value.role)
+
+let connectWebSocket = null
+let disconnectWebSocket = null
+let sendExamProgressMessage = null
+
 onMounted(async () => {
   try {
     const examId = route.params.examId
+
+    // 0. 학생의 학급 ID 조회 후 WebSocket 채널 연결 준비
+    try {
+      const myClassRes = await classApi.getMyClass()
+      const classId = myClassRes?.data?.data?.classId
+      if (classId && examId) {
+        channelName.value = `live_exam_${examId}_${classId}`
+        const ws = useClassWebSocket(
+          currentUserId.value,
+          currentUserName.value,
+          currentUserRole.value,
+          null,
+          channelName,
+        )
+        connectWebSocket = ws.connectWebSocket
+        disconnectWebSocket = ws.disconnectWebSocket
+        sendExamProgressMessage = ws.sendExamProgressMessage
+        await connectWebSocket({})
+      }
+    } catch (e) {
+      console.warn('웹소켓 준비 실패 (진행상황 미표시 가능):', e)
+    }
 
     // 1. Attempt 생성 또는 기존 Attempt 확인
     const attemptResponse = await cbtAPI.createOrGetAttempt(examId)
@@ -307,6 +342,8 @@ onMounted(async () => {
     // 8. 현재 문제 시작 시간 설정
     questionStartTime.value = Date.now()
     await updateRedisCurrentQuestion()
+    // 초기 진행 상황 전송
+    sendAnswerStatus()
   } catch (error) {
     console.error('CBT 시험 로드 실패:', error)
     alert('시험을 불러오는데 실패했습니다. 다시 시도해주세요.')
@@ -327,6 +364,11 @@ onUnmounted(() => {
   // 타이머 정리
   if (timer) {
     clearInterval(timer)
+  }
+
+  // 웹소켓 해제
+  if (disconnectWebSocket) {
+    disconnectWebSocket()
   }
 
   // 이벤트 리스너 제거
@@ -372,6 +414,7 @@ async function previousQuestion() {
     await saveQuestionTime()
     setCurrentQuestion(currentQuestion.value - 1)
     await updateRedisCurrentQuestion()
+    sendAnswerStatus()
   }
 }
 
@@ -393,6 +436,7 @@ async function nextQuestion() {
     await saveQuestionTime()
     setCurrentQuestion(currentQuestion.value + 1)
     await updateRedisCurrentQuestion()
+    sendAnswerStatus()
   }
 }
 
@@ -415,6 +459,7 @@ async function goToQuestion(questionNumber) {
 
     setCurrentQuestion(questionNumber)
     await updateRedisCurrentQuestion()
+    sendAnswerStatus()
   }
 }
 
@@ -737,8 +782,29 @@ async function saveAnswerToRedis(answerValue) {
     await cbtAPI.updateRedisData(attemptId.value, {
       questionAnswers: questionAnswers.value,
     })
+    // 진행 상황 전송
+    sendAnswerStatus()
   } catch (error) {
     console.error('답안 Redis 저장 실패:', error)
+  }
+}
+
+// 진행 상황을 웹소켓으로 전송 (교사 화면에서 실시간 확인)
+function sendAnswerStatus() {
+  try {
+    if (sendExamProgressMessage && channelName.value) {
+      const status = {
+        userId: currentUserId.value,
+        currentQuestion: currentQuestion.value,
+        answeredQuestions: answeredQuestions.value,
+        questionAnswers: questionAnswers.value,
+        remainingTime: remainingTime.value,
+        timestamp: new Date().toISOString(),
+      }
+      sendExamProgressMessage(JSON.stringify(status))
+    }
+  } catch (e) {
+    // 전송 실패는 치명적이지 않으니 무시
   }
 }
 

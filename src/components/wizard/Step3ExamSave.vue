@@ -16,7 +16,8 @@
     </div>
 
     <!-- 메인 컨텐츠 영역 -->
-    <div class="content-wrapper">
+  <div class="content-wrapper">
+
       <!-- 왼쪽: 시험 설정 -->
       <div class="exam-settings-section">
         <div class="settings-card">
@@ -93,6 +94,32 @@
                 :class="['preset-btn', { active: examSettings.timeLimit === time }]"
               >
                 {{ time }}분
+              </button>
+            </div>
+          </div>
+
+          <!-- 총점 설정 -->
+          <div class="setting-group">
+            <label class="setting-label">총점</label>
+            <div class="time-input-wrapper">
+              <input
+                type="number"
+                v-model.number="examSettings.totalPoints"
+                class="setting-input"
+                min="1"
+                max="1000"
+                step="1"
+              />
+              <span class="time-suffix">점</span>
+            </div>
+            <div class="time-presets">
+              <button
+                v-for="pts in [50, 100, 200]"
+                :key="pts"
+                @click="examSettings.totalPoints = pts"
+                :class="['preset-btn', { active: examSettings.totalPoints === pts }]"
+              >
+                {{ pts }}점
               </button>
             </div>
           </div>
@@ -189,9 +216,9 @@ import { computed, onMounted, ref } from 'vue'
 import { useTestBankStore } from '@/stores/testBank'
 import { useItemSelectionStore } from '@/stores/itemSelection'
 import ExamPDFPreview from './ExamPDFPreviewFixed.vue'
-import ExamImagePreview from './ExamImagePreview.vue'
 import examApi from '@/services/examApi'
 import userExamApi from '@/services/userExamApi'
+import ExamImagePreview from './ExamImagePreview.vue'
 
 // Emits
 const emit = defineEmits(['back', 'complete'])
@@ -207,6 +234,7 @@ const examSettings = ref({
   classId: null,
   examDate: null,
   timeLimit: 50,  // 기본 50분
+  totalPoints: 100,
   description: '',
   shuffleQuestions: false,
   showAnswerAfterSubmit: false
@@ -397,7 +425,7 @@ const saveExamToDatabase = async () => {
 
     // 시험지 저장 데이터 준비
     const examData = {
-      // 기본 정보
+      // UserExam 기본 정보
       examName: examInfo.title || examInfo.examName || `${new Date().getFullYear()}년 ${examInfo.gradeName || '중2'} ${examInfo.areaName || '수학'} 시험지`,
       gradeCode: examInfo.gradeCode || '08',
       gradeName: examInfo.gradeName || '중2',
@@ -414,17 +442,18 @@ const saveExamToDatabase = async () => {
       examDate: examSettings.value.examDate,
       description: examSettings.value.description ||
                    `${examInfo.gradeName || '중2'} ${examInfo.areaName || '수학'} ${examInfo.termName || '1학기'} 시험지`,
+      totalPoints: examSettings.value.totalPoints,
 
       // 추가 옵션
       shuffleQuestions: examSettings.value.shuffleQuestions,
       showAnswerAfterSubmit: examSettings.value.showAnswerAfterSubmit,
 
-      // 문항 리스트
+      // items 테이블용 데이터 (백엔드 ExamItemRequest에 맞춤)
       items: selectedItems.value.map((item, index) => ({
-        itemId: item.itemId || item.id,
-        subjectId: item.subjectId || null,
-        itemOrder: index + 1,
-        points: item.points || 5
+        itemId: item.itemId || item.id,  // Item 테이블의 ID (필수)
+        subjectId: item.subjectId || item.subject_id || null,  // 과목 ID 추가 (중요!)
+        itemOrder: index + 1,  // 시험지 내 문제 순서
+        points: item.points || 5  // 문제 배점
       }))
     }
 
@@ -542,32 +571,16 @@ const handleComplete = () => {
 onMounted(() => {
   console.log('Step3ExamSave 마운트됨')
   console.log('선택된 문항 수:', selectedItems.value.length)
-  console.log('변환된 이미지 사용:', hasConvertedImages.value)
-
-  // Store에서 직접 이미지 가져와서 확인
-  const directImages = itemSelectionStore.getConvertedImages()
-  console.log('Store에서 직접 가져온 이미지:', directImages)
-  console.log('Store 이미지 수:', directImages?.length || 0)
-
-  if (directImages && directImages.length > 0) {
-    console.log('첫 번째 이미지 상세 확인:', {
-      전체객체: directImages[0],
-      dataUrl존재: !!directImages[0].dataUrl,
-      dataUrl길이: directImages[0].dataUrl?.length,
-      dataUrl시작: directImages[0].dataUrl?.substring(0, 100)
-    })
-  }
-
-  console.log('convertedImages computed 값:', convertedImages.value)
   console.log('testBankStore.examInfo:', testBankStore.examInfo)
   console.log('itemSelectionStore.selectedItems:', itemSelectionStore.selectedItems)
   console.log('testBankStore.selectedItems:', testBankStore.selectedItems)
+})
 
-  if (hasConvertedImages.value) {
-    console.log('✅ ExamImagePreview 컴포넌트를 사용합니다 (이미지 기반)')
-  } else {
-    console.log('📄 ExamPDFPreview 컴포넌트를 사용합니다 (HTML 기반)')
-  }
+// 총점 변경 시 store에 반영하여 미리보기 헤더와 동기화
+import { watch } from 'vue'
+watch(() => examSettings.value.totalPoints, (val) => {
+  const info = testBankStore.examInfo || {}
+  testBankStore.setExamInfo({ ...info, totalPoints: val })
 })
 </script>
 

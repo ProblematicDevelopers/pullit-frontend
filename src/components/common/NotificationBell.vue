@@ -1,15 +1,15 @@
 <template>
   <div class="notification-container">
     <!-- 알림 벨 아이콘 -->
-    <button 
-      class="notification-bell" 
+    <button
+      class="notification-bell"
       @click="toggleDropdown"
       :class="{ 'has-unread': unreadCount > 0 }"
     >
       <svg viewBox="0 0 24 24" class="bell-icon">
         <path d="M12 22C13.1 22 14 21.1 14 20H10C10 21.1 10.9 22 12 22ZM18 16V11C18 7.93 16.37 5.36 13.5 4.68V4C13.5 3.17 12.83 2.5 12 2.5C11.17 2.5 10.5 3.17 10.5 4V4.68C7.64 5.36 6 7.92 6 11V16L4 18V19H20V18L18 16Z" />
       </svg>
-      
+
       <!-- 읽지 않은 알림 개수 배지 -->
       <span v-if="unreadCount > 0" class="notification-badge">
         {{ unreadCount > 99 ? '99+' : unreadCount }}
@@ -23,9 +23,9 @@
         <div class="dropdown-header">
           <h3 class="dropdown-title">알림</h3>
           <div class="header-actions">
-            <button 
+            <button
               v-if="notifications.length > 0"
-              @click="markAllAsRead" 
+              @click="markAllAsRead"
               class="mark-all-read-btn"
               :disabled="unreadCount === 0"
             >
@@ -36,8 +36,8 @@
 
         <!-- 알림 리스트 -->
         <div class="notification-list" v-if="notifications.length > 0">
-          <div 
-            v-for="notification in notifications" 
+          <div
+            v-for="notification in notifications"
             :key="notification.id"
             class="notification-item"
             :class="{ 'unread': !notification.isRead }"
@@ -67,8 +67,8 @@
             </div>
 
             <!-- 삭제 버튼 -->
-            <button 
-              @click.stop="deleteNotification(notification.id)" 
+            <button
+              @click.stop="deleteNotification(notification.id)"
               class="delete-btn"
               title="삭제"
             >
@@ -109,33 +109,35 @@ export default {
   setup() {
     const router = useRouter()
     const toast = useToast()
-    
+
     // 상태
     const isDropdownOpen = ref(false)
     const notifications = ref([])
     const unreadCount = ref(0)
     const isLoading = ref(false)
     const websocket = ref(null)
-    
+
     // 드롭다운 토글
     const toggleDropdown = async () => {
       isDropdownOpen.value = !isDropdownOpen.value
-      
+
       if (isDropdownOpen.value) {
         await fetchNotifications()
       }
     }
-    
+
     const closeDropdown = () => {
       isDropdownOpen.value = false
     }
-    
+
     // 알림 가져오기
     const fetchNotifications = async () => {
       isLoading.value = true
       try {
         const response = await notificationApi.getNotifications()
-        notifications.value = response.data
+        // ApiResponse 형태 처리
+        const list = response?.data?.data
+        notifications.value = Array.isArray(list) ? list : []
         updateUnreadCount()
       } catch (error) {
         console.error('Failed to fetch notifications:', error)
@@ -144,17 +146,17 @@ export default {
         isLoading.value = false
       }
     }
-    
+
     // 읽지 않은 알림 개수 업데이트
     const updateUnreadCount = async () => {
       try {
         const response = await notificationApi.getUnreadCount()
-        unreadCount.value = response.data.count
+        unreadCount.value = response?.data?.data?.count || 0
       } catch (error) {
         console.error('Failed to fetch unread count:', error)
       }
     }
-    
+
     // 알림 클릭 처리
     const handleNotificationClick = async (notification) => {
       // 읽지 않은 알림이면 읽음 처리
@@ -163,14 +165,14 @@ export default {
         notification.isRead = true
         unreadCount.value = Math.max(0, unreadCount.value - 1)
       }
-      
+
       // 타겟 URL이 있으면 이동
       if (notification.targetUrl) {
         router.push(notification.targetUrl)
         closeDropdown()
       }
     }
-    
+
     // 알림 읽음 처리
     const markAsRead = async (notificationId) => {
       try {
@@ -179,7 +181,7 @@ export default {
         console.error('Failed to mark as read:', error)
       }
     }
-    
+
     // 모든 알림 읽음 처리
     const markAllAsRead = async () => {
       try {
@@ -192,7 +194,7 @@ export default {
         toast.error('읽음 처리에 실패했습니다')
       }
     }
-    
+
     // 알림 삭제
     const deleteNotification = async (notificationId) => {
       try {
@@ -211,35 +213,35 @@ export default {
         toast.error('알림 삭제에 실패했습니다')
       }
     }
-    
+
     // WebSocket 연결
     const connectWebSocket = () => {
       const user = JSON.parse(localStorage.getItem('userInfo') || '{}')
       if (!user.id) return
-      
+
       const wsUrl = `ws://localhost:8080/ws/notifications?userId=${user.id}`
       websocket.value = new WebSocket(wsUrl)
-      
+
       websocket.value.onopen = () => {
         console.log('Notification WebSocket connected')
       }
-      
+
       websocket.value.onmessage = (event) => {
         const data = JSON.parse(event.data)
         handleWebSocketMessage(data)
       }
-      
+
       websocket.value.onerror = (error) => {
         console.error('WebSocket error:', error)
       }
-      
+
       websocket.value.onclose = () => {
         console.log('WebSocket disconnected')
         // 재연결 시도
         setTimeout(connectWebSocket, 5000)
       }
     }
-    
+
     // WebSocket 메시지 처리
     const handleWebSocketMessage = (data) => {
       switch (data.type) {
@@ -247,27 +249,29 @@ export default {
           // 새 알림 추가
           notifications.value.unshift(data.data)
           unreadCount.value++
-          
+
           // 토스트 알림 표시
           toast.info(data.data.title, {
             duration: 5000,
             onClick: () => handleNotificationClick(data.data)
           })
           break
-          
+
         case 'UNREAD_COUNT_UPDATE':
           unreadCount.value = data.count
           break
-          
+
         default:
           console.log('Unknown WebSocket message type:', data.type)
       }
     }
-    
+
     // 알림 타입 아이콘 가져오기
     const getNotificationIcon = (type) => {
       const iconMap = {
         'EXAM_ASSIGNED': 'exam',
+        'EXAM_STARTED': 'exam',
+        'EXAM_ENDED': 'exam',
         'EXAM_COMPLETED': 'exam',
         'EXAM_RESULT': 'exam',
         'CLASS_INVITATION': 'class',
@@ -278,30 +282,30 @@ export default {
       }
       return iconMap[type] || 'info'
     }
-    
+
     // 알림 타입 클래스 가져오기
     const getNotificationType = (type) => {
       return type.toLowerCase().replace(/_/g, '-')
     }
-    
+
     // 시간 포맷팅
     const formatTime = (dateString) => {
       const date = new Date(dateString)
       const now = new Date()
       const diff = now - date
-      
+
       const minutes = Math.floor(diff / 60000)
       const hours = Math.floor(diff / 3600000)
       const days = Math.floor(diff / 86400000)
-      
+
       if (minutes < 1) return '방금 전'
       if (minutes < 60) return `${minutes}분 전`
       if (hours < 24) return `${hours}시간 전`
       if (days < 7) return `${days}일 전`
-      
+
       return date.toLocaleDateString('ko-KR')
     }
-    
+
     // 외부 클릭 감지
     const handleClickOutside = (event) => {
       const container = event.target.closest('.notification-container')
@@ -309,20 +313,20 @@ export default {
         closeDropdown()
       }
     }
-    
+
     onMounted(() => {
       updateUnreadCount()
       connectWebSocket()
       document.addEventListener('click', handleClickOutside)
     })
-    
+
     onUnmounted(() => {
       if (websocket.value) {
         websocket.value.close()
       }
       document.removeEventListener('click', handleClickOutside)
     })
-    
+
     return {
       isDropdownOpen,
       notifications,

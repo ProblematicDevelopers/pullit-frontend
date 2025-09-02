@@ -1552,9 +1552,16 @@ const proceedToNext = async () => {
       console.log('첫 번째 아이템 전체:', selectedItems.value[0])
     }
 
+    // 선택된 문제들에 displayNumber 추가
+    const itemsWithNumbers = selectedItems.value.map((item, index) => ({
+      ...item,
+      displayNumber: index + 1,  // 순서대로 번호 부여
+      itemNumber: index + 1
+    }))
+
     // 선택된 문제들을 이미지로 변환
     const images = await convertQuestionsToImages(
-      selectedItems.value,
+      itemsWithNumbers,
       (progress) => {
         const progressEl = document.getElementById('conversion-progress')
         if (progressEl) {

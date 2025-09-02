@@ -32,7 +32,7 @@ export async function generatePDFFromImages(images, options = {}) {
     grade = '',
     duration = '',
     totalScore = '',
-    layoutMode = 'double', // 기본값을 'double'로 변경
+    layoutMode = 'double', // 기본값 'double' (2단 레이아웃)
     showPageNumbers = true,
     onProgress
   } = options
@@ -50,8 +50,8 @@ export async function generatePDFFromImages(images, options = {}) {
   const contentHeight = A4_CONFIG.height - A4_CONFIG.margin.top - A4_CONFIG.margin.bottom
 
   // 레이아웃에 따른 컬럼 너비 계산
-  const columnWidth = layoutMode === 'double' 
-    ? (contentWidth - A4_CONFIG.columnGap) / 2 
+  const columnWidth = layoutMode === 'double'
+    ? (contentWidth - A4_CONFIG.columnGap) / 2
     : contentWidth
 
   // 첫 페이지에 헤더 추가 - 한글 문제로 인해 간단하게 처리
@@ -63,14 +63,15 @@ export async function generatePDFFromImages(images, options = {}) {
   //   totalScore
   // })
 
-  let currentY = A4_CONFIG.margin.top // 헤더 제거로 인해 바로 시작
-  let currentColumn = 0 // 0: 왼쪽, 1: 오른쪽 (2단 레이아웃용)
   let currentPage = 1
+  let leftColumnY = A4_CONFIG.margin.top
+  let rightColumnY = A4_CONFIG.margin.top
+  let currentColumn = 0 // 0: 왼쪽, 1: 오른쪽
 
   // 각 이미지를 PDF에 추가
   for (let i = 0; i < images.length; i++) {
     const imageData = images[i]
-    
+
     if (onProgress) {
       onProgress({
         current: i + 1,
@@ -82,75 +83,138 @@ export async function generatePDFFromImages(images, options = {}) {
     // 헤더 이미지는 전체 너비로 표시
     const isHeader = imageData.type === 'header' || imageData.isHeader
     const imgWidth = isHeader ? contentWidth : columnWidth
-    
+
     // 이미지 크기 계산 (비율 유지)
     const imgAspectRatio = imageData.naturalWidth / imageData.naturalHeight
     const imgHeight = imgWidth / imgAspectRatio
 
-    // 현재 위치에서 이미지가 페이지를 벗어나는지 확인
-    const needNewColumn = currentY + imgHeight > A4_CONFIG.height - A4_CONFIG.margin.bottom
-    const needNewPage = layoutMode === 'single' 
-      ? needNewColumn 
-      : (needNewColumn && currentColumn === 1)
-
-    if (needNewPage) {
-      // 새 페이지 추가
-      pdf.addPage()
-      currentPage++
-      currentY = A4_CONFIG.margin.top
-      currentColumn = 0
-
-      // 페이지 번호 추가
-      if (showPageNumbers) {
-        addPageNumber(pdf, currentPage)
+    // 헤더 처리
+    if (isHeader) {
+      // 헤더는 항상 새 위치에서 시작
+      if (i === 0) {
+        // 첫 페이지 헤더
+        leftColumnY = A4_CONFIG.margin.top
+        rightColumnY = A4_CONFIG.margin.top
       }
-    } else if (needNewColumn && layoutMode === 'double' && currentColumn === 0) {
-      // 오른쪽 컬럼으로 이동
-      currentColumn = 1
-      currentY = A4_CONFIG.margin.top
-    }
 
-    // 이미지 위치 계산 (헤더는 항상 가운데 정렬)
-    const xPosition = isHeader 
-      ? A4_CONFIG.margin.left
-      : (layoutMode === 'double' && currentColumn === 1
-        ? A4_CONFIG.margin.left + columnWidth + A4_CONFIG.columnGap
-        : A4_CONFIG.margin.left)
-
-    // 이미지 추가
-    try {
       pdf.addImage(
         imageData.dataUrl,
         'PNG',
-        xPosition,
-        currentY,
-        imgWidth,
+        A4_CONFIG.margin.left,
+        leftColumnY,
+        contentWidth,
         imgHeight
       )
 
-      // 문제 번호는 이미지에 포함되어 있으므로 별도로 추가하지 않음
-      // (한글 폰트 문제 회피)
+      // 헤더 후 Y 위치 업데이트 - 간격을 줄임
+      leftColumnY += imgHeight + 10  // 20에서 10으로 줄임
+      rightColumnY = leftColumnY
+      currentColumn = 0
+      continue
+    }
 
-      // Y 위치 업데이트 (이미지 높이 + 간격)
-      currentY += imgHeight + 10
+    // 일반 이미지 처리 (2단 레이아웃)
+    if (layoutMode === 'double') {
+      let currentY = currentColumn === 0 ? leftColumnY : rightColumnY
 
-      // 2단 레이아웃에서 컬럼 전환
-      if (layoutMode === 'double' && currentColumn === 0 && !needNewColumn) {
-        // 다음 이미지를 위해 오른쪽 컬럼 체크
-        const nextImageFitsInRightColumn = i + 1 < images.length
-        if (nextImageFitsInRightColumn) {
-          const nextImage = images[i + 1]
-          const nextImgHeight = (columnWidth / nextImage.naturalWidth) * nextImage.naturalHeight
-          
-          // 오른쪽 컬럼에 공간이 있으면 이동
-          if (A4_CONFIG.margin.top + nextImgHeight <= A4_CONFIG.height - A4_CONFIG.margin.bottom) {
-            currentColumn = 1
-            currentY = A4_CONFIG.margin.top
+      // 페이지 넘침 체크
+      if (currentY + imgHeight > A4_CONFIG.height - A4_CONFIG.margin.bottom) {
+        // 현재 컬럼이 가득 찬 경우
+        if (currentColumn === 0) {
+          // 왼쪽 컬럼이 가득 -> 오른쪽 컬럼으로
+          currentColumn = 1
+          currentY = rightColumnY
+
+          // 오른쪽 컬럼도 가득 찬 경우 새 페이지
+          if (currentY + imgHeight > A4_CONFIG.height - A4_CONFIG.margin.bottom) {
+            pdf.addPage()
+            currentPage++
+            leftColumnY = A4_CONFIG.margin.top
+            rightColumnY = A4_CONFIG.margin.top
+            currentColumn = 0
+            currentY = leftColumnY
+
+            if (showPageNumbers) {
+              addPageNumber(pdf, currentPage)
+            }
+          }
+        } else {
+          // 오른쪽 컬럼이 가득 -> 새 페이지
+          pdf.addPage()
+          currentPage++
+          leftColumnY = A4_CONFIG.margin.top
+          rightColumnY = A4_CONFIG.margin.top
+          currentColumn = 0
+          currentY = leftColumnY
+
+          if (showPageNumbers) {
+            addPageNumber(pdf, currentPage)
           }
         }
       }
-    } catch (error) {
-      console.error(`이미지 ${i + 1} 추가 실패:`, error)
+
+      // 이미지 추가
+      const xPosition = currentColumn === 0
+        ? A4_CONFIG.margin.left
+        : A4_CONFIG.margin.left + columnWidth + A4_CONFIG.columnGap
+
+      try {
+        pdf.addImage(
+          imageData.dataUrl,
+          'PNG',
+          xPosition,
+          currentY,
+          columnWidth,
+          imgHeight
+        )
+
+        // Y 위치 업데이트 - 왼쪽 컬럼을 먼저 채우기
+        if (currentColumn === 0) {
+          leftColumnY = currentY + imgHeight + 10
+          // 다음 이미지가 왼쪽 컬럼에 들어갈 수 있는지 확인
+          if (i + 1 < images.length) {
+            const nextImage = images[i + 1]
+            const nextImgHeight = (columnWidth / nextImage.naturalWidth) * nextImage.naturalHeight
+            // 왼쪽 컬럼에 공간이 없으면 오른쪽으로
+            if (leftColumnY + nextImgHeight > A4_CONFIG.height - A4_CONFIG.margin.bottom) {
+              currentColumn = 1
+            }
+            // 왼쪽 컬럼에 공간이 있으면 계속 왼쪽에
+          }
+        } else {
+          rightColumnY = currentY + imgHeight + 10
+          // 오른쪽 컬럼을 채운 후 다시 왼쪽으로
+          currentColumn = 0
+        }
+      } catch (error) {
+        console.error(`이미지 ${i + 1} 추가 실패:`, error)
+      }
+    } else {
+      // 단일 컬럼 레이아웃 (사용하지 않지만 안전을 위해)
+      if (leftColumnY + imgHeight > A4_CONFIG.height - A4_CONFIG.margin.bottom) {
+        pdf.addPage()
+        currentPage++
+        leftColumnY = A4_CONFIG.margin.top
+
+        if (showPageNumbers) {
+          addPageNumber(pdf, currentPage)
+        }
+      }
+
+      try {
+        pdf.addImage(
+          imageData.dataUrl,
+          'PNG',
+          A4_CONFIG.margin.left,
+          leftColumnY,
+          contentWidth,
+          imgHeight
+        )
+
+        leftColumnY += imgHeight + 10
+      } catch (error) {
+        console.error(`이미지 ${i + 1} 추가 실패:`, error)
+      }
     }
   }
 
@@ -168,26 +232,26 @@ export async function generatePDFFromImages(images, options = {}) {
  */
 function addExamHeader(pdf, headerInfo) {
   const { examTitle, subject, grade, duration, totalScore } = headerInfo
-  
+
   pdf.setFontSize(18)
   pdf.setFont(undefined, 'bold')
   pdf.text(examTitle, A4_CONFIG.width / 2, A4_CONFIG.margin.top, { align: 'center' })
-  
+
   pdf.setFontSize(12)
   pdf.setFont(undefined, 'normal')
-  
+
   const infoY = A4_CONFIG.margin.top + 10
   const infoTexts = []
-  
+
   if (grade) infoTexts.push(`학년: ${grade}`)
   if (subject) infoTexts.push(`과목: ${subject}`)
   if (duration) infoTexts.push(`시간: ${duration}분`)
   if (totalScore) infoTexts.push(`총점: ${totalScore}점`)
-  
+
   if (infoTexts.length > 0) {
     pdf.text(infoTexts.join(' | '), A4_CONFIG.width / 2, infoY, { align: 'center' })
   }
-  
+
   // 구분선
   pdf.setLineWidth(0.5)
   pdf.line(

@@ -1105,8 +1105,8 @@ const checkUsernameAvailability = async () => {
 
   try {
     const response = await axios.get(`${apiBaseUrl}/users/check/username/${signupForm.value.username}`)
-
-    if (response.data.success) {
+    const isAvailable = response?.data?.data === true
+    if (isAvailable) {
       usernameCheckMessage.value = '사용 가능한 아이디입니다.'
       usernameAvailable.value = true
     } else {

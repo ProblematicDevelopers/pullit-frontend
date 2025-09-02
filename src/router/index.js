@@ -4,6 +4,7 @@ import ClassDashboard from '../views/ClassDashboard.vue'
 import Report from '../components/student/report/ReportList.vue'
 import BasicReport from '../components/student/report/BasicReport.vue'
 import StudentMain from '../components/student/Main.vue'
+import StudentMainRedesigned from '../components/student/MainRedesigned.vue'
 import StudentLayout from '@/components/student/StudentLayout.vue'
 
 // 시험지 마법사 컴포넌트 import
@@ -79,6 +80,8 @@ const routes = [
     path: '/student',
     component: StudentLayout, // 공통 레이아웃 or StudentMain 같은 것
     children: [
+      // 기본 대시보드
+      { path: '', redirect: '/student/main' },
       { path: 'main', name: 'student.main', component: StudentMain },
 
       { path: 'report', name: 'student.report', component: Report },
@@ -147,7 +150,7 @@ const routes = [
       role: 'teacher',
     },
   },
-  
+
   // 학급관리 상세 페이지
   {
     path: '/class-management',
