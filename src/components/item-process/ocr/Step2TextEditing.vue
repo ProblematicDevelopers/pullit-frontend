@@ -538,6 +538,7 @@ export default {
     const tinymceApiKey = getTinyMCEApiKey()
     const editorConfig = createCommonEditorConfig({
       enableMathTools: false, // MathJax 렌더링 비활성화
+      enableImageUpload: true, // 이미지 업로드 활성화
       setup: (editor) => {
         // MathJax 렌더링 비활성화 - 에디터 내에서는 LaTeX 코드만 표시
         editor.on('init', () => {
