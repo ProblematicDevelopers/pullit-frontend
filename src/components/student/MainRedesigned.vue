@@ -1,0 +1,743 @@
+<template>
+  <div class="student-dashboard">
+    <!-- Hero Section with Welcome Message -->
+    <section class="hero-section">
+      <div class="container">
+        <div class="hero-content">
+          <div class="welcome-text">
+            <h1 class="hero-title">
+              안녕하세요, <span class="text-primary">{{ userInfo.fullName || '학생' }}</span>님!
+            </h1>
+            <p class="hero-subtitle">
+              오늘도 열심히 공부해요! 당신의 학습 여정을 응원합니다.
+            </p>
+          </div>
+          <div class="hero-illustration">
+            <div class="floating-book">📚</div>
+            <div class="floating-star star-1">⭐</div>
+            <div class="floating-star star-2">✨</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick Stats Section -->
+    <section class="stats-section">
+      <div class="container">
+        <div class="stats-grid">
+          <div class="stat-card">
+            <div class="stat-icon completed">
+              <i class="bi bi-check-circle"></i>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ stats.completedExams || 0 }}</div>
+              <div class="stat-label">완료한 시험</div>
+            </div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-icon pending">
+              <i class="bi bi-clock-history"></i>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ stats.pendingExams || 0 }}</div>
+              <div class="stat-label">대기 중인 시험</div>
+            </div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-icon score">
+              <i class="bi bi-graph-up"></i>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ stats.averageScore || 0 }}점</div>
+              <div class="stat-label">평균 점수</div>
+            </div>
+          </div>
+          
+          <div class="stat-card">
+            <div class="stat-icon rank">
+              <i class="bi bi-trophy"></i>
+            </div>
+            <div class="stat-content">
+              <div class="stat-value">{{ stats.classRank || '-' }}등</div>
+              <div class="stat-label">반 순위</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Main Features Section -->
+    <section class="features-section">
+      <div class="container">
+        <h2 class="section-title">학습 도구</h2>
+        <div class="features-grid">
+          
+          <!-- CBT 문제은행 -->
+          <router-link to="/student/cbt/step01" class="feature-card">
+            <div class="feature-header">
+              <div class="feature-icon primary">
+                <i class="bi bi-journal-text"></i>
+              </div>
+              <span class="feature-badge new">NEW</span>
+            </div>
+            <h3 class="feature-title">문제은행 CBT</h3>
+            <p class="feature-description">
+              15,000+ 검증된 문제로 실력을 향상시키세요. 과목별, 단원별로 체계적으로 분류된 문제를 풀어보세요.
+            </p>
+            <div class="feature-stats">
+              <span class="stat-item">
+                <i class="bi bi-database"></i> 15,000+ 문제
+              </span>
+              <span class="stat-item">
+                <i class="bi bi-patch-check"></i> 검증된 문제
+              </span>
+            </div>
+            <div class="feature-action">
+              문제 풀기 <i class="bi bi-arrow-right"></i>
+            </div>
+          </router-link>
+
+          <!-- 우리반 시험 -->
+          <router-link to="/student/class-room/my-class" class="feature-card">
+            <div class="feature-header">
+              <div class="feature-icon success">
+                <i class="bi bi-people"></i>
+              </div>
+              <span class="feature-badge hot">HOT</span>
+            </div>
+            <h3 class="feature-title">똑똑한 우리반</h3>
+            <p class="feature-description">
+              실시간으로 진행되는 우리반 시험에 참여하세요. 선생님과 함께 공정한 온라인 시험을 경험할 수 있습니다.
+            </p>
+            <div class="feature-stats">
+              <span class="stat-item">
+                <i class="bi bi-broadcast"></i> 실시간 시험
+              </span>
+              <span class="stat-item">
+                <i class="bi bi-shield-check"></i> 공정한 평가
+              </span>
+            </div>
+            <div class="feature-action">
+              반 입장하기 <i class="bi bi-arrow-right"></i>
+            </div>
+          </router-link>
+
+          <!-- 성적 분석 -->
+          <router-link to="/student/report" class="feature-card">
+            <div class="feature-header">
+              <div class="feature-icon warning">
+                <i class="bi bi-graph-up-arrow"></i>
+              </div>
+            </div>
+            <h3 class="feature-title">시험 성적 분석</h3>
+            <p class="feature-description">
+              상세한 성적 분석과 문항별 리포트로 약점을 파악하고 학습 전략을 세우세요.
+            </p>
+            <div class="feature-stats">
+              <span class="stat-item">
+                <i class="bi bi-bar-chart"></i> 성적 추이
+              </span>
+              <span class="stat-item">
+                <i class="bi bi-clipboard-data"></i> 문항 분석
+              </span>
+            </div>
+            <div class="feature-action">
+              리포트 보기 <i class="bi bi-arrow-right"></i>
+            </div>
+          </router-link>
+
+          <!-- 학습 자료 -->
+          <div class="feature-card disabled">
+            <div class="feature-header">
+              <div class="feature-icon secondary">
+                <i class="bi bi-book"></i>
+              </div>
+              <span class="feature-badge coming">COMING</span>
+            </div>
+            <h3 class="feature-title">학습 자료실</h3>
+            <p class="feature-description">
+              선생님이 공유한 학습 자료와 참고 문서를 확인하고 다운로드할 수 있습니다.
+            </p>
+            <div class="feature-stats">
+              <span class="stat-item">
+                <i class="bi bi-file-earmark-pdf"></i> PDF 자료
+              </span>
+              <span class="stat-item">
+                <i class="bi bi-camera-video"></i> 동영상 강의
+              </span>
+            </div>
+            <div class="feature-action">
+              준비 중 <i class="bi bi-lock"></i>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </section>
+
+    <!-- Recent Activities -->
+    <section class="activities-section">
+      <div class="container">
+        <div class="activities-header">
+          <h2 class="section-title">최근 활동</h2>
+          <router-link to="/student/activities" class="view-all-link">
+            전체 보기 <i class="bi bi-arrow-right"></i>
+          </router-link>
+        </div>
+        
+        <div class="activities-grid">
+          <div class="activity-card" v-for="activity in recentActivities" :key="activity.id">
+            <div class="activity-icon" :class="activity.type">
+              <i :class="getActivityIcon(activity.type)"></i>
+            </div>
+            <div class="activity-content">
+              <h4 class="activity-title">{{ activity.title }}</h4>
+              <p class="activity-description">{{ activity.description }}</p>
+              <span class="activity-time">{{ formatTime(activity.timestamp) }}</span>
+            </div>
+          </div>
+          
+          <div v-if="!recentActivities.length" class="empty-state">
+            <i class="bi bi-inbox"></i>
+            <p>아직 활동 내역이 없습니다.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  </div>
+</template>
+
+<script setup>
+import { ref, onMounted, computed } from 'vue'
+import studentApi from '@/services/studentApi'
+
+// 사용자 정보
+const userInfo = ref(JSON.parse(localStorage.getItem('userInfo') || '{}'))
+
+// 통계 데이터
+const stats = ref({
+  completedExams: 0,
+  pendingExams: 0,
+  averageScore: 0,
+  classRank: '-'
+})
+
+// 최근 활동
+const recentActivities = ref([])
+
+// 활동 타입별 아이콘
+const getActivityIcon = (type) => {
+  const icons = {
+    exam_completed: 'bi bi-check-circle',
+    exam_assigned: 'bi bi-clipboard',
+    score_improved: 'bi bi-graph-up',
+    achievement: 'bi bi-trophy'
+  }
+  return icons[type] || 'bi bi-circle'
+}
+
+// 시간 포맷
+const formatTime = (timestamp) => {
+  const date = new Date(timestamp)
+  const now = new Date()
+  const diff = now - date
+  const minutes = Math.floor(diff / 60000)
+  const hours = Math.floor(minutes / 60)
+  const days = Math.floor(hours / 24)
+  
+  if (days > 0) return `${days}일 전`
+  if (hours > 0) return `${hours}시간 전`
+  if (minutes > 0) return `${minutes}분 전`
+  return '방금 전'
+}
+
+// 데이터 로드
+const loadDashboardData = async () => {
+  try {
+    // TODO: API 호출로 실제 데이터 로드
+    // const response = await studentApi.getDashboardStats()
+    // stats.value = response.data
+    
+    // 임시 데이터
+    stats.value = {
+      completedExams: 12,
+      pendingExams: 3,
+      averageScore: 85,
+      classRank: 5
+    }
+    
+    recentActivities.value = [
+      {
+        id: 1,
+        type: 'exam_completed',
+        title: '중간고사 수학 완료',
+        description: '85점 획득',
+        timestamp: new Date(Date.now() - 3600000)
+      },
+      {
+        id: 2,
+        type: 'exam_assigned',
+        title: '새로운 시험 배정',
+        description: '영어 단원평가가 배정되었습니다',
+        timestamp: new Date(Date.now() - 7200000)
+      }
+    ]
+  } catch (error) {
+    console.error('대시보드 데이터 로드 실패:', error)
+  }
+}
+
+onMounted(() => {
+  loadDashboardData()
+})
+</script>
+
+<style scoped>
+.student-dashboard {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding-bottom: 3rem;
+}
+
+/* Hero Section */
+.hero-section {
+  padding: 3rem 0 2rem;
+  color: white;
+}
+
+.hero-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  position: relative;
+}
+
+.hero-title {
+  font-size: 2.5rem;
+  font-weight: 700;
+  margin-bottom: 0.5rem;
+}
+
+.hero-title .text-primary {
+  color: #ffd700;
+}
+
+.hero-subtitle {
+  font-size: 1.2rem;
+  opacity: 0.95;
+}
+
+.hero-illustration {
+  position: relative;
+  width: 200px;
+  height: 150px;
+}
+
+.floating-book {
+  font-size: 4rem;
+  animation: float 3s ease-in-out infinite;
+}
+
+.floating-star {
+  position: absolute;
+  font-size: 1.5rem;
+  animation: twinkle 2s ease-in-out infinite;
+}
+
+.star-1 {
+  top: 10px;
+  right: 20px;
+  animation-delay: 0.5s;
+}
+
+.star-2 {
+  bottom: 20px;
+  left: 30px;
+  animation-delay: 1s;
+}
+
+/* Stats Section */
+.stats-section {
+  padding: 2rem 0;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1.5rem;
+}
+
+.stat-card {
+  background: white;
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  transition: transform 0.3s ease;
+}
+
+.stat-card:hover {
+  transform: translateY(-5px);
+}
+
+.stat-icon {
+  width: 50px;
+  height: 50px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+}
+
+.stat-icon.completed {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+  color: white;
+}
+
+.stat-icon.pending {
+  background: linear-gradient(135deg, #f093fb, #f5576c);
+  color: white;
+}
+
+.stat-icon.score {
+  background: linear-gradient(135deg, #4facfe, #00f2fe);
+  color: white;
+}
+
+.stat-icon.rank {
+  background: linear-gradient(135deg, #ffd700, #ffb347);
+  color: white;
+}
+
+.stat-value {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: #2d3748;
+}
+
+.stat-label {
+  font-size: 0.9rem;
+  color: #718096;
+}
+
+/* Features Section */
+.features-section {
+  padding: 3rem 0;
+}
+
+.section-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: white;
+  margin-bottom: 2rem;
+}
+
+.features-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 2rem;
+}
+
+.feature-card {
+  background: white;
+  border-radius: 20px;
+  padding: 2rem;
+  text-decoration: none;
+  color: inherit;
+  transition: all 0.3s ease;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+}
+
+.feature-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #667eea, #764ba2);
+  transform: translateX(-100%);
+  transition: transform 0.3s ease;
+}
+
+.feature-card:hover::before {
+  transform: translateX(0);
+}
+
+.feature-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.feature-card.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.feature-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.5rem;
+}
+
+.feature-icon {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.8rem;
+  color: white;
+}
+
+.feature-icon.primary {
+  background: linear-gradient(135deg, #667eea, #764ba2);
+}
+
+.feature-icon.success {
+  background: linear-gradient(135deg, #48bb78, #38a169);
+}
+
+.feature-icon.warning {
+  background: linear-gradient(135deg, #f6ad55, #ed8936);
+}
+
+.feature-icon.secondary {
+  background: linear-gradient(135deg, #718096, #4a5568);
+}
+
+.feature-badge {
+  padding: 0.25rem 0.75rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.feature-badge.new {
+  background: #e6fffa;
+  color: #319795;
+}
+
+.feature-badge.hot {
+  background: #fff5f5;
+  color: #e53e3e;
+}
+
+.feature-badge.coming {
+  background: #f7fafc;
+  color: #718096;
+}
+
+.feature-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #2d3748;
+  margin-bottom: 1rem;
+}
+
+.feature-description {
+  color: #718096;
+  line-height: 1.6;
+  margin-bottom: 1.5rem;
+  flex-grow: 1;
+}
+
+.feature-stats {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #4a5568;
+  font-size: 0.9rem;
+}
+
+.feature-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 1rem;
+  border-top: 1px solid #e2e8f0;
+  color: #667eea;
+  font-weight: 600;
+  transition: color 0.3s ease;
+}
+
+.feature-card:hover .feature-action {
+  color: #764ba2;
+}
+
+/* Activities Section */
+.activities-section {
+  padding: 3rem 0;
+}
+
+.activities-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+}
+
+.view-all-link {
+  color: white;
+  text-decoration: none;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 500;
+  transition: opacity 0.3s ease;
+}
+
+.view-all-link:hover {
+  opacity: 0.8;
+}
+
+.activities-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.activity-card {
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  transition: transform 0.3s ease;
+}
+
+.activity-card:hover {
+  transform: translateX(5px);
+}
+
+.activity-icon {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.2rem;
+  color: white;
+}
+
+.activity-icon.exam_completed {
+  background: linear-gradient(135deg, #48bb78, #38a169);
+}
+
+.activity-icon.exam_assigned {
+  background: linear-gradient(135deg, #4299e1, #3182ce);
+}
+
+.activity-icon.score_improved {
+  background: linear-gradient(135deg, #f6ad55, #ed8936);
+}
+
+.activity-icon.achievement {
+  background: linear-gradient(135deg, #ffd700, #ffb347);
+}
+
+.activity-content {
+  flex-grow: 1;
+}
+
+.activity-title {
+  font-weight: 600;
+  color: #2d3748;
+  margin-bottom: 0.25rem;
+}
+
+.activity-description {
+  color: #718096;
+  font-size: 0.9rem;
+  margin-bottom: 0.5rem;
+}
+
+.activity-time {
+  color: #a0aec0;
+  font-size: 0.8rem;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 3rem;
+  background: white;
+  border-radius: 12px;
+  color: #a0aec0;
+}
+
+.empty-state i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+}
+
+/* Animations */
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-20px);
+  }
+}
+
+@keyframes twinkle {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.5;
+    transform: scale(0.8);
+  }
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .hero-content {
+    flex-direction: column;
+    text-align: center;
+  }
+  
+  .hero-illustration {
+    margin-top: 2rem;
+  }
+  
+  .hero-title {
+    font-size: 2rem;
+  }
+  
+  .features-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  
+  .activities-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+}
+</style>

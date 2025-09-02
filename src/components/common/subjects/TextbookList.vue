@@ -49,10 +49,19 @@
               </div>
               <div class="card-body">
                 <h5 class="card-title mb-1 text-truncate" :title="s.subjectName">{{ s.subjectName }}</h5>
-                <div class="d-flex gap-1 small text-muted">
+                <div class="d-flex gap-1 small text-muted mb-2">
                   <span class="badge text-bg-light border" v-if="s.schoolLevelName">{{ s.schoolLevelName }}</span>
                   <span class="badge text-bg-light border" v-if="s.gradeName">{{ s.gradeName }}</span>
                   <span class="badge text-bg-light border" v-if="s.termName">{{ s.termName }}</span>
+                </div>
+                <div class="d-flex align-items-center">
+                  <span class="badge bg-primary">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" class="me-1">
+                      <path d="M9 11H3M9 11C9 12.6569 10.3431 14 12 14C13.6569 14 15 12.6569 15 11C15 9.34315 13.6569 8 12 8C10.3431 8 9 9.34315 9 11ZM15 11H21M12 4V8M12 14V20"
+                            stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                    </svg>
+                    {{ s.itemCount || 0 }} 문항
+                  </span>
                 </div>
               </div>
               <div class="card-footer bg-transparent d-flex justify-content-between align-items-center border-0">
