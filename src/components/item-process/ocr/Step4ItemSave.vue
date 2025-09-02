@@ -44,6 +44,34 @@
           </div>
         </div>
 
+        <!-- 편집된 텍스트 요약 -->
+        <div class="confirmation-section">
+          <h5 class="section-title">
+            <i class="bi bi-file-text me-2"></i>편집된 텍스트 요약
+          </h5>
+          <div class="text-summary">
+            <div
+              v-for="areaType in availableAreaTypes"
+              :key="areaType"
+              class="text-summary-item"
+            >
+              <div class="text-header">
+                <i :class="getAreaIcon(areaType)" class="me-2"></i>
+                <span class="text-name">{{ getAreaTypeLabel(areaType) }}</span>
+                <span class="text-length">{{ editedTexts[areaType]?.length || 0 }}자</span>
+              </div>
+              <div class="text-preview">
+                <div v-if="editedTexts[areaType]" class="text-content">
+                  {{ getTextPreview(editedTexts[areaType]) }}
+                </div>
+                <div v-else class="no-text">
+                  <i class="bi bi-exclamation-circle text-muted"></i>
+                  <span class="text-muted">편집된 텍스트가 없습니다.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
 
         <!-- 문제 정보 요약 -->
         <div class="confirmation-section">
@@ -82,13 +110,6 @@
           <i class="bi bi-eye me-2"></i>문제 미리보기
         </h5>
         <div class="problem-preview-content">
-          <!-- 이미지 영역 -->
-          <div v-if="safeCaptureFullImg" class="image-section">
-            <div class="image-content">
-              <img :src="safeCaptureFullImg" alt="문제 이미지" class="problem-image" />
-              <div class="text-muted text-xs">[캡쳐한 이미지 영역]</div>
-            </div>
-          </div>
           <!-- 실제 문제처럼 표시 -->
           <div class="problem-display">
             <!-- 지문 영역 -->
@@ -99,6 +120,13 @@
             <!-- 문제 영역 -->
             <div v-if="editedTexts.problem" class="problem-section">
               <div class="problem-content" v-html="editedTexts.problem"></div>
+            </div>
+
+            <!-- 이미지 영역 -->
+            <div v-if="safeCaptureFullImg" class="image-section">
+              <div class="image-content">
+                <img :src="safeCaptureFullImg" alt="문제 이미지" class="problem-image" />
+              </div>
             </div>
 
             <!-- 보기 영역 -->
@@ -113,7 +141,6 @@
           </div>
         </div>
       </div>
-
 
       <!-- 정답 및 해설 정보 -->
       <div class="answer-explanation-section">
@@ -137,36 +164,6 @@
                        v-html="itemInfo.explanation"></div>
                   <div v-else class="text-muted">해설이 입력되지 않았습니다.</div>
                 </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-
-      <!-- 편집된 텍스트 요약 -->
-      <div class="confirmation-section">
-        <h5 class="section-title">
-          <i class="bi bi-file-text me-2"></i>편집된 텍스트 요약
-        </h5>
-        <div class="text-summary">
-          <div
-            v-for="areaType in availableAreaTypes"
-            :key="areaType"
-            class="text-summary-item"
-          >
-            <div class="text-header">
-              <i :class="getAreaIcon(areaType)" class="me-2"></i>
-              <span class="text-name">{{ getAreaTypeLabel(areaType) }}</span>
-              <span class="text-length">{{ editedTexts[areaType]?.length || 0 }}자</span>
-            </div>
-            <div class="text-preview">
-              <div v-if="editedTexts[areaType]" class="text-content">
-                {{ getTextPreview(editedTexts[areaType]) }}
-              </div>
-              <div v-else class="no-text">
-                <i class="bi bi-exclamation-circle text-muted"></i>
-                <span class="text-muted">편집된 텍스트가 없습니다.</span>
               </div>
             </div>
           </div>
@@ -273,15 +270,30 @@ export default {
     const splitOptions = (optionsText) => {
       if (!optionsText) return []
 
-      // (1), (2), (3) 패턴으로 분리하되, 번호와 내용을 함께 유지
-      const matches = optionsText.match(/\(\d+\)[^()]*/g)
-      if (!matches) return []
+      // 옵션을 수동으로 분리하는 방법
+      const options = []
+      const parts = optionsText.split(/(?=\(\d+\))/g) // (숫자) 앞에서 분리
 
-      return matches.map(match => {
-        // (1) 1 형태에서 내용 부분만 추출
-        const content = match.replace(/\(\d+\)\s*/, '').trim()
-        return content
-      }).filter(content => content) // 빈 내용 제거
+      for (const part of parts) {
+        if (part.trim()) {
+          // (숫자) 부분을 제거하고 나머지 내용만 추출
+          const content = part.replace(/\(\d+\)\s*/, '').trim()
+          if (content) {
+            options.push(content)
+          }
+        }
+      }
+
+      return options
+    }
+
+    // 보기 텍스트를 줄바꿈이 포함된 형태로 변환하는 함수
+    const formatOptionsWithLineBreaks = (optionsText) => {
+      if (!optionsText) return ''
+
+      // splitOptions를 사용해서 각 옵션을 분리한 후 줄바꿈으로 연결
+      const options = splitOptions(optionsText)
+      return options.join('\n')
     }
 
     // 처리된 보기 목록 (MathJax 렌더링을 위해 raw LaTeX 반환)
@@ -600,7 +612,8 @@ export default {
       processedOptionsList,
       renderMathJaxInPreview,
       styleLatexCode,
-      safeCaptureFullImg
+      safeCaptureFullImg,
+      formatOptionsWithLineBreaks
     }
   }
 }
@@ -872,8 +885,6 @@ export default {
 .image-section {
   margin-bottom: 2rem;
   text-align: center;
-  justify-content: center;
-  display: flex;
 }
 
 .image-content {
