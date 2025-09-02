@@ -26,6 +26,15 @@
         <div class="image-container">
           <div v-if="getCurrentAreaImage()" class="area-image">
             <img :src="getCurrentAreaImage()" :alt="`${getAreaTypeLabel(currentEditingArea)} 영역`" />
+            <!-- 좌표 정보 표시 -->
+            <div v-if="getCurrentAreaInfo()" class="coordinate-info">
+              <small class="text-muted">
+                <strong>좌표 정보:</strong><br>
+                화면: {{ getCurrentAreaInfo().x }}×{{ getCurrentAreaInfo().y }} ({{ getCurrentAreaInfo().width }}×{{ getCurrentAreaInfo().height }})<br>
+                원본: {{ getCurrentAreaInfo().originalX }}×{{ getCurrentAreaInfo().originalY }} ({{ getCurrentAreaInfo().originalWidth }}×{{ getCurrentAreaInfo().originalHeight }})<br>
+                줌: {{ getCurrentAreaInfo().zoomLevel }}x
+              </small>
+            </div>
           </div>
           <div v-else class="no-image">
             선택한 유형의 이미지들
@@ -522,7 +531,28 @@ export default {
       }
 
       const currentArea = props.selectedAreas[props.currentEditingArea]
+
+      // 좌표 정보 디버깅
+      console.log('Step2 - 현재 영역 정보:', {
+        areaType: props.currentEditingArea,
+        area: currentArea,
+        좌표정보: {
+          화면좌표: { x: currentArea.x, y: currentArea.y, width: currentArea.width, height: currentArea.height },
+          원본좌표: { x: currentArea.originalX, y: currentArea.originalY, width: currentArea.originalWidth, height: currentArea.originalHeight },
+          줌레벨: currentArea.zoomLevel
+        }
+      })
+
       return currentArea.imageData || null
+    }
+
+    // 현재 영역의 정보 가져오기
+    const getCurrentAreaInfo = () => {
+      if (!props.currentEditingArea || !props.selectedAreas[props.currentEditingArea]) {
+        return null
+      }
+
+      return props.selectedAreas[props.currentEditingArea]
     }
 
     // 편집 영역 전환 상태 (중복 호출 방지)
@@ -1464,6 +1494,7 @@ LaTeX 수식 예시:
             ensureMathJaxLoaded,
       getAreaTypeLabel,
       getCurrentAreaImage,
+      getCurrentAreaInfo,
       selectEditingArea,
       copyOcrToEditor,
       syncEditorToPreview,
@@ -1587,6 +1618,14 @@ LaTeX 수식 예시:
   max-width: 100%;
   height: auto;
   border-radius: 4px;
+}
+
+.coordinate-info {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: #f8f9fa;
+  border-radius: 4px;
+  border: 1px solid #e9ecef;
 }
 
 .no-image,
