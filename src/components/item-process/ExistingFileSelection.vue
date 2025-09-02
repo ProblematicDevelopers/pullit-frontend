@@ -79,7 +79,7 @@
               <!-- 파일 정보 헤더 -->
               <div class="file-header d-flex justify-content-between align-items-start mb-3">
                 <div class="file-info flex-grow-1">
-                  <h6 class="file-name mb-1" :title="fileHistory.originalFileName">
+                  <h6 class="file-name mb-2" :title="fileHistory.originalFileName">
                     {{ truncateFileName(fileHistory.originalFileName) }}
                   </h6>
                   <div class="file-meta">
@@ -103,7 +103,7 @@
                     class="preview-image"
                   >
                     <img :src="image.imageUrl" :alt="`페이지 ${image.pageNumber}`" />
-                    <div class="page-number">{{ image.pageNumber }}</div>
+                    <div class="page-number">{{ index + 1 }}</div>
                   </div>
                   <div v-if="fileHistory.pdfImages.length > 4" class="more-pages">
                     +{{ fileHistory.pdfImages.length - 4 }}
@@ -182,7 +182,7 @@ export default {
       // 검색 필터
       if (searchQuery.value) {
         files = files.filter(file =>
-          file.originalFileName.toLowerCase().includes(searchQuery.value.toLowerCase())
+          file.originalFileName.toLowerCase().includes(searchQuery.value)
         )
       }
 
@@ -225,8 +225,8 @@ export default {
     }
 
     const truncateFileName = (fileName) => {
-      if (fileName.length > 30) {
-        return fileName.substring(0, 27) + '...'
+      if (fileName.length > 50) {
+        return fileName.substring(0, 47) + '...'
       }
       return fileName
     }

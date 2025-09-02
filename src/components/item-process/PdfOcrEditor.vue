@@ -225,9 +225,38 @@ import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue'
 import { useToast } from '@/composables/useToast'
 
 import { ocrApi } from '@/services/ocrApi'
+import { fileHistoryAPI } from '@/services/fileHistoryApi'
 import { renderMathJax, waitForMathJax } from '@/utils/mathjax'
 
 import OcrResultModal from './OcrResultModal.vue'
+
+/**
+ * 안정적인 이미지 순서 생성 함수
+ * pageNumber 기반으로 0-based 인덱스를 생성하여 중복 0 문제 해결
+ */
+function buildImageOrder(pages) {
+  // pageNumber는 1-based → 0-based로 전송
+  let order = pages.map(p => {
+    const base = Number.isInteger(p?.pageNumber) ? (p.pageNumber - 1)
+               : Number.isInteger(p?.originalPage) ? p.originalPage
+               : null
+    return base
+  })
+
+  // 방어: null/NaN/범위 밖/중복 정리
+  const n = pages.length
+  const seen = new Set()
+  const fixed = []
+  for (const i of order) {
+    if (Number.isInteger(i) && i >= 0 && i < n && !seen.has(i)) {
+      seen.add(i); fixed.push(i)
+    }
+  }
+  // 누락된 인덱스 보충
+  for (let i = 0; i < n; i++) if (!seen.has(i)) fixed.push(i)
+
+  return fixed.join(',')
+}
 
 export default {
   name: 'PdfOcrEditor',
@@ -367,7 +396,8 @@ export default {
       }
     }
 
-    // MathJax 초기화
+    // MathJax 초기화 - 사용하지 않음
+    /*
     const initMathJax = () => {
       if (window.MathJax) {
         try {
@@ -393,6 +423,7 @@ export default {
         }
       }
     }
+    */
 
 
 
@@ -400,7 +431,8 @@ export default {
 
 
 
-    // KaTeX로 수식 렌더링 (MathJax 대안)
+    // KaTeX로 수식 렌더링 (MathJax 대안) - 사용하지 않음
+    /*
     const renderWithKaTeX = (text) => {
       try {
         if (window.katex) {
@@ -431,10 +463,12 @@ export default {
       }
       return text
     }
+    */
 
 
 
-    // 커서 위치에 텍스트 삽입
+    // 커서 위치에 텍스트 삽입 - 사용하지 않음
+    /*
     const insertTextAtCursor = (text) => {
       const textarea = document.querySelector('.fallback-textarea')
       if (textarea) {
@@ -452,8 +486,10 @@ export default {
         })
       }
     }
+    */
 
-    // MathJax로 수식 렌더링
+    // MathJax로 수식 렌더링 - 사용하지 않음
+    /*
     const renderMathContent = async () => {
       if (currentEditingText.value.includes('$$') || currentEditingText.value.includes('$')) {
         try {
@@ -513,6 +549,7 @@ export default {
         renderedMath.value = ''
       }
     }
+    */
 
     // currentEditingText 변경 감지
     watch(currentEditingText, () => {
@@ -528,7 +565,7 @@ export default {
     })
 
     // props.pdfPages 변경 감지하여 totalPages 업데이트
-    watch(() => props.pdfPages, (newPdfPages) => {
+    watch(() => props.pdfPages, async (newPdfPages, oldPdfPages) => {
       console.log('=== PdfOcrEditor에서 pdfPages 변경 감지 ===')
       console.log('새로운 pdfPages:', newPdfPages)
       console.log('새로운 길이:', newPdfPages.length)
@@ -541,7 +578,39 @@ export default {
         currentPage.value = Math.max(0, newPdfPages.length - 1)
         console.log('현재 페이지 조정됨:', currentPage.value)
       }
+
+              // 페이지 순서가 변경된 경우 백엔드에 알림
+        if (oldPdfPages && oldPdfPages.length > 0) {
+          const oldOrder = oldPdfPages.map(p => p.originalPage).join(',')
+          const newOrder = newPdfPages.map(p => p.originalPage).join(',')
+
+        if (oldOrder !== newOrder) {
+          console.log('페이지 순서 변경 감지:', { oldOrder, newOrder })
+          await updateImageOrder()
+        }
+      }
     }, { immediate: true, deep: true })
+
+    // PDF 페이지 순서 업데이트 (0-based 인덱스)
+    const updateImageOrder = async () => {
+      try {
+        if (!props.pdfPages || props.pdfPages.length === 0) return
+
+        // 안정적인 이미지 순서 생성
+        const imageOrder = buildImageOrder(props.pdfPages)
+        console.log('📤 이미지 순서 업데이트:', imageOrder)
+
+        // fileHistoryId가 있는 경우에만 업데이트
+        const fileHistoryId = props.pdfPages[0]?.fileHistoryId
+        if (fileHistoryId) {
+          await fileHistoryAPI.updateImageOrder(fileHistoryId, imageOrder)
+          console.log('✅ 이미지 순서 업데이트 완료')
+        }
+      } catch (error) {
+        console.warn('⚠️ 이미지 순서 업데이트 실패:', error)
+        // 순서 업데이트 실패는 전체 플로우를 막지 않음
+      }
+    }
 
     // PDF 페이지 렌더링
     const renderPdfPage = async (pageIndex) => {
@@ -1335,7 +1404,8 @@ export default {
 
 
 
-    // OCR API 호출
+    // OCR API 호출 - 사용하지 않음
+    /*
     const callOcrApi = async (imageBase64, subjectCode) => {
       try {
         const result = await ocrApi.processImage(imageBase64, subjectCode)
@@ -1345,6 +1415,7 @@ export default {
         throw error
       }
     }
+    */
 
     // 결과 삭제
     const removeResult = (index) => {
