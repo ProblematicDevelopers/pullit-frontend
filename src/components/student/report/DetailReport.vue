@@ -86,7 +86,11 @@ function createChart() {
 
   // 문제 번호와 평균 정답률 데이터 추출
   const labels = errataData.value.map((question) => `문제 ${question.itemOrder}`)
-  const accuracyData = errataData.value.map((question) => Math.round(question.accuracy * 100))
+  // 정답률 계산: API가 0~1 범위 제공 시 0~100%로 환산
+  const accuracyData = errataData.value.map((question) => {
+    const pct = typeof question.accuracy === 'number' ? question.accuracy * 100 : 0
+    return Math.round(pct)
+  })
   const isCorrectData = errataData.value.map((question) => question.isCorrect)
 
   console.log('차트 데이터:', { labels, accuracyData, isCorrectData })
@@ -139,7 +143,8 @@ function createChart() {
               const isCorrect = isCorrectData[context.dataIndex]
               const status = isCorrect ? '정답' : '오답'
               const domainName = errataData.value[context.dataIndex]?.domainName || 'N/A'
-              return [`정답률: ${context.parsed.y}%`, `상태: ${status}`, `평가 영역: ${domainName}`]
+              // 가로 막대(indexAxis: 'y')에서는 값이 x축에 위치함
+              return [`정답률: ${context.parsed.x}%`, `상태: ${status}`, `평가 영역: ${domainName}`]
             },
           },
         },
