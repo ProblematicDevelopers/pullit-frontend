@@ -430,11 +430,6 @@ onMounted(async () => {
     margin: 1rem 0;
 }
 
-/* 컨테이너 마진 */
-.container {
-
-}
-
 /* 차트 컨테이너 높이 조정 */
 .chart-container-small {
     height: 400px;

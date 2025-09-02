@@ -14,172 +14,237 @@ import jsPDF from 'jspdf'
  */
 export const convertHtmlToPdf = async (element, filename = 'report.pdf') => {
   try {
-    // Vue 컴포넌트들이 완전히 렌더링될 때까지 기다리기
-    await new Promise((resolve) => setTimeout(resolve, 1000)) // 1초 대기
+    console.log('PDF 변환 시작')
 
-    // 차트나 동적 콘텐츠가 있는지 확인하고 추가 대기
+    // Vue 컴포넌트들이 완전히 렌더링될 때까지 대기
+    await new Promise((resolve) => setTimeout(resolve, 2000))
+
+    // 차트가 있는지 확인하고 추가 대기
     const charts = element.querySelectorAll('canvas')
     if (charts.length > 0) {
-      console.log('차트 발견:', charts.length, '개')
-      await new Promise((resolve) => setTimeout(resolve, 2000)) // 차트가 있으면 추가 2초 대기
+      console.log(`차트 ${charts.length}개 발견, 추가 렌더링 대기`)
+      await new Promise((resolve) => setTimeout(resolve, 3000))
     }
 
     // HTML을 캔버스로 변환
     const canvas = await html2canvas(element, {
-      scale: 1.5, // 해상도 최적화
-      useCORS: true, // 외부 이미지 허용
-      allowTaint: true, // 외부 리소스 허용
-      backgroundColor: '#ffffff', // 배경색
+      scale: 2.0,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: '#ffffff',
       width: element.scrollWidth,
       height: element.scrollHeight,
       scrollX: 0,
       scrollY: 0,
       windowWidth: element.scrollWidth,
       windowHeight: element.scrollHeight,
-      logging: false, // 로그 비활성화
-      imageTimeout: 10000, // 이미지 타임아웃 10초
-              onclone: (clonedDoc) => {
-          // 복제된 문서에서 차트나 동적 콘텐츠가 제대로 렌더링되었는지 확인
-          const clonedElement = clonedDoc.querySelector(element.tagName.toLowerCase())
-          if (clonedElement) {
-            // 스타일 복사
-            const computedStyle = window.getComputedStyle(element)
-            clonedElement.style.width = computedStyle.width
-            clonedElement.style.height = computedStyle.height
-            clonedElement.style.backgroundColor = '#ffffff'
-          }
+      logging: false,
+      imageTimeout: 15000,
+      onclone: (clonedDoc) => {
+        console.log('PDF용 문서 복제 시작')
 
-          // PDF에서 숨길 요소들 제거 (차트 패널 설정 등)
-          const hideElements = clonedDoc.querySelectorAll('.hide-in-pdf')
-          hideElements.forEach(el => {
-            el.style.display = 'none'
-          })
+        // 메인 컨테이너 설정
+        const clonedElement = clonedDoc.querySelector(element.tagName.toLowerCase())
+        if (clonedElement) {
+          clonedElement.style.width = '1600px'
+          clonedElement.style.maxWidth = '1600px'
+          clonedElement.style.minWidth = '1600px'
+          clonedElement.style.backgroundColor = '#ffffff'
+          clonedElement.style.boxSizing = 'border-box'
+          clonedElement.style.margin = '0 auto'
+          clonedElement.style.textAlign = 'center'
+          clonedElement.style.display = 'flex'
+          clonedElement.style.flexDirection = 'column'
+          clonedElement.style.alignItems = 'center'
+        }
 
-          // 차트 컨테이너 여백 추가 (PDF에서 짤리지 않도록)
-          const chartContainers = clonedDoc.querySelectorAll('.chart-container, .statistics-section')
-          chartContainers.forEach(container => {
-            container.style.margin = '20px 0'
-            container.style.padding = '15px'
-            container.style.boxSizing = 'border-box'
-            container.style.overflow = 'visible'
-          })
+                          // PDF에서 숨길 요소들 제거
+         const hideElements = clonedDoc.querySelectorAll('.hide-in-pdf')
+         hideElements.forEach(el => el.style.display = 'none')
 
-          // 난이도별 통계 섹션 마진 추가 (차트와 표 겹침 방지)
-          const difficultySections = clonedDoc.querySelectorAll('.chart-section')
-          difficultySections.forEach(section => {
-            section.style.marginBottom = '60px'
-            section.style.paddingBottom = '30px'
-          })
+         // PDF에서 탭 버튼만 숨기기 (기본리포트, 상세리포트 버튼)
+         const tabButtons = clonedDoc.querySelectorAll('.tab-btn')
+         tabButtons.forEach(btn => btn.style.display = 'none')
 
-          // 난이도별 통계 표 마진 추가
-          const difficultyTables = clonedDoc.querySelectorAll('table')
-          difficultyTables.forEach(table => {
-            table.style.marginTop = '80px'
-            table.style.marginBottom = '40px'
-            table.style.paddingTop = '20px'
-          })
+                 // 차트 컨테이너 설정
+         const chartContainers = clonedDoc.querySelectorAll('.chart-container, .statistics-section')
+         chartContainers.forEach(container => {
+           container.style.margin = '20px auto'
+           container.style.padding = '30px'
+           container.style.boxSizing = 'border-box'
+           container.style.overflow = 'visible'
+           container.style.width = '100%'
+           container.style.maxWidth = '2400px'
+           container.style.border = 'none'
+           container.style.outline = 'none'
+           container.style.textAlign = 'center'
+           container.style.display = 'block'
+           container.style.position = 'relative'
+           container.style.clear = 'both'
 
-          // 평가 영역별 통계 표 마진 추가
-          const evaluationTables = clonedDoc.querySelectorAll('.evaluation-table, table[data-evaluation]')
-          evaluationTables.forEach(table => {
-            table.style.marginTop = '80px'
-            table.style.marginBottom = '40px'
-            table.style.paddingTop = '20px'
-          })
+           // 컨테이너 내부 요소들도 가운데 정렬
+           const containerChildren = container.querySelectorAll('*')
+           containerChildren.forEach(child => {
+             if (child.style) {
+               child.style.textAlign = 'center'
+             }
+           })
+         })
 
-          // 난이도별 통계 제목과 차트 사이 간격 추가
-          const difficultyTitles = clonedDoc.querySelectorAll('h3, h4, .section-title')
-          difficultyTitles.forEach(title => {
-            title.style.marginBottom = '25px'
-            title.style.paddingBottom = '10px'
-          })
+        // 차트 섹션 마진 설정
+        const chartSections = clonedDoc.querySelectorAll('.chart-section')
+        chartSections.forEach(section => {
+          section.style.marginBottom = '40px'
+          section.style.paddingBottom = '30px'
+        })
 
-          // 차트 강제 재렌더링 시도
-          const clonedCharts = clonedDoc.querySelectorAll('canvas')
-          if (clonedCharts.length > 0 && window.Chart) {
-            console.log('복제된 문서에서 차트 재렌더링 시도:', clonedCharts.length, '개')
+                                   // 테이블 설정
+         const tables = clonedDoc.querySelectorAll('table')
+         tables.forEach(table => {
+           table.style.marginTop = '80px'
+           table.style.marginBottom = '40px'
+           table.style.marginLeft = 'auto'
+           table.style.marginRight = 'auto'
+           table.style.paddingTop = '20px'
+           table.style.width = '100%'
+           table.style.maxWidth = '1600px'
+           table.style.boxSizing = 'border-box'
+           table.style.textAlign = 'center'
 
-            // 원본 차트 데이터 복사
-            const originalCharts = element.querySelectorAll('canvas')
-            originalCharts.forEach((originalCanvas, index) => {
-              const clonedCanvas = clonedCharts[index]
-              if (clonedCanvas && originalCanvas.chart) {
-                try {
-                  console.log(`차트 ${index + 1} 재렌더링 시작:`, originalCanvas.chart.config.type)
+            // 테이블 헤더(th) 텍스트 줄바꿈 방지 (헤더는 한 줄 유지)
+            const tableHeaders = table.querySelectorAll('th')
+            tableHeaders.forEach(th => {
+              th.style.whiteSpace = 'nowrap'
+              th.style.overflow = 'hidden'
+              th.style.textOverflow = 'ellipsis'
+              th.style.maxWidth = '150px'
+              th.style.textAlign = 'center'
+            })
 
-                  // 기존 차트 제거
-                  if (clonedCanvas.chart) {
-                    clonedCanvas.chart.destroy()
-                  }
+            // 테이블 셀(td)도 가운데 정렬
+            const tableCells = table.querySelectorAll('td')
+            tableCells.forEach(td => {
+              td.style.textAlign = 'center'
+            })
+         })
 
-                  // 차트 크기 설정 (원본 비율 유지)
-                  const originalRatio = originalCanvas.width / originalCanvas.height
-                  clonedCanvas.width = originalCanvas.width
-                  clonedCanvas.height = originalCanvas.height
-                  clonedCanvas.style.width = originalCanvas.style.width
-                  clonedCanvas.style.height = originalCanvas.style.height
-                  clonedCanvas.style.margin = '10px 0'
-                  clonedCanvas.style.padding = '10px'
-                  clonedCanvas.style.boxSizing = 'border-box'
-                  clonedCanvas.style.aspectRatio = originalRatio
-                  clonedCanvas.style.maxWidth = '100%'
+                 // 제목 간격 설정 및 가운데 정렬
+         const titles = clonedDoc.querySelectorAll('h3, h4, .section-title')
+         titles.forEach(title => {
+           title.style.marginBottom = '25px'
+           title.style.paddingBottom = '10px'
+           title.style.textAlign = 'center'
+         })
 
-                  // 원본 차트 설정 복사 (JSON으로 깊은 복사)
-                  const chartConfig = JSON.parse(JSON.stringify(originalCanvas.chart.config))
+         // 모든 텍스트 요소 가운데 정렬
+         const textElements = clonedDoc.querySelectorAll('p, span, div, label')
+         textElements.forEach(element => {
+           if (element.style && !element.classList.contains('chart-container') && !element.classList.contains('statistics-section')) {
+             element.style.textAlign = 'center'
+           }
+         })
 
-                  // PDF용 옵션 설정
-                  chartConfig.options.responsive = false
-                  chartConfig.options.maintainAspectRatio = false
-                  chartConfig.options.animation = false
-                  if (chartConfig.options.plugins) {
-                    chartConfig.options.plugins.tooltip = { enabled: false }
-                  }
+        // 차트 재렌더링
+        const clonedCharts = clonedDoc.querySelectorAll('canvas')
+        if (clonedCharts.length > 0 && window.Chart) {
+          console.log(`차트 ${clonedCharts.length}개 재렌더링 시작`)
 
-                  // 새 차트 생성
-                  const newChart = new window.Chart(clonedCanvas.getContext('2d'), chartConfig)
-                  clonedCanvas.chart = newChart
-
-                  console.log(`차트 ${index + 1} 생성 완료:`, newChart)
-
-                                    // 차트 렌더링 완료 대기 (최적화)
-                  setTimeout(() => {
-                    if (newChart && newChart.update) {
-                      newChart.update('none')
-                      console.log(`차트 ${index + 1} 업데이트 완료`)
-                    }
-                  }, 300)
-                } catch (error) {
-                  console.error(`차트 ${index + 1} 재렌더링 중 오류:`, error)
+          const originalCharts = element.querySelectorAll('canvas')
+          originalCharts.forEach((originalCanvas, index) => {
+            const clonedCanvas = clonedCharts[index]
+            if (clonedCanvas && originalCanvas.chart) {
+              try {
+                // 기존 차트 제거
+                if (clonedCanvas.chart) {
+                  clonedCanvas.chart.destroy()
                 }
-              } else {
-                console.warn(`차트 ${index + 1} 원본 인스턴스 없음:`, originalCanvas.chart)
+
+                // 문제 수에 따른 동적 크기 계산
+                const questionCount = originalCanvas.chart?.data?.labels?.length || 0
+                const dynamicWidth = 1600
+                const dynamicHeight = Math.max(600, questionCount * 50 + 200)
+
+                // 캔버스 크기 설정
+                clonedCanvas.width = dynamicWidth
+                clonedCanvas.height = dynamicHeight
+                clonedCanvas.style.width = dynamicWidth + 'px'
+                clonedCanvas.style.height = dynamicHeight + 'px'
+
+                // 컨테이너 크기 조정
+                const container = clonedCanvas.closest('.chart-container, .statistics-section, .chart-section')
+                if (container) {
+                  container.style.height = dynamicHeight + 'px'
+                  container.style.minHeight = dynamicHeight + 'px'
+                  container.style.maxHeight = dynamicHeight + 'px'
+                }
+
+                // 차트 설정 복사 및 수정
+                const chartConfig = JSON.parse(JSON.stringify(originalCanvas.chart.config))
+                chartConfig.options.responsive = false
+                chartConfig.options.maintainAspectRatio = false
+                chartConfig.options.animation = false
+                chartConfig.options.width = dynamicWidth
+                chartConfig.options.height = dynamicHeight
+                chartConfig.options.layout = { padding: { top: 20, right: 20, bottom: 20, left: 20 } }
+
+                                                  // 폰트 크기 동적 조정
+                 const fontSize = questionCount <= 20 ? 18 : questionCount <= 50 ? 16 : 14
+                 if (chartConfig.options.scales) {
+                   if (chartConfig.options.scales.x?.ticks) {
+                     chartConfig.options.scales.x.ticks.font = { size: fontSize, weight: '600' }
+                   }
+                   if (chartConfig.options.scales.y?.ticks) {
+                     chartConfig.options.scales.y.ticks.font = { size: fontSize, weight: '600' }
+                   }
+                 }
+
+                // 새 차트 생성
+                const newChart = new window.Chart(clonedCanvas.getContext('2d'), chartConfig)
+                clonedCanvas.chart = newChart
+
+                // 차트 크기 강제 적용
+                newChart.canvas.width = dynamicWidth
+                newChart.canvas.height = dynamicHeight
+                newChart.canvas.style.width = dynamicWidth + 'px'
+                newChart.canvas.style.height = dynamicHeight + 'px'
+
+                if (newChart.resize) newChart.resize()
+                newChart.options.width = dynamicWidth
+                newChart.options.height = dynamicHeight
+
+                console.log(`차트 ${index + 1} 설정 완료: ${dynamicWidth}x${dynamicHeight}px (문제 수: ${questionCount}개)`)
+
+                // 차트 업데이트
+                setTimeout(() => {
+                  newChart.update('none')
+                  console.log(`차트 ${index + 1} 업데이트 완료`)
+                }, 500)
+
+              } catch (error) {
+                console.error(`차트 ${index + 1} 재렌더링 실패:`, error)
               }
-            })
-          } else {
-            console.warn('차트 재렌더링 조건 불충족:', {
-              clonedChartsLength: clonedCharts.length,
-              hasChart: !!window.Chart
-            })
-          }
-        },
+            }
+          })
+        }
+      }
     })
 
-    // 캔버스를 이미지로 변환 (용량 최적화)
-    const imgData = canvas.toDataURL('image/jpeg', 0.8)
+    // 모든 차트 렌더링 완료 대기
+    console.log('차트 렌더링 완료 대기 중...')
+    await new Promise((resolve) => setTimeout(resolve, 3000))
 
-    // 원본 HTML 크기를 픽셀 단위로 계산 (1mm = 약 3.78px)
+    // 캔버스를 이미지로 변환
+    const imgData = canvas.toDataURL('image/png', 1.0)
+
+    // PDF 크기 계산
     const mmToPx = 3.78
     const originalWidth = canvas.width / mmToPx
     const originalHeight = canvas.height / mmToPx
-
-    // 여백 설정 (mm 단위)
-    const margin = 10 // 최소 여백
-
-    // PDF 크기를 원본 HTML 크기에 맞춤
+    const margin = 10
     const pdfWidth = originalWidth + margin * 2
     const pdfHeight = originalHeight + margin * 2
 
-    // PDF 생성 (원본 크기에 맞춤)
+    // PDF 생성
     const pdf = new jsPDF({
       orientation: pdfWidth > pdfHeight ? 'landscape' : 'portrait',
       unit: 'px',
@@ -187,20 +252,17 @@ export const convertHtmlToPdf = async (element, filename = 'report.pdf') => {
       compress: true,
     })
 
-    // 원본 크기 그대로 이미지 추가 (중앙 정렬)
-    const x = margin
-    const y = margin
-    const imageWidth = originalWidth
-    const imageHeight = originalHeight
-
-    pdf.addImage(imgData, 'PNG', x, y, imageWidth, imageHeight)
+    // 이미지 추가
+    pdf.addImage(imgData, 'PNG', margin, margin, originalWidth, originalHeight)
 
     // PDF 다운로드
     pdf.save(filename)
+    console.log('PDF 변환 완료:', filename)
 
     return { success: true, filename }
+
   } catch (error) {
-    console.error('HTML을 PDF로 변환 실패:', error)
+    console.error('PDF 변환 실패:', error)
     throw error
   }
 }
@@ -215,216 +277,51 @@ export const convertDetailReportToPdf = async (filename = null) => {
     // 파일명이 없으면 자동 생성
     if (!filename) {
       const now = new Date()
-      const dateStr = now.toISOString().slice(0, 10) // YYYY-MM-DD
+      const dateStr = now.toISOString().slice(0, 10)
 
-      // 시험지 이름과 사용자 이름 가져오기
       let examName = '시험지'
       let userName = '사용자'
 
       try {
-        // 시험지 이름 찾기 (여러 가능한 소스에서)
-        const examTitleElement = document.querySelector('.exam-title, .exam-name, h2, h3')
-        if (examTitleElement) {
-          examName = examTitleElement.textContent.trim().replace(/[^\w\s가-힣]/g, '_')
+        // 시험지 이름과 사용자 이름 가져오기
+        const examNameElement = document.querySelector('.exam-title, h1, .title')
+        if (examNameElement) {
+          examName = examNameElement.textContent.trim()
         }
 
-        // 로그인한 사용자 정보 가져오기 (localStorage에서)
-        const userInfo = localStorage.getItem('userInfo')
-
-        if (userInfo) {
-          try {
-            const user = JSON.parse(userInfo)
-
-            if (user.fullName) {
-              userName = user.fullName.replace(/[^\w\s가-힣]/g, '_')
-            } else if (user.name) {
-              userName = user.name.replace(/[^\w\s가-힣]/g, '_')
-            } else if (user.username) {
-              userName = user.username.replace(/[^\w\s가-힣]/g, '_')
-            }
-          } catch (parseError) {
-            console.warn('사용자 정보 파싱 오류:', parseError)
-          }
+        const userNameElement = document.querySelector('.user-name, .student-name, .name')
+        if (userNameElement) {
+          userName = userNameElement.textContent.trim()
         }
-
-        // DOM에서 사용자 이름 찾기 (백업)
-        if (userName === '사용자') {
-          const userNameElement = document.querySelector('.user-name, .student-name, .display-name')
-          if (userNameElement) {
-            userName = userNameElement.textContent.trim().replace(/[^\w\s가-힣]/g, '_')
-          }
-        }
-      } catch (error) {
-        console.warn('파일명 생성 중 오류:', error)
+      } catch (err) {
+        console.warn('시험지 이름 또는 사용자 이름을 가져오는데 실패했습니다:', err)
       }
 
-      // 파일명 생성: 시험지이름_사용자이름_날짜.pdf
-      filename = `${examName}_${userName}_${dateStr}.pdf`
+      filename = `[CBT]${examName}_${dateStr}_${userName}_${dateStr}.pdf`
     }
 
-    // 상세리포트 컨테이너 찾기 (탭 버튼만 제외)
-    let reportContainer = document.querySelector('[data-report-container]')
+         // 상세리포트 컨테이너 찾기 (DetailReport.vue의 실제 구조에 맞춤)
+     console.log('상세리포트 컨테이너 검색 시작...')
 
-    // data-report-container가 있으면 상세리포트의 모든 내용을 포함하도록 처리
-    if (reportContainer) {
-      // Vue 컴포넌트들이 완전히 렌더링될 때까지 기다리기
-      await new Promise((resolve) => setTimeout(resolve, 1500))
+     let reportContainer = document.querySelector('[data-report-container], .report-wrap')
+     console.log('data-report-container 또는 .report-wrap:', reportContainer)
 
-      // 차트가 완전히 렌더링될 때까지 기다리기
-      const charts = document.querySelectorAll('canvas')
-      if (charts.length > 0) {
-        await new Promise((resolve) => setTimeout(resolve, 3000))
+     if (!reportContainer) {
+       // 백업: 다른 가능한 컨테이너들 찾기
+       reportContainer = document.querySelector('.detail-report-container, .report-container, .main-content, .report-content')
+       console.log('백업 컨테이너 검색 결과:', reportContainer)
+     }
 
-        // 차트가 실제로 그려졌는지 확인
-        for (let i = 0; i < 15; i++) {
-          const canvas = charts[0]
-          if (canvas && canvas.getContext) {
-            try {
-              const ctx = canvas.getContext('2d')
-              const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height)
-              const hasContent = imageData.data.some((pixel) => pixel !== 0)
-              if (hasContent) {
-                break
-              }
-            } catch {
-              // 차트 렌더링 확인 중 오류 무시
-            }
-          }
-          await new Promise((resolve) => setTimeout(resolve, 500))
-        }
+     if (!reportContainer) {
+       console.warn('상세리포트 컨테이너를 찾을 수 없어 body를 사용합니다.')
+       reportContainer = document.body
+     }
 
-        // 추가 대기 (차트가 완전히 안정화될 때까지)
-        await new Promise((resolve) => setTimeout(resolve, 2000))
-      }
+     console.log('최종 선택된 컨테이너:', reportContainer, '클래스:', reportContainer.className)
 
-      // 상세리포트의 모든 내용을 포함하는 임시 컨테이너 생성
-      const tempContainer = document.createElement('div')
-      tempContainer.style.position = 'absolute'
-      tempContainer.style.left = '-9999px'
-      tempContainer.style.top = '-9999px'
-      tempContainer.style.width = '100%'
-      tempContainer.style.backgroundColor = '#ffffff'
+    // PDF 변환 실행
+    return await convertHtmlToPdf(reportContainer, filename)
 
-      // 정오표 섹션 추가 (맨 위에 배치)
-      const errataSection = document.querySelector('.errata-section, [data-errata], .errata-container, .errata-table-container')
-      if (errataSection) {
-        const clonedErrataSection = errataSection.cloneNode(true)
-        tempContainer.appendChild(clonedErrataSection)
-      } else {
-        // 정오표 테이블 직접 찾기 (JavaScript로 텍스트 검색)
-        const allTables = document.querySelectorAll('table')
-        const errataTable = Array.from(allTables).find(table => {
-          const thElements = table.querySelectorAll('th')
-          return Array.from(thElements).some(th =>
-            th.textContent.includes('번호') || th.textContent.includes('평균 정답률')
-          )
-        })
-        if (errataTable) {
-          const clonedErrataTable = errataTable.cloneNode(true)
-          tempContainer.appendChild(clonedErrataTable)
-        }
-      }
-
-      // statistics-section들만 추가 (차트, 통계 등)
-      const statisticsSections = document.querySelectorAll('.statistics-section')
-      statisticsSections.forEach((section) => {
-        const clonedSection = section.cloneNode(true)
-
-        // 차트가 있는 경우 원본 canvas에서 이미지 추출
-        const originalCanvas = section.querySelector('canvas')
-        const clonedCanvas = clonedSection.querySelector('canvas')
-
-        if (originalCanvas && clonedCanvas) {
-          try {
-            // 원본 canvas에서 이미지 데이터 추출
-            const chartImage = originalCanvas.toDataURL('image/png', 1.0)
-
-            // 이미지가 제대로 생성되었는지 확인
-            if (chartImage && chartImage !== 'data:,' && chartImage.length > 100) {
-              const img = document.createElement('img')
-              img.src = chartImage
-
-              // 원본 비율 계산
-              const originalRatio = originalCanvas.width / originalCanvas.height
-              const maxWidth = 900
-              const calculatedHeight = maxWidth / originalRatio
-
-              img.style.width = maxWidth + 'px'
-              img.style.height = calculatedHeight + 'px'
-              img.style.display = 'block'
-              img.style.margin = '20px auto'
-              img.style.objectFit = 'none'
-              img.style.aspectRatio = originalRatio
-              img.style.maxWidth = '100%'
-              img.style.maxHeight = '500px'
-
-              // canvas를 img로 교체 (안전한 교체)
-              if (clonedCanvas.parentNode) {
-                clonedCanvas.parentNode.replaceChild(img, clonedCanvas)
-              }
-            }
-          } catch (error) {
-            console.error('차트 이미지 변환 실패:', error)
-          }
-        }
-
-        tempContainer.appendChild(clonedSection)
-      })
-
-      // 정오표 테이블 추가 (백업)
-      const backupErrataTable = document.querySelector('table[data-errata-table], .errata-table')
-      if (backupErrataTable && !errataSection) {
-        const clonedBackupErrataTable = backupErrataTable.cloneNode(true)
-        tempContainer.appendChild(clonedBackupErrataTable)
-      }
-
-      document.body.appendChild(tempContainer)
-      reportContainer = tempContainer
-
-      // 임시 컨테이너가 DOM에 추가된 후 추가 대기 (컴포넌트 렌더링을 위해)
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-    } else {
-      // data-report-container가 없으면 탭 버튼만 숨기고 나머지는 그대로 캡처
-      const reportWrap = document.querySelector('.report-wrap')
-      if (reportWrap) {
-        // 탭 버튼들을 임시로 숨기기 (visibility 사용으로 레이아웃 유지)
-        const tabButtons = reportWrap.querySelectorAll('.tabs, .tab-btn')
-        const originalVisibility = []
-
-        tabButtons.forEach((tab, index) => {
-          originalVisibility[index] = tab.style.visibility
-          tab.style.visibility = 'hidden'
-        })
-
-        // PDF 변환
-        const result = await convertHtmlToPdf(reportWrap, filename)
-
-        // 탭 버튼들 복원
-        tabButtons.forEach((tab, index) => {
-          tab.style.visibility = originalVisibility[index] || ''
-        })
-
-        return result
-      } else {
-        reportContainer = document.body
-      }
-    }
-
-    // PDF 변환
-    const result = await convertHtmlToPdf(reportContainer, filename)
-
-    // 임시 컨테이너 정리
-    if (reportContainer && reportContainer.style.position === 'absolute') {
-      try {
-        if (document.body.contains(reportContainer)) {
-          document.body.removeChild(reportContainer)
-        }
-      } catch (error) {
-        console.warn('임시 컨테이너 정리 중 오류:', error)
-      }
-    }
-
-    return result
   } catch (error) {
     console.error('상세리포트 PDF 변환 실패:', error)
     throw error
