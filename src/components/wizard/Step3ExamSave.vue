@@ -158,16 +158,44 @@
 
       <!-- 오른쪽: PDF 미리보기 -->
       <div class="pdf-preview-section">
-        <!-- 이미지 기반 미리보기 (변환된 이미지가 있을 때) -->
+        <!-- 미리보기 모드 토글 (기존 옆 TEST 버튼) -->
+        <div class="preview-mode-toggle">
+          <button
+            class="toggle-btn"
+            :class="{ active: !useTestPreview }"
+            @click="setPreviewMode('default')"
+            title="기존 미리보기 사용"
+          >기존 미리보기</button>
+          <button
+            class="toggle-btn"
+            :class="{ active: useTestPreview }"
+            @click="setPreviewMode('test')"
+            title="TEST 2컬럼 미리보기"
+          >TEST 미리보기</button>
+        </div>
+
+        <!-- TEST 미리보기 (2컬럼 고정) -->
+        <ExamPDFPreviewTest
+          v-if="useTestPreview"
+          :key="useTestPreview ? 'test' : 'default'"
+          ref="pdfPreviewRef"
+          :selected-items="selectedItems"
+          @download="handleDownload"
+          @save="handleSave"
+        />
+
+        <!-- 기존: 이미지 기반 미리보기 (변환된 이미지가 있을 때) -->
         <ExamImagePreview
-          v-if="hasConvertedImages"
+          v-else-if="hasConvertedImages"
+          :key="'img-preview'"
           ref="pdfPreviewRef"
           :converted-images="convertedImages"
         />
 
-        <!-- HTML 기반 미리보기 (변환된 이미지가 없을 때) -->
+        <!-- 기존: HTML 기반 미리보기 (변환된 이미지가 없을 때) -->
         <ExamPDFPreview
           v-else
+          :key="'html-preview'"
           ref="pdfPreviewRef"
           :selected-items="selectedItems"
           @download="handleDownload"
@@ -216,6 +244,7 @@ import { computed, onMounted, ref } from 'vue'
 import { useTestBankStore } from '@/stores/testBank'
 import { useItemSelectionStore } from '@/stores/itemSelection'
 import ExamPDFPreview from './ExamPDFPreviewFixed.vue'
+import ExamPDFPreviewTest from './ExamPDFPreviewTest.vue'
 import examApi from '@/services/examApi'
 import userExamApi from '@/services/userExamApi'
 import ExamImagePreview from './ExamImagePreview.vue'
@@ -227,6 +256,16 @@ const emit = defineEmits(['back', 'complete'])
 const isSaving = ref(false)
 const examSavedId = ref(null)
 const pdfPreviewRef = ref(null)
+const useTestPreview = ref(false)
+
+// 미리보기 모드 전환 및 로그, 상태 유지
+const setPreviewMode = (mode) => {
+  useTestPreview.value = mode === 'test'
+  console.log('[Step3] Preview mode changed:', useTestPreview.value ? 'TEST' : 'DEFAULT')
+  try {
+    localStorage.setItem('wizard_preview_mode', useTestPreview.value ? 'test' : 'default')
+  } catch (e) { /* ignore */ }
+}
 
 // 시험 설정 상태
 const examSettings = ref({
@@ -574,6 +613,14 @@ onMounted(() => {
   console.log('testBankStore.examInfo:', testBankStore.examInfo)
   console.log('itemSelectionStore.selectedItems:', itemSelectionStore.selectedItems)
   console.log('testBankStore.selectedItems:', testBankStore.selectedItems)
+  // 이전에 선택한 모드 복원
+  try {
+    const prev = localStorage.getItem('wizard_preview_mode')
+    if (prev === 'test') {
+      useTestPreview.value = true
+      console.log('[Step3] Restored preview mode to TEST')
+    }
+  } catch (e) { /* ignore */ }
 })
 
 // 총점 변경 시 store에 반영하여 미리보기 헤더와 동기화
@@ -726,6 +773,28 @@ watch(() => examSettings.value.totalPoints, (val) => {
   border-radius: 12px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
   order: 2;
+}
+
+.preview-mode-toggle {
+  display: flex;
+  gap: 8px;
+  padding: 0.75rem 0.75rem 0;
+}
+
+.toggle-btn {
+  padding: 0.375rem 0.75rem;
+  border: 1px solid #e0e6ed;
+  border-radius: 8px;
+  background: #fff;
+  color: #475569;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.toggle-btn.active {
+  background: #2563eb;
+  color: white;
+  border-color: #2563eb;
 }
 
 .exam-settings-section {
