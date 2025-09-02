@@ -22,13 +22,7 @@
       >
         <i class="bi bi-question-circle me-1"></i>문제
       </button>
-      <button
-        @click="selectAreaType('image')"
-        class="tab-btn"
-        :class="{ active: activeSelectionType === 'image' }"
-      >
-        <i class="bi bi-image me-1"></i>이미지
-      </button>
+
     </div>
   </div>
 </template>
