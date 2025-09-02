@@ -1,4 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
+import authService from '@/services/auth'
 import Home from '../Home.vue'
 import ClassDashboard from '../views/ClassDashboard.vue'
 import Report from '../components/student/report/ReportList.vue'
@@ -6,6 +7,7 @@ import BasicReport from '../components/student/report/BasicReport.vue'
 import StudentMain from '../components/student/Main.vue'
 import StudentMainRedesigned from '../components/student/MainRedesigned.vue'
 import StudentLayout from '@/components/student/StudentLayout.vue'
+import Forbidden from '@/views/Forbidden.vue'
 
 // 시험지 마법사 컴포넌트 import
 import TestWizardView from '@/views/TestWizardView.vue'
@@ -79,6 +81,23 @@ const routes = [
   {
     path: '/student',
     component: StudentLayout, // 공통 레이아웃 or StudentMain 같은 것
+    beforeEnter: (to, from, next) => {
+      // 학생 전용 보호
+      if (!authService.isAuthenticated()) {
+        next({ path: '/login', query: { redirect: to.fullPath } })
+        return
+      }
+      const user = authService.getCurrentUser()
+      if (user?.role !== 'STUDENT') {
+        next('/403')
+        return
+      }
+      next()
+    },
+    meta: {
+      requiresAuth: true,
+      role: 'student',
+    },
     children: [
       // 기본 대시보드
       { path: '', redirect: '/student/main' },
@@ -127,6 +146,13 @@ const routes = [
       { path: 'scores', name: 'student.scores', component: StudentScore}
       // { path: 'result/:id', name: 'student.result', component: StudentResult },
     ],
+  },
+  // 접근 권한 없음
+  {
+    path: '/403',
+    name: 'Forbidden',
+    component: Forbidden,
+    meta: { hideHeader: true, hideFooter: true },
   },
   {
     path: '/teacher/class-room/live-exam-management/:examId',
@@ -240,6 +266,39 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(), // 히스토리 모드
   routes,
+})
+
+// 전역 가드: 인증 및 역할 체크 일원화
+router.beforeEach((to, from, next) => {
+  const requiresAuth = to.matched.some(r => r.meta && r.meta.requiresAuth)
+  const requiredRoles = to.matched
+    .flatMap(r => {
+      const m = r.meta || {}
+      if (Array.isArray(m.roles)) return m.roles
+      if (m.role) return [m.role]
+      return []
+    })
+
+  if (requiresAuth && !authService.isAuthenticated()) {
+    next({ path: '/login', query: { redirect: to.fullPath } })
+    return
+  }
+
+  if (requiredRoles.length > 0) {
+    const user = authService.getCurrentUser()
+    if (!user) {
+      next({ path: '/login', query: { redirect: to.fullPath } })
+      return
+    }
+    const roleUpper = (Array.isArray(requiredRoles) ? requiredRoles : [requiredRoles])
+      .map(r => String(r).toUpperCase())
+    if (!roleUpper.includes(user.role)) {
+      next('/403')
+      return
+    }
+  }
+
+  next()
 })
 
 export default router

@@ -1,6 +1,7 @@
 import { ref, onMounted, onUnmounted } from 'vue'
 import SockJS from 'sockjs-client'
 import { Stomp } from '@stomp/stompjs'
+import api from '@/services/api.js'
 
 export function useExamWebSocket(classId) {
   const stompClient = ref(null)
@@ -9,7 +10,12 @@ export function useExamWebSocket(classId) {
 
   // WebSocket 연결
   const connect = () => {
-    const socket = new SockJS('http://localhost:8080/ws')
+    // api.js의 baseURL에서 ORIGIN 계산 후 SockJS HTTP(S) 엔드포인트 구성
+    const base = api.defaults.baseURL || '/api'
+    const origin = new URL(base, window.location.origin).origin
+    const sockJsUrl = `${origin}/ws`
+
+    const socket = new SockJS(sockJsUrl)
     stompClient.value = Stomp.over(socket)
     
     // 디버그 모드 비활성화
