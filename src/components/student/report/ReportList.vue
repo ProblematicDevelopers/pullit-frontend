@@ -106,7 +106,7 @@
         <div class="info">
           <span class="tag">{{ item.subject }}</span>
           <span class="title">{{ item.title }}</span>
-          <span class="sub">{{ item.grade }} 사용 {{ item.usage }}회</span>
+          <span class="sub">{{ item.grade }} | {{ currentTab === 'in-progress' ? '진행중' : '종료: ' + item.endTime }}</span>
         </div>
       </div>
       <div class="right">
@@ -264,7 +264,9 @@ export default {
                 subject: this.getSubjectName(subject),
                 title: exam.examName || exam.title || exam.examTitle || exam.exam_name,
                 grade: exam.grade,
-                usage: exam.attemptCount || 1,
+                startedAt: exam.startedAt,
+                completedAt: exam.completedAt,
+                endTime: this.formatEndTime(exam.completedAt),
                 status: exam.status || 'completed',
                 score: exam.score || exam.correctAnswers,
                 totalQuestions: exam.totalQuestions || exam.questionCount,
@@ -329,6 +331,24 @@ export default {
         7: '도덕',
       }
       return subjectMap[areaCode] || areaCode
+    },
+        // 종료시각 포맷 함수
+    formatEndTime(completedAt) {
+      if (!completedAt) return '진행중'
+
+      try {
+        const date = new Date(completedAt)
+        const year = date.getFullYear()
+        const month = String(date.getMonth() + 1).padStart(2, '0')
+        const day = String(date.getDate()).padStart(2, '0')
+        const hours = String(date.getHours()).padStart(2, '0')
+        const minutes = String(date.getMinutes()).padStart(2, '0')
+
+        return `${year}-${month}-${day} ${hours}:${minutes}`
+      } catch (error) {
+        console.warn('종료시각 포맷 실패:', error)
+        return '계산 불가'
+      }
     },
     goToReport(id, attemptId) {
       if (this.currentTab === 'in-progress') {
