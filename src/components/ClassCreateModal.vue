@@ -68,21 +68,7 @@
             </select>
           </div>
 
-          <!-- 초대 코드 생성 옵션 -->
-          <div class="form-group">
-            <div class="checkbox-wrapper">
-              <input
-                v-model="formData.generateInviteCode"
-                type="checkbox"
-                id="generateInviteCode"
-                class="form-checkbox"
-              />
-              <label for="generateInviteCode" class="checkbox-label">
-                초대 코드 자동 생성
-              </label>
-            </div>
-            <p class="form-help">학생들이 학급에 가입할 수 있는 초대 코드를 생성합니다.</p>
-          </div>
+          
 
           <!-- 학급 생성 안내 -->
           <div class="info-box">
@@ -97,8 +83,7 @@
                 <div class="info-list">
                   <ul>
                     <li>학급은 한 번 생성하면 수정할 수 있습니다.</li>
-                    <li>초대 코드는 나중에도 생성할 수 있습니다.</li>
-                    <li>학생들은 초대 코드나 직접 초대를 통해 가입할 수 있습니다.</li>
+                    <li>학생 추가는 학급 생성 후 ‘학생 초대’에서 바로 할 수 있습니다.</li>
                   </ul>
                 </div>
               </div>
@@ -139,25 +124,15 @@
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd" />
               </svg>
             </div>
-            <div class="success-text">
-              <h3 class="success-title">학급이 생성되었습니다!</h3>
-              <div class="success-info">
-                <p>학급명: {{ createdClass.className }}</p>
-                <p v-if="createdClass.inviteCode" class="invite-code-wrapper">
-                  초대 코드: <span class="invite-code">{{ createdClass.inviteCode }}</span>
-                  <button
-                    @click="copyInviteCode"
-                    class="copy-btn"
-                  >
-                    <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
-                    </svg>
-                  </button>
-                </p>
+              <div class="success-text">
+                <h3 class="success-title">학급이 생성되었습니다!</h3>
+                <div class="success-info">
+                  <p>학급명: {{ createdClass.className }}</p>
+                
+                </div>
               </div>
             </div>
           </div>
-        </div>
       </div>
     </div>
   </div>
@@ -184,7 +159,7 @@ const formData = ref({
   className: '',
   classGrade: '',
   classSubject: '',
-  generateInviteCode: true
+  generateInviteCode: false
 })
 
 // 학년 목록 (위자드와 동일한 코드 체계)
@@ -246,18 +221,7 @@ const handleSubmit = async () => {
   }
 }
 
-// 초대 코드 복사
-const copyInviteCode = async () => {
-  if (!createdClass.value?.inviteCode) return
-  
-  try {
-    await navigator.clipboard.writeText(createdClass.value.inviteCode)
-    toast.success('초대 코드가 복사되었습니다!')
-  } catch (error) {
-    console.error('Failed to copy invite code:', error)
-    toast.error('초대 코드 복사에 실패했습니다.')
-  }
-}
+// 초대 코드 기능은 사용하지 않음 (교사가 직접 학생 추가)
 
 // 모달 닫기
 const close = () => {
@@ -267,7 +231,7 @@ const close = () => {
     className: '',
     classGrade: '',
     classSubject: '',
-    generateInviteCode: true
+    generateInviteCode: false
   }
   createdClass.value = null
 }
