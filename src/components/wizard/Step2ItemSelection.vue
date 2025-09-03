@@ -875,7 +875,9 @@ import RandomItemModal from './RandomItemModal.vue'
 import ItemPreviewModal from './ItemPreviewModal.vue'
 import SimilarItemsModal from '@/components/common/SimilarItemsModal.vue'
 import { useMathJax } from '@/composables/useMathJax'
+import { normalizeImgTags } from '@/utils/question-to-image-converter'
 import { renderMathJaxParallelHybrid, renderMathJaxSmartHybrid } from '@/utils/mathjax-hybrid'
+import { replaceExternalImagesWithDataUrls } from '@/utils/question-to-image-converter'
 // import { renderMathJaxSimple } from '@/utils/mathjax-simple'
 import debugMathJax from '@/utils/mathjax-debug'
 import { convertQuestionsToImages } from '@/utils/question-to-image-converter'
@@ -1870,12 +1872,17 @@ const sanitizeHtml = (html) => {
       return `__MATH_${mathIndex++}__`
     })
 
-  // 위험한 요소 제거 (수식 이미지는 제거하되 일반 이미지는 유지 가능)
+  // 위험한 요소 제거 (수식 이미지는 제거하되 일반 이미지는 유지)
   cleaned = cleaned
     .replace(/<img[^>]*class="[^"]*mathjax[^"]*"[^>]*>/gi, '') // MathJax 관련 이미지만 제거
     .replace(/<script(?! type="math\/tex)[^>]*>[\s\S]*?<\/script>/gi, '') // 위험한 스크립트 제거
     .replace(/on\w+="[^"]*"/g, '') // 이벤트 핸들러 제거
     .replace(/on\w+='[^']*'/g, '')
+    // style 속성은 유지하되, position:absolute 같은 위험한 스타일만 제거
+    .replace(/position\s*:\s*(absolute|fixed)[^;]*/gi, '')
+
+  // IMG 정규화 (data-src/srcset -> src, lazy 제거 등)
+  cleaned = normalizeImgTags(cleaned)
 
   // 보호했던 수식들을 다시 복원
   mathPatterns.forEach((pattern, index) => {
@@ -1906,6 +1913,14 @@ onMounted(async () => {
     hideBeforeRender: true,
     clearFirst: false
   })
+
+  // 외부 이미지 프록시 처리로 CORS 회피 (표시용)
+  // 프록시 처리 실패해도 원본 이미지는 유지됨
+  try {
+    await replaceExternalImagesWithDataUrls(container)
+  } catch (e) {
+    console.warn('외부 이미지 프록시 처리 실패 (원본 이미지 유지):', e)
+  }
 
   // 편집 모드 또는 기존 문항이 있는 경우: 기존 시험지 정보 사용
   // mode가 'edit'이거나 selectedItems가 있으면 기존 시험지 편집으로 처리
@@ -1991,6 +2006,14 @@ watch(items, async (newItems, oldItems) => {
       const elements = document.querySelectorAll('.mathjax-content[data-mathjax-pending="true"]')
       if (elements.length > 0) {
         await renderMathJaxParallelHybrid(elements)
+      }
+
+      // 렌더링된 컨테이너의 외부 이미지 프록시 처리
+      const container = document.querySelector('.items-container') || document.body
+      try {
+        await replaceExternalImagesWithDataUrls(container)
+      } catch (e) {
+        console.warn('외부 이미지 프록시 처리 실패:', e)
       }
 
       // 렌더링 후 확인
@@ -3401,7 +3424,6 @@ watch(items, async (newItems, oldItems) => {
 }
 
 /* 수식 이미지 제거 */
-.item-html :deep(img),
 .passage-text :deep(img[src*="latex"]),
 .passage-text :deep(img[src*="math"]),
 .question-preview :deep(img[src*="latex"]),
