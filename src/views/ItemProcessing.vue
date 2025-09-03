@@ -200,14 +200,7 @@
           :selected-file="selectedFile"
           @go-back="goBackFromOcr"
         />
-        <!-- 디버깅용 로그 -->
-        <div v-if="showOcrEditor" class="debug-info" style="background: #f0f0f0; padding: 10px; margin: 10px 0; font-size: 12px;">
-          <strong>Debug Info:</strong><br>
-          processingMethod: {{ processingMethod }}<br>
-          selectedFile: {{ selectedFile ? '있음' : '없음' }}<br>
-          selectedTextbook: {{ selectedTextbook ? '있음' : '없음' }}<br>
-          showOcrEditor: {{ showOcrEditor }}
-        </div>
+
       </div>
     </div>
 
