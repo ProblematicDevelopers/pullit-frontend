@@ -283,7 +283,7 @@ export default {
 
     // 계산된 속성 제거 (더 이상 problems 배열 사용하지 않음)
 
-    // 변환 가능 여부 (문제 + 보기는 필수)
+    // 변환 가능 여부 (유효한 영역 조합 확인)
     const canConvert = computed(() => {
       // null-safe 처리: selectedAreas.value가 undefined/null인 경우 false 반환
       if (!selectedAreas?.value || typeof selectedAreas.value !== 'object') {
@@ -291,7 +291,50 @@ export default {
         return false
       }
 
-      return selectedAreas.value?.problem && selectedAreas.value?.options
+      // 선택된 영역들 확인
+      const selectedAreaKeys = Object.keys(selectedAreas.value).filter(
+        key => selectedAreas.value[key] !== null
+      )
+
+      console.log('canConvert 검사:', {
+        selectedAreaKeys,
+        selectedAreas: selectedAreas.value
+      })
+
+      // 유효한 조합들:
+      // 1. 문제만 (단답형 등)
+      // 2. 문제 + 보기 (객관식)
+      // 3. 지문만 (지문 그룹에 문항 추가)
+      // 4. 지문 + 문제 (지문형 문제)
+
+      const hasProblem = selectedAreaKeys.includes('problem')
+      const hasOptions = selectedAreaKeys.includes('options')
+      const hasPassage = selectedAreaKeys.includes('question') // question이 지문 영역
+
+      // 최소 하나의 영역은 선택되어야 함
+      if (selectedAreaKeys.length === 0) {
+        return false
+      }
+
+      // 유효한 조합인지 확인
+      const isValidCombination =
+        // 문제만
+        (hasProblem && !hasOptions && !hasPassage) ||
+        // 문제 + 보기
+        (hasProblem && hasOptions && !hasPassage) ||
+        // 지문만
+        (!hasProblem && !hasOptions && hasPassage) ||
+        // 지문 + 문제
+        (hasProblem && !hasOptions && hasPassage)
+
+      console.log('canConvert 결과:', {
+        hasProblem,
+        hasOptions,
+        hasPassage,
+        isValidCombination
+      })
+
+      return isValidCombination
     })
 
     // 다음 단계로 진행 가능 여부
@@ -402,7 +445,7 @@ export default {
       try {
         // TinyMCE 에디터 정리
         await cleanupTinyMCEEditors()
-        
+
         // MathJax 정리 (필요한 경우)
         if (window.MathJax && window.MathJax.startup) {
           try {
@@ -412,7 +455,7 @@ export default {
             console.warn('MathJax 정리 중 오류:', error)
           }
         }
-        
+
         // 추가 대기 시간
         await new Promise(resolve => setTimeout(resolve, 50))
       } catch (error) {
@@ -433,10 +476,10 @@ export default {
 
                 if (currentStep.value < steps.value.length) {
           const previousStep = currentStep.value
-          
+
           // 현재 단계의 컴포넌트 정리
           await cleanupTinyMCEEditors()
-          
+
           // 단계 변경
           currentStep.value++
           console.log('✅ [OcrResultModal] 단계 이동:', previousStep, '→', currentStep.value)
@@ -453,7 +496,7 @@ export default {
 
             // 추가 DOM 업데이트 대기
             await nextTick()
-            
+
             // 추가 대기 시간을 주어 DOM이 완전히 업데이트되도록 함
             await new Promise(resolve => setTimeout(resolve, 100))
 
@@ -480,20 +523,20 @@ export default {
 
         if (currentStep.value > 1) {
           const previousStep = currentStep.value
-          
+
           // 현재 단계의 컴포넌트 정리
           await cleanupTinyMCEEditors()
-          
+
           // 단계 변경
           currentStep.value--
           console.log('✅ [OcrResultModal] 단계 이동:', previousStep, '→', currentStep.value)
 
           // DOM 업데이트를 기다린 후 추가 작업 수행
           await nextTick()
-          
+
           // 추가 대기 시간을 주어 DOM이 완전히 업데이트되도록 함
           await new Promise(resolve => setTimeout(resolve, 100))
-          
+
           console.log('✅ [OcrResultModal] prevStep 완료')
         }
       } catch (error) {
