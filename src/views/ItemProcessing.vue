@@ -618,12 +618,14 @@ export default {
 
         // 선택된 파일의 이미지들을 store를 통해 설정
         if (fileHistory.pdfImages && fileHistory.pdfImages.length > 0) {
+          // imageApiService를 미리 import
+          const { imageApiService } = await import('@/services/imageApi')
+
           const pages = fileHistory.pdfImages.map((image, index) => {
             // S3 URL인 경우 프록시 URL로 변경
             let previewUrl = image.imageUrl
             if (previewUrl && previewUrl.includes('s3.ap-northeast-2.amazonaws.com')) {
-              const encodedUrl = encodeURIComponent(previewUrl)
-              previewUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8080'}/api/image/proxy?url=${encodedUrl}`
+              previewUrl = imageApiService.getProxyUrl(previewUrl)
               console.log('S3 URL을 프록시 URL로 변경:', previewUrl)
             }
 

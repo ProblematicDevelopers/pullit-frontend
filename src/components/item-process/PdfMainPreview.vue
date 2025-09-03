@@ -52,7 +52,7 @@ export default {
     })
 
     // 이미지 로드 에러 처리
-    const handleImageError = (event) => {
+    const handleImageError = async (event) => {
       const img = event.target
       console.warn('이미지 로드 실패:', img.src)
 
@@ -60,7 +60,7 @@ export default {
       if (currentPage.value &&
           currentPage.value.originalUrl &&
           currentPage.value.useProxy &&
-          img.src.includes('/api/image/proxy')) {
+          img.src.includes('/image/proxy')) {
 
         console.log('프록시 실패, S3 URL로 fallback 시도:', currentPage.value.originalUrl)
 
@@ -72,8 +72,16 @@ export default {
           error: '프록시 이미지 로드 실패'
         })
 
-        // S3 URL로 직접 시도
-        img.src = currentPage.value.originalUrl
+        // imageApiService를 사용하여 fallback URL 생성
+        try {
+          const { imageApiService } = await import('@/services/imageApi')
+          const fallbackUrl = imageApiService.getFallbackUrl(currentPage.value.originalUrl, img.src)
+          img.src = fallbackUrl
+        } catch (error) {
+          console.error('Fallback URL 생성 실패:', error)
+          img.src = currentPage.value.originalUrl
+        }
+
         imageLoadError.value = true
       } else {
         imageLoadError.value = true
