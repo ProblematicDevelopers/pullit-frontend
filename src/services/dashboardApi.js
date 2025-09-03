@@ -36,6 +36,22 @@ const dashboardApi = {
       console.error('Failed to get dashboard stats:', error)
       throw error
     }
+  },
+
+  // 학생용 - 시험 목록 조회 (일반시험 + CBT)
+  getStudentExams: async (classId, limit = 20) => {
+    try {
+      const params = { limit }
+      if (classId) {
+        params.classId = classId
+      }
+      
+      const response = await api.get('/dashboard/student/exams', { params })
+      return response.data
+    } catch (error) {
+      console.error('Failed to get student exams:', error)
+      throw error
+    }
   }
 }
 

@@ -108,6 +108,27 @@
         </div>
 
         <div v-if="!filterCollapsed" class="filter-content">
+          <!-- 문항 소스 선택 -->
+          <div class="filter-section">
+            <h4>문항 유형</h4>
+            <div class="item-source-filters">
+              <label
+                v-for="source in itemSourceOptions"
+                :key="source.value"
+                class="filter-chip"
+                :class="{ active: selectedItemSource === source.value }"
+              >
+                <input
+                  type="radio"
+                  :value="source.value"
+                  v-model="selectedItemSource"
+                  @change="handleItemSourceChange"
+                />
+                <span>{{ source.label }}</span>
+              </label>
+            </div>
+          </div>
+
           <!-- 학년 선택 -->
           <div class="filter-section">
             <h4>학년</h4>
@@ -360,6 +381,9 @@
                   </label>
                   <span class="item-id">#{{ item.itemId }}</span>
                   <div class="item-badges">
+                    <span v-if="item.isOcrItem" class="badge-ocr" title="OCR로 생성된 문항">
+                      OCR
+                    </span>
                     <span :class="'badge-difficulty difficulty-' + item.difficulty?.code">
                       {{ item.difficulty?.name }}
                     </span>
@@ -464,6 +488,9 @@
               </label>
               <span class="item-id">#{{ item.itemId }}</span>
               <div class="item-badges">
+                <span v-if="item.isOcrItem" class="badge-ocr" title="OCR로 생성된 문항">
+                  OCR
+                </span>
                 <span :class="'badge-difficulty difficulty-' + item.difficulty?.code">
                   {{ item.difficulty?.name }}
                 </span>
@@ -570,6 +597,7 @@
                 </th>
                 <th width="80">번호</th>
                 <th>문제</th>
+                <th width="80">소스</th>
                 <th width="100">난이도</th>
                 <th width="100">유형</th>
                 <th width="150">단원</th>
@@ -594,6 +622,10 @@
                 <td class="question-cell">
                   <div v-if="item.questionHtml" v-html="sanitizeHtml(item.questionHtml)" class="question-preview mathjax-content" data-mathjax-pending="true"></div>
                   <div v-else>{{ item.questionText || '내용 없음' }}</div>
+                </td>
+                <td class="text-center">
+                  <span v-if="item.isOcrItem" class="badge-ocr">OCR</span>
+                  <span v-else class="badge-regular">일반</span>
                 </td>
                 <td class="text-center">
                   <span :class="'badge-difficulty difficulty-' + item.difficulty?.code">
@@ -779,23 +811,15 @@
         <div class="panel-footer">
           <div style="display: flex; gap: 10px; align-items: center;">
             <button
-              class="btn-primary"
-              @click="goNextFast"
-              :disabled="selectedItems.length === 0"
-            >
-              다음 단계 (빠르게)
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              </svg>
-            </button>
-
-            <button
-              class="btn-secondary"
+              class="btn-primary-large"
               @click="proceedToNext"
               :disabled="selectedItems.length === 0"
-              title="수식/복잡한 HTML을 이미지로 변환하여 고품질 미리보기 (느림)"
+              title="선택한 문항으로 다음 단계 진행"
             >
-              이미지 변환 후 다음 (고급)
+              다음
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
             </button>
           </div>
         </div>
@@ -900,6 +924,7 @@ const selectedItemForSimilar = ref(null)
 
 // Search & Filters
 const searchKeyword = ref('')
+const selectedItemSource = ref('REGULAR') // 문항 소스 선택 (REGULAR, OCR, BOTH)
 const selectedGrade = ref(null) // 학년 선택
 const selectedSubject = ref(null) // 과목 선택
 const selectedTextbook = ref(null)
@@ -913,6 +938,13 @@ const textbooks = ref([])
 const chapterTree = ref([])
 const expandedChapters = ref([]) // 확장된 챕터 ID 추가
 const expandedPassages = ref([]) // 확장된 지문 ID 추가
+
+// 문항 소스 옵션
+const itemSourceOptions = ref([
+  { value: 'REGULAR', label: '기존 문항' },
+  { value: 'OCR', label: 'OCR 문항' },
+  { value: 'BOTH', label: '전체 문항' }
+])
 
 // 학년 옵션 (Step1과 동일)
 const gradeOptions = ref([
@@ -1075,7 +1107,8 @@ const loadItems = async () => {
       textbook: selectedTextbook.value || null, // subjects가 아닌 textbook으로 전송
       chapters: selectedMediumChapters.value.length > 0 ? selectedMediumChapters.value : selectedChapters.value, // chapterIds가 아닌 chapters로 전송
       difficulties: difficultyFilters.value,
-      categories: questionFormFilters.value // 문제유형 필터 적용
+      categories: questionFormFilters.value, // 문제유형 필터 적용
+      itemSource: selectedItemSource.value // 문항 소스 추가
     }
 
     console.log('검색 파라미터:', searchParams)
@@ -1213,6 +1246,14 @@ const handleSearchWithDebounce = debounce(() => {
   currentPage.value = 1
   loadItems()
 }, 300)
+
+// 문항 소스 변경 핸들러
+const handleItemSourceChange = () => {
+  // 페이지 초기화
+  currentPage.value = 1
+  // 검색 재실행
+  loadItems()
+}
 
 // 학년 변경 핸들러
 const handleGradeChange = () => {
@@ -1616,21 +1657,7 @@ const proceedToNext = async () => {
   }
 }
 
-// 빠른 이동: 이미지 변환 건너뛰고 HTML 미리보기 사용
-const goNextFast = () => {
-  try {
-    // 선택된 문항을 store에 반영
-    itemStore.setSelectedItems([...selectedItems.value])
-
-    // 이전 변환 결과가 있으면 비워서 Step3가 HTML 미리보기를 사용하도록 유도
-    itemStore.setConvertedImages([])
-
-    emit('next')
-  } catch (e) {
-    console.error('빠른 이동 중 오류:', e)
-    alert('다음 단계로 이동 중 문제가 발생했습니다. 다시 시도해주세요.')
-  }
-}
+// (제거됨) 빠른 이동 버튼 및 핸들러
 
 // 드래그 앤 드롭 관련 메서드
 const handleDragStart = (index, type, itemIndex = null) => {
@@ -2140,6 +2167,59 @@ watch(items, async (newItems, oldItems) => {
   font-weight: 600;
 }
 
+/* 큰 기본 버튼 스타일 */
+.btn-primary-large {
+  padding: 12px 32px;
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary-large::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s;
+}
+
+.btn-primary-large:hover:not(:disabled)::before {
+  transform: translateX(100%);
+}
+
+.btn-primary-large:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+}
+
+.btn-primary-large:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary-large:disabled {
+  background: linear-gradient(135deg, #9CA3AF 0%, #6B7280 100%);
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
 /* 메인 레이아웃 */
 .main-layout {
   display: flex;
@@ -2557,7 +2637,9 @@ watch(items, async (newItems, oldItems) => {
 }
 
 .badge-difficulty,
-.badge-type {
+.badge-type,
+.badge-ocr,
+.badge-regular {
   padding: 0.25rem 0.5rem;
   border-radius: 4px;
   font-size: 0.75rem;
@@ -2597,6 +2679,18 @@ watch(items, async (newItems, oldItems) => {
 .badge-type {
   background: #e0e7ff;
   color: #3730a3;
+}
+
+.badge-ocr {
+  background: #fce7f3;
+  color: #9f1239;
+  font-weight: 600;
+  border: 1px solid #fecdd3;
+}
+
+.badge-regular {
+  background: #f3f4f6;
+  color: #6b7280;
 }
 
 .card-body {

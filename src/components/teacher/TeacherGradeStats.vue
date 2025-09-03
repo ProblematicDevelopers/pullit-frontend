@@ -24,9 +24,14 @@
       </div>
 
       <!-- 성적 분포 차트 -->
-      <div class="distribution-chart" v-if="overview.gradeDistribution">
+      <div class="distribution-chart">
         <h3>성적 등급별 분포</h3>
-        <canvas ref="gradeChart"></canvas>
+        <template v-if="hasDistributionData">
+          <canvas ref="gradeChart"></canvas>
+        </template>
+        <template v-else>
+          <div class="empty-state">분포 데이터가 없습니다.</div>
+        </template>
       </div>
     </div>
 
@@ -70,7 +75,7 @@
               <th>상세보기</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody v-if="sortedStudents.length > 0">
             <tr v-for="student in sortedStudents" :key="student.studentId">
               <td>{{ student.studentNo }}</td>
               <td>{{ student.studentName }}</td>
@@ -94,6 +99,13 @@
               </td>
             </tr>
           </tbody>
+          <tbody v-else>
+            <tr>
+              <td colspan="8" style="text-align:center; color:#6b7280; padding:24px;">
+                학생 성적 데이터가 없습니다.
+              </td>
+            </tr>
+          </tbody>
         </table>
       </div>
     </div>
@@ -112,8 +124,7 @@
 import { ref, computed, onMounted, watch } from 'vue'
 import Chart from 'chart.js/auto'
 import StudentDetailModal from './StudentDetailModal.vue'
-import api from '@/services/api'
-import classApi from '@/services/classApi'
+import { teacherStatsAPI } from '@/services/api'
 
 export default {
   name: 'TeacherGradeStats',
@@ -141,169 +152,73 @@ export default {
     // 클래스 개요 데이터 로드
     const loadClassOverview = async () => {
       try {
-        // 시험별 통계 데이터 가져오기
-        const [statsLineResponse, statsDetailResponse] = await Promise.all([
-          classApi.getStatsLines(props.classId),
-          classApi.getStatsDetail(props.classId)
-        ])
+        // 교사 성적 통계 API에서 클래스 개요 데이터 가져오기
+        const overviewResponse = await teacherStatsAPI.getClassOverview(props.classId)
         
-        const statsLines = statsLineResponse.data.data
-        const statsDetails = statsDetailResponse.data.data
-        
-        // 개요 데이터 구성
-        if (statsLines && statsLines.length > 0) {
-          // 전체 평균 계산
-          const totalAverage = statsLines.reduce((sum, exam) => sum + exam.avgPoints, 0) / statsLines.length
-          const totalExams = statsLines.length
+        if (overviewResponse.data.success) {
+          const data = overviewResponse.data.data
           
-          // 시험 목록 구성
-          exams.value = statsLines.map(exam => ({
-            examId: exam.examId,
-            examName: exam.examName,
-            examDate: new Date(),
-            averageScore: exam.avgPoints,
-            participantCount: statsDetails.find(d => d.examId === exam.examId)?.totalStudents || 0
-          }))
-          
-          // 성적 분포 계산 (백분위 기준)
-          let gradeDistribution = {
-            excellent: 0,    // 90-100
-            good: 0,         // 80-89
-            average: 0,      // 70-79
-            belowAverage: 0, // 60-69
-            poor: 0          // 0-59
-          }
-          
-          // 각 시험의 평균 점수를 기준으로 분포 계산
-          statsLines.forEach(exam => {
-            const percentage = (exam.avgPoints / exam.totalPoints) * 100
-            if (percentage >= 90) gradeDistribution.excellent++
-            else if (percentage >= 80) gradeDistribution.good++
-            else if (percentage >= 70) gradeDistribution.average++
-            else if (percentage >= 60) gradeDistribution.belowAverage++
-            else gradeDistribution.poor++
-          })
-          
+          // 개요 데이터 설정
           overview.value = {
-            totalStudents: statsDetails[0]?.totalStudents || 0,
-            totalExams: totalExams,
-            // keep raw numbers; format in UI helpers
-            classAverageScore: Number(totalAverage),
-            classMedianScore: statsDetails[0]?.median || 0,
-            gradeDistribution: gradeDistribution,
-            recentExams: exams.value
-          }
-        } else {
-          // 데이터가 없을 경우 기본값
-          overview.value = {
-            totalStudents: 0,
-            totalExams: 0,
-            classAverageScore: 0,
-            classMedianScore: 0,
-            gradeDistribution: {
+            totalStudents: data.totalStudents || 0,
+            totalExams: data.totalExams || 0,
+            classAverageScore: data.classAverageScore || 0,
+            classMedianScore: data.classMedianScore || 0,
+            gradeDistribution: data.gradeDistribution || {
               excellent: 0,
               good: 0,
               average: 0,
               belowAverage: 0,
               poor: 0
             },
-            recentExams: []
+            recentExams: data.recentExams || []
           }
+          
+          // 시험 목록 설정
+          exams.value = data.recentExams || []
+          
+          // 차트 그리기 (실데이터가 있을 때만)
+          if (hasDistributionData.value) {
+            drawGradeChart()
+          }
+          return
         }
-        
-        // 차트 그리기
-        if (overview.value.gradeDistribution) {
-          drawGradeChart()
-        }
+        // 성공이 아니면 빈 상태로 처리
+        overview.value = getEmptyOverview()
+        exams.value = []
       } catch (error) {
         console.error('Failed to load class overview:', error)
-        // 개발 중 임시 데이터 (401 에러 등)
-        overview.value = {
-          totalStudents: 25,
-          totalExams: 5,
-          classAverageScore: 78.5,
-          classMedianScore: 80.0,
-          gradeDistribution: {
-            excellent: 5,
-            good: 8,
-            average: 7,
-            belowAverage: 3,
-            poor: 2
-          },
-          recentExams: [
-            { examId: 1, examName: '중간고사', examDate: new Date(), averageScore: 75.2, participantCount: 24 },
-            { examId: 2, examName: '단원평가', examDate: new Date(), averageScore: 82.1, participantCount: 25 }
-          ]
-        }
-        exams.value = overview.value.recentExams
-        drawGradeChart()
+        // 에러 발생 시 빈 데이터로 초기화 (더미 데이터 제거)
+        overview.value = getEmptyOverview()
+        exams.value = []
+        
+        // 사용자에게 에러 메시지 표시 (옵션)
+        // alert('성적 데이터를 불러오는 데 실패했습니다. 나중에 다시 시도해주세요.')
       }
     }
 
     // 학생별 성적 데이터 로드
     const loadStudentGrades = async () => {
       try {
-        const params = selectedExam.value ? { examId: selectedExam.value } : {}
-        const response = await api.get(
-          `/teacher/stats/class/${props.classId}/students`,
-          { params }
-        )
-        students.value = response.data.data
+        // 교사 성적 통계 API 사용
+        const response = await teacherStatsAPI.getStudentsGrades(props.classId, selectedExam.value)
+        
+        if (response.data.success) {
+          students.value = response.data.data || []
+        } else {
+          // API 응답이 실패한 경우
+          console.warn('API returned unsuccessful response:', response.data)
+          students.value = []
+        }
       } catch (error) {
         console.error('Failed to load student grades:', error)
-        // 개발 중 임시 데이터
-        students.value = [
-          {
-            studentId: 1,
-            studentName: '김민수',
-            studentNo: '20240001',
-            averageScore: 85.5,
-            totalExamsTaken: 5,
-            classRank: 3,
-            percentile: 88.0,
-            trend: 'IMPROVING'
-          },
-          {
-            studentId: 2,
-            studentName: '이영희',
-            studentNo: '20240002',
-            averageScore: 92.3,
-            totalExamsTaken: 5,
-            classRank: 1,
-            percentile: 96.0,
-            trend: 'STABLE'
-          },
-          {
-            studentId: 3,
-            studentName: '박철수',
-            studentNo: '20240003',
-            averageScore: 78.2,
-            totalExamsTaken: 5,
-            classRank: 8,
-            percentile: 68.0,
-            trend: 'DECLINING'
-          },
-          {
-            studentId: 4,
-            studentName: '정수진',
-            studentNo: '20240004',
-            averageScore: 88.7,
-            totalExamsTaken: 5,
-            classRank: 2,
-            percentile: 92.0,
-            trend: 'IMPROVING'
-          },
-          {
-            studentId: 5,
-            studentName: '최동현',
-            studentNo: '20240005',
-            averageScore: 73.5,
-            totalExamsTaken: 5,
-            classRank: 15,
-            percentile: 40.0,
-            trend: 'STABLE'
-          }
-        ]
+        // 에러 발생 시 빈 배열로 초기화 (더미 데이터 제거)
+        students.value = []
+        
+        // 에러가 401(인증) 또는 403(권한) 문제가 아닌 경우에만 알림
+        if (error.response?.status !== 401 && error.response?.status !== 403) {
+          console.error('학생 성적 데이터 로드 실패:', error.message)
+        }
       }
     }
 
@@ -371,6 +286,30 @@ export default {
           return aVal < bVal ? 1 : -1
         }
       })
+    })
+
+    // 분포 데이터 존재 여부
+    const hasDistributionData = computed(() => {
+      const d = overview.value?.gradeDistribution
+      if (!d) return false
+      const sum = (d.excellent || 0) + (d.good || 0) + (d.average || 0) + (d.belowAverage || 0) + (d.poor || 0)
+      return sum > 0
+    })
+
+    // 빈 개요 데이터 생성기
+    const getEmptyOverview = () => ({
+      totalStudents: 0,
+      totalExams: 0,
+      classAverageScore: 0,
+      classMedianScore: 0,
+      gradeDistribution: {
+        excellent: 0,
+        good: 0,
+        average: 0,
+        belowAverage: 0,
+        poor: 0
+      },
+      recentExams: []
     })
 
     // 정렬 기능
@@ -463,7 +402,8 @@ export default {
       getTrendClass,
       getTrendIcon,
       getTrendText,
-      showStudentDetail
+      showStudentDetail,
+      hasDistributionData
     }
   }
 }
@@ -528,6 +468,12 @@ export default {
 
 .distribution-chart canvas {
   max-height: 300px;
+}
+
+.empty-state {
+  text-align: center;
+  color: #6b7280;
+  padding: 24px 0;
 }
 
 /* 학생 섹션 */

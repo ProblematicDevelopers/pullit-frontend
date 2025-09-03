@@ -283,36 +283,7 @@
             </div>
           </section>
 
-          <!-- 인기 시험지 섹션 -->
-          <section class="popular-section">
-            <div class="section-header">
-              <h3>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.286 6.857L21 12l-5.714 2.143L13 21l-2.286-6.857L5 12l5.714-2.143L13 3z" stroke="currentColor" stroke-width="2"/>
-                </svg>
-                인기 시험지
-              </h3>
-              <select v-model="popularFilter" class="filter-select-small">
-                <option value="all">전체</option>
-                <option value="week">이번 주</option>
-                <option value="month">이번 달</option>
-              </select>
-            </div>
-            <div class="popular-list">
-              <div v-for="(exam, index) in popularExams" :key="exam.id" class="popular-item" @click="selectExam(exam)">
-                <span class="rank">{{ index + 1 }}</span>
-                <div class="exam-info">
-                  <h4>{{ exam.title }}</h4>
-                  <div class="exam-meta">
-                    <span class="subject-tag">{{ getSubjectName(exam.subject) }}</span>
-                    <span>{{ exam.grade }}</span>
-                    <span>사용 {{ exam.useCount }}회</span>
-                  </div>
-                </div>
-                <button @click.stop="editExam(exam)" class="btn-text">사용하기</button>
-              </div>
-            </div>
-          </section>
+          
         </div>
 
         <!-- 검색 결과 -->
@@ -570,7 +541,6 @@ const selectedExamId = ref(null)
 const selectedExamName = ref('')
 const selectedExamObject = ref(null) // 선택한 exam 객체 전체 저장
 const isCreatingNew = ref(false)
-const popularFilter = ref('week')
 
 // 추천 시험지 데이터 (임시)
 const recentExams = ref([
@@ -603,43 +573,7 @@ const recentExams = ref([
   }
 ])
 
-const popularExams = ref([
-  {
-    id: 4,
-    title: '2024 수학 1단원 총정리',
-    subject: 'math',
-    grade: '중1',
-    useCount: 567
-  },
-  {
-    id: 5,
-    title: '영어 문법 기초',
-    subject: 'english',
-    grade: '중1',
-    useCount: 432
-  },
-  {
-    id: 6,
-    title: '국어 문학 작품 분석',
-    subject: 'korean',
-    grade: '중2',
-    useCount: 389
-  },
-  {
-    id: 7,
-    title: '과학 실험 보고서',
-    subject: 'science',
-    grade: '중3',
-    useCount: 234
-  },
-  {
-    id: 8,
-    title: '역사 연표 정리',
-    subject: 'social',
-    grade: '중2',
-    useCount: 198
-  }
-])
+// 인기 시험지 기능 제거됨
 
 // Computed
 const hasActiveFilters = computed(() => {
@@ -1096,7 +1030,6 @@ const proceedToNext = () => {
     // 선택된 시험지 찾기
     const exam = searchResults.value.find(e => e.id === selectedExamId.value) ||
                  recentExams.value.find(e => e.id === selectedExamId.value) ||
-                 popularExams.value.find(e => e.id === selectedExamId.value) ||
                  selectedExamObject.value
     
     if (exam) {
@@ -1294,17 +1227,7 @@ const getGradeCode = (gradeName) => {
   return gradeMap[gradeName] || ''
 }
 
-// 인기 시험지 로드
-const loadPopularExams = async () => {
-  try {
-    const result = await store.fetchPopularExams(10)
-    if (result && Array.isArray(result)) {
-      popularExams.value = transformSearchResults(result)
-    }
-  } catch (error) {
-    console.error('인기 시험지 로드 실패:', error)
-  }
-}
+// 인기 시험지 로드 기능 제거됨
 
 // Lifecycle
 onMounted(async () => {
@@ -1356,8 +1279,7 @@ onMounted(async () => {
     // 초기 시험지 목록 로드 (접근 가능한 시험지)
     await loadAccessibleExams()
 
-    // 인기 시험지 로드
-    await loadPopularExams()
+    // 인기 시험지 로드 제거
 
     // 통계 데이터 로드
     await loadStatistics()

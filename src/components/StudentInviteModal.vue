@@ -2,12 +2,12 @@
   <div v-if="isOpen" class="fixed inset-0 z-50 overflow-y-auto">
     <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
       <!-- 배경 오버레이 -->
-      <div class="fixed inset-0 transition-opacity" @click="close">
-        <div class="absolute inset-0 bg-gray-500 opacity-75"></div>
+      <div class="fixed inset-0 transition-opacity">
+        <div class="absolute inset-0 bg-gray-500 opacity-75" @click="close"></div>
       </div>
 
       <!-- 모달 -->
-      <div class="inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full sm:p-6">
+      <div class="relative inline-block align-bottom bg-white rounded-lg px-4 pt-5 pb-4 text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-4xl sm:w-full sm:p-6">
         <div class="flex justify-between items-center mb-4">
           <h3 class="text-lg font-medium text-gray-900">학생 추가</h3>
           <button @click="close" class="text-gray-400 hover:text-gray-500">
@@ -85,8 +85,15 @@
                     </td>
                   </tr>
                   <tr v-else-if="availableStudents.length === 0" class="text-center">
-                    <td colspan="5" class="px-6 py-4 text-gray-500">
-                      추가 가능한 학생이 없습니다.
+                    <td colspan="5" class="px-6 py-8">
+                      <div class="flex flex-col items-center justify-center">
+                        <svg class="w-12 h-12 text-gray-400 mb-3" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M12 5.5A3.5 3.5 0 0 1 15.5 9A3.5 3.5 0 0 1 12 12.5A3.5 3.5 0 0 1 8.5 9A3.5 3.5 0 0 1 12 5.5M5 8C5.56 8 6.08 8.15 6.53 8.42C6.38 9.85 6.8 11.27 7.66 12.38C7.16 13.34 6.16 14 5 14A3 3 0 0 1 2 11A3 3 0 0 1 5 8M19 8A3 3 0 0 1 22 11A3 3 0 0 1 19 14C17.84 14 16.84 13.34 16.34 12.38C17.2 11.27 17.62 9.85 17.47 8.42C17.92 8.15 18.44 8 19 8M5.5 18.25C5.5 16.18 8.41 14.5 12 14.5C15.59 14.5 18.5 16.18 18.5 18.25V20H5.5V18.25Z"/>
+                        </svg>
+                        <h3 class="text-gray-900 font-medium mb-1">추가 가능한 학생이 없습니다</h3>
+                        <p class="text-gray-500 text-sm">같은 학교의 학급 미배정 학생이 없습니다.</p>
+                        <p class="text-gray-500 text-sm">학생이 아직 가입하지 않았다면, 먼저 학생 회원가입을 안내해 주세요.</p>
+                      </div>
                     </td>
                   </tr>
                   <tr v-else v-for="student in availableStudents" :key="student.studentId">
@@ -158,28 +165,6 @@
       </div>
     </div>
 
-    <!-- 빈 목록 안내 모달 -->
-    <div v-if="showEmptyModal" class="fixed inset-0 z-60 flex items-center justify-center">
-      <div class="absolute inset-0 bg-black opacity-30" @click="showEmptyModal = false"></div>
-      <div class="relative bg-white rounded-lg shadow-xl max-w-md w-full mx-4 p-6">
-        <div class="flex items-start">
-          <div class="flex-shrink-0 mr-3">
-            <svg class="w-6 h-6 text-blue-600" viewBox="0 0 24 24" fill="currentColor">
-              <path d="M11 15H13V17H11V15M11 7H13V13H11V7M11.99 2C6.47 2 2 6.48 2 12C2 17.52 6.47 22 11.99 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 11.99 2Z"/>
-            </svg>
-          </div>
-          <div class="flex-1">
-            <h4 class="text-base font-semibold text-gray-900 mb-1">추가 가능한 학생이 없습니다</h4>
-            <p class="text-sm text-gray-600 mb-4">
-              같은 학교의 학급 미배정 학생이 없습니다. 학생이 아직 가입하지 않았다면, 먼저 학생 회원가입을 안내해 주세요.
-            </p>
-            <div class="flex justify-end gap-2">
-              <button @click="showEmptyModal = false" class="px-4 py-2 text-sm rounded-md border border-gray-300 text-gray-700 bg-white hover:bg-gray-50">확인</button>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
@@ -224,8 +209,6 @@ const selectAll = ref(false)
 const loading = ref(false)
 const inviting = ref(false)
 const invitationResults = ref([])
-const showEmptyModal = ref(false)
-let hasShownEmptyModal = false
 
 // 디바운스 타이머
 let searchTimer = null
@@ -255,12 +238,6 @@ const fetchAvailableStudents = async () => {
     availableStudents.value = response.data.data || []
     console.log('Available students loaded count:', availableStudents.value.length)
     console.log('Available students:', availableStudents.value)
-
-    // 빈 목록 안내 모달: 초기 조회(검색/필터 없음)이며 아직 띄운 적 없을 때만 표시
-    if (!searchQuery.value && !selectedGrade.value && !hasShownEmptyModal && (availableStudents.value.length === 0)) {
-      showEmptyModal.value = true
-      hasShownEmptyModal = true
-    }
   } catch (error) {
     console.error('Failed to fetch available students:', error)
     console.error('Error details:', error.response?.data)
@@ -358,12 +335,13 @@ const close = () => {
   searchQuery.value = ''
   selectedGrade.value = ''
   invitationResults.value = []
-  showEmptyModal.value = false
-  hasShownEmptyModal = false
 }
 
 // 모달이 열릴 때 데이터 로드
 watch(() => props.isOpen, (newVal) => {
+  console.log('=== StudentInviteModal isOpen changed ===')
+  console.log('isOpen:', newVal)
+  console.log('classId:', props.classId)
   if (newVal) {
     fetchAvailableStudents()
   }
@@ -378,3 +356,552 @@ watch(selectedStudents, (newVal, oldVal) => {
   selectAll.value = newVal.length === availableStudents.value.length && availableStudents.value.length > 0
 })
 </script>
+
+<style scoped>
+/* 모달 오버레이 */
+.fixed {
+  position: fixed;
+}
+
+.inset-0 {
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+.z-50 {
+  z-index: 50;
+}
+
+.z-60 {
+  z-index: 60;
+}
+
+.overflow-y-auto {
+  overflow-y: auto;
+}
+
+/* 플렉스 레이아웃 */
+.flex {
+  display: flex;
+}
+
+.flex-col {
+  flex-direction: column;
+}
+
+.items-center {
+  align-items: center;
+}
+
+.items-start {
+  align-items: flex-start;
+}
+
+.justify-center {
+  justify-content: center;
+}
+
+.justify-between {
+  justify-content: space-between;
+}
+
+.justify-end {
+  justify-content: flex-end;
+}
+
+/* 레이아웃 */
+.min-h-screen {
+  min-height: 100vh;
+}
+
+.inline-block {
+  display: inline-block;
+}
+
+.align-bottom {
+  vertical-align: bottom;
+}
+
+.align-middle {
+  vertical-align: middle;
+}
+
+/* 배경 오버레이 */
+.bg-gray-500 {
+  background-color: rgb(107 114 128);
+}
+
+.bg-black {
+  background-color: rgb(0 0 0);
+}
+
+.opacity-75 {
+  opacity: 0.75;
+}
+
+.opacity-30 {
+  opacity: 0.3;
+}
+
+/* 모달 박스 */
+.bg-white {
+  background-color: rgb(255 255 255);
+}
+
+.rounded-lg {
+  border-radius: 0.5rem;
+}
+
+.shadow-xl {
+  box-shadow: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+}
+
+.transform {
+  transform: translate(var(--tw-translate-x), var(--tw-translate-y)) rotate(var(--tw-rotate)) skewX(var(--tw-skew-x)) skewY(var(--tw-skew-y)) scaleX(var(--tw-scale-x)) scaleY(var(--tw-scale-y));
+}
+
+.transition-all {
+  transition-property: all;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+.transition-opacity {
+  transition-property: opacity;
+  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  transition-duration: 150ms;
+}
+
+/* 패딩과 마진 */
+.px-4 {
+  padding-left: 1rem;
+  padding-right: 1rem;
+}
+
+.px-3 {
+  padding-left: 0.75rem;
+  padding-right: 0.75rem;
+}
+
+.px-6 {
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
+}
+
+.px-2 {
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+}
+
+.py-2 {
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+}
+
+.py-3 {
+  padding-top: 0.75rem;
+  padding-bottom: 0.75rem;
+}
+
+.py-4 {
+  padding-top: 1rem;
+  padding-bottom: 1rem;
+}
+
+.py-8 {
+  padding-top: 2rem;
+  padding-bottom: 2rem;
+}
+
+.pt-4 {
+  padding-top: 1rem;
+}
+
+.pt-5 {
+  padding-top: 1.25rem;
+}
+
+.pb-4 {
+  padding-bottom: 1rem;
+}
+
+.pb-20 {
+  padding-bottom: 5rem;
+}
+
+.p-4 {
+  padding: 1rem;
+}
+
+.p-6 {
+  padding: 1.5rem;
+}
+
+.mb-4 {
+  margin-bottom: 1rem;
+}
+
+.mb-2 {
+  margin-bottom: 0.5rem;
+}
+
+.mb-1 {
+  margin-bottom: 0.25rem;
+}
+
+.mb-3 {
+  margin-bottom: 0.75rem;
+}
+
+.mt-4 {
+  margin-top: 1rem;
+}
+
+.mr-2 {
+  margin-right: 0.5rem;
+}
+
+.mr-3 {
+  margin-right: 0.75rem;
+}
+
+.mx-4 {
+  margin-left: 1rem;
+  margin-right: 1rem;
+}
+
+/* 텍스트 스타일 */
+.text-left {
+  text-align: left;
+}
+
+.text-center {
+  text-align: center;
+}
+
+.text-lg {
+  font-size: 1.125rem;
+  line-height: 1.75rem;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+}
+
+.text-xs {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
+
+.text-base {
+  font-size: 1rem;
+  line-height: 1.5rem;
+}
+
+.font-medium {
+  font-weight: 500;
+}
+
+.font-semibold {
+  font-weight: 600;
+}
+
+.text-gray-900 {
+  color: rgb(17 24 39);
+}
+
+.text-gray-700 {
+  color: rgb(55 65 81);
+}
+
+.text-gray-600 {
+  color: rgb(75 85 99);
+}
+
+.text-gray-500 {
+  color: rgb(107 114 128);
+}
+
+.text-gray-400 {
+  color: rgb(156 163 175);
+}
+
+.text-blue-600 {
+  color: rgb(37 99 235);
+}
+
+.text-blue-500 {
+  color: rgb(59 130 246);
+}
+
+.text-blue-900 {
+  color: rgb(30 58 138);
+}
+
+.text-green-600 {
+  color: rgb(22 163 74);
+}
+
+.text-green-800 {
+  color: rgb(22 101 52);
+}
+
+.text-red-600 {
+  color: rgb(220 38 38);
+}
+
+.text-white {
+  color: rgb(255 255 255);
+}
+
+/* hover 스타일 */
+.hover\:text-gray-500:hover {
+  color: rgb(107 114 128);
+}
+
+.hover\:bg-gray-50:hover {
+  background-color: rgb(249 250 251);
+}
+
+.hover\:bg-blue-700:hover {
+  background-color: rgb(29 78 216);
+}
+
+/* 버튼 스타일 */
+button {
+  cursor: pointer;
+}
+
+.cursor-not-allowed {
+  cursor: not-allowed;
+}
+
+/* 테이블 스타일 */
+.min-w-full {
+  min-width: 100%;
+}
+
+.divide-y {
+  border-top-width: 0;
+  border-bottom-width: 1px;
+}
+
+.divide-gray-200 > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgb(229 231 235);
+}
+
+.bg-gray-50 {
+  background-color: rgb(249 250 251);
+}
+
+.bg-green-100 {
+  background-color: rgb(220 252 231);
+}
+
+.bg-blue-50 {
+  background-color: rgb(239 246 255);
+}
+
+.bg-blue-600 {
+  background-color: rgb(37 99 235);
+}
+
+.bg-gray-300 {
+  background-color: rgb(209 213 219);
+}
+
+/* 보더 스타일 */
+.border {
+  border-width: 1px;
+}
+
+.border-gray-300 {
+  border-color: rgb(209 213 219);
+}
+
+.border-gray-200 {
+  border-color: rgb(229 231 235);
+}
+
+.rounded-md {
+  border-radius: 0.375rem;
+}
+
+.rounded-full {
+  border-radius: 9999px;
+}
+
+.rounded {
+  border-radius: 0.25rem;
+}
+
+/* 기타 유틸리티 */
+.overflow-hidden {
+  overflow: hidden;
+}
+
+.max-h-96 {
+  max-height: 24rem;
+}
+
+.whitespace-nowrap {
+  white-space: nowrap;
+}
+
+.uppercase {
+  text-transform: uppercase;
+}
+
+.tracking-wider {
+  letter-spacing: 0.05em;
+}
+
+.leading-5 {
+  line-height: 1.25rem;
+}
+
+.space-y-4 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 1rem;
+}
+
+.space-y-1 > :not([hidden]) ~ :not([hidden]) {
+  margin-top: 0.25rem;
+}
+
+.gap-4 {
+  gap: 1rem;
+}
+
+.gap-2 {
+  gap: 0.5rem;
+}
+
+.flex-1 {
+  flex: 1 1 0%;
+}
+
+.flex-shrink-0 {
+  flex-shrink: 0;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.w-12 {
+  width: 3rem;
+}
+
+.w-6 {
+  width: 1.5rem;
+}
+
+.w-5 {
+  width: 1.25rem;
+}
+
+.w-4 {
+  width: 1rem;
+}
+
+.h-12 {
+  height: 3rem;
+}
+
+.h-6 {
+  height: 1.5rem;
+}
+
+.h-5 {
+  height: 1.25rem;
+}
+
+.h-4 {
+  height: 1rem;
+}
+
+.max-w-4xl {
+  max-width: 56rem;
+}
+
+.max-w-md {
+  max-width: 28rem;
+}
+
+/* 포커스 스타일 */
+.focus\:outline-none:focus {
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+}
+
+.focus\:ring-2:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+}
+
+.focus\:ring-blue-500:focus {
+  --tw-ring-color: rgb(59 130 246);
+}
+
+/* 애니메이션 */
+.animate-spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* 반응형 스타일 */
+@media (min-width: 640px) {
+  .sm\:block {
+    display: block;
+  }
+  
+  .sm\:p-0 {
+    padding: 0;
+  }
+  
+  .sm\:p-6 {
+    padding: 1.5rem;
+  }
+  
+  .sm\:my-8 {
+    margin-top: 2rem;
+    margin-bottom: 2rem;
+  }
+  
+  .sm\:align-middle {
+    vertical-align: middle;
+  }
+  
+  .sm\:max-w-4xl {
+    max-width: 56rem;
+  }
+  
+  .sm\:w-full {
+    width: 100%;
+  }
+}
+
+/* 절대 위치 */
+.absolute {
+  position: absolute;
+}
+
+.relative {
+  position: relative;
+}
+
+/* 인라인 플렉스 */
+.inline-flex {
+  display: inline-flex;
+}
+</style>

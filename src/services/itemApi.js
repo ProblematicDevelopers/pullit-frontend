@@ -43,7 +43,8 @@ class ItemApiService {
         sortOrder: searchParams.sortDirection === 'desc' ? 'DESC' : 'ASC',
         hasImage: null,
         hasHtml: null,
-        passageId: null
+        passageId: null,
+        itemSource: searchParams.itemSource || 'REGULAR'  // 문항 소스 추가
       }
       
       console.log('searchItems 변환된 요청:', requestData)

@@ -33,6 +33,7 @@ export async function generatePDFFromImages(images, options = {}) {
     duration = '',
     totalScore = '',
     layoutMode = 'double', // 기본값 'double' (2단 레이아웃)
+    questionsPerPage = 4, // 페이지당 문항 수 (기본값: 4개)
     showPageNumbers = true,
     onProgress
   } = options
@@ -67,6 +68,7 @@ export async function generatePDFFromImages(images, options = {}) {
   let leftColumnY = A4_CONFIG.margin.top
   let rightColumnY = A4_CONFIG.margin.top
   let currentColumn = 0 // 0: 왼쪽, 1: 오른쪽
+  let questionsOnCurrentPage = 0 // 현재 페이지의 문항 수
 
   // 각 이미지를 PDF에 추가
   for (let i = 0; i < images.length; i++) {
@@ -115,10 +117,25 @@ export async function generatePDFFromImages(images, options = {}) {
 
     // 일반 이미지 처리 (2단 레이아웃)
     if (layoutMode === 'double') {
+      // 페이지당 문항 수 체크 (헤더 제외)
+      if (questionsPerPage > 0 && questionsOnCurrentPage >= questionsPerPage) {
+        // 페이지당 문항 수를 초과하면 새 페이지로
+        pdf.addPage()
+        currentPage++
+        leftColumnY = A4_CONFIG.margin.top
+        rightColumnY = A4_CONFIG.margin.top
+        currentColumn = 0
+        questionsOnCurrentPage = 0
+        
+        if (showPageNumbers) {
+          addPageNumber(pdf, currentPage)
+        }
+      }
+      
       let currentY = currentColumn === 0 ? leftColumnY : rightColumnY
 
-      // 페이지 넘침 체크
-      if (currentY + imgHeight > A4_CONFIG.height - A4_CONFIG.margin.bottom) {
+      // 페이지 넘침 체크 (questionsPerPage가 0이거나 음수일 때만 적용)
+      if (questionsPerPage <= 0 && currentY + imgHeight > A4_CONFIG.height - A4_CONFIG.margin.bottom) {
         // 현재 컬럼이 가득 찬 경우
         if (currentColumn === 0) {
           // 왼쪽 컬럼이 가득 -> 오른쪽 컬럼으로
@@ -168,18 +185,26 @@ export async function generatePDFFromImages(images, options = {}) {
           imgHeight
         )
 
+        // 문항 수 증가
+        questionsOnCurrentPage++
+        
         // Y 위치 업데이트 - 왼쪽 컬럼을 먼저 채우기
         if (currentColumn === 0) {
           leftColumnY = currentY + imgHeight + 10
-          // 다음 이미지가 왼쪽 컬럼에 들어갈 수 있는지 확인
-          if (i + 1 < images.length) {
-            const nextImage = images[i + 1]
-            const nextImgHeight = (columnWidth / nextImage.naturalWidth) * nextImage.naturalHeight
-            // 왼쪽 컬럼에 공간이 없으면 오른쪽으로
-            if (leftColumnY + nextImgHeight > A4_CONFIG.height - A4_CONFIG.margin.bottom) {
-              currentColumn = 1
+          
+          // questionsPerPage 설정이 있을 때는 단순히 컬럼 전환
+          if (questionsPerPage > 0) {
+            currentColumn = 1 // 다음은 오른쪽 컬럼으로
+          } else {
+            // 기존 로직: 다음 이미지가 왼쪽 컬럼에 들어갈 수 있는지 확인
+            if (i + 1 < images.length) {
+              const nextImage = images[i + 1]
+              const nextImgHeight = (columnWidth / nextImage.naturalWidth) * nextImage.naturalHeight
+              // 왼쪽 컬럼에 공간이 없으면 오른쪽으로
+              if (leftColumnY + nextImgHeight > A4_CONFIG.height - A4_CONFIG.margin.bottom) {
+                currentColumn = 1
+              }
             }
-            // 왼쪽 컬럼에 공간이 있으면 계속 왼쪽에
           }
         } else {
           rightColumnY = currentY + imgHeight + 10

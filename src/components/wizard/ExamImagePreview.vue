@@ -23,9 +23,15 @@
         </button>
       </div>
 
-      <!-- Layout Controls - 2단 고정 -->
+      <!-- Questions Per Page Control -->
       <div class="layout-controls">
-        <span class="layout-fixed">2단 레이아웃</span>
+        <label class="control-label">페이지당 문항:</label>
+        <select v-model.number="questionsPerPage" @change="recalculatePagination" class="page-select">
+          <option :value="2">2개</option>
+          <option :value="4">4개 (권장)</option>
+          <option :value="6">6개</option>
+          <option :value="8">8개</option>
+        </select>
       </div>
 
       <!-- Zoom Controls -->
@@ -237,120 +243,42 @@ const previewImages = computed(() => {
 
 const hasImages = computed(() => previewImages.value.length > 0)
 
-// PDF와 동일한 페이징 로직 적용
+// 페이지당 문항 수 설정 (기본값: 4개)
+const questionsPerPage = ref(4)
+
+// 페이지별로 이미지 분할 (간단한 4개씩 분할 로직)
 const paginatedImages = computed(() => {
   if (!hasImages.value) return []
 
   const pages = []
   const allImages = [...previewImages.value]
-
-  // 사용 가능한 영역 계산
-  const contentHeight = PREVIEW_CONFIG.height - PREVIEW_CONFIG.margin.top - PREVIEW_CONFIG.margin.bottom
-  const contentWidth = PREVIEW_CONFIG.width - PREVIEW_CONFIG.margin.left - PREVIEW_CONFIG.margin.right
-  const columnWidth = (contentWidth - PREVIEW_CONFIG.columnGap) / 2
-
-  let currentPageImages = []
-  let leftColumnY = 0
-  let rightColumnY = 0
-  let currentColumn = 0 // 0: 왼쪽, 1: 오른쪽
-
-  // 각 이미지를 페이지에 배치
-  for (let i = 0; i < allImages.length; i++) {
-    const image = allImages[i]
-    const isHeader = image.type === 'header' || image.isHeader
-
-    // 이미지 높이 계산 (비율 유지)
-    const imgWidth = isHeader ? contentWidth : columnWidth
-    const imgAspectRatio = image.naturalWidth / image.naturalHeight || 1
-    const imgHeight = imgWidth / imgAspectRatio
-
-    // 헤더는 새 페이지에서 시작
-    if (isHeader && currentPageImages.length > 0) {
-      pages.push([...currentPageImages])
-      currentPageImages = []
-      leftColumnY = 0
-      rightColumnY = 0
-      currentColumn = 0
-    }
-
-    // 일반 이미지 처리
-    if (!isHeader && layoutMode.value === 'double') {
-      let currentY = currentColumn === 0 ? leftColumnY : rightColumnY
-
-      // 페이지 넘침 체크
-      if (currentY + imgHeight > contentHeight) {
-        if (currentColumn === 0) {
-          // 왼쪽 컬럼이 가득 -> 오른쪽 컬럼으로
-          currentColumn = 1
-          currentY = rightColumnY
-
-          // 오른쪽 컬럼도 가득 찬 경우 새 페이지
-          if (currentY + imgHeight > contentHeight) {
-            if (currentPageImages.length > 0) {
-              pages.push([...currentPageImages])
-              currentPageImages = []
-            }
-            leftColumnY = 0
-            rightColumnY = 0
-            currentColumn = 0
-            currentY = leftColumnY
-          }
-        } else {
-          // 오른쪽 컬럼이 가득 -> 새 페이지
-          if (currentPageImages.length > 0) {
-            pages.push([...currentPageImages])
-            currentPageImages = []
-          }
-          leftColumnY = 0
-          rightColumnY = 0
-          currentColumn = 0
-          currentY = leftColumnY
-        }
-      }
-
-      // 이미지 추가
-      currentPageImages.push({
-        ...image,
-        column: currentColumn,
-        yPosition: currentY
-      })
-
-      // Y 위치 업데이트
-      const imageSpacing = 10 * MM_TO_PX // 10mm 간격
-      if (currentColumn === 0) {
-        leftColumnY = currentY + imgHeight + imageSpacing
-        // 다음 이미지가 왼쪽 컬럼에 들어갈 수 있는지 확인
-        if (i + 1 < allImages.length) {
-          const nextImage = allImages[i + 1]
-          const nextImgHeight = (columnWidth / (nextImage.naturalWidth || 1)) * (nextImage.naturalHeight || 1)
-          // 왼쪽 컬럼에 공간이 없으면 오른쪽으로
-          if (leftColumnY + nextImgHeight > contentHeight) {
-            currentColumn = 1
-          }
-        }
-      } else {
-        rightColumnY = currentY + imgHeight + imageSpacing
-        currentColumn = 0
-      }
-    } else {
-      // 헤더 또는 단일 컬럼
-      currentPageImages.push(image)
-      if (isHeader) {
-        leftColumnY = imgHeight + (10 * MM_TO_PX)
-        rightColumnY = leftColumnY
-      }
-    }
+  
+  // 페이지당 문항 수로 단순 분할
+  const itemsPerPage = questionsPerPage.value
+  
+  for (let i = 0; i < allImages.length; i += itemsPerPage) {
+    const pageImages = allImages.slice(i, i + itemsPerPage)
+    
+    // 2단 레이아웃을 위해 컬럼 할당
+    // 짝수 인덱스는 왼쪽(0), 홀수 인덱스는 오른쪽(1)
+    const processedImages = pageImages.map((img, idx) => ({
+      ...img,
+      column: idx % 2, // 0: 왼쪽, 1: 오른쪽
+      pageIndex: idx
+    }))
+    
+    pages.push(processedImages)
   }
-
-  // 마지막 페이지 추가
-  if (currentPageImages.length > 0) {
-    pages.push(currentPageImages)
-  }
-
+  
   console.log('[ExamImagePreview] Pagination result:', {
     totalImages: allImages.length,
+    questionsPerPage: itemsPerPage,
     totalPages: pages.length,
-    pagesDetail: pages.map((p, idx) => ({ page: idx + 1, imageCount: p.length }))
+    pagesDetail: pages.map((p, idx) => ({ 
+      page: idx + 1, 
+      imageCount: p.length,
+      questionNumbers: p.map(img => img.questionNumber || '?').join(', ')
+    }))
   })
 
   return pages
@@ -632,7 +560,7 @@ const downloadPDF = async () => {
     // 헤더 이미지를 포함한 전체 이미지 배열
     const allImages = [headerImage, ...previewImages.value]
 
-    // Generate PDF from images
+    // Generate PDF from images with questions per page setting
     const pdf = await generatePDFFromImages(allImages, {
       examTitle: examInfo.value.title,
       subject: examInfo.value.subject,
@@ -640,6 +568,7 @@ const downloadPDF = async () => {
       duration: examInfo.value.duration,
       totalScore: examInfo.value.totalScore,
       layoutMode: layoutMode.value,
+      questionsPerPage: questionsPerPage.value, // 페이지당 문항 수 전달
       showPageNumbers: true,
       onProgress: (progress) => {
         progressMessage.value = progress.message || 'PDF 생성 중...'
@@ -939,7 +868,33 @@ onMounted(async () => {
 .layout-controls {
   display: flex;
   align-items: center;
-  gap: 15px;
+  gap: 10px;
+}
+
+.control-label {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.page-select {
+  padding: 6px 12px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  font-size: 14px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.page-select:hover {
+  border-color: #007bff;
+}
+
+.page-select:focus {
+  outline: none;
+  border-color: #007bff;
+  box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.1);
 }
 
 .layout-fixed {

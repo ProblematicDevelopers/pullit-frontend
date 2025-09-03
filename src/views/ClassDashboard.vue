@@ -1,23 +1,23 @@
 <template>
   <div class="teacher-dashboard">
     <!-- Page Header -->
-    <div class="page-header">
+    <div class="page-header" style="background: white !important; box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1) !important; border-bottom: 1px solid #e5e7eb !important;">
       <div class="container">
         <div class="header-content">
           <div>
-            <h1 class="page-title">선생님 대시보드</h1>
-            <p class="page-subtitle">오늘도 좋은 하루 되세요! 학급 현황을 확인해보세요.</p>
+            <h1 class="page-title" style="color: #1e293b !important;">선생님 대시보드</h1>
+            <p class="page-subtitle" style="color: #6b7280 !important;">오늘도 좋은 하루 되세요! 학급 현황을 확인해보세요.</p>
           </div>
           <div class="header-actions">
-            <button class="notification-btn">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M10 21H14C14 22.1 13.1 23 12 23S10 22.1 10 21M21 19V20H3V19L5 17V11C5 7.9 7.03 5.17 10 4.29V4C10 2.9 10.9 2 12 2S14 2.9 14 4V4.29C16.97 5.17 19 7.9 19 11V17L21 19Z"/>
-              </svg>
-              <span class="notification-badge">3</span>
-            </button>
-            <div class="user-avatar">
-              <span>김선생</span>
-            </div>
+<!--            <button class="notification-btn">-->
+<!--              <svg viewBox="0 0 24 24" fill="currentColor">-->
+<!--                <path d="M10 21H14C14 22.1 13.1 23 12 23S10 22.1 10 21M21 19V20H3V19L5 17V11C5 7.9 7.03 5.17 10 4.29V4C10 2.9 10.9 2 12 2S14 2.9 14 4V4.29C16.97 5.17 19 7.9 19 11V17L21 19Z"/>-->
+<!--              </svg>-->
+<!--              <span class="notification-badge">3</span>-->
+<!--            </button>-->
+<!--            <div class="user-avatar">-->
+<!--              <span>김선생</span>-->
+<!--            </div>-->
           </div>
         </div>
       </div>
@@ -250,13 +250,6 @@
       @close="showGradeStatsModal = false"
     />
 
-    <!-- Assignment Management Modal -->
-    <AssignmentManagementModal
-      :isOpen="showAssignmentManagementModal"
-      :classId="currentClassId"
-      @close="showAssignmentManagementModal = false"
-      @assignment-created="handleAssignmentCreated"
-    />
   </div>
 </template>
 
@@ -271,11 +264,11 @@ import MyExamsModal from '@/components/MyExamsModal.vue'
 import ExamAssignModal from '@/components/ExamAssignModal.vue'
 import LiveExamControlModal from '@/components/LiveExamControlModal.vue'
 import GradeStatsModal from '@/components/teacher/GradeStatsModal.vue'
-import AssignmentManagementModal from '@/components/assignment/AssignmentManagementModal.vue'
 import authService from '@/services/auth'
 import examApi from '@/services/examApi'
 import dashboardApi from '@/services/dashboardApi'
 import scheduleApi from '@/services/scheduleApi'
+import { teacherStatsAPI } from '@/services/api'
 import { useClassWebSocket } from '@/components/student/class-room/composables/useClassWebSocket'
 
 const router = useRouter()
@@ -292,7 +285,6 @@ const showMyExamsModal = ref(false)
 const showExamAssignModal = ref(false)
 const showLiveExamControlModal = ref(false)
 const showGradeStatsModal = ref(false)
-const showAssignmentManagementModal = ref(false)
 const currentClassId = ref(null)
 const selectedExamForAssign = ref(null)
 
@@ -357,45 +349,45 @@ const ClipboardListIcon = markRaw({
   ])
 })
 
-// 통계 데이터
+// 통계 데이터 - 초기값은 0으로 설정
 const stats = ref({
-  totalStudents: 156,
-  activeExams: 8,
-  averageGrade: 87.5,
-  classesToday: 5
+  totalStudents: 0,
+  activeExams: 0,
+  averageGrade: 0,
+  classesToday: 0
 })
 
-// Display stats computed
+// Display stats computed - 실제 데이터 기반으로 표시
 const displayStats = computed(() => [
   {
     title: '전체 학생',
     value: stats.value.totalStudents.toString(),
-    change: '+12%',
-    trend: 'up',
+    change: '',  // 변화량은 별도 API 필요시 구현
+    trend: 'stable',
     icon: UsersIcon,
     color: 'blue'
   },
   {
     title: '진행중 시험',
     value: stats.value.activeExams.toString(),
-    change: '+3',
-    trend: 'up',
+    change: '',
+    trend: 'stable',
     icon: FileTextIcon,
     color: 'green'
   },
   {
     title: '평균 성적',
-    value: `${stats.value.averageGrade}%`,
-    change: '+2.3%',
-    trend: 'up',
+    value: stats.value.averageGrade ? `${stats.value.averageGrade.toFixed(1)}점` : '0점',
+    change: '',
+    trend: 'stable',
     icon: AwardIcon,
     color: 'purple'
   },
   {
-    title: '오늘 수업',
+    title: '오늘 일정',
     value: stats.value.classesToday.toString(),
-    change: '2 대기중',
-    trend: 'up',
+    change: '',
+    trend: 'stable',
     icon: CalendarIcon,
     color: 'orange'
   }
@@ -404,20 +396,14 @@ const displayStats = computed(() => [
 // Quick actions
 const quickActions = ref([
   {
-    title: '과제 관리',
-    description: '학생들에게 과제를 출제하고 현황을 확인하세요',
-    icon: ClipboardListIcon,
-    action: 'assignment-management'
-  },
-  {
-    title: '시험 출제',
+    title: '내 시험지 관리',
     description: '내 시험지로 학생들에게 시험을 출제하세요',
     icon: BookOpenIcon,
     action: 'assign-exam'
   },
   {
     title: '실시간 시험 관리',
-    description: 'CBT 시험을 실시간으로 관리하세요',
+    description: 'CBT 시험만 실시간으로 출제하고 관리하세요',
     icon: CalendarIcon,
     action: 'live-exam-control'
   },
@@ -451,14 +437,11 @@ const upcomingEvents = ref([])
 // Handle action click
 const handleActionClick = (action) => {
   switch(action.action) {
-    case 'assignment-management':
-      showAssignmentManagementModal.value = true  // 과제 관리 모달 열기
-      break
     case 'assign-exam':
       showMyExamsModal.value = true  // 내 시험지 목록 모달 열기
       break
     case 'live-exam-control':
-      showLiveExamControlModal.value = true  // 실시간 시험 관리 모달 열기
+      showLiveExamControlModal.value = true  // CBT 실시간 시험 관리 모달 열기
       break
     case 'grade-stats':
       showGradeStatsModal.value = true  // 성적 통계 모달 열기
@@ -506,19 +489,28 @@ const openTestWizardPopup = () => {
 
 // 학생 초대 모달 열기
 const openStudentInviteModal = async () => {
+  console.log('=== openStudentInviteModal 호출 ===')
+  console.log('현재 currentClassId.value:', currentClassId.value)
+
   // 이미 currentClassId가 있으면 바로 모달 열기
   if (currentClassId.value) {
+    console.log('학급 ID 있음, 학생 초대 모달 열기')
     showInviteModal.value = true
     return
   }
 
   try {
-    // 현재 학급 정보 가져오기
-    const response = await authService.getClassInfo()
-    if (response && response.classId) {
-      currentClassId.value = response.classId
+    console.log('학급 정보 다시 조회 시도...')
+    // 선생님의 담당 학급 정보 가져오기
+    const teacherClass = await authService.getTeacherClass()
+    console.log('getTeacherClass 응답:', teacherClass)
+
+    if (teacherClass && teacherClass.classId) {
+      currentClassId.value = teacherClass.classId
+      console.log('학급 ID 설정됨:', currentClassId.value)
       showInviteModal.value = true
     } else {
+      console.log('학급이 없음, 학급 생성 모달 표시')
       // 학급이 없는 경우 학급 생성 모달 표시
       showCreateClassModal.value = true
     }
@@ -526,8 +518,10 @@ const openStudentInviteModal = async () => {
     console.error('Failed to open invite modal:', error)
     // 404 에러는 학급이 없는 경우
     if (error.response?.status === 404) {
+      console.log('404 에러 - 학급 없음')
       showCreateClassModal.value = true
     } else {
+      console.error('학급 정보 조회 실패:', error)
       alert('학급 정보를 불러오는데 실패했습니다.')
     }
   }
@@ -536,7 +530,7 @@ const openStudentInviteModal = async () => {
 // 학생 초대 완료 핸들러
 const handleStudentsInvited = () => {
   // 학생 수 업데이트 등의 처리
-  loadStatistics()
+  loadDashboardData()
 }
 
 // 학급 생성 완료 핸들러
@@ -549,22 +543,32 @@ const handleClassCreated = (createdClass) => {
   }, 500)
 }
 
-// 과제 생성 완료 핸들러
-const handleAssignmentCreated = (assignment) => {
-  console.log('과제 생성 완료:', assignment)
-  // 최근 활동 목록 업데이트
-  loadDashboardData()
-  // 알림 표시
-  alert('과제가 성공적으로 생성되었습니다!')
-}
 
 // 대시보드 데이터 로드
 const loadDashboardData = async () => {
   try {
-    // 1. 대시보드 통계 로드
-    const statsResponse = await dashboardApi.getDashboardStats()
-    if (statsResponse.success) {
-      stats.value = statsResponse.data
+    // 클래스 ID가 있는 경우에만 통계 로드
+    if (currentClassId.value) {
+      // 1. 교사 성적 통계 API에서 클래스 개요 로드
+      try {
+        const overviewResponse = await teacherStatsAPI.getClassOverview(currentClassId.value)
+        if (overviewResponse.data.success) {
+          const overview = overviewResponse.data.data
+          stats.value = {
+            totalStudents: overview.totalStudents || 0,
+            activeExams: overview.totalExams || 0,
+            averageGrade: overview.classAverageScore || 0,
+            classesToday: overview.recentExams ? overview.recentExams.length : 0
+          }
+        }
+      } catch (error) {
+        console.error('클래스 개요 로드 실패:', error)
+        // 기본 대시보드 API 시도
+        const statsResponse = await dashboardApi.getDashboardStats()
+        if (statsResponse.success) {
+          stats.value = statsResponse.data
+        }
+      }
     }
 
     // 2. 최근 활동 로드
@@ -594,6 +598,13 @@ const loadDashboardData = async () => {
     }
   } catch (error) {
     console.error('대시보드 데이터 로드 실패:', error)
+    // 에러 발생 시 기본값 유지
+    stats.value = {
+      totalStudents: 0,
+      activeExams: 0,
+      averageGrade: 0,
+      classesToday: 0
+    }
   }
 }
 
@@ -792,11 +803,11 @@ onUnmounted(() => {
 
 /* Page Header - Override common.css with higher specificity */
 .teacher-dashboard .page-header {
-  background: #2563eb !important;
+  background: white !important;
   padding: 2rem 0 !important;
   margin-bottom: 2rem;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
-  border-bottom: none !important;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  border-bottom: 1px solid #e5e7eb !important;
 }
 
 .teacher-dashboard .header-content {
@@ -808,14 +819,14 @@ onUnmounted(() => {
 .teacher-dashboard .page-title {
   font-size: 2rem !important;
   font-weight: 700 !important;
-  color: white !important;
+  color: #1e293b !important;
   margin: 0 !important;
   margin-bottom: 0.5rem !important;
 }
 
 .teacher-dashboard .page-subtitle {
   font-size: 1.1rem !important;
-  color: rgba(255, 255, 255, 0.9) !important;
+  color: #6b7280 !important;
   margin: 0 !important;
 }
 
@@ -827,8 +838,8 @@ onUnmounted(() => {
 
 .teacher-dashboard .notification-btn {
   position: relative;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   border-radius: 12px;
   padding: 0.75rem;
   cursor: pointer;
@@ -836,14 +847,15 @@ onUnmounted(() => {
 }
 
 .teacher-dashboard .notification-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: #f1f5f9;
   transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .teacher-dashboard .notification-btn svg {
   width: 24px;
   height: 24px;
-  fill: white;
+  fill: #475569;
 }
 
 .teacher-dashboard .notification-badge {
@@ -861,11 +873,11 @@ onUnmounted(() => {
 }
 
 .teacher-dashboard .user-avatar {
-  background: rgba(255, 255, 255, 0.2);
-  border: 2px solid rgba(255, 255, 255, 0.3);
+  background: #f8fafc;
+  border: 2px solid #e2e8f0;
   border-radius: 12px;
   padding: 0.75rem 1.5rem;
-  color: white;
+  color: #1e293b;
   font-weight: 600;
 }
 

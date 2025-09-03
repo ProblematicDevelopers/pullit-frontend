@@ -20,7 +20,7 @@
         
         <div class="header-info">
           <h2>생성된 문항 확인</h2>
-          <p class="header-desc">AI가 선택한 {{ generatedItems.length }}개의 문항을 확인하세요</p>
+          <p class="header-desc">{{ generatedItems.length > 0 ? `AI가 선택한 ${generatedItems.length}개의 문항을 확인하세요` : '문항을 확인하세요' }}</p>
         </div>
       </header>
 
@@ -31,11 +31,11 @@
           <div class="report-stats">
             <div class="stat-item">
               <span class="stat-label">요청 문항 수:</span>
-              <span class="stat-value">{{ selectionReport.requestedCount }}개</span>
+              <span class="stat-value">{{ selectionReport.requestedCount || 0 }}개</span>
             </div>
             <div class="stat-item">
               <span class="stat-label">실제 생성 문항 수:</span>
-              <span class="stat-value">{{ selectionReport.actualCount }}개</span>
+              <span class="stat-value">{{ selectionReport.actualCount || generatedItems.length }}개</span>
             </div>
             <div class="stat-item" v-if="selectionReport.difficultyAdjusted">
               <span class="stat-label warning">⚠️ 난이도 조정:</span>
@@ -49,7 +49,7 @@
       <div class="preview-items">
         <div class="items-header">
           <h3>문항 목록</h3>
-          <span class="item-count">총 {{ generatedItems.length }}문항</span>
+          <span class="item-count">{{ generatedItems.length > 0 ? `총 ${generatedItems.length}문항` : '문항 없음' }}</span>
         </div>
         
         <!-- 지문 그룹 표시 (passageId가 있는 문제들) -->
@@ -224,21 +224,31 @@
       </div>
 
       <!-- 하단 액션 버튼 -->
-      <footer class="step-footer">
-        <button class="btn btn-secondary" @click="regenerate">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M1 4V10H7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-            <path d="M3.51 15C4.15 16.84 5.54 18.34 7.34 19.06C9.14 19.78 11.17 19.68 12.9 18.77C14.63 17.86 15.89 16.25 16.37 14.34C16.85 12.43 16.51 10.39 15.43 8.72C14.35 7.05 12.64 5.89 10.71 5.5C8.78 5.11 6.81 5.52 5.2 6.64L1 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-          다시 생성
-        </button>
+      <footer class="step-footer preview-footer">
+        <div class="footer-left">
+          <button class="btn btn-outline" @click="regenerate">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M1 4V10H7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              <path d="M3.51 15C4.15 16.84 5.54 18.34 7.34 19.06C9.14 19.78 11.17 19.68 12.9 18.77C14.63 17.86 15.89 16.25 16.37 14.34C16.85 12.43 16.51 10.39 15.43 8.72C14.35 7.05 12.64 5.89 10.71 5.5C8.78 5.11 6.81 5.52 5.2 6.64L1 10" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+            </svg>
+            다시 생성
+          </button>
+        </div>
         
-        <button class="btn btn-primary" @click="confirmAndProceed">
-          확인 후 다음 단계
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-          </svg>
-        </button>
+        <div class="footer-right">
+          <button class="btn btn-primary-large" @click="confirmAndProceed" :disabled="isGenerating || generatedItems.length === 0">
+            <span v-if="!isGenerating">
+              다음
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+              </svg>
+            </span>
+            <span v-else class="btn-loading">
+              <span class="loading-spinner"></span>
+              처리 중...
+            </span>
+          </button>
+        </div>
       </footer>
     </div>
 
@@ -417,88 +427,39 @@
           </div>
         </div>
 
-        <!-- 고급 설정 섹션 -->
-        <div class="setting-section">
-          <h3 class="section-title">
-            <span class="icon">⚙️</span>
-            고급 설정
-          </h3>
-          
-          <div class="setting-group">
-            <!-- 추가 옵션 -->
-            <div class="setting-item">
-              <label>추가 옵션</label>
-              <div class="option-group">
-                <label class="switch-option">
-                  <input type="checkbox" v-model="settings.includePassage" />
-                  <span class="switch"></span>
-                  <span>지문 문항 포함</span>
-                </label>
-                <label class="switch-option">
-                  <input type="checkbox" v-model="settings.avoidDuplicate" />
-                  <span class="switch"></span>
-                  <span>최근 사용 문항 제외</span>
-                </label>
-                <label class="switch-option">
-                  <input type="checkbox" v-model="settings.prioritizeLatest" />
-                  <span class="switch"></span>
-                  <span>최신 문항 우선</span>
-                </label>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 생성 미리보기 -->
-        <div class="preview-section">
-          <h3 class="section-title">
-            <span class="icon">✨</span>
-            생성 예상 결과
-          </h3>
-          <div class="preview-content">
-            <div class="preview-item">
-              <span class="label">학년/과목:</span>
-              <span class="value">{{ getGradeName }} {{ getSubjectName }}</span>
-            </div>
-            <div class="preview-item">
-              <span class="label">문항 수:</span>
-              <span class="value">{{ settings.itemCount }}문항</span>
-            </div>
-            <div class="preview-item">
-              <span class="label">난이도:</span>
-              <span class="value">{{ getDifficultyName }}</span>
-            </div>
-            <div class="preview-item" v-if="settings.questionTypes.length > 0">
-              <span class="label">문제 유형:</span>
-              <span class="value">{{ getQuestionTypesName }}</span>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
 
     <!-- 하단 액션 버튼 -->
-    <footer class="step-footer">
-      <button class="btn btn-secondary" @click="handleBack">
-        이전
-      </button>
-      
-      <button 
-        class="btn btn-primary"
-        :disabled="!canGenerate || isGenerating"
-        @click="handleGenerate"
-      >
-        <span v-if="!isGenerating">
+    <footer class="step-footer settings-footer">
+      <div class="footer-left">
+        <button class="btn btn-outline" @click="handleBack">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M13 3L4.00999 20.892L6.45099 21.1105L9.85999 13H14.17L13 3Z" fill="currentColor"/>
-            <path d="M17.96 11.0105L20 20L14.74 17.5005L11 3L17.96 11.0105Z" fill="currentColor"/>
+            <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
           </svg>
-          시험지 생성
-        </span>
-        <span v-else>
-          생성 중...
-        </span>
-      </button>
+          이전
+        </button>
+      </div>
+      
+      <div class="footer-right">
+        <button 
+          class="btn btn-primary-large btn-generate"
+          :disabled="!canGenerate || isGenerating"
+          @click="handleGenerate"
+        >
+          <span v-if="!isGenerating" class="btn-content">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="btn-icon">
+              <path d="M13 3L4.00999 20.892L6.45099 21.1105L9.85999 13H14.17L13 3Z" fill="currentColor"/>
+              <path d="M17.96 11.0105L20 20L14.74 17.5005L11 3L17.96 11.0105Z" fill="currentColor"/>
+            </svg>
+            <span class="btn-text">문항 생성</span>
+          </span>
+          <span v-else class="btn-loading">
+            <span class="loading-spinner"></span>
+            생성 중...
+          </span>
+        </button>
+      </div>
     </footer>
     </template>
     
@@ -520,6 +481,9 @@ import SimilarItemsModal from '@/components/common/SimilarItemsModal.vue'
 import { useMathJax } from '@/composables/useMathJax'
 import { renderMathJaxSmartHybrid } from '@/utils/mathjax-hybrid'
 import DOMPurify from 'dompurify'
+import { convertQuestionsToImages } from '@/utils/question-to-image-converter'
+import { useItemSelectionStore } from '@/stores/itemSelection'
+import { useTestBankStore } from '@/stores/testBank'
 
 // Props & Emits
 const props = defineProps({
@@ -530,6 +494,10 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['back', 'next'])
+
+// Stores
+const itemSelectionStore = useItemSelectionStore()
+const testBankStore = useTestBankStore()
 
 // State
 const settings = ref({
@@ -784,25 +752,37 @@ const loadChapters = async () => {
   try {
     console.log('단원 트리 로드 시작:', settings.value.textbook)
     
-    // Step2ItemSelection과 동일하게 getChapterTree 사용
-    const response = await chapterApi.getChapterTree(settings.value.textbook)
-    console.log('단원 트리 응답:', response)
+    // getChapterTreeWithItemCount API 사용 - 문항 수 포함된 트리 데이터
+    const response = await chapterApi.getChapterTreeWithItemCount(settings.value.textbook)
+    console.log('단원 트리 응답 (문항 수 포함):', response)
     
     if (response.success && response.data) {
       // 트리 구조로 받은 데이터 그대로 사용
       chapters.value = response.data
-      console.log('단원 트리 로드 성공:', chapters.value)
+      console.log('단원 트리 로드 성공 (문항 수 포함):', chapters.value)
     } else if (response.data?.success && response.data?.data) {
       // response.data 안에 success가 있는 경우
       chapters.value = response.data.data
-      console.log('단원 트리 로드 성공 (nested):', chapters.value)
+      console.log('단원 트리 로드 성공 (nested, 문항 수 포함):', chapters.value)
     } else {
       console.warn('단원 트리 데이터가 비어있습니다:', response)
       chapters.value = []
     }
   } catch (error) {
     console.error('단원 트리 로드 실패:', error)
-    chapters.value = []
+    // fallback으로 기존 getChapterTree 사용
+    try {
+      const fallbackResponse = await chapterApi.getChapterTree(settings.value.textbook)
+      if (fallbackResponse.success && fallbackResponse.data) {
+        chapters.value = fallbackResponse.data
+        console.log('단원 트리 로드 성공 (fallback):', chapters.value)
+      } else {
+        chapters.value = []
+      }
+    } catch (fallbackError) {
+      console.error('단원 트리 fallback 로드 실패:', fallbackError)
+      chapters.value = []
+    }
   }
 }
 
@@ -846,16 +826,143 @@ const regenerate = () => {
   backToSettings()
 }
 
-const confirmAndProceed = () => {
-  // 생성된 문항과 설정 정보를 다음 단계로 전달
-  const generatedData = {
-    ...settings.value,
-    selectedItems: generatedItems.value,
-    selectionMetadata: selectionMetadata.value,
-    selectionReport: selectionReport.value
-  }
+const confirmAndProceed = async () => {
+  // 로딩 상태 표시 (더 자세한 UI)
+  const loadingEl = document.createElement('div')
+  loadingEl.style.cssText = `
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+    color: white;
+    font-size: 18px;
+  `
+  loadingEl.innerHTML = `
+    <div style="text-align: center;">
+      <div style="margin-bottom: 20px;">
+        <svg width="50" height="50" viewBox="0 0 50 50" style="animation: spin 1s linear infinite;">
+          <circle cx="25" cy="25" r="20" stroke="white" stroke-width="4" fill="none" stroke-dasharray="80" stroke-dashoffset="60"></circle>
+        </svg>
+      </div>
+      <div>문제를 이미지로 변환 중...</div>
+      <div id="conversion-progress" style="margin-top: 10px; font-size: 14px;">0%</div>
+    </div>
+    <style>
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+  `
+  document.body.appendChild(loadingEl)
   
-  emit('next', generatedData)
+  try {
+    // 로딩 상태 표시
+    isGenerating.value = true
+    
+    // 디버깅: 선택된 아이템 데이터 구조 확인
+    console.log('=== 이미지 변환 시작 (간편 선택) ===')
+    console.log('생성된 아이템 수:', generatedItems.value.length)
+    if (generatedItems.value.length > 0) {
+      console.log('첫 번째 아이템 구조:', {
+        itemId: generatedItems.value[0].itemId,
+        hasQuestionHtml: !!generatedItems.value[0].questionHtml,
+        hasItemHtml: !!generatedItems.value[0].itemHtml,
+        hasPassageHtml: !!generatedItems.value[0].passageHtml,
+        hasChoice1Html: !!generatedItems.value[0].choice1Html,
+        allKeys: Object.keys(generatedItems.value[0])
+      })
+    }
+    
+    // 선택된 문제들에 displayNumber와 itemNumber 추가
+    const itemsWithNumbers = generatedItems.value.map((item, index) => ({
+      ...item,
+      displayNumber: index + 1,  // 순서대로 번호 부여
+      itemNumber: index + 1
+    }))
+    
+    // 문항을 store에 저장
+    itemSelectionStore.setSelectedItems(itemsWithNumbers)
+    
+    // testBankStore에는 직접 상태 설정
+    testBankStore.selectedItems = itemsWithNumbers
+    testBankStore.setSelectedQuestions(itemsWithNumbers)
+    
+    // 문항을 이미지로 변환 (convertQuestionsToImages 사용)
+    console.log('문항을 이미지로 변환 시작...')
+    const convertedImages = await convertQuestionsToImages(
+      itemsWithNumbers,
+      (progress) => {
+        const progressEl = document.getElementById('conversion-progress')
+        if (progressEl) {
+          progressEl.textContent = `${progress.percentage}% - ${progress.message}`
+        }
+      }
+    )
+    
+    console.log(`이미지 변환 완료: ${convertedImages.length}개`)
+    
+    // 변환된 이미지를 store에 저장
+    console.log('[Step2SimpleGeneration] 변환된 이미지 수:', convertedImages.length)
+    if (convertedImages.length > 0) {
+      console.log('[Step2SimpleGeneration] 첫 번째 이미지 확인:', {
+        hasDataUrl: !!convertedImages[0].dataUrl,
+        dataUrlLength: convertedImages[0].dataUrl?.length,
+        type: convertedImages[0].type,
+        questionNumber: convertedImages[0].questionNumber
+      })
+    }
+    itemSelectionStore.setConvertedImages(convertedImages)
+    
+    // examInfo 업데이트
+    testBankStore.setExamInfo({
+      ...props.examInfo,
+      gradeCode: settings.value.grade,
+      gradeName: grades.find(g => g.code === settings.value.grade)?.name,
+      areaCode: settings.value.subject,
+      areaName: subjects.find(s => s.code === settings.value.subject)?.name,
+      textbook: settings.value.textbook,
+      selectedItems: itemsWithNumbers
+    })
+    
+    // Store에 제대로 저장되었는지 확인
+    const storedImages = itemSelectionStore.getConvertedImages()
+    console.log('[Step2SimpleGeneration] Store에 저장된 이미지 수:', storedImages?.length || 0)
+    
+    // 다음 단계로 이동 - 설정 정보도 함께 전달
+    emit('next', {
+      items: itemsWithNumbers,
+      convertedImages,
+      metadata: selectionMetadata.value,
+      report: selectionReport.value,
+      // 간편 생성 설정 정보 추가
+      grade: settings.value.grade,
+      subject: settings.value.subject,
+      textbook: settings.value.textbook,
+      itemCount: settings.value.itemCount,
+      difficulty: settings.value.difficulty,
+      questionTypes: settings.value.questionTypes,
+      chapters: settings.value.chapters,
+      includePassage: settings.value.includePassage,
+      avoidDuplicate: settings.value.avoidDuplicate,
+      prioritizeLatest: settings.value.prioritizeLatest
+    })
+  } catch (error) {
+    console.error('이미지 변환 중 오류:', error)
+    alert('이미지 변환 중 오류가 발생했습니다.')
+  } finally {
+    // 로딩 UI 제거
+    if (loadingEl && loadingEl.parentNode) {
+      loadingEl.parentNode.removeChild(loadingEl)
+    }
+    isGenerating.value = false
+  }
 }
 
 const getQuestionTypeName = (code) => {
@@ -929,18 +1036,12 @@ const handleGenerate = async () => {
       // 생성된 문항 저장
       generatedItems.value = result.data
       
-      // 미리보기 화면으로 전환
+      // 미리보기 모드로 전환
       showPreview.value = true
       
-      // MathJax 스마트 하이브리드 렌더링
-      await nextTick()
-      requestAnimationFrame(async () => {
-        const container = document.querySelector('.preview-content') || document.body
-        await renderMathJaxSmartHybrid(container, {
-          hideBeforeRender: true,
-          clearFirst: false
-        })
-      })
+      // 메타데이터와 리포트 저장
+      selectionMetadata.value = result.metadata
+      selectionReport.value = result.report
     } else {
       console.warn('Smart Random Selection 결과 없음:', result)
       
@@ -1435,6 +1536,32 @@ onMounted(async () => {
   align-items: center;
 }
 
+/* 미리보기 모드 푸터 */
+.step-footer.preview-footer {
+  background: linear-gradient(to right, #f8f9fa, white);
+  padding: 20px 32px;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+}
+
+/* 설정 모드 푸터 */
+.step-footer.settings-footer {
+  background: white;
+  padding: 20px 32px;
+  border-top: 2px solid #e5e7eb;
+}
+
+.footer-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
 /* 버튼 */
 .btn {
   padding: 10px 20px;
@@ -1472,6 +1599,118 @@ onMounted(async () => {
 .btn-secondary:hover {
   background: #F3F4F6;
   border-color: #9CA3AF;
+}
+
+/* 개선된 버튼 스타일 */
+.btn-outline {
+  padding: 10px 20px;
+  background: white;
+  color: #6B7280;
+  border: 1px solid #E5E7EB;
+  border-radius: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-outline:hover {
+  background: #F9FAFB;
+  border-color: #D1D5DB;
+  color: #374151;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.btn-outline:active {
+  transform: translateY(0);
+}
+
+.btn-primary-large {
+  padding: 12px 32px;
+  background: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.3s;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.3);
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-primary-large::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(135deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  transform: translateX(-100%);
+  transition: transform 0.6s;
+}
+
+.btn-primary-large:hover:not(:disabled)::before {
+  transform: translateX(100%);
+}
+
+.btn-primary-large:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(59, 130, 246, 0.4);
+  background: linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%);
+}
+
+.btn-primary-large:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
+}
+
+.btn-primary-large:disabled {
+  background: linear-gradient(135deg, #9CA3AF 0%, #6B7280 100%);
+  cursor: not-allowed;
+  box-shadow: none;
+  opacity: 0.6;
+}
+
+/* 시험지 생성 버튼 */
+.btn-generate {
+  min-width: 140px;
+}
+
+.btn-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.loading-spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255, 255, 255, 0.3);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* 미리보기 모드 스타일 */

@@ -35,7 +35,7 @@
             />
             <span class="checkbox-custom"></span>
             <span class="chapter-name">{{ chapter.name || chapter.chapterName }}</span>
-            <span class="item-count">({{ chapter.totalItemCount || 0 }}문항)</span>
+            <span class="item-count" v-if="chapter.totalItemCount > 0">({{ chapter.totalItemCount }}문항)</span>
           </label>
           
           <button 
@@ -73,7 +73,7 @@
               />
               <span class="checkbox-custom"></span>
               <span class="chapter-name">{{ subChapter.name || subChapter.chapterName }}</span>
-              <span class="item-count">({{ subChapter.itemCount || 0 }}문항)</span>
+              <span class="item-count" v-if="subChapter.itemCount > 0">({{ subChapter.itemCount }}문항)</span>
             </label>
           </div>
         </div>
