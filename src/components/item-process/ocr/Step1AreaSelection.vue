@@ -4,11 +4,7 @@
     <div class="left-section">
       <div class="section-header">
         <h4 class="section-title">문제 추출</h4>
-        <div class="page-info">
-          <button class="btn btn-outline-secondary btn-sm">이전</button>
-          <span class="page-indicator">1 / 8</span>
-          <button class="btn btn-outline-secondary btn-sm">다음</button>
-        </div>
+
       </div>
 
       <div class="image-viewer">
@@ -53,10 +49,34 @@
       <!-- 현재 활성 지문 선택 -->
       <div class="passage-selection" v-if="showPassageGroupSection">
         <label class="form-label">현재 활성 지문</label>
-        <select class="form-select" v-model="selectedPassageGroup">
-          <option value="">없음</option>
-
-        </select>
+        <div class="passage-select-container">
+          <select
+            class="form-select"
+            v-model="selectedPassageGroup"
+            @change="onPassageGroupChange(selectedPassageGroup)"
+            :disabled="loadingPassageGroups"
+          >
+            <option value="">없음 (새로운 지문 생성)</option>
+            <option
+              v-for="group in passageGroups"
+              :key="group.passageId"
+              :value="group.passageId"
+            >
+              {{ group.passageContent ? group.passageContent.substring(0, 50) + '...' : `지문 그룹 ${group.passageId}` }}
+              ({{ group.itemCount || 0 }}개 문항)
+            </option>
+          </select>
+          <div v-if="loadingPassageGroups" class="loading-indicator">
+            <i class="bi bi-arrow-clockwise spin"></i>
+            <span>지문 그룹 로딩 중...</span>
+          </div>
+        </div>
+        <div v-if="selectedPassageGroup" class="passage-info">
+          <small class="text-muted">
+            <i class="bi bi-info-circle me-1"></i>
+            선택된 지문 그룹에 문항을 추가합니다.
+          </small>
+        </div>
       </div>
 
       <!-- 통합된 영역 타입 선택 및 진행 상태 -->
@@ -76,11 +96,8 @@
           >
             <i :class="areaType.icon"></i>
             {{ areaType.label }}
-            <span class="required-badge" v-if="areaType.required">(필수)</span>
-            <span class="optional-badge" v-else>(선택)</span>
+            <span class="optional-badge">(선택)</span>
             <i v-if="selectedAreas[areaType.key]" class="bi bi-check-circle-fill text-success ms-1"></i>
-            <i v-else-if="areaType.required" class="bi bi-circle text-muted ms-1"></i>
-            <!-- 선택 영역은 선택되지 않았을 때 아무것도 표시하지 않음 -->
           </button>
         </div>
       </div>
@@ -191,7 +208,8 @@
 </template>
 
 <script>
-import { ref, computed, toRefs } from 'vue'
+import { ref, computed, toRefs, onMounted, watch } from 'vue'
+import passageGroupApi from '@/services/passageGroupApi'
 
 export default {
   name: 'Step1AreaSelection',
@@ -238,6 +256,11 @@ export default {
       type: Object,
       required: false,
       default: () => null
+    },
+    subjectId: {
+      type: Number,
+      required: false,
+      default: null
     }
   },
   emits: [
@@ -278,13 +301,15 @@ export default {
 
     // 지문 그룹 관리
     const selectedPassageGroup = ref('')
+    const passageGroups = ref([])
+    const loadingPassageGroups = ref(false)
     const showPassageGroupSection = computed(() => true) // 임시
 
     // 영역 타입 정의 (백엔드 AreaType enum에 맞춤)
     const areaTypes = ref([
-      { key: 'problem', label: '문제', icon: 'bi bi-question-circle', required: true },
+      { key: 'problem', label: '문제', icon: 'bi bi-question-circle', required: false },
       { key: 'options', label: '보기', icon: 'bi bi-list-ul', required: false },
-      { key: 'passage', label: '지문', icon: 'bi bi-file-text', required: false },
+      { key: 'question', label: '지문', icon: 'bi bi-file-text', required: false }, // question이 지문 영역
     ])
 
     // 계산된 속성
@@ -295,9 +320,56 @@ export default {
         return false
       }
 
-      // 필수 영역들이 모두 선택되었는지 확인
-      const requiredAreas = areaTypes.value.filter(type => type.required)
-      return requiredAreas.every(type => selectedAreas.value?.[type.key])
+      // 선택된 영역들 확인
+      const selectedAreaKeys = Object.keys(selectedAreas.value).filter(
+        key => selectedAreas.value[key] !== null
+      )
+
+      console.log('canProceedToNext 검사:', {
+        selectedAreaKeys,
+        selectedAreas: selectedAreas.value,
+        selectedAreasKeys: Object.keys(selectedAreas.value),
+        selectedAreasValues: Object.values(selectedAreas.value)
+      })
+
+      // 유효한 조합들:
+      // 1. 문제만 (단답형 등)
+      // 2. 문제 + 보기 (객관식)
+      // 3. 지문만 (지문 그룹에 문항 추가)
+      // 4. 지문 + 문제 (지문형 문제)
+
+      const hasProblem = selectedAreaKeys.includes('problem')
+      const hasOptions = selectedAreaKeys.includes('options')
+      const hasPassage = selectedAreaKeys.includes('question') // question이 지문 영역
+
+      // 최소 하나의 영역은 선택되어야 함
+      if (selectedAreaKeys.length === 0) {
+        return false
+      }
+
+      // 유효한 조합인지 확인
+      const isValidCombination =
+        // 문제만
+        (hasProblem && !hasOptions && !hasPassage) ||
+        // 문제 + 보기
+        (hasProblem && hasOptions && !hasPassage) ||
+        // 지문만
+        (!hasProblem && !hasOptions && hasPassage) ||
+        // 지문 + 문제
+        (hasProblem && !hasOptions && hasPassage)
+
+      console.log('canProceedToNext 결과:', {
+        hasProblem,
+        hasOptions,
+        hasPassage,
+        isValidCombination,
+        combination1: (hasProblem && !hasOptions && !hasPassage),
+        combination2: (hasProblem && hasOptions && !hasPassage),
+        combination3: (!hasProblem && !hasOptions && hasPassage),
+        combination4: (hasProblem && !hasOptions && hasPassage)
+      })
+
+      return isValidCombination
     })
 
     // 선택된 영역이 있는지 확인 (사용하지 않으므로 제거)
@@ -431,8 +503,13 @@ export default {
     })
 
     // 탭 비활성화 여부 (지문 선택 시 다른 탭 비활성화 로직)
-    const isTabDisabled = () => {
-      // 지문을 선택했을 때 다른 탭 비활성화하는 로직을 여기에 구현
+    const isTabDisabled = (areaType) => {
+      // 지문 그룹이 선택된 경우, 지문 영역만 활성화하고 나머지는 비활성화
+      if (selectedPassageGroup.value && areaType !== 'question') {
+        return true
+      }
+
+      // 지문 그룹이 선택되지 않은 경우, 모든 영역 활성화
       return false
     }
 
@@ -786,6 +863,66 @@ export default {
       console.error('이미지 로드 실패:', error)
     }
 
+    // 지문 그룹 목록 로딩
+    const loadPassageGroups = async () => {
+      if (!props.subjectId) {
+        console.warn('subjectId가 없어서 지문 그룹을 로딩할 수 없습니다.')
+        return
+      }
+
+      try {
+        loadingPassageGroups.value = true
+        console.log('📤 지문 그룹 목록 로딩 시작:', { subjectId: props.subjectId })
+
+        const result = await passageGroupApi.getPassageGroups(props.subjectId)
+
+        if (result.success) {
+          passageGroups.value = result.data || []
+          console.log('✅ 지문 그룹 목록 로딩 성공:', passageGroups.value)
+        } else {
+          console.error('❌ 지문 그룹 목록 로딩 실패:', result.error)
+          passageGroups.value = []
+        }
+      } catch (error) {
+        console.error('❌ 지문 그룹 목록 로딩 중 오류:', error)
+        passageGroups.value = []
+      } finally {
+        loadingPassageGroups.value = false
+      }
+    }
+
+    // 지문 그룹 선택 변경 핸들러
+    const onPassageGroupChange = (passageId) => {
+      console.log('지문 그룹 선택 변경:', passageId)
+
+      if (passageId) {
+        // 지문 그룹 선택 시 다른 영역들을 비활성화하고 지문 영역만 활성화
+        emit('update:activeSelectionType', 'question')
+        emit('update:captureMode', true)
+      } else {
+        // 지문 그룹 선택 해제 시 기본 문제 영역으로 복원
+        emit('update:activeSelectionType', 'problem')
+        emit('update:captureMode', false)
+      }
+    }
+
+    // subjectId 변경 감지하여 지문 그룹 목록 다시 로딩
+    watch(() => props.subjectId, (newSubjectId) => {
+      if (newSubjectId) {
+        loadPassageGroups()
+      } else {
+        passageGroups.value = []
+        selectedPassageGroup.value = ''
+      }
+    }, { immediate: true })
+
+    // 컴포넌트 마운트 시 지문 그룹 목록 로딩
+    onMounted(() => {
+      if (props.subjectId) {
+        loadPassageGroups()
+      }
+    })
+
     // 다음 단계로 진행
     const nextStep = () => {
       if (canProceedToNext.value) {
@@ -797,6 +934,8 @@ export default {
       // 상태
       currentSelection,
       selectedPassageGroup,
+      passageGroups,
+      loadingPassageGroups,
       showPassageGroupSection,
       areaTypes,
 
@@ -815,7 +954,9 @@ export default {
       onImageLoad,
       onImageError,
       nextStep,
-      clearCurrentSelection
+      clearCurrentSelection,
+      loadPassageGroups,
+      onPassageGroupChange
     }
   }
 }
@@ -988,6 +1129,10 @@ export default {
   display: block;
 }
 
+.passage-select-container {
+  position: relative;
+}
+
 .form-select {
   width: 100%;
   padding: 0.5rem;
@@ -995,6 +1140,49 @@ export default {
   border-radius: 6px;
   font-size: 0.875rem;
   background: white;
+  transition: border-color 0.2s ease;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+.form-select:disabled {
+  background-color: #f9fafb;
+  color: #6b7280;
+  cursor: not-allowed;
+}
+
+.loading-indicator {
+  position: absolute;
+  right: 0.75rem;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+  color: #6b7280;
+  pointer-events: none;
+}
+
+.spin {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.passage-info {
+  margin-top: 0.5rem;
+  padding: 0.5rem;
+  background: #f0f9ff;
+  border: 1px solid #bae6fd;
+  border-radius: 4px;
 }
 
 /* 탭 버튼 */
