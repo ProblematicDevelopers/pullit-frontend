@@ -471,7 +471,7 @@ import { ref, reactive, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useTestBankStore } from '@/stores/testBank'
 import { storeToRefs } from 'pinia'
 import examApi from '@/services/examApi'
-import axios from 'axios'
+import api from '@/services/api'
 
 // Props & Emits
 const emit = defineEmits(['next', 'cancel', 'selectNew', 'selectExisting'])
@@ -480,8 +480,7 @@ const emit = defineEmits(['next', 'cancel', 'selectNew', 'selectExisting'])
 const store = useTestBankStore()
 const { loading, examSearchResults } = storeToRefs(store)
 
-// API URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+// API URL handled by shared client
 
 // 통계 데이터
 const totalExamCount = ref(0)
@@ -791,7 +790,7 @@ const loadTextbooksForSubject = async () => {
     // 각 교과서별 시험지 개수 조회
     const textbooksWithCount = await Promise.all(textbooks.map(async t => {
       try {
-        const countResponse = await axios.get(`${API_BASE_URL}/api/exams/count`, {
+        const countResponse = await api.get(`/exams/count`, {
           params: {
             subjectId: t.subjectId,
             gradeCode: gradeCode,
@@ -861,7 +860,7 @@ const loadChaptersForFilters = async () => {
 
         // 각 대단원별 시험지 개수를 개별 조회
         try {
-          const countResponse = await axios.get(`${API_BASE_URL}/api/exams/count`, {
+          const countResponse = await api.get(`/exams/count`, {
             params: {
               largeChapterCode: chapterCode,
               subjectId: subjectId,

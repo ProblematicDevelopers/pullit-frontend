@@ -214,6 +214,9 @@
     <CalendarModal
       :isOpen="showCalendarModal"
       :upcomingEvents="upcomingEvents"
+      :userId="currentUserId"
+      :classId="currentClassId"
+      :isStudent="false"
       @close="showCalendarModal = false"
       @schedule-added="handleScheduleAdded"
     />

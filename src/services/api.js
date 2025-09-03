@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { tokenManager } from './auth'
+import { tokenManager } from './token'
 
 // API 기본 URL
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
@@ -34,9 +34,7 @@ api.interceptors.request.use(
 
     return config
   },
-  (error) => {
-    return Promise.reject(error)
-  }
+  (error) => Promise.reject(error)
 )
 
 // 응답 인터셉터 - 에러 처리
@@ -52,9 +50,12 @@ api.interceptors.response.use(
       try {
         const refreshToken = tokenManager.getRefreshToken()
         if (refreshToken) {
-          const response = await axios.post(`${API_BASE_URL}/api/auth/refresh`, {
-            refreshToken
-          })
+          // Use a bare axios call to avoid interceptor recursion
+          const response = await axios.post(
+            `${API_BASE_URL}/api/auth/refresh`,
+            { refreshToken },
+            { headers: { 'Content-Type': 'application/json' } }
+          )
 
           if (response.data.success) {
             const { accessToken, refreshToken: newRefreshToken } = response.data.data
@@ -107,6 +108,21 @@ export const authAPI = {
   // 인증번호 재발송
   resendVerificationCode: (phoneNumber) => {
     return api.post('/auth/verification/resend', { phoneNumber })
+  }
+}
+
+// 사용자 관련 API 함수들
+export const userAPI = {
+  // 아이디 중복 확인
+  checkUsername: (username) => {
+    const encoded = encodeURIComponent(username)
+    return api.get(`/users/check/username/${encoded}`)
+  },
+
+  // 이메일 중복 확인
+  checkEmail: (email) => {
+    const encoded = encodeURIComponent(email)
+    return api.get(`/users/check/email/${encoded}`)
   }
 }
 

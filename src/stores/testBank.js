@@ -1,8 +1,8 @@
 import { defineStore } from 'pinia'
 import examApi from '@/services/examApi'
-import axios from 'axios'
+import api from '@/services/api'
 
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
+// Base URL handled by shared API client
 
 export const useTestBankStore = defineStore('testBank', {
   state: () => ({
@@ -21,7 +21,9 @@ export const useTestBankStore = defineStore('testBank', {
       gradeCode: null,
       gradeName: '',
       subjectId: null,
-      subjectName: ''
+      subjectName: '',
+      // 미리보기 모드: 'image' | 'html'
+      previewMode: 'image',
     },
 
     // ===== 시험지 타입 =====
@@ -426,7 +428,7 @@ export const useTestBankStore = defineStore('testBank', {
      */
     async fetchTextbooks(gradeCode, areaCode) {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/subject`)
+        const response = await api.get(`/subject`)
         const textbooks = response.data.data || []
 
         // 학년과 과목에 맞는 교과서만 필터링
@@ -449,7 +451,7 @@ export const useTestBankStore = defineStore('testBank', {
      */
     async fetchChapters(subjectId) {
       try {
-        const response = await axios.get(`${API_BASE_URL}/api/chapter/${subjectId}/tree`)
+        const response = await api.get(`/chapter/${subjectId}/tree`)
         const chapters = response.data.data || []
 
         console.log('대단원 목록 로드:', chapters.length)

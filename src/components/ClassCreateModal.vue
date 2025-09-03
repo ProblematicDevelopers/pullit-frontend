@@ -140,7 +140,7 @@
 
 <script setup>
 import { ref, watch } from 'vue'
-import axios from 'axios'
+import api from '@/services/api'
 import { useToast } from '@/composables/useToast'
 
 const props = defineProps({
@@ -198,7 +198,7 @@ const handleSubmit = async () => {
     
     console.log('학급 생성 요청 데이터:', requestData)
     
-    const response = await axios.post('/api/classes/test', requestData) // 테스트용 엔드포인트 사용
+    const response = await api.post('/classes/test', requestData) // 테스트용 엔드포인트 사용
     
     if (response.data.success) {
       createdClass.value = response.data.data

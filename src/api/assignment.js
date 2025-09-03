@@ -1,11 +1,9 @@
-import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
+import api from '@/services/api.js'
 
 const assignmentApi = {
   // 선생님용 API
   createAssignment(formData) {
-    return axios.post(`${API_BASE_URL}/assignments`, formData, {
+    return api.post(`/assignments`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -13,7 +11,7 @@ const assignmentApi = {
   },
 
   updateAssignment(id, data, teacherId) {
-    return axios.put(`${API_BASE_URL}/assignments/${id}`, data, {
+    return api.put(`/assignments/${id}`, data, {
       headers: {
         'X-Teacher-Id': teacherId
       }
@@ -21,7 +19,7 @@ const assignmentApi = {
   },
 
   publishAssignment(id, teacherId) {
-    return axios.post(`${API_BASE_URL}/assignments/${id}/publish`, null, {
+    return api.post(`/assignments/${id}/publish`, null, {
       headers: {
         'X-Teacher-Id': teacherId
       }
@@ -29,7 +27,7 @@ const assignmentApi = {
   },
 
   deleteAssignment(id, teacherId) {
-    return axios.delete(`${API_BASE_URL}/assignments/${id}`, {
+    return api.delete(`/assignments/${id}`, {
       headers: {
         'X-Teacher-Id': teacherId
       }
@@ -37,14 +35,14 @@ const assignmentApi = {
   },
 
   getTeacherAssignments(teacherId, params = {}) {
-    return axios.get(`${API_BASE_URL}/assignments/teacher/${teacherId}`, {
+    return api.get(`/assignments/teacher/${teacherId}`, {
       params
     })
   },
 
   // 학생용 API
   getStudentAssignments(studentId, classIds) {
-    return axios.get(`${API_BASE_URL}/assignments/student/${studentId}`, {
+    return api.get(`/assignments/student/${studentId}`, {
       params: {
         classIds: classIds.join(',')
       }
@@ -53,11 +51,11 @@ const assignmentApi = {
 
   // 공통 API
   getAssignmentDetail(id) {
-    return axios.get(`${API_BASE_URL}/assignments/${id}`)
+    return api.get(`/assignments/${id}`)
   },
 
   getAssignmentFileDownloadUrl(assignmentId, fileId) {
-    return axios.get(`${API_BASE_URL}/assignments/${assignmentId}/files/${fileId}/download`)
+    return api.get(`/assignments/${assignmentId}/files/${fileId}/download`)
   }
 }
 
