@@ -293,11 +293,20 @@ export default {
         // 옵션을 수동으로 분리하는 방법
         const options = []
 
-        // 여러 패턴 시도
+        // 여러 패턴 시도 (국어 문제의 줄바꿈 고려)
         const patterns = [
-          /\((\d+)\)\s*([\s\S]*?)(?=\(\d+\)|$)/g,  // (1) 텍스트 (2) 텍스트
-          /(\d+)\.\s*([\s\S]*?)(?=\d+\.|$)/g,       // 1. 텍스트 2. 텍스트
-          /(\d+)\)\s*([\s\S]*?)(?=\d+\)|$)/g        // 1) 텍스트 2) 텍스트
+          // (1) 형태 - 괄호 안 숫자
+          /\((\d+)\)\s*([\s\S]*?)(?=\(\d+\)|$)/g,
+          // 1. 형태 - 한 줄에 여러 개 (우선 처리)
+          /(\d+)\.\s*([\s\S]*?)(?=\d+\.|$)/g,
+          // 1) 형태 - 한 줄에 여러 개 (우선 처리)
+          /(\d+)\)\s*([\s\S]*?)(?=\d+\)|$)/g,
+          // 1. 형태 - 점이 있는 숫자 (줄바꿈 고려)
+          /(\d+)\.\s*([\s\S]*?)(?=\n\s*\d+\.|$)/g,
+          // 1) 형태 - 괄호 밖 숫자 (줄바꿈 고려)
+          /(\d+)\)\s*([\s\S]*?)(?=\n\s*\d+\)|$)/g,
+          // HTML p 태그 형태
+          /<p>\s*(\d+)\.\s*([\s\S]*?)<\/p>/g
         ]
 
         for (const pattern of patterns) {
@@ -340,13 +349,20 @@ export default {
     const processedOptionsList = computed(() => {
       const options = splitOptions(props.editedTexts.options)
 
-      // MathJax가 로드되어 있으면 raw LaTeX 반환, 아니면 스타일링된 LaTeX 반환
-      if (window.MathJax && window.MathJax.startup) {
-        return options // raw LaTeX for MathJax processing
-      } else {
-        // MathJax가 없을 때 LaTeX 스타일링
-        return options.map(option => styleLatexCode(option))
-      }
+      // 각 옵션에 줄바꿈 처리 적용
+      const processedOptions = options.map(option => {
+        // 줄바꿈을 <br> 태그로 변환
+        const withLineBreaks = option.replace(/\n/g, '<br>')
+
+        // MathJax가 로드되어 있으면 raw LaTeX 반환, 아니면 스타일링된 LaTeX 반환
+        if (window.MathJax && window.MathJax.startup) {
+          return withLineBreaks // raw LaTeX for MathJax processing
+        } else {
+          return styleLatexCode(withLineBreaks)
+        }
+      })
+
+      return processedOptions
     })
 
     // 사용 가능한 영역 타입들
