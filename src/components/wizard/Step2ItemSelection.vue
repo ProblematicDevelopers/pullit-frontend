@@ -3400,13 +3400,22 @@ watch(items, async (newItems, oldItems) => {
   display: none !important;
 }
 
-/* 수식 이미지 제거 */
-.item-html :deep(img),
+/* 수식 이미지만 제거 (일반 이미지는 표시) */
+.item-html :deep(img[src*="latex"]),
+.item-html :deep(img[src*="math"]),
+.item-html :deep(img.mathjax),
 .passage-text :deep(img[src*="latex"]),
 .passage-text :deep(img[src*="math"]),
 .question-preview :deep(img[src*="latex"]),
 .question-preview :deep(img[src*="math"]) {
   display: none !important;
+}
+
+/* 문항 이미지는 명시적으로 표시 */
+.item-image img {
+  display: block !important;
+  max-width: 100%;
+  height: auto;
 }
 
 /* 수식 관련 요소 - 스크롤 가능하게 하되 컨테이너 내에서만 */
