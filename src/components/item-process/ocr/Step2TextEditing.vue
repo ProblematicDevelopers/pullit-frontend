@@ -248,15 +248,15 @@
 
             <!-- 보기 내용 (단순화된 구조) -->
             <div class="options-content">
-              <!-- 객관식일 때 번호와 함께 표시 -->
-              <div v-if="questionType === 'fiveChoice'" class="multiple-choice-options">
+              <!-- 보기가 분리된 경우 번호와 함께 표시 -->
+              <div v-if="optionsList.length > 0" class="multiple-choice-options">
                 <div v-for="(option, index) in optionsList" :key="index" class="option-item">
                   <span class="option-number">({{ index + 1 }})</span>
                   <span class="option-content" v-html="option"></span>
                 </div>
               </div>
 
-              <!-- 주관식일 때 일반 텍스트로 표시 -->
+              <!-- 보기가 분리되지 않은 경우 일반 텍스트로 표시 -->
               <div v-else class="subjective-options">
                 <div class="options-text" v-html="optionsPreview"></div>
               </div>
@@ -457,11 +457,20 @@ export default {
         // 옵션을 수동으로 분리하는 방법
         const options = []
 
-        // 여러 패턴 시도
+        // 여러 패턴 시도 (국어 문제의 줄바꿈 고려)
         const patterns = [
-          /\((\d+)\)\s*([\s\S]*?)(?=\(\d+\)|$)/g,  // (1) 텍스트 (2) 텍스트
-          /(\d+)\.\s*([\s\S]*?)(?=\d+\.|$)/g,       // 1. 텍스트 2. 텍스트
-          /(\d+)\)\s*([\s\S]*?)(?=\d+\)|$)/g        // 1) 텍스트 2) 텍스트
+          // (1) 형태 - 괄호 안 숫자
+          /\((\d+)\)\s*([\s\S]*?)(?=\(\d+\)|$)/g,
+          // 1. 형태 - 한 줄에 여러 개 (우선 처리)
+          /(\d+)\.\s*([\s\S]*?)(?=\d+\.|$)/g,
+          // 1) 형태 - 한 줄에 여러 개 (우선 처리)
+          /(\d+)\)\s*([\s\S]*?)(?=\d+\)|$)/g,
+          // 1. 형태 - 점이 있는 숫자 (줄바꿈 고려)
+          /(\d+)\.\s*([\s\S]*?)(?=\n\s*\d+\.|$)/g,
+          // 1) 형태 - 괄호 밖 숫자 (줄바꿈 고려)
+          /(\d+)\)\s*([\s\S]*?)(?=\n\s*\d+\)|$)/g,
+          // HTML p 태그 형태
+          /<p>\s*(\d+)\.\s*([\s\S]*?)<\/p>/g
         ]
 
         for (const pattern of patterns) {
@@ -507,12 +516,18 @@ export default {
       const optionsText = localEditedTexts.value.options
       const result = splitOptions(optionsText)
 
+      // 각 옵션에 줄바꿈 처리 적용
+      const processedResult = result.map(option => {
+        // 줄바꿈을 <br> 태그로 변환
+        return option.replace(/\n/g, '<br>')
+      })
+
       // optionsList가 변경될 때 MathJax 렌더링 실행
       nextTick(() => {
         renderOptionsMathJax()
       })
 
-      return result
+      return processedResult
     })
 
     // 선택된 보기 텍스트
