@@ -4,11 +4,11 @@
     <div class="utility-bar">
       <div class="utility-bar-content">
         <!-- Dev Toggle (temporary for testing) -->
-        <div class="dev-section">
-          <button @click="toggleUserType" class="dev-toggle" v-if="!isLoggedIn">
-            🎭 역할: {{ userType === 'teacher' ? '선생님' : '학생' }}
-          </button>
-        </div>
+<!--        <div class="dev-section">-->
+<!--          <button @click="toggleUserType" class="dev-toggle" v-if="!isLoggedIn">-->
+<!--            🎭 역할: {{ userType === 'teacher' ? '선생님' : '학생' }}-->
+<!--          </button>-->
+<!--        </div>-->
 
         <!-- Utility Links -->
         <div class="utility-links">
@@ -17,10 +17,6 @@
             <a href="#" @click.prevent="handleLogin" class="utility-link">로그인</a>
             <span class="utility-divider">|</span>
             <a href="#" @click.prevent="handleSignup" class="utility-link">회원가입</a>
-            <span class="utility-divider">|</span>
-            <a href="#" class="utility-link">고객센터</a>
-            <span class="utility-divider">|</span>
-            <a href="#" class="utility-link">사이트맵</a>
           </template>
 
           <!-- Logged in state -->
@@ -68,10 +64,6 @@
                 </div>
               </div>
             </div>
-            <span class="utility-divider">|</span>
-            <a href="#" class="utility-link">고객센터</a>
-            <span class="utility-divider">|</span>
-            <a href="#" class="utility-link">사이트맵</a>
           </template>
         </div>
       </div>
@@ -151,7 +143,7 @@
           <!-- Student-specific menu items -->
           <template v-else>
             <router-link
-              to="/student/dashboard"
+              to="/"
               class="nav-item"
               :class="{ active: isCurrentRoute('/student/dashboard') }"
             >
@@ -472,7 +464,7 @@ export default {
   margin: 0 auto;
   padding: 0;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   height: 100%;
 }

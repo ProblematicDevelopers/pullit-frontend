@@ -373,7 +373,8 @@ export const useItemSelectionStore = defineStore('itemSelection', {
           page: searchParams.page !== undefined ? searchParams.page : (this.currentPage - 1), // 0-based indexing
           size: searchParams.size || this.itemsPerPage,
           sortBy: this.sortBy,
-          sortDirection: this.sortOrder
+          sortDirection: this.sortOrder,
+          itemSource: searchParams.itemSource || 'REGULAR' // 문항 소스 추가
         }
 
         // 검색 기록에 추가

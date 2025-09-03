@@ -60,61 +60,58 @@
         <!-- 시험 이력 -->
         <div class="exam-history">
           <h3>시험 이력</h3>
-          <div class="history-chart">
-            <canvas ref="scoreChart"></canvas>
+          <div v-if="studentDetail.examHistory && studentDetail.examHistory.length > 0">
+            <div class="history-chart">
+              <canvas ref="scoreChart"></canvas>
+            </div>
+            
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>시험명</th>
+                  <th>날짜</th>
+                  <th>점수</th>
+                  <th>백분율</th>
+                  <th>등수</th>
+                  <th>소요시간</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="exam in studentDetail.examHistory" :key="exam.examId">
+                  <td>{{ exam.examName }}</td>
+                  <td>{{ formatDate(exam.examDate) }}</td>
+                  <td>{{ exam.score }}/{{ exam.totalPoints }}</td>
+                  <td>
+                    <span class="percentage-badge">{{ formatPercentage(exam.percentage) }}</span>
+                  </td>
+                  <td>{{ exam.rank }}/{{ exam.totalStudents }}</td>
+                  <td>{{ formatTime(exam.timeTaken) }}</td>
+                </tr>
+              </tbody>
+            </table>
           </div>
-          
-          <table class="history-table">
-            <thead>
-              <tr>
-                <th>시험명</th>
-                <th>날짜</th>
-                <th>점수</th>
-                <th>백분율</th>
-                <th>등수</th>
-                <th>소요시간</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr v-for="exam in studentDetail.examHistory" :key="exam.examId">
-                <td>{{ exam.examName }}</td>
-                <td>{{ formatDate(exam.examDate) }}</td>
-                <td>{{ exam.score }}/{{ exam.totalPoints }}</td>
-                <td>
-                  <span class="percentage-badge">{{ formatPercentage(exam.percentage) }}</span>
-                </td>
-                <td>{{ exam.rank }}/{{ exam.totalStudents }}</td>
-                <td>{{ formatTime(exam.timeTaken) }}</td>
-              </tr>
-            </tbody>
-          </table>
+          <div v-else class="empty-state">시험 이력 데이터가 없습니다.</div>
         </div>
 
-        <!-- 성과 분석 -->
-        <div v-if="studentDetail.analysis" class="performance-analysis">
-          <h3>성과 분석</h3>
+        <!-- 성과 분석: 성적 추이만 표시 -->
+        <div v-if="studentDetail.analysis && studentDetail.analysis.trend" class="performance-analysis">
+          <h3>성적 추이</h3>
           <div class="analysis-content">
             <div class="analysis-item">
-              <strong>성적 추이:</strong>
               <span :class="getTrendClass(studentDetail.analysis.trend)">
                 {{ getTrendText(studentDetail.analysis.trend) }}
-                ({{ formatTrendScore(studentDetail.analysis.trendScore) }})
+                <template v-if="studentDetail.analysis.trendScore !== undefined && studentDetail.analysis.trendScore !== null">
+                  ({{ formatTrendScore(studentDetail.analysis.trendScore) }})
+                </template>
               </span>
-            </div>
-            <div class="analysis-item">
-              <strong>강점:</strong>
-              <span>{{ studentDetail.analysis.strengths?.join(', ') || '-' }}</span>
-            </div>
-            <div class="analysis-item">
-              <strong>개선점:</strong>
-              <span>{{ studentDetail.analysis.weaknesses?.join(', ') || '-' }}</span>
-            </div>
-            <div class="analysis-item">
-              <strong>권장사항:</strong>
-              <span>{{ studentDetail.analysis.recommendation || '-' }}</span>
             </div>
           </div>
         </div>
+      </div>
+
+      <!-- 데이터 없음 상태 -->
+      <div v-else class="empty-state">
+        학생 성적 데이터가 없습니다.
       </div>
     </div>
   </div>
@@ -123,7 +120,7 @@
 <script>
 import { ref, onMounted, watch } from 'vue'
 import Chart from 'chart.js/auto'
-import api from '@/services/api'
+import { teacherStatsAPI } from '@/services/api'
 import classApi from '@/services/classApi'
 
 export default {
@@ -149,108 +146,23 @@ export default {
     const loadStudentDetail = async () => {
       loading.value = true
       try {
-        const response = await api.get(
-          `/teacher/stats/class/${props.classId}/student/${props.studentId}`
-        )
-        studentDetail.value = response.data.data
+        // 교사 성적 통계 API 사용
+        const response = await teacherStatsAPI.getStudentDetail(props.classId, props.studentId)
         
-        // 차트 그리기
-        if (studentDetail.value.examHistory && studentDetail.value.examHistory.length > 0) {
-          setTimeout(() => drawScoreChart(), 100)
+        if (response.data.success) {
+          studentDetail.value = response.data.data
+          
+          // 차트 그리기
+          if (studentDetail.value.examHistory && studentDetail.value.examHistory.length > 0) {
+            setTimeout(() => drawScoreChart(), 100)
+          }
+        } else {
+          throw new Error('Failed to load student detail')
         }
       } catch (error) {
         console.error('Failed to load student detail:', error)
-        // 개발 중 임시 데이터
-        studentDetail.value = {
-          studentId: props.studentId,
-          studentName: '김민수',
-          studentNo: '20240001',
-          grade: '고1',
-          schoolName: '서울고등학교',
-          summary: {
-            overallAverage: 85.5,
-            totalExamsTaken: 5,
-            averageRank: 3,
-            averagePercentile: 88.0,
-            overallGrade: 'B',
-            highestScore: 95,
-            lowestScore: 72
-          },
-          examHistory: [
-            {
-              examId: 1,
-              examName: '1차 중간고사',
-              examDate: new Date('2024-03-15'),
-              score: 85,
-              totalPoints: 100,
-              percentage: 85,
-              rank: 5,
-              totalStudents: 25,
-              percentile: 80,
-              timeTaken: 45
-            },
-            {
-              examId: 2,
-              examName: '단원평가 1',
-              examDate: new Date('2024-04-10'),
-              score: 92,
-              totalPoints: 100,
-              percentage: 92,
-              rank: 2,
-              totalStudents: 25,
-              percentile: 92,
-              timeTaken: 40
-            },
-            {
-              examId: 3,
-              examName: '1차 기말고사',
-              examDate: new Date('2024-05-20'),
-              score: 88,
-              totalPoints: 100,
-              percentage: 88,
-              rank: 3,
-              totalStudents: 25,
-              percentile: 88,
-              timeTaken: 50
-            },
-            {
-              examId: 4,
-              examName: '2차 중간고사',
-              examDate: new Date('2024-09-15'),
-              score: 95,
-              totalPoints: 100,
-              percentage: 95,
-              rank: 1,
-              totalStudents: 25,
-              percentile: 96,
-              timeTaken: 42
-            },
-            {
-              examId: 5,
-              examName: '단원평가 2',
-              examDate: new Date('2024-10-10'),
-              score: 72,
-              totalPoints: 100,
-              percentage: 72,
-              rank: 8,
-              totalStudents: 25,
-              percentile: 68,
-              timeTaken: 38
-            }
-          ],
-          analysis: {
-            trend: 'IMPROVING',
-            trendScore: 5.2,
-            strengths: ['문제 해결 능력', '시간 관리'],
-            weaknesses: ['응용 문제', '서술형 답안'],
-            recommendation: '기초 개념 복습 후 응용 문제 연습 권장'
-          }
-        }
-        
-        // 차트 그리기
-        if (studentDetail.value.examHistory && studentDetail.value.examHistory.length > 0) {
-          setTimeout(() => drawScoreChart(), 100)
-        }
+        // 더미 데이터 사용 금지: 데이터 없음 상태 유지
+        studentDetail.value = null
       } finally {
         loading.value = false
       }
@@ -614,5 +526,11 @@ export default {
 
 .trend-stable {
   color: #6b7280 !important;
+}
+
+.empty-state {
+  text-align: center;
+  color: #6b7280;
+  padding: 24px 0;
 }
 </style>
