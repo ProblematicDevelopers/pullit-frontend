@@ -1240,25 +1240,64 @@ export default {
     }
 
         // 선택지 HTML 파싱 함수
-    const parseChoicesFromOptions = (optionsHtml) => {
-      if (!optionsHtml) return []
+    const parseChoicesFromOptions = (optionsData) => {
+      if (!optionsData) {
+        console.log('parseChoicesFromOptions: optionsData가 없음')
+        return []
+      }
 
       try {
-        // HTML에서 (1), (2), (3), (4), (5) 패턴으로 선택지 추출
-        // HTML 태그를 고려한 더 정확한 정규식
-        const choices = []
-        const choicePattern = /\((\d+)\)\s*([\s\S]*?)(?=\(\d+\)|$)/g
-        let match
+        console.log('parseChoicesFromOptions 입력:', optionsData)
+        console.log('parseChoicesFromOptions 입력 타입:', typeof optionsData)
 
-        while ((match = choicePattern.exec(optionsHtml)) !== null) {
-          const choiceText = match[2].trim()
-          if (choiceText) {
-            choices.push(choiceText)
+        // 이미 배열인 경우 (["1", "2", "3", "4", "5"] 같은 경우)
+        if (Array.isArray(optionsData)) {
+          console.log('배열로 전달된 선택지 데이터:', optionsData)
+          // 숫자만 있는 배열인 경우 빈 배열 반환 (실제 선택지 텍스트가 아님)
+          if (optionsData.every(item => /^\d+$/.test(item))) {
+            console.log('숫자만 있는 배열이므로 빈 배열 반환')
+            return []
           }
+          // 실제 텍스트가 있는 배열인 경우 그대로 반환
+          return optionsData.filter(item => item && item.trim().length > 0).slice(0, 5)
         }
 
-        console.log('파싱된 선택지:', choices)
-        return choices.slice(0, 5) // 최대 5개
+        // 문자열인 경우 HTML 파싱 시도
+        if (typeof optionsData === 'string') {
+          const choices = []
+
+          // 여러 패턴 시도
+          const patterns = [
+            /\((\d+)\)\s*([\s\S]*?)(?=\(\d+\)|$)/g,  // (1) 텍스트 (2) 텍스트
+            /(\d+)\.\s*([\s\S]*?)(?=\d+\.|$)/g,       // 1. 텍스트 2. 텍스트
+            /(\d+)\)\s*([\s\S]*?)(?=\d+\)|$)/g        // 1) 텍스트 2) 텍스트
+          ]
+
+          for (const pattern of patterns) {
+            let match
+            pattern.lastIndex = 0 // 정규식 인덱스 리셋
+
+            while ((match = pattern.exec(optionsData)) !== null) {
+              const choiceNumber = match[1]
+              const choiceText = match[2]?.trim()
+
+              // 1-5번까지만 처리 (6번 이상은 무시)
+              if (choiceNumber && parseInt(choiceNumber) <= 5 && choiceText && choiceText.length > 0) {
+                choices.push(choiceText)
+              }
+            }
+
+            if (choices.length > 0) {
+              break // 패턴이 매치되면 다른 패턴은 시도하지 않음
+            }
+          }
+
+          console.log('문자열에서 파싱된 선택지:', choices)
+          return choices.slice(0, 5) // 최대 5개
+        }
+
+        console.log('알 수 없는 데이터 타입:', typeof optionsData)
+        return []
       } catch (error) {
         console.warn('선택지 파싱 실패:', error)
         return []
@@ -1361,11 +1400,22 @@ export default {
             console.log('문항 변환 시작:', processedItemId)
 
                         // HTML 에디터 데이터 구성
+            const parsedChoices = parseChoicesFromOptions(itemData.editedTexts?.options) || []
+
+            // 정답 텍스트 추출 (정답 번호가 아닌 실제 정답 텍스트)
+            let answerText = null
+            if (itemData.answer && parsedChoices.length > 0) {
+              const answerIndex = parseInt(itemData.answer) - 1 // 1-based를 0-based로 변환
+              if (answerIndex >= 0 && answerIndex < parsedChoices.length) {
+                answerText = parsedChoices[answerIndex]
+              }
+            }
+
             const htmlPayload = {
               passageHtml: itemData.editedTexts?.passage || itemData.editedTexts?.question || null,
               questionHtml: itemData.editedTexts?.problem || null,
-              choicesHtml: parseChoicesFromOptions(itemData.editedTexts?.options),
-              answerHtml: itemData.answer || null,
+              choicesHtml: parsedChoices,
+              answerHtml: answerText || itemData.answer || null,
               explainHtml: itemData.editedTexts?.explanation || itemData.explanation || null
             }
 

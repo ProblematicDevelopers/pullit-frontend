@@ -11,67 +11,6 @@
 
       <!-- 최종 확인 섹션 -->
       <div class="confirmation-sections">
-        <!-- 선택된 영역 요약 -->
-        <div class="confirmation-section">
-          <h5 class="section-title">
-            <i class="bi bi-check-circle me-2"></i>선택된 영역 요약
-          </h5>
-          <div class="area-summary">
-            <div class="row g-3">
-              <div
-                v-for="areaType in availableAreaTypes"
-                :key="areaType"
-                class="col-md-6"
-              >
-                <div class="area-summary-item" :class="{ required: isRequired(areaType) }">
-                  <div class="area-header">
-                    <i :class="getAreaIcon(areaType)" class="me-2"></i>
-                    <span class="area-name">{{ getAreaTypeLabel(areaType) }}</span>
-                    <span v-if="isRequired(areaType)" class="badge bg-danger ms-2">필수</span>
-                    <span v-else class="badge bg-secondary ms-2">선택</span>
-                  </div>
-                  <div class="area-status">
-                    <span v-if="selectedAreas[areaType]" class="status-success">
-                      <i class="bi bi-check-circle-fill me-2"></i>선택 완료
-                    </span>
-                    <span v-else class="status-missing">
-                      <i class="bi bi-x-circle me-2"></i>미선택
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <!-- 편집된 텍스트 요약 -->
-        <div class="confirmation-section">
-          <h5 class="section-title">
-            <i class="bi bi-file-text me-2"></i>편집된 텍스트 요약
-          </h5>
-          <div class="text-summary">
-            <div
-              v-for="areaType in availableAreaTypes"
-              :key="areaType"
-              class="text-summary-item"
-            >
-              <div class="text-header">
-                <i :class="getAreaIcon(areaType)" class="me-2"></i>
-                <span class="text-name">{{ getAreaTypeLabel(areaType) }}</span>
-                <span class="text-length">{{ editedTexts[areaType]?.length || 0 }}자</span>
-              </div>
-              <div class="text-preview">
-                <div v-if="editedTexts[areaType]" class="text-content">
-                  {{ getTextPreview(editedTexts[areaType]) }}
-                </div>
-                <div v-else class="no-text">
-                  <i class="bi bi-exclamation-circle text-muted"></i>
-                  <span class="text-muted">편집된 텍스트가 없습니다.</span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
 
         <!-- 문제 정보 요약 -->
         <div class="confirmation-section">
@@ -103,8 +42,7 @@
           </div>
         </div>
       </div>
-
-      <!-- 문제 미리보기 -->
+         <!-- 문제 미리보기 -->
       <div class="problem-preview-section">
         <h5 class="section-title">
           <i class="bi bi-eye me-2"></i>문제 미리보기
@@ -112,6 +50,14 @@
         <div class="problem-preview-content">
           <!-- 실제 문제처럼 표시 -->
           <div class="problem-display">
+            <!-- 이미지 영역 -->
+            <div v-if="safeCaptureFullImg" class="image-section d-flex justify-content-center">
+              <div class="image-content">
+                <img :src="safeCaptureFullImg" alt="문제 이미지" class="problem-image" />
+                <div class="text-xs text-secondary">[문제 원본 이미지]</div>
+              </div>
+
+            </div>
             <!-- 지문 영역 -->
             <div v-if="editedTexts.question" class="passage-section">
               <div class="passage-content" v-html="editedTexts.question"></div>
@@ -120,13 +66,6 @@
             <!-- 문제 영역 -->
             <div v-if="editedTexts.problem" class="problem-section">
               <div class="problem-content" v-html="editedTexts.problem"></div>
-            </div>
-
-            <!-- 이미지 영역 -->
-            <div v-if="safeCaptureFullImg" class="image-section">
-              <div class="image-content">
-                <img :src="safeCaptureFullImg" alt="문제 이미지" class="problem-image" />
-              </div>
             </div>
 
             <!-- 보기 영역 -->
@@ -141,6 +80,7 @@
           </div>
         </div>
       </div>
+
 
       <!-- 정답 및 해설 정보 -->
       <div class="answer-explanation-section">
@@ -160,8 +100,8 @@
                 <label class="info-label">해설</label>
                 <div class="info-value">
                   <div v-if="itemInfo.explanation && itemInfo.explanation.trim()"
-                       class="explanation-content"
-                       v-html="itemInfo.explanation"></div>
+                       class="explanation-content tex2jax_process"
+                       v-html="explanationPreviewHtml || itemInfo.explanation"></div>
                   <div v-else class="text-muted">해설이 입력되지 않았습니다.</div>
                 </div>
               </div>
@@ -169,6 +109,69 @@
           </div>
         </div>
       </div>
+<!-- 선택된 영역 요약 -->
+<div class="confirmation-section">
+          <h5 class="section-title">
+            <i class="bi bi-check-circle me-2"></i>선택된 영역 요약
+          </h5>
+          <div class="area-summary">
+            <div class="row g-3">
+              <div
+                v-for="areaType in availableAreaTypes"
+                :key="areaType"
+                class="col-md-6"
+              >
+                <div class="area-summary-item" :class="{ required: isRequired(areaType) }">
+                  <div class="area-header">
+                    <i :class="getAreaIcon(areaType)" class="me-2"></i>
+                    <span class="area-name">{{ getAreaTypeLabel(areaType) }}</span>
+                    <span v-if="isRequired(areaType)" class="badge bg-danger ms-2">필수</span>
+                    <span v-else class="badge bg-secondary ms-2">선택</span>
+                  </div>
+                  <div class="area-status">
+                    <span v-if="selectedAreas[areaType]" class="status-success">
+                      <i class="bi bi-check-circle-fill me-2"></i>선택 완료
+                    </span>
+                    <span v-else class="status-missing">
+                      <i class="bi bi-x-circle me-2"></i>미선택
+                    </span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <!-- 편집된 텍스트 요약 -->
+        <div class="confirmation-section">
+          <h5 class="section-title">
+            <i class="bi bi-file-text me-2"></i>편집된 텍스트 요약
+          </h5>
+          <div class="text-summary">
+            <div
+              v-for="areaType in availableAreaTypes"
+              :key="areaType"
+              class="text-summary-item"
+            >
+              <div class="text-header">
+                <i :class="getAreaIcon(areaType)" class="me-2"></i>
+                <span class="text-name">{{ getAreaTypeLabel(areaType) }}</span>
+                <span class="text-length">{{ editedTexts[areaType]?.length || 0 }}자</span>
+              </div>
+              <div class="text-preview">
+                <div v-if="editedTexts[areaType]" class="text-content">
+                  {{ getTextPreview(editedTexts[areaType]) }}
+                </div>
+                <div v-else class="no-text">
+                  <i class="bi bi-exclamation-circle text-muted"></i>
+                  <span class="text-muted">편집된 텍스트가 없습니다.</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+
+
 
       <!-- 유효성 검사 결과 -->
       <div v-if="validationErrors.length > 0" class="validation-errors">
@@ -257,34 +260,71 @@ export default {
       return props.captureFullImg || ''
     })
 
-    // LaTeX 코드를 스타일링하는 함수
-    const styleLatexCode = (text) => {
-      if (!text) return text
+    // LaTeX 코드를 스타일링하는 함수 (MathJax가 로드되지 않은 경우)
+    const styleLatexCode = (content) => {
+      let result = content
 
-      // $...$ 패턴을 찾아서 스타일링
-      return text.replace(/\$([^$]+)\$/g, '<span class="math-latex">$$1$</span>')
-                 .replace(/\\[a-zA-Z]+/g, '<span class="math-latex">$&</span>')
+      // $$...$$ 패턴 (display mode)
+      result = result.replace(/\$\$([^$]+?)\$\$/g, '<div class="latex-code-display">$$$1$$</div>')
+
+      // $...$ 패턴 (inline mode)
+      result = result.replace(/\$([^$\n]+?)\$/g, '<span class="latex-code-inline">$$1$</span>')
+
+      // \(...\) 패턴 (inline mode) - 원본 LaTeX 유지
+      result = result.replace(/\\\(([^)]+?)\\\)/g, '<span class="latex-code-inline">\\($1\\)</span>')
+
+      // \[...\] 패턴 (display mode) - 원본 LaTeX 유지
+      result = result.replace(/\\\[([^\]]+?)\\\]/g, '<div class="latex-code-display">\\[$1\\]</div>')
+
+      // math-latex 클래스가 있는 span 태그 처리
+      result = result.replace(/<span class="math-latex"[^>]*data-latex="([^"]*)"[^>]*>([^<]*)<\/span>/g,
+        '<span class="latex-code-inline" data-latex="$1">$2</span>')
+
+      return result
     }
 
     // 보기 텍스트를 항목별로 분리하는 함수
     const splitOptions = (optionsText) => {
       if (!optionsText) return []
 
-      // 옵션을 수동으로 분리하는 방법
-      const options = []
-      const parts = optionsText.split(/(?=\(\d+\))/g) // (숫자) 앞에서 분리
+      try {
+        console.log('splitOptions 입력:', optionsText)
 
-      for (const part of parts) {
-        if (part.trim()) {
-          // (숫자) 부분을 제거하고 나머지 내용만 추출
-          const content = part.replace(/\(\d+\)\s*/, '').trim()
-          if (content) {
-            options.push(content)
+        // 옵션을 수동으로 분리하는 방법
+        const options = []
+
+        // 여러 패턴 시도
+        const patterns = [
+          /\((\d+)\)\s*([\s\S]*?)(?=\(\d+\)|$)/g,  // (1) 텍스트 (2) 텍스트
+          /(\d+)\.\s*([\s\S]*?)(?=\d+\.|$)/g,       // 1. 텍스트 2. 텍스트
+          /(\d+)\)\s*([\s\S]*?)(?=\d+\)|$)/g        // 1) 텍스트 2) 텍스트
+        ]
+
+        for (const pattern of patterns) {
+          let match
+          pattern.lastIndex = 0 // 정규식 인덱스 리셋
+
+          while ((match = pattern.exec(optionsText)) !== null) {
+            const choiceNumber = match[1]
+            const choiceText = match[2]?.trim()
+
+            // 1-5번까지만 처리 (6번 이상은 무시)
+            if (choiceNumber && parseInt(choiceNumber) <= 5 && choiceText && choiceText.length > 0) {
+              options.push(choiceText)
+            }
+          }
+
+          if (options.length > 0) {
+            break // 패턴이 매치되면 다른 패턴은 시도하지 않음
           }
         }
-      }
 
-      return options
+        console.log('splitOptions 결과:', options)
+        return options
+      } catch (error) {
+        console.warn('선택지 파싱 실패:', error)
+        return []
+      }
     }
 
     // 보기 텍스트를 줄바꿈이 포함된 형태로 변환하는 함수
@@ -296,19 +336,16 @@ export default {
       return options.join('\n')
     }
 
-    // 처리된 보기 목록 (MathJax 렌더링을 위해 raw LaTeX 반환)
+    // 처리된 보기 목록 (Step3와 동일한 로직)
     const processedOptionsList = computed(() => {
       const options = splitOptions(props.editedTexts.options)
-      // MathJax가 로드되어 있으면 raw LaTeX 반환, 아니면 styled LaTeX 반환
+
+      // MathJax가 로드되어 있으면 raw LaTeX 반환, 아니면 스타일링된 LaTeX 반환
       if (window.MathJax && window.MathJax.startup) {
-        return options
+        return options // raw LaTeX for MathJax processing
       } else {
-        return options.map(option => {
-          if (option && (option.includes('$') || option.includes('\\'))) {
-            return styleLatexCode(option)
-          }
-          return option
-        })
+        // MathJax가 없을 때 LaTeX 스타일링
+        return options.map(option => styleLatexCode(option))
       }
     })
 
@@ -537,29 +574,182 @@ export default {
 
 
 
-    // MathJax 렌더링 함수
-    const renderMathJaxInPreview = async () => {
-      try {
-        await waitForMathJax()
+    // MathJax 로드 확인 및 로드 함수 (Step3와 동일)
+    const ensureMathJaxLoaded = async () => {
+      await waitForMathJax()
 
-        // 문제 미리보기 영역의 MathJax 렌더링
-        const previewElements = document.querySelectorAll('.passage-content, .problem-content, .option-content, .explanation-content')
-        console.log(`Step4 미리보기 영역 ${previewElements.length}개 발견`)
-
-        for (const element of previewElements) {
-          if (element.innerHTML && (element.innerHTML.includes('$') || element.innerHTML.includes('\\'))) {
-            console.log('Step4 미리보기 영역 MathJax 렌더링 시작:', element.className)
-
-            try {
-              await renderMathJax(element, { clearFirst: false })
-              console.log('Step4 미리보기 영역 MathJax 렌더링 성공')
-            } catch (error) {
-              console.warn('Step4 미리보기 영역 MathJax 렌더링 실패:', error)
-            }
+      // MathJax 설정 강제 적용 (LaTeX 패턴 인식)
+      if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+        // MathJax 설정 강제 적용
+        window.MathJax.config = {
+          tex: {
+            inlineMath: [['$', '$'], ['\\(', '\\)']],
+            displayMath: [['$$', '$$'], ['\\[', '\\]']],
+            processEscapes: true,
+            processEnvironments: true,
+            packages: ['base', 'ams', 'noerrors', 'noundefined']
+          },
+          options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+            ignoreHtmlClass: 'tex2jax_ignore',
+            processHtmlClass: 'tex2jax_process'
           }
         }
+
+        // MathJax 문서 재설정
+        if (window.MathJax.startup.document) {
+          window.MathJax.startup.document.clear()
+          window.MathJax.startup.document.updateDocument()
+        }
+
+        console.log('Step4 MathJax LaTeX 설정 강제 적용 및 문서 재설정 완료')
+      }
+    }
+
+    // MathJax 로드 상태 추적 (Step3와 동일)
+    const mathJaxLoaded = computed(() => {
+      return !!(window.MathJax && window.MathJax.startup && window.MathJax.startup.document)
+    })
+
+    // 해설 미리보기 (MathJax 렌더링 적용)
+    const explanationPreviewHtml = ref('')
+
+    // 해설 내용이 변경될 때마다 미리보기 업데이트
+    watch(() => props.itemInfo.explanation, async (newExplanation) => {
+      if (newExplanation && newExplanation.trim()) {
+        try {
+          const rendered = await renderLatexContent(newExplanation)
+          explanationPreviewHtml.value = rendered
+        } catch (error) {
+          console.warn('Step4 해설 미리보기 렌더링 실패:', error)
+          explanationPreviewHtml.value = styleLatexCode(newExplanation)
+        }
+      } else {
+        explanationPreviewHtml.value = ''
+      }
+    }, { immediate: true })
+
+    // LaTeX 수식을 MathJax로 렌더링하는 함수 (Step3와 동일)
+    const renderLatexContent = async (content) => {
+      console.log('Step4 renderLatexContent 호출됨:', {
+        content,
+        type: typeof content,
+        length: content ? content.length : 0,
+        hasLatex: content ? (content.includes('$') || content.includes('\\')) : false
+      })
+
+      if (!content || typeof content !== 'string') {
+        console.log('Step4 content가 유효하지 않음:', content)
+        return ''
+      }
+
+      try {
+        // MathJax가 로드되었는지 확인
+        console.log('Step4 MathJax 상태 확인:', {
+          mathJaxExists: !!window.MathJax,
+          startupExists: !!(window.MathJax && window.MathJax.startup)
+        })
+
+        if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+          console.log('Step4 MathJax 사용하여 렌더링 시작')
+
+          // 임시 div에 수식 렌더링
+          const tempDiv = document.createElement('div')
+          tempDiv.innerHTML = content
+          tempDiv.style.position = 'absolute'
+          tempDiv.style.left = '-9999px'
+          tempDiv.style.visibility = 'hidden'
+          document.body.appendChild(tempDiv)
+
+          try {
+            // MathJax로 렌더링
+            await renderMathJax(tempDiv, { clearFirst: false })
+            console.log('Step4 MathJax 렌더링 성공')
+
+            // 렌더링된 HTML 가져오기
+            const result = tempDiv.innerHTML
+
+            // 임시 div 제거
+            document.body.removeChild(tempDiv)
+
+            console.log('Step4 최종 렌더링 결과:', result)
+            return result
+
+          } catch (renderError) {
+            console.warn('Step4 MathJax 렌더링 실패:', renderError)
+            document.body.removeChild(tempDiv)
+
+            // 렌더링 실패 시 LaTeX 코드를 스타일링하여 표시
+            return styleLatexCode(content)
+          }
+        } else {
+          console.log('Step4 MathJax가 로드되지 않음, LaTeX 코드 스타일링 적용')
+          return styleLatexCode(content)
+        }
       } catch (error) {
-        console.error('Step4 MathJax 렌더링 중 오류:', error)
+        console.warn('Step4 LaTeX 렌더링 함수 오류:', error)
+        return styleLatexCode(content)
+      }
+    }
+
+    // MathJax 렌더링 함수 (Step3와 동일한 로직)
+    const renderMathJaxInPreview = async () => {
+      try {
+        // MathJax 로드 대기
+        await waitForMathJax()
+
+        console.log('Step4 미리보기 MathJax 렌더링 시작')
+
+        // DOM이 완전히 업데이트될 때까지 대기
+        await nextTick()
+        await new Promise(resolve => setTimeout(resolve, 100))
+
+        // 미리보기 영역 요소들 찾기
+        const previewElements = document.querySelectorAll('.passage-content, .problem-content, .option-content, .explanation-content')
+        console.log(`Step4 미리보기 영역 ${previewElements.length}개 발견:`, Array.from(previewElements).map(el => el.className))
+
+        for (const element of previewElements) {
+          console.log('Step4 미리보기 영역 요소 검사:', element.className, element.innerHTML.substring(0, 100))
+
+          if (element.innerHTML && (element.innerHTML.includes('$') || element.innerHTML.includes('\\'))) {
+            console.log('Step4 미리보기 영역 렌더링 시작:', element.className)
+
+            // MathJax 설정 재확인
+            if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+              // MathJax 문서 업데이트
+              window.MathJax.startup.document.updateDocument()
+
+              // 강제 렌더링 시도
+              try {
+                await window.MathJax.typesetPromise([element])
+                console.log('Step4 미리보기 영역 MathJax 강제 렌더링 성공:', element.className)
+              } catch (error) {
+                console.warn('Step4 미리보기 영역 MathJax 강제 렌더링 실패, 기본 렌더링 시도:', error)
+                await renderMathJax(element, { clearFirst: false })
+              }
+            } else {
+              await renderMathJax(element, { clearFirst: false })
+            }
+          } else {
+            console.log('Step4 미리보기 영역 요소에 LaTeX 없음:', element.className)
+          }
+        }
+
+        // 전체 미리보기 컨테이너도 렌더링
+        const previewContainer = document.querySelector('.problem-display')
+        if (previewContainer) {
+          console.log('Step4 미리보기 컨테이너 렌더링 시도')
+          try {
+            await renderMathJax(previewContainer, { clearFirst: false })
+            console.log('Step4 미리보기 컨테이너 렌더링 성공')
+          } catch (error) {
+            console.warn('Step4 미리보기 컨테이너 렌더링 실패:', error)
+          }
+        }
+
+        console.log('Step4 미리보기 MathJax 렌더링 완료')
+      } catch (error) {
+        console.error('Step4 미리보기 MathJax 렌더링 중 오류:', error)
       }
     }
 
@@ -590,8 +780,15 @@ export default {
       }
     })
 
-    // 컴포넌트 마운트 시 MathJax 렌더링
+    // 컴포넌트 마운트 시 MathJax 초기화 및 렌더링
     onMounted(async () => {
+      try {
+        await ensureMathJaxLoaded()
+        console.log('Step4 MathJax 초기화 완료')
+      } catch (error) {
+        console.warn('Step4 MathJax 초기화 실패:', error)
+      }
+
       await nextTick()
       await renderMathJaxInPreview()
     })
@@ -613,7 +810,11 @@ export default {
       renderMathJaxInPreview,
       styleLatexCode,
       safeCaptureFullImg,
-      formatOptionsWithLineBreaks
+      formatOptionsWithLineBreaks,
+      mathJaxLoaded,
+      explanationPreviewHtml,
+      renderLatexContent,
+      ensureMathJaxLoaded
     }
   }
 }
@@ -970,6 +1171,38 @@ export default {
   padding: 0.25em 0.5em;
   border-radius: 0.25em;
   font-family: monospace;
+}
+
+/* LaTeX 코드 스타일링 (MathJax가 로드되지 않은 경우) */
+.latex-code-display {
+  display: block;
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  font-family: 'Times New Roman', serif;
+  color: #1e40af;
+  text-align: center;
+  font-size: 1.1em;
+}
+
+.latex-code-inline {
+  display: inline;
+  padding: 2px 4px;
+  background: #f0f8ff;
+  border: 1px solid #d0e7ff;
+  border-radius: 3px;
+  font-family: 'Times New Roman', serif;
+  color: #1e40af;
+  font-size: 0.9em;
+  margin: 0 1px;
+}
+
+.latex-command {
+  color: #dc2626;
+  font-weight: bold;
+  font-family: 'Courier New', monospace;
 }
 
 

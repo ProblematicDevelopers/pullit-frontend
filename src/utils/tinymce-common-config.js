@@ -1,6 +1,24 @@
 // TinyMCE 공통 설정 및 도구 유틸리티
 import katex from 'katex'
 
+/**
+ * TinyMCE 이미지 업로드 기능이 포함된 에디터 설정 생성
+ * 
+ * @example
+ * // 이미지 업로드 기능과 함께 에디터 설정 (사용자 기반)
+ * const editorConfig = createCommonEditorConfig({
+ *   enableImageUpload: true, // 이미지 업로드 활성화 (인증된 사용자 자동 처리)
+ *   height: 400
+ * })
+ * 
+ * @example
+ * // 기본 에디터 설정 (이미지 업로드 없음)
+ * const editorConfig = createCommonEditorConfig({
+ *   height: 300,
+ *   enableMathTools: true
+ * })
+ */
+
 // 공통 에디터 설정
 export const createCommonEditorConfig = (options = {}) => {
   const {
@@ -144,22 +162,38 @@ export const createCommonEditorConfig = (options = {}) => {
     }
   }
 
-  // 이미지 업로드 핸들러 추가
+  // TinyMCE 이미지 업로드 핸들러 (백엔드 API 사용 - 사용자 기반)
   if (options.enableImageUpload) {
-    config.images_upload_handler = (blobInfo) => {
-      return new Promise((resolve, reject) => {
+    config.images_upload_handler = async (blobInfo, progress) => {
+      // 동적 import로 api 인스턴스 가져오기 (순환 참조 방지)
+      const { default: api } = await import('@/services/api')
+      
+      return new Promise(async (resolve, reject) => {
         try {
-          const reader = new FileReader()
-          reader.onload = () => {
-            const base64Data = reader.result
-            resolve(base64Data)
+          const formData = new FormData()
+          formData.append('file', blobInfo.blob(), blobInfo.filename())
+
+          const response = await api.post('/file-history/tinymce-upload', formData)
+          
+          if (response.data.success && response.data.data) {
+            resolve(response.data.data) // 프록시 URL 반환
+          } else {
+            throw new Error(response.data.message || '이미지 업로드 실패')
           }
-          reader.readAsDataURL(blobInfo.blob())
         } catch (error) {
-          reject(error)
+          console.error('TinyMCE image upload failed:', error)
+          const errorMsg = error.response?.data?.message || error.message || '이미지 업로드 실패'
+          reject(errorMsg)
         }
       })
     }
+
+    // 이미지 업로드 관련 설정
+    config.paste_data_images = false // data: URL 비허용 (보안)
+    config.automatic_uploads = true // 자동 업로드 활성화
+    config.images_reuse_filename = true // 파일명 재사용
+    config.images_file_types = 'jpeg,jpg,png,gif,webp,svg' // 허용 파일 타입
+    config.cache_suffix = '' // 캐시 접미사 제거로 presigned URL 보호
   }
 
   return config
