@@ -222,8 +222,11 @@
       <button class="btn-secondary" @click="handleBack">
         이전 단계
       </button>
-      <button class="btn-primary" @click="handleNext" :disabled="items.length === 0">
-        다음 단계 (저장)
+      <button class="btn-primary btn-next-step" @click="handleNext" :disabled="items.length === 0">
+        <span class="btn-text">다음 단계</span>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" class="btn-icon">
+          <path d="M5 12H19M19 12L12 5M19 12L12 19" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </button>
     </div>
     
@@ -900,6 +903,39 @@ onMounted(() => {
 .btn-primary:disabled {
   opacity: 0.5;
   cursor: not-allowed;
+}
+
+/* 다음 단계 버튼 특별 스타일 */
+.btn-next-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  background: #3B82F6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.btn-next-step:hover:not(:disabled) {
+  background: #2563EB;
+}
+
+.btn-next-step:disabled {
+  background: #9CA3AF;
+  cursor: not-allowed;
+}
+
+.btn-next-step .btn-icon {
+  transition: transform 0.2s ease;
+}
+
+.btn-next-step:hover:not(:disabled) .btn-icon {
+  transform: translateX(2px);
 }
 
 /* MathJax 렌더링 스타일 */

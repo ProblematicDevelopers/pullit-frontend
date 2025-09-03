@@ -184,30 +184,105 @@
             </h6>
 
             <div v-show="showExplanationEditor" class="explanation-editor">
-              <!-- TinyMCE 에디터 -->
-              <div class="editor-container">
-                <Editor
-                  :key="explanationEditorKey"
-                  :api-key="tinymceApiKey"
-                  :model-value="problemInfo.explanation"
-                  @update:model-value="updateExplanation"
-                  :init="explanationEditorConfig"
-                  class="explanation-tinymce-editor"
-                />
-              </div>
+              <div class="editor-with-tools">
+                <!-- 에디터 섹션 -->
+                <div class="editor-panel">
+                  <div class="editor-header">
+                    <h6 class="editor-title">해설 에디터</h6>
+                  </div>
+                  <div class="editor-content">
+                    <Editor
+                      :key="explanationEditorKey"
+                      :api-key="tinymceApiKey"
+                      :model-value="problemInfo.explanation"
+                      @update:model-value="updateExplanation"
+                      @init="onEditorInit"
+                      :init="explanationEditorConfig"
+                      class="explanation-tinymce-editor"
+                    />
+                  </div>
+                </div>
 
-              <!-- 수식 도구 -->
-              <div class="math-tools-section">
-                <h6>수식 도구</h6>
-                <div class="math-buttons">
-                  <button @click="insertMathToExplanation('+')" class="math-btn">덧셈</button>
-                  <button @click="insertMathToExplanation('-')" class="math-btn">뺄셈</button>
-                  <button @click="insertMathToExplanation('\\times')" class="math-btn">곱셈</button>
-                  <button @click="insertMathToExplanation('\\div')" class="math-btn">나눗셈</button>
-                  <button @click="insertMathToExplanation('\\sqrt{}')" class="math-btn">제곱근</button>
-                  <button @click="insertMathToExplanation('^{}')" class="math-btn">지수</button>
-                  <button @click="insertMathToExplanation('\\log')" class="math-btn">로그</button>
-                  <button @click="insertMathToExplanation('\\int')" class="math-btn">적분</button>
+                <!-- 우측 도구 패널 -->
+                <div class="right-tools-panel">
+                  <div class="tool-tabs">
+                    <button
+                      @click="activeToolTab = 'math'"
+                      class="tool-tab"
+                      :class="{ active: activeToolTab === 'math' }"
+                    >
+                      <i class="bi bi-calculator me-2"></i>수식
+                    </button>
+                    <button
+                      @click="activeToolTab = 'preview'"
+                      class="tool-tab"
+                      :class="{ active: activeToolTab === 'preview' }"
+                    >
+                      <i class="bi bi-eye me-2"></i>미리보기
+                    </button>
+                  </div>
+
+                  <!-- 수식 도구 탭 -->
+                  <div v-if="activeToolTab === 'math'" class="tool-content">
+                    <div class="math-tools">
+                      <div class="tool-section">
+                        <h6 class="tool-section-title">수식 검색</h6>
+                        <input
+                          v-model="mathSearch"
+                          type="text"
+                          placeholder="덧셈, 방정식, 분수..."
+                          class="form-control form-control-sm"
+                        />
+                        <!-- 검색 결과 -->
+                        <div class="search-results mt-2" v-if="filteredMathTemplates.length > 0 && mathSearch">
+                          <div
+                            v-for="template in filteredMathTemplates"
+                            :key="template.id"
+                            @click="insertMath(template.latex)"
+                            class="search-result-item small p-2 border rounded mb-1"
+                          >
+                            <div class="template-name fw-semibold">{{ template.name }}</div>
+                            <div class="template-preview text-muted">{{ template.preview }}</div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="tool-section">
+                        <h6 class="tool-section-title">수식 입력</h6>
+                        <div class="math-buttons">
+                          <button @click="insertMath('+')" class="math-btn">덧셈</button>
+                          <button @click="insertMath('-')" class="math-btn">뺄셈</button>
+                          <button @click="insertMath('\\times')" class="math-btn">곱셈</button>
+                          <button @click="insertMath('\\div')" class="math-btn">나눗셈</button>
+                          <button @click="insertMath('\\sqrt{}')" class="math-btn">제곱근</button>
+                          <button @click="insertMath('^{}')" class="math-btn">지수</button>
+                          <button @click="insertMath('\\log')" class="math-btn">로그</button>
+                          <button @click="insertMath('\\int')" class="math-btn">적분</button>
+                        </div>
+                      </div>
+
+                      <div class="tool-section">
+                        <h6 class="tool-section-title">(LaTeX) 미리보기</h6>
+                        <div class="latex-preview" v-html="mathPreviewHtml"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 미리보기 탭 -->
+                  <div v-if="activeToolTab === 'preview'" class="tool-content">
+                    <div class="preview-tools">
+                      <h6 class="tool-section-title">해설 미리보기</h6>
+                      <div class="preview-content">
+                        <div v-if="explanationPreviewHtml && explanationPreviewHtml.trim()"
+                             class="explanation-preview-content tex2jax_process"
+                             v-html="explanationPreviewHtml"></div>
+                        <div v-else class="no-explanation">
+                          <i class="bi bi-info-circle me-2"></i>
+                          해설을 입력해주세요
+                        </div>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -221,12 +296,13 @@
 </template>
 
 <script>
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, watch, onMounted, nextTick, markRaw } from 'vue'
 import Editor from '@tinymce/tinymce-vue'
 import chapterApi from '@/services/chapterApi'
 import { useSubjectStore } from '@/store/subjectStore.js'
 import { fileHistoryAPI } from '@/services/fileHistoryApi.js'
 import { renderMathJax, waitForMathJax } from '@/utils/mathjax'
+import { createCommonEditorConfig, getTinyMCEApiKey } from '@/utils/tinymce-common-config'
 
 export default {
   name: 'Step3InfoInput',
@@ -268,6 +344,14 @@ export default {
     'update:chapters'
   ],
   setup(props, { emit }) {
+    // 도구 탭 상태
+    const activeToolTab = ref('math')
+
+    // Math tools (Step2와 동일)
+    const mathSearch = ref('')
+    const currentMathLatex = ref('')
+    const editorInstance = ref(null)
+
     // 문제 정보 상태
     const problemInfo = ref({
       majorChapter: '',
@@ -285,6 +369,27 @@ export default {
     const showExplanationEditor = ref(false)
     const explanationEditorKey = ref(0)
 
+    // 수식 검색을 위한 템플릿 데이터 (Step2와 동일)
+    const mathTemplates = ref([
+      { id: 1, name: '이차방정식', latex: 'ax^2 + bx + c = 0', preview: 'ax² + bx + c = 0', category: 'algebra' },
+      { id: 2, name: '분수', latex: '\\frac{a}{b}', preview: 'a/b', category: 'algebra' },
+      { id: 3, name: '근의 공식', latex: 'x = \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}', preview: 'x = (-b ± √(b²-4ac))/2a', category: 'algebra' },
+      { id: 4, name: '피타고라스', latex: 'a^2 + b^2 = c^2', preview: 'a² + b² = c²', category: 'geometry' },
+      { id: 5, name: '원의 넓이', latex: 'A = \\pi r^2', preview: 'A = πr²', category: 'geometry' },
+      { id: 6, name: '미분', latex: '\\frac{d}{dx}f(x)', preview: 'd/dx f(x)', category: 'calculus' },
+      { id: 7, name: '적분', latex: '\\int_a^b f(x) dx', preview: '∫ₐᵇ f(x) dx', category: 'calculus' },
+      { id: 8, name: '평균', latex: '\\bar{x} = \\frac{1}{n}\\sum_{i=1}^{n} x_i', preview: 'x̄ = (1/n)Σxᵢ', category: 'statistics' },
+      // 도형 LaTeX 템플릿 추가
+      { id: 9, name: '원', latex: '\\bigcirc', preview: '○', category: 'shapes' },
+      { id: 10, name: '삼각형', latex: '\\triangle', preview: '△', category: 'shapes' },
+      { id: 11, name: '사각형', latex: '\\square', preview: '□', category: 'shapes' },
+      { id: 12, name: '다이아몬드', latex: '\\diamond', preview: '◇', category: 'shapes' },
+      { id: 13, name: '직선', latex: '\\overline{AB}', preview: 'AB', category: 'shapes' },
+      { id: 14, name: '각도', latex: '\\angle ABC', preview: '∠ABC', category: 'shapes' },
+      { id: 15, name: '평행선', latex: 'AB \\parallel CD', preview: 'AB ∥ CD', category: 'shapes' },
+      { id: 16, name: '수직선', latex: 'AB \\perp CD', preview: 'AB ⊥ CD', category: 'shapes' }
+    ])
+
     // 챕터 데이터 상태
     const majorChapters = ref([])
     const middleChapters = ref([])
@@ -293,25 +398,99 @@ export default {
     const chaptersLoading = ref(false)
     const chaptersError = ref(null)
 
+    // 수식 검색 결과 (Step2와 동일)
+    const filteredMathTemplates = computed(() => {
+      if (!mathSearch.value?.trim() || !mathTemplates.value) return []
+
+      const query = mathSearch.value.toLowerCase()
+      return mathTemplates.value.filter(template =>
+        template.name.toLowerCase().includes(query) ||
+        template.preview.toLowerCase().includes(query) ||
+        template.category.toLowerCase().includes(query)
+      )
+    })
+
+        // 수식 미리보기 (Step2와 동일)
+    const mathPreviewHtml = computed(() => {
+      if (!currentMathLatex.value) return '<div class="text-muted">수식을 입력하거나 선택하세요</div>'
+
+      try {
+        return `$$${currentMathLatex.value}$$`
+      } catch {
+        return '<div class="text-danger">수식 오류</div>'
+      }
+    })
+
+    // 해설 미리보기 (MathJax 렌더링 적용)
+    const explanationPreviewHtml = ref('')
+
+    // 해설 내용이 변경될 때마다 미리보기 업데이트
+    watch(() => problemInfo.value.explanation, async (newExplanation) => {
+      if (newExplanation && newExplanation.trim()) {
+        try {
+          const rendered = await renderLatexContent(newExplanation)
+          explanationPreviewHtml.value = rendered
+        } catch (error) {
+          console.warn('해설 미리보기 렌더링 실패:', error)
+          explanationPreviewHtml.value = styleLatexCode(newExplanation)
+        }
+      } else {
+        explanationPreviewHtml.value = ''
+      }
+    }, { immediate: true })
+
+    // 컴포넌트 마운트 시 MathJax 초기화
+    onMounted(async () => {
+      try {
+        await ensureMathJaxLoaded()
+        console.log('Step3 MathJax 초기화 완료')
+      } catch (error) {
+        console.warn('Step3 MathJax 초기화 실패:', error)
+      }
+    })
+
     // 보기 텍스트를 항목별로 분리하는 함수
     const splitOptions = (optionsText) => {
       if (!optionsText) return []
 
-      // 옵션을 수동으로 분리하는 방법
-      const options = []
-      const parts = optionsText.split(/(?=\(\d+\))/g) // (숫자) 앞에서 분리
+      try {
+        console.log('splitOptions 입력:', optionsText)
 
-      for (const part of parts) {
-        if (part.trim()) {
-          // (숫자) 부분을 제거하고 나머지 내용만 추출
-          const content = part.replace(/\(\d+\)\s*/, '').trim()
-          if (content) {
-            options.push(content)
+        // 옵션을 수동으로 분리하는 방법
+        const options = []
+
+        // 여러 패턴 시도
+        const patterns = [
+          /\((\d+)\)\s*([\s\S]*?)(?=\(\d+\)|$)/g,  // (1) 텍스트 (2) 텍스트
+          /(\d+)\.\s*([\s\S]*?)(?=\d+\.|$)/g,       // 1. 텍스트 2. 텍스트
+          /(\d+)\)\s*([\s\S]*?)(?=\d+\)|$)/g        // 1) 텍스트 2) 텍스트
+        ]
+
+        for (const pattern of patterns) {
+          let match
+          pattern.lastIndex = 0 // 정규식 인덱스 리셋
+
+          while ((match = pattern.exec(optionsText)) !== null) {
+            const choiceNumber = match[1]
+            const choiceText = match[2]?.trim()
+
+            // 1-5번까지만 처리 (6번 이상은 무시)
+            if (choiceNumber && parseInt(choiceNumber) <= 5 && choiceText && choiceText.length > 0) {
+              options.push(choiceText)
+            }
+          }
+
+          if (options.length > 0) {
+            break // 패턴이 매치되면 다른 패턴은 시도하지 않음
           }
         }
-      }
 
-      return options
+        console.log('splitOptions 결과:', options)
+        return options
+      } catch (error) {
+        console.warn('선택지 파싱 실패:', error)
+        return []
+      }
     }
 
         // 보기 텍스트를 줄바꿈이 포함된 형태로 변환하는 함수
@@ -336,14 +515,7 @@ export default {
       }
     })
 
-    // LaTeX 코드 스타일링 함수 (MathJax 없을 때)
-    const styleLatexCode = (text) => {
-      if (!text) return text
 
-      // LaTeX 패턴 감지 및 스타일링
-      return text.replace(/\$([^$]+)\$/g, '<span class="latex-code-display">$1</span>')
-                 .replace(/\\([a-zA-Z]+)/g, '<span class="latex-command">\\$1</span>')
-    }
 
     // 유효한 지문 이미지가 있는지 확인
     const hasValidPassageImage = computed(() => {
@@ -981,60 +1153,21 @@ export default {
       updateProblemInfo()
     }, { deep: true })
 
-    // TinyMCE 설정
-    const tinymceApiKey = import.meta.env.VITE_TINYMCE_KEY || 'no-api-key'
-    const explanationEditorConfig = {
-      height: 300,
-      min_height: 200,
-      max_height: 400,
-      branding: false,
-      promotion: false,
-      menubar: false,
-      statusbar: true,
-      resize: true,
-      language: 'en',
-
-      plugins: [
-        'advlist', 'autolink', 'lists', 'link', 'charmap', 'preview',
-        'anchor', 'searchreplace', 'visualblocks', 'code',
-        'insertdatetime', 'help', 'wordcount'
-      ],
-      toolbar: 'undo redo | formatselect | bold italic underline | alignleft aligncenter alignright | bullist numlist | mathformula',
-
-      content_style: `
-        body {
-          font-family: 'Noto Sans KR', Arial, sans-serif;
-          font-size: 14px;
-          line-height: 1.6;
-          margin: 8px !important;
-          padding: 8px !important;
-        }
-        .math-latex {
-          background: #f0f8ff;
-          padding: 4px 6px;
-          border-radius: 4px;
-          border: 1px solid #d0e7ff;
-          font-family: 'Times New Roman', serif;
-          color: #1e40af;
-          display: inline-block;
-          margin: 0 2px;
-        }
-      `,
-
+    // TinyMCE 설정 (Step2와 동일)
+    const tinymceApiKey = getTinyMCEApiKey()
+    const explanationEditorConfig = createCommonEditorConfig({
+      enableMathTools: false, // MathJax 렌더링 비활성화
+      enableImageUpload: true, // 이미지 업로드 활성화
       setup: (editor) => {
-        editor.ui.registry.addButton('mathformula', {
-          text: '수식',
-          icon: 'equation',
-          onAction: () => {
-            const mathText = prompt('LaTeX 수식을 입력하세요:', 'x^2 + y^2 = r^2')
-            if (mathText) {
-              const html = `<span class="math-latex" data-latex="${mathText}">$${mathText}$</span>`
-              editor.insertContent(html)
-            }
+        // MathJax 렌더링 비활성화 - 에디터 내에서는 LaTeX 코드만 표시
+        editor.on('init', () => {
+          // 기존의 renderMathInEditor 함수를 오버라이드하여 아무것도 하지 않음
+          editor.renderMathInEditor = () => {
+            console.log('해설 에디터 내 MathJax 렌더링 비활성화됨')
           }
         })
       }
-    }
+    })
 
     // 정답 플레이스홀더
     const getAnswerPlaceholder = () => {
@@ -1062,14 +1195,235 @@ export default {
       problemInfo.value.explanation = content
     }
 
-    // 수식 삽입 (해설 에디터)
-    const insertMathToExplanation = () => {
-      // 실제 구현에서는 에디터 인스턴스에 접근해서 삽입
-      console.log('📝 [Step3InfoInput] 수식 삽입 기능 호출됨')
-      // TODO: TinyMCE 에디터 인스턴스에 접근하여 수식 삽입 구현
+    // 수식 삽입 (Step2와 동일한 최대 안정성)
+    const insertMath = async (latex) => {
+      currentMathLatex.value = latex
+      console.log('수식 삽입 시도:', latex)
+
+      let retries = 40
+      while (retries > 0) {
+        if (editorInstance.value &&
+            typeof editorInstance.value.insertContent === 'function' &&
+            !editorInstance.value.destroyed) {
+
+          try {
+            const html = `<span class="math-latex" data-latex="${latex}">$${latex}$</span>`
+            editorInstance.value.insertContent(html)
+            console.log('수식 삽입 성공:', latex)
+            return
+          } catch (insertError) {
+            console.warn('수식 삽입 시도 실패:', insertError)
+          }
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 100))
+        retries--
+      }
+
+      console.error('수식 삽입 최종 실패:', latex)
+      alert('수식 삽입에 실패했습니다. 에디터를 새로고침해주세요.')
+    }
+
+    // MathJax 로드 확인 및 로드 함수 (Step2와 동일)
+    const ensureMathJaxLoaded = async () => {
+      await waitForMathJax()
+
+      // MathJax 설정 강제 적용 (LaTeX 패턴 인식)
+      if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+        // MathJax 설정 강제 적용
+        window.MathJax.config = {
+          tex: {
+            inlineMath: [['$', '$'], ['\\(', '\\)']],
+            displayMath: [['$$', '$$'], ['\\[', '\\]']],
+            processEscapes: true,
+            processEnvironments: true,
+            packages: ['base', 'ams', 'noerrors', 'noundefined']
+          },
+          options: {
+            skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code'],
+            ignoreHtmlClass: 'tex2jax_ignore',
+            processHtmlClass: 'tex2jax_process'
+          }
+        }
+
+        // MathJax 문서 재설정
+        if (window.MathJax.startup.document) {
+          window.MathJax.startup.document.clear()
+          window.MathJax.startup.document.updateDocument()
+        }
+
+        console.log('MathJax LaTeX 설정 강제 적용 및 문서 재설정 완료')
+      }
+    }
+
+    // MathJax 로드 상태 추적 (Step2와 동일)
+    const mathJaxLoaded = computed(() => {
+      return !!(window.MathJax && window.MathJax.startup && window.MathJax.startup.document)
+    })
+
+    // LaTeX 수식을 MathJax로 렌더링하는 함수 (Step2와 동일)
+    const renderLatexContent = async (content) => {
+      console.log('renderLatexContent 호출됨:', {
+        content,
+        type: typeof content,
+        length: content ? content.length : 0,
+        hasLatex: content ? (content.includes('$') || content.includes('\\')) : false
+      })
+
+      if (!content || typeof content !== 'string') {
+        console.log('content가 유효하지 않음:', content)
+        return ''
+      }
+
+      try {
+        // MathJax가 로드되었는지 확인
+        console.log('MathJax 상태 확인:', {
+          mathJaxExists: !!window.MathJax,
+          startupExists: !!(window.MathJax && window.MathJax.startup)
+        })
+
+        if (window.MathJax && window.MathJax.startup && window.MathJax.startup.document) {
+          console.log('MathJax 사용하여 렌더링 시작')
+
+          // 임시 div에 수식 렌더링
+          const tempDiv = document.createElement('div')
+          tempDiv.innerHTML = content
+          tempDiv.style.position = 'absolute'
+          tempDiv.style.left = '-9999px'
+          tempDiv.style.visibility = 'hidden'
+          document.body.appendChild(tempDiv)
+
+          try {
+            // MathJax로 렌더링
+            await renderMathJax(tempDiv, { clearFirst: false })
+            console.log('MathJax 렌더링 성공')
+
+            // 렌더링된 HTML 가져오기
+            const result = tempDiv.innerHTML
+
+            // 임시 div 제거
+            document.body.removeChild(tempDiv)
+
+            console.log('최종 렌더링 결과:', result)
+            return result
+
+          } catch (renderError) {
+            console.warn('MathJax 렌더링 실패:', renderError)
+            document.body.removeChild(tempDiv)
+
+            // 렌더링 실패 시 LaTeX 코드를 스타일링하여 표시
+            return styleLatexCode(content)
+          }
+        } else {
+          console.log('MathJax가 로드되지 않음, LaTeX 코드 스타일링 적용')
+          return styleLatexCode(content)
+        }
+      } catch (error) {
+        console.warn('LaTeX 렌더링 함수 오류:', error)
+        return styleLatexCode(content)
+      }
+    }
+
+    // LaTeX 코드를 스타일링하는 함수 (MathJax가 로드되지 않은 경우)
+    const styleLatexCode = (content) => {
+      let result = content
+
+      // $$...$$ 패턴 (display mode)
+      result = result.replace(/\$\$([^$]+?)\$\$/g, '<div class="latex-code-display">$$$1$$</div>')
+
+      // $...$ 패턴 (inline mode)
+      result = result.replace(/\$([^$\n]+?)\$/g, '<span class="latex-code-inline">$$1$</span>')
+
+      // \(...\) 패턴 (inline mode) - 원본 LaTeX 유지
+      result = result.replace(/\\\(([^)]+?)\\\)/g, '<span class="latex-code-inline">\\($1\\)</span>')
+
+      // \[...\] 패턴 (display mode) - 원본 LaTeX 유지
+      result = result.replace(/\\\[([^\]]+?)\\\]/g, '<div class="latex-code-display">\\[$1\\]</div>')
+
+      // math-latex 클래스가 있는 span 태그 처리
+      result = result.replace(/<span class="math-latex"[^>]*data-latex="([^"]*)"[^>]*>([^<]*)<\/span>/g,
+        '<span class="latex-code-inline" data-latex="$1">$2</span>')
+
+      return result
+    }
+
+    // 해설 미리보기 렌더링 함수
+    const renderExplanationPreview = async () => {
+      if (!problemInfo.value.explanation) return
+
+      try {
+        const renderedContent = await renderLatexContent(problemInfo.value.explanation)
+        return renderedContent
+      } catch (error) {
+        console.warn('해설 미리보기 렌더링 실패:', error)
+        return styleLatexCode(problemInfo.value.explanation)
+      }
+    }
+
+    // 안전한 에디터 초기화 핸들러 (Step2와 동일)
+    const onEditorInit = async (...args) => {
+      try {
+        console.log('해설 TinyMCE 에디터 초기화 시작...')
+        console.log('onEditorInit args:', args)
+
+        // 에디터 인스턴스 안전하게 추출
+        let editor = null
+
+        // 1) 직접 에디터 인스턴스가 첫 인자로 온 경우
+        for (const arg of args) {
+          if (arg && typeof arg.getBody === 'function' && typeof arg.setContent === 'function') {
+            editor = arg
+            break
+          }
+        }
+
+        if (!editor) {
+          console.error('에디터 인스턴스를 찾을 수 없습니다')
+          return
+        }
+
+        console.log('✅ 해설 에디터 인스턴스 발견:', editor.id)
+
+        // 이전 인스턴스가 있다면 정리
+        if (editorInstance.value && editorInstance.value !== editor) {
+          try {
+            if (editorInstance.value.removed !== true && typeof editorInstance.value.remove === 'function') {
+              editorInstance.value.remove()
+            }
+          } catch (error) {
+            console.warn('이전 해설 에디터 인스턴스 정리 중 오류:', error)
+          }
+        }
+
+        editorInstance.value = markRaw(editor)
+
+        // 에디터 상태 확인
+        const state = {
+          hasAllMethods: ['getBody', 'setContent', 'remove'].every(m => typeof editor[m] === 'function'),
+          hasBody: typeof editor.getBody === 'function',
+          hasValidId: !!editor.id,
+          isNotDestroyed: editor.removed !== true,
+          editorId: editor.id,
+        }
+        console.log('✅ 해설 에디터 상태:', state)
+
+        // 에디터 준비 완료
+        console.log('✅ 해설 에디터 초기화 완료')
+      } catch (error) {
+        console.error('해설 에디터 초기화 중 오류:', error)
+      }
     }
 
     return {
+      activeToolTab,
+      mathSearch,
+      currentMathLatex,
+      editorInstance,
+      mathTemplates,
+      filteredMathTemplates,
+      mathPreviewHtml,
+      explanationPreviewHtml,
+      mathJaxLoaded,
       problemInfo,
       showExplanationEditor,
       explanationEditorKey,
@@ -1087,7 +1441,11 @@ export default {
       getAnswerPlaceholder,
       toggleExplanationEditor,
       updateExplanation,
-      insertMathToExplanation,
+      insertMath,
+      onEditorInit,
+      ensureMathJaxLoaded,
+      renderLatexContent,
+      renderExplanationPreview,
       loadChapters,
       loadMiddleChapters,
       loadMinorChapters,
@@ -1356,8 +1714,224 @@ export default {
   background: #f8f9fa;
 }
 
-.editor-container {
+.editor-with-tools {
+  gap: 1rem;
+  height: 400px;
+}
+
+/* 에디터 패널 */
+.editor-panel {
+  flex: 1;
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  overflow: hidden;
+  background: white;
+}
+
+.editor-header {
+  background: #f8f9fa;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.editor-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #495057;
+}
+
+.editor-content {
+  height: calc(100% - 50px);
+  padding: 0;
+}
+
+/* 우측 도구 패널 */
+.right-tools-panel {
+  border: 1px solid #e9ecef;
+  border-radius: 6px;
+  overflow: hidden;
+  background: white;
+  display: flex;
+  flex-direction: column;
+}
+
+.tool-tabs {
+  display: flex;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e9ecef;
+}
+
+.tool-tab {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border: none;
+  background: transparent;
+  color: #6c757d;
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-bottom: 2px solid transparent;
+}
+
+.tool-tab:hover {
+  background: #e9ecef;
+  color: #495057;
+}
+
+.tool-tab.active {
+  background: white;
+  color: #0d6efd;
+  border-bottom-color: #0d6efd;
+}
+
+.tool-content {
+  flex: 1;
+  padding: 1rem;
+  overflow-y: auto;
+}
+
+.tool-section-title {
+  margin: 0 0 1rem 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #495057;
+}
+
+.math-tools {
   margin-bottom: 1rem;
+}
+
+.math-buttons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.5rem;
+}
+
+.math-btn {
+  padding: 0.5rem 0.75rem;
+  border: 1px solid #dee2e6;
+  background: white;
+  color: #495057;
+  font-size: 0.7rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.math-btn:hover {
+  background: #f8f9fa;
+  border-color: #0d6efd;
+  color: #0d6efd;
+}
+
+.preview-tools {
+  height: 100%;
+}
+
+.preview-content {
+  height: 100%;
+  overflow-y: auto;
+}
+
+.explanation-preview-content {
+  line-height: 1.6;
+  font-size: 0.875rem;
+}
+
+.no-explanation {
+  color: #6c757d;
+  font-style: italic;
+  text-align: center;
+  padding: 2rem;
+}
+
+/* 수식 검색 결과 스타일링 */
+.search-results {
+  max-height: 200px;
+  overflow-y: auto;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  background: white;
+}
+
+.search-result-item {
+  cursor: pointer;
+  transition: background-color 0.2s ease;
+}
+
+.search-result-item:hover {
+  background-color: #f8f9fa;
+}
+
+.template-name {
+  font-size: 0.75rem;
+  color: #495057;
+}
+
+.template-preview {
+  font-size: 0.7rem;
+  color: #6c757d;
+}
+
+/* 수식 미리보기 */
+.latex-preview {
+  min-height: 60px;
+  padding: 0.75rem;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  background: #f8f9fa;
+  font-size: 0.875rem;
+  line-height: 1.4;
+}
+
+/* 도구 섹션 */
+.tool-section {
+  margin-bottom: 1.5rem;
+}
+
+.tool-section:last-child {
+  margin-bottom: 0;
+}
+
+/* LaTeX 코드 스타일링 (Step2와 동일) */
+.latex-code-display {
+  display: block;
+  margin: 0.5rem 0;
+  padding: 0.5rem;
+  background: #f8f9fa;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  font-family: 'Times New Roman', serif;
+  color: #1e40af;
+  text-align: center;
+  font-size: 1.1em;
+}
+
+.latex-code-inline {
+  display: inline;
+  padding: 2px 4px;
+  background: #f0f8ff;
+  border: 1px solid #d0e7ff;
+  border-radius: 3px;
+  font-family: 'Times New Roman', serif;
+  color: #1e40af;
+  font-size: 0.9em;
+  margin: 0 1px;
+}
+
+/* 해설 미리보기 스타일 */
+.explanation-preview-content {
+  line-height: 1.6;
+  font-size: 0.875rem;
+  padding: 0.5rem;
+  border: 1px solid #e9ecef;
+  border-radius: 4px;
+  background: #f8f9fa;
+  min-height: 100px;
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .math-tools-section h6 {

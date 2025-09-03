@@ -24,4 +24,14 @@ export default defineConfig({
       },
     },
   },
+  build: {
+    // 프로덕션 빌드 시 console과 debugger 제거
+    minify: 'terser',
+    terserOptions: {
+      compress: {
+        drop_console: true,  // console.* 제거
+        drop_debugger: true, // debugger 제거
+      },
+    },
+  },
 })

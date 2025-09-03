@@ -110,4 +110,39 @@ export const authAPI = {
   }
 }
 
+// 교사 성적 통계 API
+export const teacherStatsAPI = {
+  // 클래스 전체 성적 개요
+  getClassOverview: (classId) => {
+    return api.get(`/teacher/stats/class/${classId}/overview`)
+  },
+
+  // 전체 학생 성적 목록
+  getStudentsGrades: (classId, examId = null) => {
+    const params = examId ? { examId } : {}
+    return api.get(`/teacher/stats/class/${classId}/students`, { params })
+  },
+
+  // 학생 개인 상세 성적
+  getStudentDetail: (classId, studentId) => {
+    return api.get(`/teacher/stats/class/${classId}/student/${studentId}`)
+  },
+
+  // 시험별 상세 결과
+  getExamResultDetail: (classId, examId) => {
+    return api.get(`/teacher/stats/class/${classId}/exam/${examId}`)
+  },
+
+  // 성적 분포도
+  getGradeDistribution: (classId, examId = null) => {
+    const params = examId ? { examId } : {}
+    return api.get(`/teacher/stats/class/${classId}/distribution`, { params })
+  },
+
+  // 시험별 비교
+  getExamComparison: (classId) => {
+    return api.get(`/teacher/stats/class/${classId}/comparison`)
+  }
+}
+
 export default api

@@ -265,36 +265,42 @@ const handleStep1Back = () => {
 /**
  * Step 2 간편 생성 완료 핸들러
  */
-const handleStep2SimpleNext = async (settings) => {
-  console.log('Step 2(간편 생성) 설정 완료:', settings)
+const handleStep2SimpleNext = async (data) => {
+  console.log('Step 2(간편 생성) 완료:', data)
   
-  // Step2SimpleGeneration에서 이미 생성된 문항들이 전달됨
-  if (settings.selectedItems && settings.selectedItems.length > 0) {
+  // Step2SimpleGeneration에서 생성된 문항들과 이미지들이 전달됨
+  if (data.items && data.items.length > 0) {
     // 이미 생성된 문항들을 store에 저장
     store.setExamInfo({
       ...store.examInfo,
-      grade: settings.grade,
-      subject: settings.subject,
-      textbook: settings.textbook,
-      selectedItems: settings.selectedItems, // Step2SimpleGeneration에서 생성된 문항들
+      grade: data.grade,
+      subject: data.subject,
+      textbook: data.textbook,
+      selectedItems: data.items, // Step2SimpleGeneration에서 생성된 문항들
       generationSettings: {
-        itemCount: settings.itemCount,
-        difficulty: settings.difficulty,
-        questionTypes: settings.questionTypes,
-        chapters: settings.chapters,
-        includePassage: settings.includePassage,
-        avoidDuplicate: settings.avoidDuplicate,
-        prioritizeLatest: settings.prioritizeLatest,
-        selectionMetadata: settings.selectionMetadata,
-        selectionReport: settings.selectionReport
+        itemCount: data.itemCount,
+        difficulty: data.difficulty,
+        questionTypes: data.questionTypes,
+        chapters: data.chapters,
+        includePassage: data.includePassage,
+        avoidDuplicate: data.avoidDuplicate,
+        prioritizeLatest: data.prioritizeLatest,
+        selectionMetadata: data.metadata,
+        selectionReport: data.report
       }
     })
     
     // itemStore에도 선택된 문항들 설정
-    itemStore.setSelectedItems(settings.selectedItems)
+    itemStore.setSelectedItems(data.items)
     
-    console.log(`${settings.selectedItems.length}개 문항이 선택되었습니다.`)
-    console.log('선택된 문항들:', settings.selectedItems)
+    // 변환된 이미지가 있으면 store에 저장
+    if (data.convertedImages && data.convertedImages.length > 0) {
+      itemStore.setConvertedImages(data.convertedImages)
+      console.log(`${data.convertedImages.length}개 이미지가 변환되었습니다.`)
+    }
+    
+    console.log(`${data.items.length}개 문항이 선택되었습니다.`)
+    console.log('선택된 문항들:', data.items)
     
     // 시험지 저장 단계로 이동
     setCurrentStep(3)

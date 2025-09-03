@@ -11,19 +11,19 @@
       <div class="container">
         <div class="header-content">
           <div>
-            <h1 class="page-title">똑똑한 우리반</h1>
-            <p class="page-subtitle">{{ classInfo.className }} · {{ classInfo.grade }}학년 {{ classInfo.classNumber }}반</p>
+            <h1 class="page-title">우리반</h1>
+            <p class="page-subtitle">{{ classInfo.className }} </p>
           </div>
           <div class="header-actions">
-            <button class="notification-btn">
-              <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M10 21H14C14 22.1 13.1 23 12 23S10 22.1 10 21M21 19V20H3V19L5 17V11C5 7.9 7.03 5.17 10 4.29V4C10 2.9 10.9 2 12 2S14 2.9 14 4V4.29C16.97 5.17 19 7.9 19 11V17L21 19Z"/>
-              </svg>
-              <span class="notification-badge">{{ unreadNotifications || 0 }}</span>
-            </button>
-            <div class="user-avatar">
-              <span>{{ currentUserName }}</span>
-            </div>
+<!--            <button class="notification-btn">-->
+<!--              <svg viewBox="0 0 24 24" fill="currentColor">-->
+<!--                <path d="M10 21H14C14 22.1 13.1 23 12 23S10 22.1 10 21M21 19V20H3V19L5 17V11C5 7.9 7.03 5.17 10 4.29V4C10 2.9 10.9 2 12 2S14 2.9 14 4V4.29C16.97 5.17 19 7.9 19 11V17L21 19Z"/>-->
+<!--              </svg>-->
+<!--              <span class="notification-badge">{{ unreadNotifications || 0 }}</span>-->
+<!--            </button>-->
+<!--            <div class="user-avatar">-->
+<!--              <span>{{ currentUserName }}</span>-->
+<!--            </div>-->
           </div>
         </div>
       </div>
@@ -66,7 +66,7 @@
             </div>
             <div class="action-content">
               <h3 class="action-title">시험 응시</h3>
-              <p class="action-description">예정된 시험 보기</p>
+              <p class="action-description">내가 골라서 시험 보기</p>
             </div>
             <svg viewBox="0 0 24 24" fill="currentColor" class="arrow-icon">
               <path d="M8.59 16.59L13.17 12L8.59 7.41L10 6L16 12L10 18L8.59 16.59Z"/>
@@ -587,10 +587,11 @@ const {
 
 /* Page Header */
 .page-header {
-  background: #2563eb;
+  background: white;
   padding: 2rem 0;
   margin-bottom: 2rem;
-  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.1);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1);
+  border-bottom: 1px solid #e5e7eb;
 }
 
 .container {
@@ -608,12 +609,12 @@ const {
 .page-title {
   font-size: 2rem;
   font-weight: 700;
-  color: white;
+  color: #1e293b;
   margin: 0 0 0.5rem 0;
 }
 
 .page-subtitle {
-  color: rgba(255, 255, 255, 0.9);
+  color: #6b7280;
   margin: 0;
 }
 
@@ -625,8 +626,8 @@ const {
 
 .notification-btn {
   position: relative;
-  background: rgba(255, 255, 255, 0.2);
-  border: none;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
   width: 44px;
   height: 44px;
   border-radius: 12px;
@@ -638,14 +639,15 @@ const {
 }
 
 .notification-btn:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: #f1f5f9;
   transform: translateY(-2px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
 .notification-btn svg {
   width: 24px;
   height: 24px;
-  color: white;
+  color: #475569;
 }
 
 .notification-badge {
@@ -663,11 +665,12 @@ const {
 }
 
 .user-avatar {
-  background: rgba(255, 255, 255, 0.2);
+  background: #f8fafc;
   padding: 0.75rem 1.5rem;
   border-radius: 12px;
-  color: white;
+  color: #1e293b;
   font-weight: 600;
+  border: 2px solid #e2e8f0;
 }
 
 /* Online Status Section */
@@ -677,29 +680,36 @@ const {
 
 .online-status-card {
   background: white;
-  border-radius: 16px;
+  border-radius: 12px;
   padding: 1.5rem;
   display: flex;
   align-items: center;
   gap: 1.5rem;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  transition: all 0.3s ease;
+}
+
+.online-status-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  border-color: #cbd5e1;
 }
 
 .online-icon {
   position: relative;
-  background: linear-gradient(135deg, #10b981 0%, #34d399 100%);
-  width: 60px;
-  height: 60px;
-  border-radius: 16px;
+  background: #eff6ff;
+  width: 56px;
+  height: 56px;
+  border-radius: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
 .online-icon svg {
-  width: 32px;
-  height: 32px;
-  color: white;
+  width: 28px;
+  height: 28px;
+  fill: #2563eb;
 }
 
 .pulse-dot {
@@ -731,14 +741,15 @@ const {
 
 .online-title {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #64748b;
   margin: 0 0 0.25rem 0;
+  font-weight: 500;
 }
 
 .online-count {
   font-size: 1.5rem;
   font-weight: 700;
-  color: #111827;
+  color: #1e293b;
   margin: 0;
 }
 
@@ -748,16 +759,20 @@ const {
   gap: 0.5rem;
   background: #2563eb;
   color: white;
-  border: none;
-  padding: 0.75rem 1.5rem;
-  border-radius: 12px;
+  border: 1px solid #2563eb;
+  padding: 0.625rem 1.25rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
-  transition: all 0.3s ease;
+  transition: all 0.2s ease;
 }
 
 .view-class-btn:hover {
-  transform: translateX(4px);
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+  transform: translateY(-1px);
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.2);
 }
 
 .view-class-btn svg {
@@ -771,9 +786,9 @@ const {
 }
 
 .section-title {
-  color: white;
-  font-size: 1.5rem;
-  font-weight: 600;
+  color: #1e293b;
+  font-size: 1.75rem;
+  font-weight: 700;
   margin-bottom: 1.5rem;
 }
 
@@ -785,49 +800,53 @@ const {
 
 .action-card {
   background: white;
-  border-radius: 16px;
-  padding: 1.5rem;
+  border-radius: 8px;
+  padding: 1.25rem;
   display: flex;
   align-items: center;
   gap: 1rem;
   cursor: pointer;
-  transition: all 0.3s ease;
+  border: 1px solid #e2e8f0;
+  transition: all 0.2s ease;
 }
 
 .action-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+  border-color: #2563eb;
+  box-shadow: 0 2px 8px rgba(37, 99, 235, 0.08);
+  transform: translateX(4px);
 }
 
 .action-icon {
   width: 48px;
   height: 48px;
-  border-radius: 12px;
+  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
+  background: #eff6ff;
+  flex-shrink: 0;
 }
 
 .action-icon.exam {
-  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  background: #eff6ff;
 }
 
 .action-icon.score {
-  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  background: #eff6ff;
 }
 
 .action-icon.report {
-  background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+  background: #eff6ff;
 }
 
 .action-icon.schedule {
-  background: linear-gradient(135deg, #ec4899 0%, #db2777 100%);
+  background: #eff6ff;
 }
 
 .action-icon svg {
   width: 24px;
   height: 24px;
-  color: white;
+  fill: #2563eb;
 }
 
 .action-content {
@@ -835,21 +854,30 @@ const {
 }
 
 .action-title {
+  font-size: 1rem;
   font-weight: 600;
-  color: #111827;
+  color: #1e293b;
   margin: 0 0 0.25rem 0;
 }
 
 .action-description {
   font-size: 0.875rem;
-  color: #6b7280;
+  color: #64748b;
   margin: 0;
+  line-height: 1.4;
 }
 
 .arrow-icon {
   width: 20px;
   height: 20px;
-  color: #9ca3af;
+  fill: #94a3b8;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.action-card:hover .arrow-icon {
+  fill: #2563eb;
+  transform: translateX(3px);
 }
 
 /* Main Content Grid */
@@ -865,33 +893,34 @@ const {
 
 .content-card {
   background: white;
-  border-radius: 16px;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
   margin-bottom: 1.5rem;
 }
 
 .card-header {
-  padding: 1.25rem 1.5rem;
-  border-bottom: 1px solid #e5e7eb;
+  padding: 1.75rem;
+  border-bottom: 1px solid #e2e8f0;
   display: flex;
   justify-content: space-between;
   align-items: center;
 }
 
 .card-title {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #111827;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #1e293b;
   margin: 0;
 }
 
 .badge {
-  background: #2563eb;
-  color: white;
-  padding: 0.25rem 0.75rem;
-  border-radius: 999px;
-  font-size: 0.875rem;
-  font-weight: 600;
+  background: #f1f5f9;
+  color: #475569;
+  padding: 0.25rem 0.625rem;
+  border-radius: 6px;
+  font-size: 0.8125rem;
+  font-weight: 500;
 }
 
 .view-all-btn {

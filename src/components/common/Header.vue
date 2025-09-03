@@ -4,11 +4,11 @@
     <div class="utility-bar">
       <div class="utility-bar-content">
         <!-- Dev Toggle (temporary for testing) -->
-        <div class="dev-section">
-          <button @click="toggleUserType" class="dev-toggle" v-if="!isLoggedIn">
-            🎭 역할: {{ userType === 'teacher' ? '선생님' : '학생' }}
-          </button>
-        </div>
+<!--        <div class="dev-section">-->
+<!--          <button @click="toggleUserType" class="dev-toggle" v-if="!isLoggedIn">-->
+<!--            🎭 역할: {{ userType === 'teacher' ? '선생님' : '학생' }}-->
+<!--          </button>-->
+<!--        </div>-->
 
         <!-- Utility Links -->
         <div class="utility-links">
@@ -17,10 +17,6 @@
             <a href="#" @click.prevent="handleLogin" class="utility-link">로그인</a>
             <span class="utility-divider">|</span>
             <a href="#" @click.prevent="handleSignup" class="utility-link">회원가입</a>
-            <span class="utility-divider">|</span>
-            <a href="#" class="utility-link">고객센터</a>
-            <span class="utility-divider">|</span>
-            <a href="#" class="utility-link">사이트맵</a>
           </template>
 
           <!-- Logged in state -->
@@ -68,10 +64,6 @@
                 </div>
               </div>
             </div>
-            <span class="utility-divider">|</span>
-            <a href="#" class="utility-link">고객센터</a>
-            <span class="utility-divider">|</span>
-            <a href="#" class="utility-link">사이트맵</a>
           </template>
         </div>
       </div>
@@ -107,18 +99,18 @@
             </router-link>
 
 
-            <router-link
-              to="/exam-management"
-              class="nav-item"
-              :class="{ active: isCurrentRoute('/exam-management') }"
-            >
-              <svg viewBox="0 0 24 24" class="nav-icon">
-                <path
-                  d="M19 3H18V1H16V3H8V1H6V3H5C3.89 3 3.01 3.9 3.01 5L3 19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3M19 19H5V8H19V19M7 10H12V15H7"
-                />
-              </svg>
-              <span>시험관리</span>
-            </router-link>
+<!--            <router-link-->
+<!--              to="/exam-management"-->
+<!--              class="nav-item"-->
+<!--              :class="{ active: isCurrentRoute('/exam-management') }"-->
+<!--            >-->
+<!--              <svg viewBox="0 0 24 24" class="nav-icon">-->
+<!--                <path-->
+<!--                  d="M19 3H18V1H16V3H8V1H6V3H5C3.89 3 3.01 3.9 3.01 5L3 19C3 20.1 3.89 21 5 21H19C20.1 21 21 20.1 21 19V5C21 3.9 20.1 3 19 3M19 19H5V8H19V19M7 10H12V15H7"-->
+<!--                />-->
+<!--              </svg>-->
+<!--              <span>시험관리</span>-->
+<!--            </router-link>-->
 
 
             <router-link
@@ -151,7 +143,7 @@
           <!-- Student-specific menu items -->
           <template v-else>
             <router-link
-              to="/student/dashboard"
+              to="/"
               class="nav-item"
               :class="{ active: isCurrentRoute('/student/dashboard') }"
             >
@@ -472,7 +464,7 @@ export default {
   margin: 0 auto;
   padding: 0;
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   height: 100%;
 }
