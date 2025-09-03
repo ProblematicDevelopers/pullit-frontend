@@ -596,7 +596,7 @@ const saveProfile = async () => {
 
     const response = await api.put('/users/me', updateData)
 
-    if (response.ok) {
+    if (response.status === 200 && response.data?.success) {
       // 사용자 정보 업데이트
       const updatedUser = response.data
       userInfo.value = { ...userInfo.value, ...updatedUser.data }
@@ -649,11 +649,11 @@ const saveProfile = async () => {
       isEditing.value = false
       alert('프로필이 성공적으로 수정되었습니다.')
     } else {
-      const errorData = await response.json()
+      const errorData = response.data
       if (response.status === 429) {
         throw new Error('너무 빠른 요청입니다. 1분 후에 다시 시도해주세요.')
       } else {
-        throw new Error(errorData.message || '프로필 수정 실패')
+        throw new Error(errorData?.message || '프로필 수정 실패')
       }
     }
   } catch (error) {

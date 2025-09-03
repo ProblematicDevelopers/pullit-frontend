@@ -75,11 +75,10 @@
         <!-- Page Header (First Page Only) -->
         <div v-if="currentPage === 1" class="page-header">
           <h1 class="exam-title">{{ examInfo.title || '시험지' }}</h1>
-          <div class="exam-info">
-            <span v-if="examInfo.grade">학년: {{ examInfo.grade }}</span>
-            <span v-if="examInfo.subject">과목: {{ examInfo.subject }}</span>
-            <span v-if="examInfo.duration">시간: {{ examInfo.duration }}분</span>
-            <span v-if="examInfo.totalScore">총점: {{ examInfo.totalScore }}점</span>
+          <div class="exam-info" v-if="examInfo.grade || examInfo.subject">
+            <span v-if="examInfo.grade">{{ examInfo.grade }}</span>
+            <span v-if="examInfo.grade && examInfo.subject">·</span>
+            <span v-if="examInfo.subject">{{ examInfo.subject }}</span>
           </div>
         </div>
 
@@ -173,6 +172,16 @@ const props = defineProps({
   convertedImages: {
     type: Array,
     default: () => []
+  },
+  examInfo: {
+    type: Object,
+    default: () => ({
+      title: '시험지',
+      grade: '',
+      subject: '',
+      duration: '',
+      totalScore: ''
+    })
   }
 })
 
@@ -310,7 +319,14 @@ const currentPageImages = computed(() => {
   return pageImages
 })
 
+// props로 받은 examInfo를 사용하되, 없으면 기존 store에서 가져오기
 const examInfo = computed(() => {
+  // props.examInfo가 있으면 우선 사용
+  if (props.examInfo && Object.keys(props.examInfo).length > 0) {
+    return props.examInfo
+  }
+  
+  // 없으면 기존 방식대로 store에서 가져오기
   const info = testBankStore.examInfo || {}
   return {
     title: info.title || info.examName || '2024학년도 시험',
@@ -542,6 +558,31 @@ const saveExam = async () => {
     progressMessage.value = ''
   }
 }
+
+// Parent-friendly hook: Generate PDF Blob from current images (no upload)
+// Used by Step3ExamSave via ref
+async function generateAndSavePDF() {
+  if (!hasImages.value) return null
+
+  // 시험 제목 헤더 이미지 포함
+  const headerImage = await createExamHeaderImage(examInfo.value)
+  const allImages = [headerImage, ...previewImages.value]
+
+  const pdf = await generatePDFFromImages(allImages, {
+    examTitle: examInfo.value.title,
+    subject: examInfo.value.subject,
+    grade: examInfo.value.grade,
+    duration: examInfo.value.duration,
+    totalScore: examInfo.value.totalScore,
+    layoutMode: layoutMode.value,
+    showPageNumbers: true
+  })
+
+  return pdfToBlob(pdf)
+}
+
+// Expose to parent
+defineExpose({ generateAndSavePDF })
 
 const downloadPDF = async () => {
   if (!hasImages.value) {

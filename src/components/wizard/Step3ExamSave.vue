@@ -23,6 +23,19 @@
         <div class="settings-card">
           <h3 class="settings-title">시험 설정</h3>
 
+          <!-- 시험지 이름 설정 -->
+          <div class="setting-group">
+            <label class="setting-label">시험지 이름 <span class="required">*</span></label>
+            <input
+              type="text"
+              v-model="examSettings.examName"
+              class="setting-input"
+              placeholder="예: 2025년 1학기 중간고사"
+              required
+            />
+            <p class="setting-hint">저장될 시험지의 이름을 입력하세요.</p>
+          </div>
+
           <!-- 공개 범위 설정 -->
           <div class="setting-group">
             <label class="setting-label">공개 범위</label>
@@ -61,69 +74,6 @@
             </div>
           </div>
 
-          <!-- 시험 날짜 설정 -->
-          <div class="setting-group">
-            <label class="setting-label">시험 예정일</label>
-            <input
-              type="date"
-              v-model="examSettings.examDate"
-              class="setting-input"
-              :min="todayDate"
-            />
-          </div>
-
-          <!-- 시간 제한 설정 -->
-          <div class="setting-group">
-            <label class="setting-label">제한 시간 (분)</label>
-            <div class="time-input-wrapper">
-              <input
-                type="number"
-                v-model.number="examSettings.timeLimit"
-                class="setting-input"
-                min="10"
-                max="180"
-                step="5"
-              />
-              <span class="time-suffix">분</span>
-            </div>
-            <div class="time-presets">
-              <button
-                v-for="time in [30, 50, 70, 90]"
-                :key="time"
-                @click="examSettings.timeLimit = time"
-                :class="['preset-btn', { active: examSettings.timeLimit === time }]"
-              >
-                {{ time }}분
-              </button>
-            </div>
-          </div>
-
-          <!-- 총점 설정 -->
-          <div class="setting-group">
-            <label class="setting-label">총점</label>
-            <div class="time-input-wrapper">
-              <input
-                type="number"
-                v-model.number="examSettings.totalPoints"
-                class="setting-input"
-                min="1"
-                max="1000"
-                step="1"
-              />
-              <span class="time-suffix">점</span>
-            </div>
-            <div class="time-presets">
-              <button
-                v-for="pts in [50, 100, 200]"
-                :key="pts"
-                @click="examSettings.totalPoints = pts"
-                :class="['preset-btn', { active: examSettings.totalPoints === pts }]"
-              >
-                {{ pts }}점
-              </button>
-            </div>
-          </div>
-
           <!-- 설명 추가 -->
           <div class="setting-group">
             <label class="setting-label">시험 설명 (선택)</label>
@@ -134,25 +84,6 @@
               rows="3"
             />
           </div>
-
-          <!-- 추가 옵션 -->
-          <div class="setting-group">
-            <label class="checkbox-option">
-              <input
-                type="checkbox"
-                v-model="examSettings.shuffleQuestions"
-              />
-              <span>문제 순서 섞기</span>
-            </label>
-
-            <label class="checkbox-option">
-              <input
-                type="checkbox"
-                v-model="examSettings.showAnswerAfterSubmit"
-              />
-              <span>제출 후 정답 공개</span>
-            </label>
-          </div>
         </div>
       </div>
 
@@ -162,6 +93,7 @@
         <ExamImagePreview
           ref="pdfPreviewRef"
           :converted-images="convertedImages"
+          :exam-info="examInfoForPreview"
         />
       </div>
     </div>
@@ -218,14 +150,10 @@ const pdfPreviewRef = ref(null)
 
 // 시험 설정 상태
 const examSettings = ref({
+  examName: '',  // 시험지 이름 (필수)
   visibility: 'PRIVATE',  // PRIVATE, PUBLIC, CLASS_ONLY
   classId: null,
-  examDate: null,
-  timeLimit: 50,  // 기본 50분
-  totalPoints: 100,
-  description: '',
-  shuffleQuestions: false,
-  showAnswerAfterSubmit: false
+  description: ''
 })
 
 // 사용 가능한 클래스 목록 (실제로는 API에서 가져와야 함)
@@ -289,6 +217,19 @@ const canComplete = computed(() => {
   return selectedItems.value.length > 0
 })
 
+// 미리보기용 시험 정보 - 실시간 반영
+const examInfoForPreview = computed(() => {
+  return {
+    title: examSettings.value.examName || '시험지 제목',
+    grade: testBankStore.examInfo?.gradeName || '',
+    subject: testBankStore.examInfo?.subjectName || '',
+    duration: '', // 제한시간 제거됨
+    totalScore: '', // 총점 제거됨
+    visibility: examSettings.value.visibility,
+    description: examSettings.value.description
+  }
+})
+
 // PDF 다운로드 처리 (ExamPDFPreview 컴포넌트에서 처리)
 const handleDownload = async (data) => {
   console.log('PDF 다운로드 완료:', data)
@@ -340,6 +281,12 @@ const handleSaveClick = async (event) => {
   console.log('selectedItems.value.length:', selectedItems.value.length)
   console.log('isSaving.value:', isSaving.value)
 
+  // 시험지 이름 검증
+  if (!examSettings.value.examName || examSettings.value.examName.trim() === '') {
+    alert('시험지 이름을 입력해주세요.')
+    return
+  }
+
   // 선택된 문항이 없으면 경고
   if (selectedItems.value.length === 0) {
     alert('문항을 선택해주세요.')
@@ -387,8 +334,8 @@ const saveExamToDatabase = async () => {
 
     // 시험지 저장 데이터 준비
     const examData = {
-      // UserExam 기본 정보
-      examName: examInfo.title || examInfo.examName || `${new Date().getFullYear()}년 ${examInfo.gradeName || '중2'} ${examInfo.areaName || '수학'} 시험지`,
+      // UserExam 기본 정보 - 사용자가 입력한 이름 우선 사용
+      examName: examSettings.value.examName || examInfo.title || examInfo.examName || `${new Date().getFullYear()}년 ${examInfo.gradeName || '중2'} ${examInfo.areaName || '수학'} 시험지`,
       gradeCode: examInfo.gradeCode || '08',
       gradeName: examInfo.gradeName || '중2',
       termCode: examInfo.termCode || '1',
@@ -536,6 +483,19 @@ onMounted(() => {
   console.log('testBankStore.examInfo:', testBankStore.examInfo)
   console.log('itemSelectionStore.selectedItems:', itemSelectionStore.selectedItems)
   console.log('testBankStore.selectedItems:', testBankStore.selectedItems)
+  
+  // examInfo에서 기본 시험지 이름 설정
+  const examInfo = testBankStore.examInfo || {}
+  if (!examSettings.value.examName && examInfo) {
+    const year = new Date().getFullYear()
+    const month = new Date().getMonth() + 1
+    const gradeName = examInfo.gradeName || '중2'
+    const areaName = examInfo.areaName || '수학'
+    const termName = examInfo.termName || '1학기'
+    
+    // 기본 이름 생성
+    examSettings.value.examName = `${year}년 ${month}월 ${gradeName} ${areaName} ${termName} 시험지`
+  }
 })
 
 // 총점 변경 시 store에 반영하여 미리보기 헤더와 동기화
@@ -862,6 +822,19 @@ watch(() => examSettings.value.totalPoints, (val) => {
 .checkbox-option span {
   font-size: 0.875rem;
   color: #4a5568;
+}
+
+/* 필수 필드 표시 */
+.required {
+  color: #ef4444;
+  margin-left: 0.25rem;
+}
+
+/* 설정 힌트 */
+.setting-hint {
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: #94a3b8;
 }
 
 /* 반응형 디자인 */

@@ -471,15 +471,34 @@ export const useTestBankStore = defineStore('testBank', {
         this.loading = true
 
         // API 파라미터 매핑
+        // visibility 보정: 'ALL' 또는 '전체'는 서버 Enum과 불일치하므로 파라미터에서 제거
+        const rawVisibility = searchParams.visibility
+        const normalizedVisibility = (() => {
+          if (!rawVisibility) return null
+          const v = String(rawVisibility).trim().toUpperCase()
+          if (v === 'ALL' || v === '전체' || v === 'ALL_VISIBILITY') return null
+          return v
+        })()
+
+        // subjectId 정규화: 비어있거나 0/NaN이면 제거
+        const normalizedSubjectId = (() => {
+          const sid = searchParams.subjectId
+          if (sid === undefined || sid === null) return null
+          const s = String(sid).trim()
+          if (s === '' || s === '0') return null
+          const n = Number(s)
+          return Number.isFinite(n) && n > 0 ? n : null
+        })()
+
         const params = {
           keyword: searchParams.keyword || '',
-          subjectId: searchParams.subjectId || null,  // 교과서 ID
+          subjectId: normalizedSubjectId,  // 유효한 교과서 ID만 전송
           areaCode: searchParams.areaCode || null,     // 과목 코드 (MA, KO, EN 등)
           gradeCode: searchParams.gradeCode || null,
           termCode: searchParams.termCode || null,
           largeChapterCode: searchParams.largeChapterCode || null,
           examType: searchParams.examType || this.examType || 'ALL',
-          visibility: searchParams.visibility ? searchParams.visibility.toUpperCase() : null, // 대문자로 변환
+          visibility: normalizedVisibility, // 유효 값만 전송 (PUBLIC|SCHOOL|PRIVATE)
           page: searchParams.page || 0,
           size: searchParams.size || 20,
           sort: searchParams.sort || 'createdDate,desc'

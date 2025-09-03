@@ -5,6 +5,129 @@
  */
 
 import html2canvas from 'html2canvas'
+import api from '@/services/api'
+
+// IMG 태그 정규화: data-src 등 lazy 속성을 src로 승격하고 CORS/스타일 보강
+export function normalizeImgTags(html) {
+  if (!html || typeof html !== 'string' || html.indexOf('<img') === -1) return html
+
+  return html.replace(/<img([^>]*?)>/gi, (match, attrs) => {
+    let newAttrs = attrs || ''
+
+    // src 없으면 data-*에서 채우기
+    const hasSrc = /\ssrc\s*=\s*['"][^'"]+['"]/i.test(newAttrs)
+    if (!hasSrc) {
+      const sources = [
+        /\sdata-src\s*=\s*['"]([^'"]+)['"]/i,
+        /\sdata-original\s*=\s*['"]([^'"]+)['"]/i,
+        /\sdata-lazy-src\s*=\s*['"]([^'"]+)['"]/i
+      ]
+      for (const re of sources) {
+        const m = newAttrs.match(re)
+        if (m && m[1]) {
+          newAttrs += ` src="${m[1]}"`
+          break
+        }
+      }
+      // srcset만 있는 경우 첫 URL을 src로 사용
+      if (!/\ssrc\s*=\s*['"][^'"]+['"]/i.test(newAttrs)) {
+        const mSrcset = newAttrs.match(/\ssrcset\s*=\s*['"]([^'"]+)['"]/i)
+        if (mSrcset && mSrcset[1]) {
+          const first = mSrcset[1].split(',')[0].trim().split(' ')[0]
+          if (first) {
+            newAttrs += ` src="${first}"`
+          }
+        }
+      }
+    }
+
+    // loading=lazy 제거 (렌더링 영향 방지)
+    newAttrs = newAttrs.replace(/\sloading\s*=\s*['"]lazy['"]/ig, '')
+
+    // crossorigin 추가
+    if (!/\scrossorigin\s*=\s*['"][^'"]*['"]/i.test(newAttrs)) {
+      newAttrs += ' crossorigin="anonymous"'
+    }
+
+    // 스타일 보강
+    if (!/\sstyle\s*=\s*['"][^'"]*['"]/i.test(newAttrs)) {
+      newAttrs += ' style="max-width:100%; height:auto; display:inline-block; margin:6px 0;"'
+    }
+
+    return `<img${newAttrs}>`
+  })
+}
+
+/**
+ * 외부 이미지를 백엔드 프록시를 통해 data URL로 교체 (CORS 회피)
+ * @param {HTMLElement} rootEl
+ */
+export async function replaceExternalImagesWithDataUrls(rootEl) {
+  if (!rootEl) return
+  const imgs = Array.from(rootEl.querySelectorAll('img'))
+  console.log(`[Image Proxy] ${imgs.length}개 이미지 처리 시작`)
+  
+  for (const img of imgs) {
+    try {
+      const src = img.getAttribute('src') || ''
+      if (!src) {
+        console.warn('[Image Proxy] src 속성 없음:', img)
+        continue
+      }
+      if (src.startsWith('data:')) {
+        console.log('[Image Proxy] 이미 data URL:', src.substring(0, 50) + '...')
+        continue
+      }
+      
+      // URL 파싱 시도
+      let urlObj
+      try {
+        urlObj = new URL(src, window.location.href)
+      } catch (urlError) {
+        console.error('[Image Proxy] URL 파싱 실패:', src, urlError)
+        continue
+      }
+      
+      // 동일 출처는 건너뜀
+      if (urlObj.origin === window.location.origin) {
+        console.log('[Image Proxy] 동일 출처, 프록시 불필요:', src)
+        continue
+      }
+
+      console.log('[Image Proxy] 외부 이미지 프록시 요청:', urlObj.href)
+      
+      // 프록시 요청
+      const res = await api.post('/proxy/image', { imageUrl: urlObj.href })
+      const dataUrl = res?.data?.base64
+      
+      if (dataUrl && typeof dataUrl === 'string' && dataUrl.startsWith('data:')) {
+        console.log('[Image Proxy] 프록시 성공, data URL 길이:', dataUrl.length)
+        img.setAttribute('src', dataUrl)
+        
+        // 로드 대기
+        await new Promise((resolve) => {
+          const tmp = new Image()
+          tmp.onload = () => {
+            console.log('[Image Proxy] 이미지 로드 성공')
+            resolve()
+          }
+          tmp.onerror = (error) => {
+            console.error('[Image Proxy] 이미지 로드 실패:', error)
+            resolve()
+          }
+          tmp.src = dataUrl
+        })
+      } else {
+        console.error('[Image Proxy] 프록시 응답 데이터 이상:', res?.data)
+      }
+    } catch (e) {
+      console.error('[Image Proxy] 이미지 프록시 교체 실패:', img.src, e)
+      // 실패한 경우 원본 URL 유지
+    }
+  }
+  
+  console.log('[Image Proxy] 이미지 프록시 처리 완료')
+}
 
 /**
  * 단일 문제 요소를 이미지로 변환
@@ -13,6 +136,9 @@ import html2canvas from 'html2canvas'
  * @returns {Promise<Object>} 이미지 데이터 객체
  */
 export async function convertQuestionToImage(element, options = {}) {
+  // 외부 이미지는 프록시를 통해 data URL로 교체해 CORS 회피
+  await replaceExternalImagesWithDataUrls(element)
+
   // 먼저 모든 이미지가 로드될 때까지 대기
   const images = element.querySelectorAll('img')
   if (images.length > 0) {
@@ -23,7 +149,6 @@ export async function convertQuestionToImage(element, options = {}) {
       }
       return new Promise((resolve, reject) => {
         const tempImg = new Image()
-        tempImg.crossOrigin = 'anonymous'
         tempImg.onload = () => {
           console.log('이미지 로드 완료:', img.src)
           resolve()
@@ -78,21 +203,12 @@ export async function convertQuestionToImage(element, options = {}) {
           }
         })
 
-        // 클론된 요소의 이미지들 처리
+        // 클론된 요소의 이미지들 처리: 스타일만 보정
         const clonedImages = clonedElement.querySelectorAll('img')
         clonedImages.forEach(img => {
-          // CORS 설정
-          img.crossOrigin = 'anonymous'
-          // 이미지 스타일 보정
           img.style.maxWidth = '100%'
           img.style.height = 'auto'
           img.style.display = 'inline-block'
-
-          if (!img.complete) {
-            console.warn('클론된 이미지가 아직 로드되지 않음:', img.src)
-          } else {
-            console.log('클론된 이미지 로드 완료:', img.src)
-          }
         })
 
         // 잠시 대기하여 이미지 렌더링 확실히 하기
@@ -102,12 +218,17 @@ export async function convertQuestionToImage(element, options = {}) {
   }
 
   try {
+    // html2canvas로 변환하기 전, 외부 이미지가 남아있다면 한 번 더 프록시 교체 시도
+    console.log('[convertQuestionToImage] 최종 이미지 프록시 처리')
+    await replaceExternalImagesWithDataUrls(element)
+
     // HTML 내용 확인
-    console.log('렌더링할 요소:', {
+    console.log('[convertQuestionToImage] 렌더링할 요소:', {
       width: element.offsetWidth,
       height: element.offsetHeight,
       hasContent: element.innerHTML.length > 0,
-      textContent: element.textContent.substring(0, 100)
+      textContent: element.textContent.substring(0, 100),
+      imageCount: element.querySelectorAll('img').length
     })
 
     // MathJax 렌더링 대기
@@ -223,6 +344,10 @@ export async function convertQuestionsToImages(questions, onProgress) {
         passageElement.style.display = 'block'
         passageElement.style.position = 'relative'
 
+        // 지문 요소의 외부 이미지를 프록시로 교체
+        console.log(`[convertQuestionsToImages] 지문 ${groupIdx + 1} 이미지 프록시 처리 시작`)
+        await replaceExternalImagesWithDataUrls(passageElement)
+
         // 강제 렌더링을 위한 대기
         await new Promise(resolve => {
           requestAnimationFrame(() => {
@@ -268,10 +393,13 @@ export async function convertQuestionsToImages(questions, onProgress) {
         questionElement.style.display = 'block'
         questionElement.style.position = 'relative'
 
-        // 문제 요소 내의 모든 이미지 로드 대기
+        // 문제 요소 내의 모든 이미지 로드 대기 및 외부 이미지는 프록시로 교체
+        console.log(`[convertQuestionsToImages] 문제 ${question.displayNumber} 이미지 프록시 처리 시작`)
+        await replaceExternalImagesWithDataUrls(questionElement)
+        
         const questionImages = questionElement.querySelectorAll('img')
         if (questionImages.length > 0) {
-          console.log(`문제 ${question.displayNumber}의 이미지 ${questionImages.length}개 로드 대기 중...`)
+          console.log(`[convertQuestionsToImages] 문제 ${question.displayNumber}의 이미지 ${questionImages.length}개 로드 대기 중...`)
 
           // 각 이미지에 대해 처리
           for (const img of questionImages) {
@@ -283,11 +411,11 @@ export async function convertQuestionsToImages(questions, onProgress) {
             if (!img.complete) {
               await new Promise((resolve) => {
                 img.onload = () => {
-                  console.log(`문제 ${question.displayNumber} 이미지 로드 완료:`, img.src)
+                  console.log(`[convertQuestionsToImages] 문제 ${question.displayNumber} 이미지 로드 완료:`, img.src.substring(0, 50))
                   resolve()
                 }
                 img.onerror = () => {
-                  console.error(`문제 ${question.displayNumber} 이미지 로드 실패:`, img.src)
+                  console.error(`[convertQuestionsToImages] 문제 ${question.displayNumber} 이미지 로드 실패:`, img.src)
                   // 실패한 이미지 대체 처리
                   img.style.border = '1px solid red'
                   img.alt = '이미지 로드 실패'
@@ -407,6 +535,8 @@ function groupQuestionsByPassage(questions) {
  * 지문 요소 생성 - 내용 길이에 따라 높이 자동 조정
  */
 function createPassageElement(passageHtml, questionNumbers) {
+  // IMG 정규화
+  passageHtml = normalizeImgTags(passageHtml)
   const container = document.createElement('div')
   container.className = 'passage-container'
 
@@ -509,21 +639,8 @@ function createQuestionWithChoicesElement(question) {
                       question.questionText ||
                       question.itemText ||
                       ''
-
-  // 이미지 태그가 있다면 CORS 속성 추가 및 스타일 보정
-  if (htmlContent.includes('<img')) {
-    htmlContent = htmlContent.replace(/<img([^>]*?)>/g, (match, attrs) => {
-      // crossorigin 속성이 없으면 추가
-      if (!attrs.includes('crossorigin')) {
-        attrs += ' crossorigin="anonymous"'
-      }
-      // 스타일 추가 (max-width 설정)
-      if (!attrs.includes('style=')) {
-        attrs += ' style="max-width: 100%; height: auto; display: inline-block; margin: 10px 0;"'
-      }
-      return `<img${attrs}>`
-    })
-  }
+  // IMG 정규화
+  htmlContent = normalizeImgTags(htmlContent)
 
   // 디버깅 로그
   console.log('Question HTML content:', {
@@ -551,17 +668,9 @@ function createQuestionWithChoicesElement(question) {
   for (let i = 1; i <= 5; i++) {
     let choiceHtml = question[`choice${i}Html`] || question[`choice${i}Text`] || question[`choice${i}`]
     if (choiceHtml) {
-      // 선택지에도 이미지 태그가 있다면 CORS 속성 및 스타일 추가
-      if (typeof choiceHtml === 'string' && choiceHtml.includes('<img')) {
-        choiceHtml = choiceHtml.replace(/<img([^>]*?)>/g, (match, attrs) => {
-          if (!attrs.includes('crossorigin')) {
-            attrs += ' crossorigin="anonymous"'
-          }
-          if (!attrs.includes('style=')) {
-            attrs += ' style="max-width: 100%; height: auto; display: inline-block; margin: 5px 0;"'
-          }
-          return `<img${attrs}>`
-        })
+      // IMG 정규화
+      if (typeof choiceHtml === 'string') {
+        choiceHtml = normalizeImgTags(choiceHtml)
       }
       choices.push(choiceHtml)
     }
@@ -831,7 +940,7 @@ function createQuestionElement_DEPRECATED(question) {
   `
 
   // 디버깅: 사용 가능한 HTML 필드 확인
-  const htmlContent = question.questionHtml || question.itemHtml || question.html || question.questionText || ''
+  let htmlContent = question.questionHtml || question.itemHtml || question.html || question.questionText || ''
   console.log('문제 HTML 내용:', {
     questionNumber: question.displayNumber || question.itemNumber,
     hasQuestionHtml: !!question.questionHtml,
@@ -842,15 +951,17 @@ function createQuestionElement_DEPRECATED(question) {
     availableFields: Object.keys(question).filter(key => key.toLowerCase().includes('html') || key.toLowerCase().includes('text'))
   })
 
+  // IMG 정규화
+  htmlContent = normalizeImgTags(htmlContent)
   questionContent.innerHTML = htmlContent
   container.appendChild(questionContent)
 
   // 선택지가 있는 경우 (choice1Html ~ choice5Html 형식)
   const choices = []
   for (let i = 1; i <= 5; i++) {
-    const choiceHtml = question[`choice${i}Html`] || question[`choice${i}`]
+    let choiceHtml = question[`choice${i}Html`] || question[`choice${i}`]
     if (choiceHtml && choiceHtml.trim()) {
-      choices.push(choiceHtml)
+      choices.push(typeof choiceHtml === 'string' ? normalizeImgTags(choiceHtml) : choiceHtml)
     }
   }
 

@@ -479,8 +479,10 @@ import chapterApi from '@/services/chapterApi'
 import ChapterTreeSelector from './ChapterTreeSelector.vue'
 import SimilarItemsModal from '@/components/common/SimilarItemsModal.vue'
 import { useMathJax } from '@/composables/useMathJax'
+import { replaceExternalImagesWithDataUrls } from '@/utils/question-to-image-converter'
 import { renderMathJaxSmartHybrid } from '@/utils/mathjax-hybrid'
 import DOMPurify from 'dompurify'
+import { normalizeImgTags } from '@/utils/question-to-image-converter'
 import { convertQuestionsToImages } from '@/utils/question-to-image-converter'
 import { useItemSelectionStore } from '@/stores/itemSelection'
 import { useTestBankStore } from '@/stores/testBank'
@@ -636,6 +638,8 @@ const hasPassageGroups = computed(() => {
 // HTML 정리 함수 - 도수분포표와 지문 콘텐츠 보존
 const sanitizeHtml = (html) => {
   if (!html) return ''
+  // IMG 태그 정규화
+  html = normalizeImgTags(html)
   
   // DOMPurify를 사용한 안전한 HTML 정화
   // LaTeX 수식, MathJax, 테이블, 이미지 모두 보존
@@ -648,7 +652,9 @@ const sanitizeHtml = (html) => {
       // 기본 HTML 태그
       'span', 'div', 'p', 'br', 'hr', 'strong', 'em', 'u', 'sub', 'sup',
       // 리스트 태그
-      'ul', 'ol', 'li'
+      'ul', 'ol', 'li',
+      // 이미지 태그
+      'img'
     ],
     ADD_ATTR: [
       // MathJax 속성
@@ -658,7 +664,7 @@ const sanitizeHtml = (html) => {
       // 테이블 속성
       'colspan', 'rowspan', 'border', 'cellpadding', 'cellspacing', 'align', 'valign',
       // 이미지 속성
-      'src', 'alt', 'width', 'height', 'title'
+      'src', 'srcset', 'alt', 'width', 'height', 'title', 'crossorigin'
     ],
     KEEP_CONTENT: true,
     ALLOW_DATA_ATTR: true,
@@ -1072,6 +1078,8 @@ watch(showPreview, async (newVal) => {
         hideBeforeRender: true,
         clearFirst: false
       })
+      // 외부 이미지 프록시 처리
+      try { await replaceExternalImagesWithDataUrls(container) } catch (e) { console.warn('이미지 프록시 실패:', e) }
     })
   }
 })
@@ -1086,6 +1094,8 @@ watch(generatedItems, async () => {
         hideBeforeRender: true,
         clearFirst: false
       })
+      // 외부 이미지 프록시 처리
+      try { await replaceExternalImagesWithDataUrls(container) } catch (e) { console.warn('이미지 프록시 실패:', e) }
     })
   }
 }, { deep: true })
