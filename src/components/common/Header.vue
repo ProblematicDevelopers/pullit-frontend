@@ -317,19 +317,8 @@ export default {
     }
 
     const handleLogout = async () => {
-      console.log('로그아웃 버튼 클릭됨')
       try {
-        // API 호출 없이 바로 로컬 처리 (백엔드 API가 아직 준비되지 않은 경우)
-        // await authService.logout()
-
-        // 로컬 스토리지 클리어
-        localStorage.removeItem('accessToken')
-        localStorage.removeItem('refreshToken')
-        localStorage.removeItem('userInfo')
-        localStorage.removeItem('userType')
-        localStorage.removeItem('isLoggedIn')
-
-        console.log('로그아웃 성공')
+        await authService.logoutEnhanced()
       } catch (error) {
         console.error('Logout error:', error)
       } finally {

@@ -25,27 +25,21 @@
       </header>
 
       <!-- 생성 리포트 -->
-      <div class="generation-report">
+      <div class="generation-report" v-if="selectionReport">
         <div class="report-card">
           <h4>📊 문항 생성 결과</h4>
           <div class="report-stats">
             <div class="stat-item">
               <span class="stat-label">요청 문항 수:</span>
-              <span class="stat-value">{{ selectionReport?.requestedCount || settings.value.itemCount }}개</span>
+              <span class="stat-value">{{ selectionReport.requestedCount || 0 }}개</span>
             </div>
             <div class="stat-item">
               <span class="stat-label">실제 생성 문항 수:</span>
-              <span class="stat-value" :class="{ 'success': generatedItems.length === (selectionReport?.requestedCount || settings.value.itemCount) }">
-                {{ generatedItems.length }}개
-              </span>
+              <span class="stat-value">{{ selectionReport.actualCount || generatedItems.length }}개</span>
             </div>
-            <div class="stat-item" v-if="selectionReport?.difficultyAdjusted">
+            <div class="stat-item" v-if="selectionReport.difficultyAdjusted">
               <span class="stat-label warning">⚠️ 난이도 조정:</span>
               <span class="stat-value warning">{{ selectionReport.adjustmentMessage }}</span>
-            </div>
-            <div class="stat-item" v-if="generatedItems.length < (selectionReport?.requestedCount || settings.value.itemCount)">
-              <span class="stat-label info">ℹ️ 알림:</span>
-              <span class="stat-value info">요청한 문항 수보다 적게 생성되었습니다</span>
             </div>
           </div>
         </div>
@@ -527,12 +521,7 @@ const isGenerating = ref(false)
 const showPreview = ref(false)
 const generatedItems = ref([])
 const selectionMetadata = ref(null)
-const selectionReport = ref({
-  requestedCount: 0,
-  actualCount: 0,
-  difficultyAdjusted: false,
-  adjustmentMessage: ''
-})
+const selectionReport = ref(null)
 
 // 유사 문항 모달 관련 상태
 const showSimilarItemsModal = ref(false)
@@ -829,13 +818,7 @@ const handleAddSimilarItems = (items) => {
 const backToSettings = () => {
   showPreview.value = false
   generatedItems.value = []
-  selectionReport.value = {
-    requestedCount: 0,
-    actualCount: 0,
-    difficultyAdjusted: false,
-    adjustmentMessage: ''
-  }
-  selectionMetadata.value = null
+  selectionReport.value = null
 }
 
 const regenerate = () => {
@@ -1038,20 +1021,17 @@ const handleGenerate = async () => {
         console.log('선택 메타데이터:', result.metadata)
         selectionMetadata.value = result.metadata
       }
-      
-      // 리포트 정보 가공 - report가 없어도 기본값 설정
-      selectionReport.value = {
-        requestedCount: settings.value.itemCount,  // 요청한 문항 수는 settings에서 가져옴
-        actualCount: result.data.length,
-        difficultyAdjusted: result.report?.hasFallback || false,
-        adjustmentMessage: result.report?.fallbackReason || ''
-      }
-      
       if (result.report) {
         console.log('선택 리포트:', result.report)
-        // report가 있으면 추가 정보 업데이트
-        if (result.report.requestedCount !== undefined) {
-          selectionReport.value.requestedCount = result.report.requestedCount
+        
+        // 리포트 정보 가공: 서버 리포트에 표시용 필드 병합
+        selectionReport.value = {
+          ...result.report,
+          requestedCount: result.metadata?.requestedCount ?? settings.value.itemCount,
+          actualCount: result.data.length,
+          // 별칭 필드(기존 UI 호환)
+          difficultyAdjusted: result.report?.hasFallback || result.report?.hasAdjustments || false,
+          adjustmentMessage: result.report?.fallbackReason || result.report?.adjustmentReason || ''
         }
       }
       
@@ -1061,9 +1041,8 @@ const handleGenerate = async () => {
       // 미리보기 모드로 전환
       showPreview.value = true
       
-      // 메타데이터와 리포트 저장
+      // 메타데이터 저장 (리포트는 위에서 병합 처리됨)
       selectionMetadata.value = result.metadata
-      selectionReport.value = result.report
     } else {
       console.warn('Smart Random Selection 결과 없음:', result)
       
@@ -2080,19 +2059,6 @@ onMounted(async () => {
 
 .stat-value.warning {
   color: #D97706;
-}
-
-.stat-label.info {
-  color: #3B82F6;
-}
-
-.stat-value.info {
-  color: #2563EB;
-}
-
-.stat-value.success {
-  color: #10B981;
-  font-weight: 700;
 }
 
 /* 문항 목록 */

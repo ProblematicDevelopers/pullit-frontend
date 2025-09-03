@@ -110,8 +110,60 @@
             </div>
           </div>
         </div>
+        
+        <!-- 캘린더 섹션 추가 -->
+        <div class="calendar-section">
+          <div class="section-header">
+            <h3>📅 학급 캘린더</h3>
+            <button @click="showCalendarModal = true" class="view-calendar-btn">
+              전체 보기
+            </button>
+          </div>
+          
+          <div class="mini-calendar">
+            <!-- 오늘 일정 -->
+            <div class="today-events">
+              <h4>오늘 일정</h4>
+              <div v-if="todayEvents.length === 0" class="no-events">
+                오늘 예정된 일정이 없습니다.
+              </div>
+              <div v-else class="event-list">
+                <div v-for="event in todayEvents" :key="event.id" class="event-item">
+                  <span class="event-time">{{ formatEventTime(event.startDateTime) }}</span>
+                  <span class="event-title">{{ event.title }}</span>
+                  <span v-if="event.visibility === 'CLASS_WIDE'" class="class-badge">학급</span>
+                </div>
+              </div>
+            </div>
+            
+            <!-- 이번주 일정 -->
+            <div class="week-events">
+              <h4>이번주 일정</h4>
+              <div v-if="weekEvents.length === 0" class="no-events">
+                이번주 예정된 일정이 없습니다.
+              </div>
+              <div v-else class="event-list">
+                <div v-for="event in weekEvents" :key="event.id" class="event-item">
+                  <span class="event-date">{{ formatEventDate(event.startDateTime) }}</span>
+                  <span class="event-title">{{ event.title }}</span>
+                  <span v-if="event.visibility === 'CLASS_WIDE'" class="class-badge">학급</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+    
+    <!-- 캘린더 모달 -->
+    <CalendarModal 
+      v-if="showCalendarModal"
+      :isOpen="showCalendarModal"
+      @close="showCalendarModal = false"
+      :userId="userInfo.userId"
+      :classId="classId"
+      :isStudent="true"
+    />
   </div>
 </template>
 
@@ -119,8 +171,10 @@
 import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import ExamStatusBanner from '@/components/student/ExamStatusBanner.vue'
+import CalendarModal from '@/components/CalendarModal.vue'
 import { useExamWebSocket } from '@/composables/useExamWebSocket'
 import dashboardApi from '@/services/dashboardApi'
+import calendarApi from '@/services/calendarApi'
 
 // 라우터
 const router = useRouter()
@@ -140,6 +194,11 @@ const hasActiveExam = ref(false)
 // 시험 목록
 const upcomingExams = ref([])
 const loading = ref(false)
+
+// 캘린더 관련
+const showCalendarModal = ref(false)
+const todayEvents = ref([])
+const weekEvents = ref([])
 
 // WebSocket 연결 (클래스 ID가 있을 때만)
 if (classId.value) {
@@ -225,9 +284,80 @@ const viewExamDetails = (exam) => {
   alert(`${exam.title} 시험 상세 정보\n\n날짜: ${exam.dateDisplay}\n시간: ${exam.timeDisplay}\n${exam.description}`)
 }
 
+// 캘린더 이벤트 로드
+const loadCalendarEvents = async () => {
+  if (!classId.value) return
+  
+  try {
+    const today = new Date()
+    const startOfWeek = new Date(today)
+    startOfWeek.setDate(today.getDate() - today.getDay())
+    const endOfWeek = new Date(startOfWeek)
+    endOfWeek.setDate(startOfWeek.getDate() + 6)
+    
+    // 학생의 개인 일정 + 학급 전체 일정 조회
+    const response = await calendarApi.getStudentClassEvents(
+      userInfo.userId,
+      classId.value,
+      today.toISOString().split('T')[0],
+      endOfWeek.toISOString().split('T')[0]
+    )
+    
+    const events = response.data || []
+    
+    // 오늘 일정 필터링
+    todayEvents.value = events.filter(event => {
+      const eventDate = new Date(event.startDateTime).toDateString()
+      return eventDate === today.toDateString()
+    })
+    
+    // 이번주 일정 필터링
+    weekEvents.value = events.filter(event => {
+      const eventDate = new Date(event.startDateTime)
+      return eventDate >= startOfWeek && eventDate <= endOfWeek
+    }).slice(0, 5) // 최대 5개만 표시
+    
+  } catch (error) {
+    console.error('캘린더 이벤트 로드 실패:', error)
+  }
+}
+
+// 이벤트 시간 포맷
+const formatEventTime = (dateTime) => {
+  const date = new Date(dateTime)
+  return date.toLocaleTimeString('ko-KR', { 
+    hour: '2-digit', 
+    minute: '2-digit',
+    hour12: true 
+  })
+}
+
+// 이벤트 날짜 포맷
+const formatEventDate = (dateTime) => {
+  const date = new Date(dateTime)
+  const today = new Date()
+  
+  if (date.toDateString() === today.toDateString()) {
+    return '오늘'
+  }
+  
+  const tomorrow = new Date(today)
+  tomorrow.setDate(today.getDate() + 1)
+  if (date.toDateString() === tomorrow.toDateString()) {
+    return '내일'
+  }
+  
+  return date.toLocaleDateString('ko-KR', { 
+    month: 'short', 
+    day: 'numeric',
+    weekday: 'short'
+  })
+}
+
 onMounted(() => {
   loadClassInfo()
   loadUpcomingExams()
+  loadCalendarEvents()
 })
 </script>
 
@@ -547,5 +677,117 @@ onMounted(() => {
 
 .btn-view-details:hover {
   background: #e5e7eb;
+}
+
+/* 캘린더 섹션 스타일 */
+.calendar-section {
+  margin-top: 2rem;
+  background: white;
+  border-radius: 12px;
+  padding: 1.5rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.5rem;
+}
+
+.section-header h3 {
+  color: #1f2937;
+  font-size: 1.5rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.view-calendar-btn {
+  padding: 0.5rem 1rem;
+  background: #3b82f6;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.view-calendar-btn:hover {
+  background: #2563eb;
+}
+
+.mini-calendar {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 2rem;
+}
+
+.today-events,
+.week-events {
+  background: #f9fafb;
+  border-radius: 8px;
+  padding: 1rem;
+}
+
+.today-events h4,
+.week-events h4 {
+  color: #374151;
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0 0 1rem 0;
+}
+
+.no-events {
+  color: #9ca3af;
+  font-size: 0.875rem;
+  text-align: center;
+  padding: 1rem;
+}
+
+.event-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.event-item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  background: white;
+  border-radius: 6px;
+  font-size: 0.875rem;
+}
+
+.event-time,
+.event-date {
+  color: #6b7280;
+  font-size: 0.75rem;
+  min-width: 60px;
+}
+
+.event-title {
+  flex: 1;
+  color: #1f2937;
+  font-weight: 500;
+}
+
+.class-badge {
+  padding: 0.125rem 0.5rem;
+  background: #dbeafe;
+  color: #1d4ed8;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+/* 반응형 디자인 */
+@media (max-width: 768px) {
+  .mini-calendar {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

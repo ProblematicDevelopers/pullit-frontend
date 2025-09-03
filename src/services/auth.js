@@ -1,80 +1,5 @@
-import axios from 'axios'
-
-// API 기본 URL
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
-
-// 프로덕션 환경인지 확인
-const isProduction = import.meta.env.PROD
-
-// Axios 인스턴스 생성
-const authApi = axios.create({
-  // 프로덕션: nginx가 /api 프록시 처리, 로컬: 직접 /api 경로 추가
-  baseURL: isProduction ? `${API_BASE_URL}/auth` : `${API_BASE_URL}/api/auth`,
-  headers: {
-    'Content-Type': 'application/json',
-  },
-  withCredentials: true // CORS 쿠키 전송 허용
-})
-
-// 토큰 관리 유틸리티
-const tokenManager = {
-  getAccessToken: () => localStorage.getItem('accessToken'),
-  getRefreshToken: () => localStorage.getItem('refreshToken'),
-
-  setTokens: (accessToken, refreshToken) => {
-    localStorage.setItem('accessToken', accessToken)
-    localStorage.setItem('refreshToken', refreshToken)
-  },
-
-  clearTokens: () => {
-    localStorage.removeItem('accessToken')
-    localStorage.removeItem('refreshToken')
-    localStorage.removeItem('userInfo')
-    localStorage.removeItem('userType')
-    localStorage.removeItem('isLoggedIn')
-  }
-}
-
-// 요청 인터셉터 - 모든 요청에 토큰 추가
-authApi.interceptors.request.use(
-  (config) => {
-    const token = tokenManager.getAccessToken()
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`
-    }
-    return config
-  },
-  (error) => {
-    return Promise.reject(error)
-  }
-)
-
-// 응답 인터셉터 - 토큰 만료 처리
-authApi.interceptors.response.use(
-  (response) => response,
-  async (error) => {
-    const originalRequest = error.config
-
-    if (error.response?.status === 401 && !originalRequest._retry) {
-      originalRequest._retry = true
-
-      try {
-        const refreshToken = tokenManager.getRefreshToken()
-        if (refreshToken) {
-          const response = await authService.refreshToken(refreshToken)
-          tokenManager.setTokens(response.data.accessToken, response.data.refreshToken)
-          originalRequest.headers.Authorization = `Bearer ${response.data.accessToken}`
-          return authApi(originalRequest)
-        }
-      } catch (refreshError) {
-        tokenManager.clearTokens()
-        window.location.href = '/login'
-      }
-    }
-
-    return Promise.reject(error)
-  }
-)
+import api from './api'
+import { tokenManager } from './token'
 
 // 인증 서비스
 const authService = {
@@ -86,7 +11,7 @@ const authService = {
    */
   async login(username, password) {
     try {
-      const response = await authApi.post('/login', {
+      const response = await api.post('/auth/login', {
         username,
         password
       })
@@ -119,7 +44,7 @@ const authService = {
    */
   async register(userData) {
     try {
-      const response = await authApi.post('/register', userData)
+      const response = await api.post('/auth/register', userData)
       return response.data
     } catch (error) {
       console.error('Register error:', error)
@@ -134,7 +59,7 @@ const authService = {
    */
   async refreshToken(refreshToken) {
     try {
-      const response = await authApi.post('/refresh', {
+      const response = await api.post('/auth/refresh', {
         refreshToken
       })
 
@@ -151,12 +76,15 @@ const authService = {
   },
 
   /**
-   * 로그아웃
+   * 로그아웃 (기존 버전 - 호환성 유지)
    * @returns {Promise} 로그아웃 응답
    */
   async logout() {
     try {
-      const response = await authApi.post('/logout')
+      // Route legacy logout through enhanced path to ensure blacklist
+      const response = await api.post('/auth/v2/logout', {
+        refreshToken: tokenManager.getRefreshToken()
+      })
       tokenManager.clearTokens()
       return response.data
     } catch (error) {
@@ -167,12 +95,79 @@ const authService = {
   },
 
   /**
+   * 강화된 로그아웃 (JWT 블랙리스트 지원)
+   * @returns {Promise} 로그아웃 응답
+   */
+  async logoutEnhanced() {
+    try {
+      const refreshToken = tokenManager.getRefreshToken()
+      const response = await api.post('/auth/v2/logout', { refreshToken })
+      
+      tokenManager.clearTokens()
+      return response.data
+    } catch (error) {
+      console.error('Enhanced logout error:', error)
+      tokenManager.clearTokens()
+      throw error
+    }
+  },
+
+  /**
+   * 특정 토큰 무효화 (보안 사고 대응)
+   * @param {string} token - 무효화할 토큰
+   * @param {string} reason - 무효화 사유
+   * @returns {Promise} 무효화 응답
+   */
+  async revokeToken(token, reason = 'User requested') {
+    try {
+      const response = await api.post('/auth/v2/revoke-token', { token, reason })
+      return response.data
+    } catch (error) {
+      console.error('Token revocation error:', error)
+      throw error
+    }
+  },
+
+  /**
+   * 모든 토큰 무효화 (계정 탈취 대응)
+   * @param {string} reason - 무효화 사유
+   * @returns {Promise} 무효화 응답
+   */
+  async revokeAllTokens(reason = 'Security precaution') {
+    try {
+      const response = await api.post('/auth/v2/revoke-all-tokens', { reason })
+      
+      // 모든 토큰이 무효화되면 로컬 토큰도 삭제
+      tokenManager.clearTokens()
+      return response.data
+    } catch (error) {
+      console.error('All tokens revocation error:', error)
+      tokenManager.clearTokens()
+      throw error
+    }
+  },
+
+  /**
+   * 블랙리스트 통계 조회 (관리자용)
+   * @returns {Promise} 블랙리스트 통계
+   */
+  async getBlacklistStats() {
+    try {
+      const response = await api.get('/auth/v2/blacklist-stats')
+      return response.data
+    } catch (error) {
+      console.error('Get blacklist stats error:', error)
+      throw error
+    }
+  },
+
+  /**
    * 토큰 검증
    * @returns {Promise} 토큰 유효성
    */
   async validateToken() {
     try {
-      const response = await authApi.get('/validate')
+      const response = await api.get('/auth/validate')
       return response.data
     } catch (error) {
       console.error('Token validation error:', error)
@@ -208,7 +203,7 @@ const authService = {
       console.log(`Processing OAuth2 callback for ${provider}`)
 
       // OAuth2 성공 엔드포인트 호출 (세션 기반)
-      const response = await authApi.get('/oauth2/success')
+      const response = await api.get('/auth/oauth2/success')
 
       console.log('OAuth2 callback response:', response.data)
 
@@ -237,7 +232,7 @@ const authService = {
   async handleSocialLoginCallback(provider) {
     try {
       // OAuth2 성공 엔드포인트 호출
-      const response = await authApi.get('/oauth2/success')
+      const response = await api.get('/auth/oauth2/success')
 
       if (response.data.success) {
         const { accessToken, refreshToken, user } = response.data.data
@@ -290,15 +285,7 @@ const authService = {
    */
   async getClassInfo() {
     try {
-      // API 기본 URL 설정
-      const baseURL = isProduction ? `${API_BASE_URL}/classes` : `${API_BASE_URL}/api/classes`
-
-      const response = await axios.get(`${baseURL}/myclass`, {
-        headers: {
-          Authorization: `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        }
-      })
+      const response = await api.get('/classes/myclass')
 
       if (response.data.success) {
         return response.data.data
@@ -316,15 +303,7 @@ const authService = {
    */
   async getTeacherClass() {
     try {
-      // API 기본 URL 설정
-      const baseURL = isProduction ? `${API_BASE_URL}/classes` : `${API_BASE_URL}/api/classes`
-
-      const response = await axios.get(`${baseURL}/teacher/my-class`, {
-        headers: {
-          Authorization: `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        }
-      })
+      const response = await api.get('/classes/teacher/my-class')
 
       if (response.data.success) {
         return response.data.data
@@ -347,15 +326,7 @@ const authService = {
    */
   async updateClass(classId, data) {
     try {
-      // API 기본 URL 설정
-      const baseURL = isProduction ? `${API_BASE_URL}/classes` : `${API_BASE_URL}/api/classes`
-
-      const response = await axios.put(`${baseURL}/${classId}`, data, {
-        headers: {
-          Authorization: `Bearer ${tokenManager.getAccessToken()}`,
-          'Content-Type': 'application/json'
-        }
-      })
+      const response = await api.put(`/classes/${classId}`, data)
 
       if (response.data.success) {
         return response.data.data

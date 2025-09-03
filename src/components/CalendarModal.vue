@@ -151,12 +151,48 @@
             <div class="form-group">
               <label>유형</label>
               <select v-model="newSchedule.type" required>
-                <option value="exam">시험</option>
-                <option value="meeting">회의</option>
-                <option value="deadline">마감일</option>
-                <option value="class">수업</option>
-                <option value="event">이벤트</option>
+                <option value="EXAM">시험</option>
+                <option value="CBT_EXAM">CBT 시험</option>
+                <option value="MEETING">회의</option>
+                <option value="CLASS">수업</option>
+                <option value="ASSIGNMENT">과제</option>
+                <option value="PERSONAL">개인 일정</option>
+                <option value="HOLIDAY">공휴일</option>
               </select>
+            </div>
+            
+            <!-- 선생님인 경우에만 공개 범위 선택 표시 -->
+            <div class="form-group" v-if="!isStudent">
+              <label>공개 범위</label>
+              <div class="visibility-options">
+                <label class="radio-option">
+                  <input
+                    type="radio"
+                    v-model="newSchedule.visibility"
+                    value="PERSONAL"
+                    name="visibility"
+                  />
+                  <span class="radio-label">
+                    <span class="radio-icon">👤</span>
+                    본인만 보기
+                  </span>
+                </label>
+                <label class="radio-option">
+                  <input
+                    type="radio"
+                    v-model="newSchedule.visibility"
+                    value="CLASS_WIDE"
+                    name="visibility"
+                  />
+                  <span class="radio-label">
+                    <span class="radio-icon">👥</span>
+                    학급 전체 공개
+                  </span>
+                </label>
+              </div>
+              <p class="visibility-hint" v-if="newSchedule.visibility === 'CLASS_WIDE'">
+                ℹ️ 학급 전체 공개 시 모든 학생들의 캘린더에 표시됩니다.
+              </p>
             </div>
             <div class="form-actions">
               <button type="button" class="cancel-btn" @click="showAddSchedule = false">
@@ -176,6 +212,7 @@
 <script setup>
 import { ref, computed, onMounted, watch } from 'vue'
 import scheduleApi from '@/services/scheduleApi'
+import calendarApi from '@/services/calendarApi'
 
 const props = defineProps({
   isOpen: {
@@ -185,6 +222,18 @@ const props = defineProps({
   upcomingEvents: {
     type: Array,
     default: () => []
+  },
+  userId: {
+    type: [Number, String],
+    default: null
+  },
+  classId: {
+    type: [Number, String],
+    default: null
+  },
+  isStudent: {
+    type: Boolean,
+    default: false
   }
 })
 
@@ -200,7 +249,9 @@ const newSchedule = ref({
   description: '',
   date: '',
   time: '',
-  type: 'class'
+  type: 'PERSONAL',
+  visibility: 'PERSONAL',
+  classId: props.classId
 })
 
 // 요일 배열
@@ -322,13 +373,56 @@ const loadMonthSchedules = async () => {
   try {
     const year = currentDate.value.getFullYear()
     const month = currentDate.value.getMonth() + 1
-    const response = await scheduleApi.getMonthlySchedules(year, month)
-    if (response.success) {
-      // API로부터 받은 일정
-      const apiSchedules = response.data || []
+    
+    // 1. Schedule API로부터 일정 로드
+    const scheduleResponse = await scheduleApi.getMonthlySchedules(year, month)
+    const apiSchedules = scheduleResponse.success ? (scheduleResponse.data || []) : []
+    
+    // 2. Calendar Events API로부터 일정 로드
+    let calendarEvents = []
+    if (props.userId) {
+      const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0]
+      const endDate = new Date(year, month, 0).toISOString().split('T')[0]
       
-      // upcomingEvents를 일정 형식으로 변환
-      const upcomingSchedules = props.upcomingEvents.map(event => {
+      try {
+        let eventResponse
+        if (props.isStudent && props.classId) {
+          // 학생인 경우 학급 이벤트도 포함
+          eventResponse = await calendarApi.getStudentClassEvents(
+            props.userId, 
+            props.classId, 
+            startDate, 
+            endDate
+          )
+        } else {
+          // 선생님인 경우 개인 이벤트만
+          eventResponse = await calendarApi.getUserEvents(
+            props.userId, 
+            startDate, 
+            endDate
+          )
+        }
+        
+        if (eventResponse.success) {
+          // CalendarEvent를 Schedule 형식으로 변환
+          calendarEvents = (eventResponse.data || []).map(event => ({
+            id: `calendar-${event.id}`,
+            title: event.title,
+            scheduledDate: event.startDateTime,
+            description: event.description || '',
+            type: event.eventType?.toLowerCase() || 'personal',
+            isCalendarEvent: true,
+            visibility: event.visibility,
+            color: event.color || '#2563eb'
+          }))
+        }
+      } catch (error) {
+        console.error('캘린더 이벤트 로드 실패:', error)
+      }
+    }
+    
+    // upcomingEvents를 일정 형식으로 변환
+    const upcomingSchedules = props.upcomingEvents.map(event => {
         // event.date가 여러 형식일 수 있음
         let scheduledDate = null
         if (event.date) {
@@ -367,25 +461,24 @@ const loadMonthSchedules = async () => {
           type: event.type || 'exam',
           isUpcoming: true // 예정된 일정임을 표시
         }
-      }).filter(s => s.scheduledDate !== null) // 유효한 날짜만 포함
-      
-      // 두 일정 목록을 합치고 중복 제거
-      // API 일정 중에서 upcomingEvents와 중복되지 않는 것만 필터링
-      const filteredApiSchedules = apiSchedules.filter(apiSchedule => {
-        // upcoming 일정과 제목이 같은 경우 제외 (upcomingEvents를 우선)
-        return !upcomingSchedules.some(upcoming => 
-          apiSchedule.title === upcoming.title ||
-          (apiSchedule.scheduledDate && upcoming.scheduledDate && 
-           apiSchedule.scheduledDate.split('T')[0] === upcoming.scheduledDate.split('T')[0] &&
-           apiSchedule.title.includes(upcoming.title))
-        )
-      })
-      
-      // upcomingEvents를 우선하여 합치기
-      const allSchedules = [...upcomingSchedules, ...filteredApiSchedules]
-      
-      schedules.value = allSchedules
-    }
+    }).filter(s => s.scheduledDate !== null) // 유효한 날짜만 포함
+    
+    // 세 일정 목록을 합치고 중복 제거
+    // API 일정 중에서 upcomingEvents와 중복되지 않는 것만 필터링
+    const filteredApiSchedules = apiSchedules.filter(apiSchedule => {
+      // upcoming 일정과 제목이 같은 경우 제외 (upcomingEvents를 우선)
+      return !upcomingSchedules.some(upcoming => 
+        apiSchedule.title === upcoming.title ||
+        (apiSchedule.scheduledDate && upcoming.scheduledDate && 
+         apiSchedule.scheduledDate.split('T')[0] === upcoming.scheduledDate.split('T')[0] &&
+         apiSchedule.title.includes(upcoming.title))
+      )
+    })
+    
+    // 모든 일정을 합치기 (upcomingEvents, Schedule API, Calendar API)
+    const allSchedules = [...upcomingSchedules, ...filteredApiSchedules, ...calendarEvents]
+    
+    schedules.value = allSchedules
   } catch (error) {
     console.error('일정 로드 실패:', error)
   }
@@ -394,25 +487,45 @@ const loadMonthSchedules = async () => {
 // 일정 추가
 const addSchedule = async () => {
   try {
-    const dateTime = `${newSchedule.value.date}T${newSchedule.value.time}:00`
-    const scheduleData = {
+    // 캘린더 API 사용으로 변경
+    const startDateTime = `${newSchedule.value.date}T${newSchedule.value.time}:00`
+    const endDateTime = `${newSchedule.value.date}T${newSchedule.value.time}:00` // 종료 시간 동일하게 설정
+    
+    const eventData = {
       title: newSchedule.value.title,
       description: newSchedule.value.description,
-      type: newSchedule.value.type,
-      scheduledDate: dateTime
+      startDateTime: startDateTime,
+      endDateTime: endDateTime,
+      allDay: false,
+      userId: props.userId || null,
+      eventType: newSchedule.value.type,
+      visibility: newSchedule.value.visibility || 'PERSONAL',
+      classId: newSchedule.value.visibility === 'CLASS_WIDE' ? props.classId : null,
+      reminder: false,
+      reminderMinutes: null
     }
     
-    const response = await scheduleApi.createSchedule(scheduleData)
+    const response = await calendarApi.createEvent(eventData)
     if (response.success) {
+      // 성공 알림 표시
+      alert('일정이 성공적으로 추가되었습니다.')
+      
+      // 캘린더 새로고침
       await loadMonthSchedules()
+      
+      // 폼 초기화 및 모달 닫기
       showAddSchedule.value = false
       newSchedule.value = {
         title: '',
         description: '',
         date: '',
         time: '',
-        type: 'class'
+        type: 'PERSONAL',
+        visibility: 'PERSONAL',
+        classId: props.classId
       }
+      
+      // 부모 컴포넌트에 알림
       emit('schedule-added')
     }
   } catch (error) {
@@ -942,6 +1055,56 @@ onMounted(() => {
 
 .submit-btn:hover {
   background: #1d4ed8;
+}
+
+/* 공개 범위 선택 스타일 */
+.visibility-options {
+  display: flex;
+  gap: 1rem;
+  margin-top: 0.5rem;
+}
+
+.radio-option {
+  flex: 1;
+  cursor: pointer;
+}
+
+.radio-option input[type="radio"] {
+  display: none;
+}
+
+.radio-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  background: white;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #475569;
+}
+
+.radio-option input[type="radio"]:checked + .radio-label {
+  border-color: #3b82f6;
+  background: #eff6ff;
+  color: #1e40af;
+}
+
+.radio-icon {
+  font-size: 1.25rem;
+}
+
+.visibility-hint {
+  margin-top: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: #f0f9ff;
+  border-left: 3px solid #3b82f6;
+  border-radius: 4px;
+  font-size: 0.813rem;
+  color: #1e40af;
 }
 
 @media (max-width: 768px) {

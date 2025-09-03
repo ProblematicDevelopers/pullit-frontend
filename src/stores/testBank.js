@@ -21,7 +21,9 @@ export const useTestBankStore = defineStore('testBank', {
       gradeCode: null,
       gradeName: '',
       subjectId: null,
-      subjectName: ''
+      subjectName: '',
+      // 미리보기 모드: 'image' | 'html'
+      previewMode: 'image',
     },
 
     // ===== 시험지 타입 =====
