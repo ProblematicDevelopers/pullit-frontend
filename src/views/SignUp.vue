@@ -818,7 +818,8 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { authAPI } from '@/services/api'
+import { authAPI, userAPI } from '@/services/api'
+import { schoolApi } from '@/services/schoolApi'
 import Header from '@/components/common/Header.vue'
 import Footer from '@/components/common/Footer.vue'
 
@@ -901,8 +902,7 @@ const birthYears = ref([])
 const birthMonths = ref([])
 const birthDays = ref([])
 
-// API 설정
-const apiBaseUrl = 'http://localhost:8080/api'
+// API 설정: 공용 axios 인스턴스(api.js)를 사용합니다
 
 // computed properties
 const canProceedToStep2 = computed(() => {
@@ -1103,15 +1103,11 @@ const checkUsernameAvailability = async () => {
   }
 
   try {
-    const response = await fetch(`${apiBaseUrl}/users/check/username/${signupForm.value.username}`)
-    const data = await response.json()
-    
+    const { data } = await userAPI.checkUsername(signupForm.value.username)
     console.log('아이디 중복확인 응답:', data)
-    
-    // 백엔드 응답 구조에 맞게 확인
+
     // success: true이고 data: true이면 사용 가능
-    // success: true이고 data: false이면 중복
-    const isAvailable = data.success && data.data === true
+    const isAvailable = data?.success && data?.data === true
     
     if (isAvailable) {
       usernameCheckMessage.value = '사용 가능한 아이디입니다.'
@@ -1248,16 +1244,11 @@ const searchSchools = async () => {
   try {
     console.log('학교 검색 시작 (실제 API):', schoolSearchKeyword.value.trim())
 
-    // 실제 API로 학교 검색
+    // 실제 API로 학교 검색 (공용 api 사용)
     const keyword = schoolSearchKeyword.value.trim()
-    console.log('검색 키워드:', keyword)
-    console.log('검색 키워드 길이:', keyword.length)
-    console.log('검색 키워드 바이트:', new TextEncoder().encode(keyword))
-
-    const response = await fetch(`http://localhost:8080/api/schools/search?keyword=${encodeURIComponent(keyword)}`)
-    const data = await response.json()
+    const { data } = await schoolApi.searchSchools(keyword)
     console.log('검색 결과:', data)
-    schoolSearchResults.value = data
+    schoolSearchResults.value = Array.isArray(data) ? data : (data?.data || [])
   } catch (error) {
     console.error('학교 검색 실패:', error)
     console.error('에러 상세:', error.response?.data)

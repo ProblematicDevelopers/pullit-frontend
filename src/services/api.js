@@ -111,6 +111,21 @@ export const authAPI = {
   }
 }
 
+// 사용자 관련 API 함수들
+export const userAPI = {
+  // 아이디 중복 확인
+  checkUsername: (username) => {
+    const encoded = encodeURIComponent(username)
+    return api.get(`/users/check/username/${encoded}`)
+  },
+
+  // 이메일 중복 확인
+  checkEmail: (email) => {
+    const encoded = encodeURIComponent(email)
+    return api.get(`/users/check/email/${encoded}`)
+  }
+}
+
 // 교사 성적 통계 API
 export const teacherStatsAPI = {
   // 클래스 전체 성적 개요

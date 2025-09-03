@@ -360,6 +360,9 @@ const userTypeDisplay = computed(() => {
   return '사용자'
 })
 
+import api from '@/services/api'
+import { schoolApi } from '@/services/schoolApi'
+
 const roleIconSrc = computed(() => {
   if (userInfo.value.role === 'TEACHER') {
     return new URL('@/assets/icons/teacher-icon.png', import.meta.url).href
@@ -377,15 +380,11 @@ const loadUserInfo = async () => {
     const token = localStorage.getItem('accessToken')
     console.log('토큰:', token ? '있음' : '없음')
     
-    const response = await fetch(`http://localhost:8080/api/users/me`, {
-      headers: {
-        'Authorization': `Bearer ${token}`
-      }
-    })
+    const response = await api.get('/users/me')
     console.log('API 응답 상태:', response.status)
     
-    if (response.ok) {
-      const data = await response.json()
+    if (response.status === 200) {
+      const data = response.data
       console.log('API 응답 데이터:', data)
       userInfo.value = data.data
       console.log('설정된 사용자 정보:', userInfo.value)
@@ -401,8 +400,6 @@ const loadUserInfo = async () => {
       }
     } else {
       console.error('API 응답 실패:', response.status, response.statusText)
-      const errorData = await response.json()
-      console.error('에러 데이터:', errorData)
       
       // API 실패 시 localStorage에서 기본 정보 로드
       const storedUserInfo = localStorage.getItem('userInfo')
@@ -439,15 +436,11 @@ const loadRoleInfo = async () => {
     if (userInfo.value.role === 'TEACHER') {
       console.log('선생님 정보 로드 시작')
       // 선생님 정보를 직접 가져오기
-      const teacherResponse = await fetch(`http://localhost:8080/api/teachers/me`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-        }
-      })
+      const teacherResponse = await api.get('/teachers/me')
       console.log('선생님 API 응답 상태:', teacherResponse.status)
       
-      if (teacherResponse.ok) {
-        const teacherData = await teacherResponse.json()
+      if (teacherResponse.status === 200) {
+        const teacherData = teacherResponse.data
         console.log('선생님 API 응답 데이터:', teacherData)
         
         if (teacherData.data) {
@@ -470,12 +463,7 @@ const loadRoleInfo = async () => {
         }
       } else {
         console.log('선생님 API 응답 실패:', teacherResponse.status, teacherResponse.statusText)
-        try {
-          const errorData = await teacherResponse.json()
-          console.error('선생님 API 에러 데이터:', errorData)
-        } catch (error) {
-          console.error('선생님 API 에러 응답 파싱 실패:', error)
-        }
+        console.error('선생님 API 에러 상태:', teacherResponse.status)
         // API 실패 시 기본값 설정
         teacherInfo.value = {
           areaName: '미설정',
@@ -487,15 +475,11 @@ const loadRoleInfo = async () => {
     } else if (userInfo.value.role === 'STUDENT') {
       console.log('학생 정보 로드 시작')
       // 학생 정보 로드
-      const response = await fetch(`http://localhost:8080/api/students/${userInfo.value.userId || userInfo.value.id}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-        }
-      })
+      const response = await api.get(`/students/${userInfo.value.userId || userInfo.value.id}`)
       console.log('학생 API 응답 상태:', response.status)
       
-      if (response.ok) {
-        const data = await response.json()
+      if (response.status === 200) {
+        const data = response.data
         console.log('학생 API 응답 데이터:', data)
         studentInfo.value = data.data || {}
         console.log('설정된 학생 정보:', studentInfo.value)
@@ -521,15 +505,11 @@ const loadRoleInfo = async () => {
         if (studentInfo.value.classGroupId) {
           console.log('클래스 ID로 클래스 정보 조회:', studentInfo.value.classGroupId)
           try {
-            const classResponse = await fetch(`http://localhost:8080/api/classes/${studentInfo.value.classGroupId}`, {
-              headers: {
-                'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-              }
-            })
+            const classResponse = await api.get(`/classes/${studentInfo.value.classGroupId}`)
             console.log('클래스 API 응답 상태:', classResponse.status)
             
-            if (classResponse.ok) {
-              const classData = await classResponse.json()
+            if (classResponse.status === 200) {
+              const classData = classResponse.data
               console.log('클래스 API 응답 데이터:', classData)
               studentInfo.value.className = classData.data?.className || classData.className || '미설정'
               console.log('학생 클래스 정보 로드됨:', studentInfo.value.className)
@@ -614,18 +594,11 @@ const saveProfile = async () => {
       email: editForm.value.email
     }
 
-    const response = await fetch(`http://localhost:8080/api/users/me`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-      },
-      body: JSON.stringify(updateData)
-    })
+    const response = await api.put('/users/me', updateData)
 
     if (response.ok) {
       // 사용자 정보 업데이트
-      const updatedUser = await response.json()
+      const updatedUser = response.data
       userInfo.value = { ...userInfo.value, ...updatedUser.data }
       localStorage.setItem('userInfo', JSON.stringify(userInfo.value))
       
@@ -638,16 +611,9 @@ const saveProfile = async () => {
             schoolName: editForm.value.school
           }
           
-          const teacherResponse = await fetch(`http://localhost:8080/api/teachers/me`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-            },
-            body: JSON.stringify(teacherUpdateData)
-          })
+          const teacherResponse = await api.put('/teachers/me', teacherUpdateData)
           
-          if (teacherResponse.ok) {
+          if (teacherResponse.status === 200) {
             console.log('선생님 정보 업데이트 성공')
           } else {
             console.error('선생님 정보 업데이트 실패:', teacherResponse.status)
@@ -665,21 +631,12 @@ const saveProfile = async () => {
           
           console.log('학생 정보 업데이트 데이터:', studentUpdateData)
           
-          const studentResponse = await fetch(`http://localhost:8080/api/students/me`, {
-            method: 'PUT',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-            },
-            body: JSON.stringify(studentUpdateData)
-          })
+          const studentResponse = await api.put('/students/me', studentUpdateData)
           
-          if (studentResponse.ok) {
+          if (studentResponse.status === 200) {
             console.log('학생 정보 업데이트 성공')
           } else {
             console.error('학생 정보 업데이트 실패:', studentResponse.status)
-            const errorData = await studentResponse.json()
-            console.error('학생 정보 업데이트 에러 데이터:', errorData)
           }
         } catch (error) {
           console.error('학생 정보 업데이트 에러:', error)
@@ -730,17 +687,8 @@ const searchSchools = async () => {
   isSchoolSearching.value = true
 
   try {
-    const response = await fetch(`http://localhost:8080/api/schools/search?keyword=${encodeURIComponent(schoolSearchKeyword.value.trim())}`, {
-      headers: {
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-      }
-    })
-    if (response.ok) {
-      const data = await response.json()
-      schoolSearchResults.value = data
-    } else {
-      throw new Error('학교 검색 실패')
-    }
+    const { data } = await schoolApi.searchSchools(schoolSearchKeyword.value.trim())
+    schoolSearchResults.value = Array.isArray(data) ? data : (data?.data || [])
   } catch (error) {
     console.error('학교 검색 실패:', error)
     schoolSearchResults.value = []

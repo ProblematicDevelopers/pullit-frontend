@@ -203,7 +203,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import api from '@/services/api'
 import authService from '@/services/auth'
 import { useToast } from '@/composables/useToast'
 import ClassCreateModal from '@/components/ClassCreateModal.vue'
@@ -265,7 +265,7 @@ const removeStudent = async (studentId) => {
   if (!confirm('정말로 이 학생을 학급에서 제거하시겠습니까?')) return
   
   try {
-    await axios.delete(`/api/classes/${classInfo.value.classId}/students/${studentId}`)
+    await api.delete(`/classes/${classInfo.value.classId}/students/${studentId}`)
     showToast('학생이 학급에서 제거되었습니다.', 'success')
     await loadClassInfo()
   } catch (error) {

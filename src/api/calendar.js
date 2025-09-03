@@ -1,16 +1,14 @@
-import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
+import api from '@/services/api.js'
 
 const calendarApi = {
   // 캘린더 이벤트 생성
   addEvent(eventData) {
-    return axios.post(`${API_BASE_URL}/calendar/events`, eventData)
+    return api.post(`/calendar/events`, eventData)
   },
 
   // 특정 기간 이벤트 조회
   getEvents(userId, startDate, endDate) {
-    return axios.get(`${API_BASE_URL}/calendar/events`, {
+    return api.get(`/calendar/events`, {
       params: {
         userId,
         startDate,
@@ -21,28 +19,28 @@ const calendarApi = {
 
   // 오늘 일정 조회
   getTodayEvents(userId) {
-    return axios.get(`${API_BASE_URL}/calendar/events/today`, {
+    return api.get(`/calendar/events/today`, {
       params: { userId }
     })
   },
 
   // 예정된 일정 조회
   getUpcomingEvents(userId) {
-    return axios.get(`${API_BASE_URL}/calendar/events/upcoming`, {
+    return api.get(`/calendar/events/upcoming`, {
       params: { userId }
     })
   },
 
   // 과제 일정 조회
   getAssignmentEvents(userId) {
-    return axios.get(`${API_BASE_URL}/calendar/events/assignments`, {
+    return api.get(`/calendar/events/assignments`, {
       params: { userId }
     })
   },
 
   // 이벤트 수정
   updateEvent(eventId, eventData, userId) {
-    return axios.put(`${API_BASE_URL}/calendar/events/${eventId}`, eventData, {
+    return api.put(`/calendar/events/${eventId}`, eventData, {
       headers: {
         'X-User-Id': userId
       }
@@ -51,7 +49,7 @@ const calendarApi = {
 
   // 이벤트 삭제
   deleteEvent(eventId, userId) {
-    return axios.delete(`${API_BASE_URL}/calendar/events/${eventId}`, {
+    return api.delete(`/calendar/events/${eventId}`, {
       headers: {
         'X-User-Id': userId
       }
@@ -60,7 +58,7 @@ const calendarApi = {
 
   // 과제 완료 처리
   completeAssignmentEvent(assignmentId, studentId) {
-    return axios.post(`${API_BASE_URL}/calendar/events/assignment/${assignmentId}/complete`, null, {
+    return api.post(`/calendar/events/assignment/${assignmentId}/complete`, null, {
       params: { studentId }
     })
   },

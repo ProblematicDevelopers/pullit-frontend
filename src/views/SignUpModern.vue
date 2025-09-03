@@ -548,7 +548,8 @@
 <script setup>
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import api, { authAPI, userAPI } from '@/services/api'
+import { schoolApi } from '@/services/schoolApi'
 import {
   User,
   Mail,
@@ -640,8 +641,7 @@ const birthYears = ref([])
 const birthMonths = ref([])
 const birthDays = ref([])
 
-// API configuration
-const apiBaseUrl = 'http://localhost:8080/api'
+// API configuration: use shared axios instance (api.js)
 
 // Computed properties
 const canProceedToNextStep = computed(() => {
@@ -779,10 +779,8 @@ const sendVerificationCode = async () => {
   }
 
   try {
-    const response = await axios.post(`${apiBaseUrl}/auth/phone/send`, {
-      phone: signupForm.value.phone
-    })
-    if (response.data.success) {
+    const response = await authAPI.sendVerificationCode(signupForm.value.phone)
+    if (response.data?.success) {
       verificationSent.value = true
       startTimer()
     }
@@ -810,11 +808,8 @@ const verifyPhone = async () => {
   }
 
   try {
-    const response = await axios.post(`${apiBaseUrl}/auth/phone/verify`, {
-      phone: signupForm.value.phone,
-      code: verificationCode.value
-    })
-    if (response.data.success) {
+    const response = await authAPI.verifyCode(signupForm.value.phone, verificationCode.value)
+    if (response.data?.success && response.data?.verified) {
       phoneVerified.value = true
       clearInterval(timerInterval)
     }
@@ -831,8 +826,8 @@ const checkUsernameAvailability = async () => {
   }
 
   try {
-    const response = await axios.get(`${apiBaseUrl}/users/check/username/${signupForm.value.username}`)
-    const isAvailable = response?.data?.data === true
+    const { data } = await userAPI.checkUsername(signupForm.value.username)
+    const isAvailable = data?.success && data?.data === true
     if (isAvailable) {
       usernameCheckMessage.value = '사용 가능한 아이디입니다'
       usernameAvailable.value = true
@@ -923,8 +918,8 @@ const searchSchools = async () => {
 
   isSchoolSearching.value = true
   try {
-    const response = await axios.get(`${apiBaseUrl}/schools/search?keyword=${encodeURIComponent(schoolSearchKeyword.value.trim())}`)
-    schoolSearchResults.value = response.data
+    const { data } = await schoolApi.searchSchools(schoolSearchKeyword.value.trim())
+    schoolSearchResults.value = Array.isArray(data) ? data : (data?.data || [])
   } catch (error) {
     console.error('학교 검색 실패:', error)
     schoolSearchResults.value = []
@@ -1003,7 +998,7 @@ const handleSignup = async () => {
       }
     }
 
-    const response = await axios.post(`${apiBaseUrl}/auth/register`, signupData)
+    const response = await api.post('/auth/register', signupData)
 
     if (response.status === 201 || response.data.success || response.data.code === '200') {
       alert('회원가입이 완료되었습니다!')

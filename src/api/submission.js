@@ -1,11 +1,9 @@
-import axios from 'axios'
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080/api'
+import api from '@/services/api.js'
 
 const submissionApi = {
   // 학생용 API
   submitAssignment(formData) {
-    return axios.post(`${API_BASE_URL}/submissions/submit`, formData, {
+    return api.post(`/submissions/submit`, formData, {
       headers: {
         'Content-Type': 'multipart/form-data'
       }
@@ -13,12 +11,12 @@ const submissionApi = {
   },
 
   getStudentSubmission(assignmentId, studentId) {
-    return axios.get(`${API_BASE_URL}/submissions/assignment/${assignmentId}/student/${studentId}`)
+    return api.get(`/submissions/assignment/${assignmentId}/student/${studentId}`)
   },
 
   // 선생님용 API
   getAssignmentSubmissions(assignmentId, teacherId, params = {}) {
-    return axios.get(`${API_BASE_URL}/submissions/assignment/${assignmentId}`, {
+    return api.get(`/submissions/assignment/${assignmentId}`, {
       headers: {
         'X-Teacher-Id': teacherId
       },
@@ -27,7 +25,7 @@ const submissionApi = {
   },
 
   getSubmissionStats(assignmentId, teacherId) {
-    return axios.get(`${API_BASE_URL}/submissions/assignment/${assignmentId}/stats`, {
+    return api.get(`/submissions/assignment/${assignmentId}/stats`, {
       headers: {
         'X-Teacher-Id': teacherId
       }
@@ -35,7 +33,7 @@ const submissionApi = {
   },
 
   gradeSubmission(submissionId, data, teacherId) {
-    return axios.put(`${API_BASE_URL}/submissions/${submissionId}/grade`, data, {
+    return api.put(`/submissions/${submissionId}/grade`, data, {
       headers: {
         'X-Teacher-Id': teacherId
       }
@@ -43,7 +41,7 @@ const submissionApi = {
   },
 
   getNotSubmittedStudents(assignmentId, teacherId) {
-    return axios.get(`${API_BASE_URL}/submissions/assignment/${assignmentId}/not-submitted`, {
+    return api.get(`/submissions/assignment/${assignmentId}/not-submitted`, {
       headers: {
         'X-Teacher-Id': teacherId
       }
@@ -51,12 +49,12 @@ const submissionApi = {
   },
 
   getPendingGradingSubmissions(teacherId) {
-    return axios.get(`${API_BASE_URL}/submissions/teacher/${teacherId}/pending`)
+    return api.get(`/submissions/teacher/${teacherId}/pending`)
   },
 
   // 공통 API
   getSubmissionFileDownloadUrl(submissionId, fileId, userId) {
-    return axios.get(`${API_BASE_URL}/submissions/${submissionId}/files/${fileId}/download`, {
+    return api.get(`/submissions/${submissionId}/files/${fileId}/download`, {
       headers: {
         'X-User-Id': userId
       }
