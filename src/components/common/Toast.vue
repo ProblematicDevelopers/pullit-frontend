@@ -11,6 +11,7 @@
           v-for="toast in toasts" 
           :key="toast.id"
           :class="['toast', `toast-${toast.type}`]"
+          @click="handleClick(toast)"
         >
           <div class="toast-icon">
             <span v-if="toast.type === 'success'">✅</span>
@@ -18,7 +19,23 @@
             <span v-else-if="toast.type === 'warning'">⚠️</span>
             <span v-else>ℹ️</span>
           </div>
-          <div class="toast-message">{{ toast.message }}</div>
+          <div class="toast-message">
+            <span>{{ toast.message }}</span>
+            <template v-if="toast.actionText && (toast.route || toast.href)">
+              <router-link
+                v-if="toast.route"
+                class="toast-action"
+                :to="toast.route"
+                @click.stop
+              >{{ toast.actionText }}</router-link>
+              <a 
+                v-else
+                class="toast-action"
+                :href="toast.href"
+                @click.stop
+              >{{ toast.actionText }}</a>
+            </template>
+          </div>
           <button class="toast-close" @click="removeToast(toast.id)">×</button>
         </div>
       </transition-group>
@@ -28,8 +45,29 @@
 
 <script setup>
 import { useToast } from '@/composables/useToast'
+import { useRouter } from 'vue-router'
 
 const { toasts, removeToast } = useToast()
+
+const router = useRouter()
+
+const handleClick = (toast) => {
+  // Prioritize explicit onClick if provided
+  if (typeof toast.onClick === 'function') {
+    try {
+      toast.onClick()
+    } catch (e) {
+      // no-op
+    }
+    return
+  }
+  // If route provided but no explicit action button, navigate on container click
+  if (toast.route) {
+    router.push(toast.route)
+  } else if (toast.href) {
+    window.location.href = toast.href
+  }
+}
 </script>
 
 <style scoped>
@@ -85,6 +123,17 @@ const { toasts, removeToast } = useToast()
   font-size: 0.875rem;
   color: #374151;
   line-height: 1.4;
+}
+
+.toast-action {
+  margin-left: 0.75rem;
+  color: #2563eb;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.toast-action:hover {
+  text-decoration: underline;
 }
 
 .toast-close {

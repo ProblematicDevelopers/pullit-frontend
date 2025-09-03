@@ -50,6 +50,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import { useToast } from '@/composables/useToast'
 
 const props = defineProps({
   classId: {
@@ -59,6 +60,7 @@ const props = defineProps({
 })
 
 const router = useRouter()
+const toast = useToast()
 const activeExam = ref(null)
 const remainingTime = ref('00:00')
 let timerInterval = null
@@ -73,8 +75,13 @@ const onExamStatusUpdate = (data) => {
       ...data,
       examStatus: 'CREATED'
     }
-    // 알림 표시
-    showNotification('새로운 실시간 시험이 생성되었습니다!')
+    // 알림 표시 (시험 상세/응시 페이지로 이동 링크)
+    showNotification('새로운 실시간 시험이 생성되었습니다!', {
+      route: '/student/cbt/exam/' + data.examId,
+      actionText: '시험 보기'
+    })
+    // 상단 알림 배지 갱신 트리거
+    window.dispatchEvent(new Event('notifications:refresh'))
   } else if (data.eventType === 'EXAM_STARTED') {
     activeExam.value = {
       ...data,
@@ -82,18 +89,28 @@ const onExamStatusUpdate = (data) => {
       startTime: new Date()
     }
     startTimer()
-    showNotification('실시간 시험이 시작되었습니다!')
+    showNotification('실시간 시험이 시작되었습니다!', {
+      route: '/student/cbt/exam/' + data.examId,
+      actionText: '응시하기'
+    })
+    // 상단 알림 배지 갱신 트리거
+    window.dispatchEvent(new Event('notifications:refresh'))
   } else if (data.eventType === 'EXAM_ENDED') {
     if (activeExam.value) {
       activeExam.value.examStatus = 'ENDED'
     }
     stopTimer()
-    showNotification('시험이 종료되었습니다.')
+    showNotification('시험이 종료되었습니다.', {
+      route: `/student/exam/results/${data.examId}`,
+      actionText: '결과 보기'
+    })
+    // 상단 알림 배지 갱신 트리거
+    window.dispatchEvent(new Event('notifications:refresh'))
   }
 }
 
-// 알림 표시 함수
-const showNotification = (message) => {
+// 알림 표시 함수 (브라우저 알림 + 토스트)
+const showNotification = (message, options = {}) => {
   // 브라우저 알림 API 사용
   if (Notification.permission === 'granted') {
     new Notification('똑똑한 우리반', {
@@ -102,8 +119,13 @@ const showNotification = (message) => {
     })
   }
   
-  // 화면 내 토스트 알림도 표시
-  console.log('Notification:', message)
+  // 화면 내 토스트 알림도 표시 (액션 링크 지원)
+  const { route, actionText } = options
+  if (route) {
+    toast.info(message, { actionText: actionText || '바로가기', route, duration: 7000 })
+  } else {
+    toast.info(message, { duration: 5000 })
+  }
 }
 
 // 배너 클래스

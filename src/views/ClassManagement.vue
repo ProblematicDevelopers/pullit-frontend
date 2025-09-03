@@ -91,10 +91,7 @@
                 <dt class="text-sm font-medium text-gray-500">생성일</dt>
                 <dd class="mt-1 text-sm text-gray-900">{{ formatDate(classInfo.createdDate) }}</dd>
               </div>
-              <div v-if="classInfo.invitationCode">
-                <dt class="text-sm font-medium text-gray-500">초대 코드</dt>
-                <dd class="mt-1 text-sm text-gray-900 font-mono font-bold">{{ classInfo.invitationCode }}</dd>
-              </div>
+              
             </dl>
           </div>
         </div>
