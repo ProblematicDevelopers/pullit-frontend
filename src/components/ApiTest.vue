@@ -35,9 +35,9 @@
 
 <script setup>
 import { ref } from 'vue'
-import axios from 'axios'
+import api from '@/services/api'
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api'
+// Use shared API client (handles baseURL and interceptors)
 
 const loading = ref(false)
 const response = ref(null)
@@ -53,7 +53,7 @@ const testHealth = async () => {
   loading.value = true
 
   try {
-    const res = await axios.get(`${API_BASE_URL}/test/health`)
+    const res = await api.get('/test/health')
     response.value = res.data
     console.log('Health check success:', res.data)
   } catch (err) {
@@ -69,7 +69,7 @@ const testCors = async () => {
   loading.value = true
 
   try {
-    const res = await axios.get(`${API_BASE_URL}/test/cors-test`)
+    const res = await api.get('/test/cors-test')
     response.value = res.data
     console.log('CORS test success:', res.data)
   } catch (err) {
@@ -91,7 +91,7 @@ const testEcho = async () => {
       test: true
     }
 
-    const res = await axios.post(`${API_BASE_URL}/test/echo`, testData)
+    const res = await api.post('/test/echo', testData)
     response.value = res.data
     console.log('Echo test success:', res.data)
   } catch (err) {

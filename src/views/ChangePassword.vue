@@ -140,6 +140,7 @@
 
 <script setup>
 import { ref, computed } from 'vue'
+import api from '@/services/api'
 import { useRouter } from 'vue-router'
 import Header from '@/components/common/Header.vue'
 
@@ -222,20 +223,13 @@ const changePassword = async () => {
   isChanging.value = true
 
   try {
-    const response = await fetch('http://localhost:8080/api/users/me/password', {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${localStorage.getItem('accessToken')}`
-      },
-      body: JSON.stringify({
-        oldPassword: passwordForm.value.currentPassword,
-        newPassword: passwordForm.value.newPassword,
-        confirmPassword: passwordForm.value.confirmPassword
-      })
+    const response = await api.put('/users/me/password', {
+      oldPassword: passwordForm.value.currentPassword,
+      newPassword: passwordForm.value.newPassword,
+      confirmPassword: passwordForm.value.confirmPassword
     })
 
-    if (response.ok) {
+    if (response.status === 200) {
       // 비밀번호 변경 성공 시 로그아웃 처리
       alert('비밀번호가 성공적으로 변경되었습니다. 보안을 위해 다시 로그인해주세요.')
       
@@ -247,8 +241,7 @@ const changePassword = async () => {
       // 로그인 페이지로 리다이렉트
       router.push('/login')
     } else {
-      const errorData = await response.json()
-      throw new Error(errorData.message || '비밀번호 변경 실패')
+      throw new Error('비밀번호 변경 실패')
     }
   } catch (error) {
     console.error('비밀번호 변경 에러:', error)
