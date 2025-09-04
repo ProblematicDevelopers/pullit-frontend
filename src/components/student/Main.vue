@@ -51,7 +51,7 @@
 
         <!-- 2) 스마트 시험지 생성 -->
         <div class="col-12 col-md-6 col-lg-4">
-          <router-link to="" class="text-decoration-none">
+          <router-link to="/student/class-room/my-class" class="text-decoration-none">
             <div class="card feature-card h-100 rounded-4 border-0 shadow-sm">
               <div class="card-body p-4">
                 <div class="d-flex align-items-start justify-content-between">
@@ -145,25 +145,25 @@ const connectToClassWebSocket = async () => {
     const response = await classApi.getStudentClass()
     if (response.data && response.data.success && response.data.data) {
       classInfo.value = response.data.data
-      
+
       // WebSocket 연결
       if (classInfo.value.classId) {
         const userId = userInfo.value.id || userInfo.value.userId
         const userName = userInfo.value.fullName || userInfo.value.name
         const channelName = `class-${classInfo.value.classId}`
-        
+
         console.log('🎓 학생 WebSocket 연결 시작:', {
           classId: classInfo.value.classId,
           userId: userId,
           userName: userName,
           channelName: channelName
         })
-        
+
         // 기존 연결이 있으면 끊기
         if (wsService.isConnected()) {
           wsService.disconnect()
         }
-        
+
         // 새로 연결
         await wsService.connect(
           channelName,
@@ -176,9 +176,9 @@ const connectToClassWebSocket = async () => {
             }
           }
         )
-        
+
         console.log('✅ 학생 WebSocket 연결 성공')
-        
+
         // 온라인 상태 전송
         wsService.updateOnlineStatus(channelName, userId, userName, 'STUDENT', 'ONLINE')
       }
@@ -201,13 +201,13 @@ onUnmounted(() => {
     const userId = userInfo.value.id || userInfo.value.userId
     const userName = userInfo.value.fullName || userInfo.value.name
     const channelName = classInfo.value ? `class-${classInfo.value.classId}` : null
-    
+
     if (channelName) {
       // 오프라인 상태 전송
       wsService.updateOnlineStatus(channelName, userId, userName, 'STUDENT', 'OFFLINE')
       wsService.removeUser(channelName, userId, userName, 'STUDENT')
     }
-    
+
     wsService.disconnect()
   }
 })
