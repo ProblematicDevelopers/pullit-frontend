@@ -1,5 +1,6 @@
 import SockJS from 'sockjs-client'
 import { Client } from '@stomp/stompjs'
+import { tokenManager } from './token'
 
 // WebSocket 기본 URL 설정 (API와 동일한 패턴 사용)
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080'
@@ -22,12 +23,16 @@ class WebSocketService {
   connect(channelName, userId, senderName, senderRole, callbacks = {}) {
     return new Promise((resolve, reject) => {
       try {
+        const token = tokenManager.getAccessToken()
+        const connectHeaders = token ? { Authorization: `Bearer ${token}` } : {}
+
         // 새로운 STOMP 클라이언트 생성
         this.stompClient = new Client({
           webSocketFactory: () => new SockJS(WS_URL),
           reconnectDelay: 5000,
           heartbeatIncoming: 4000,
           heartbeatOutgoing: 4000,
+          connectHeaders,
         })
 
         this.stompClient.onConnect = () => {
