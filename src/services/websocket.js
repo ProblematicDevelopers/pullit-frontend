@@ -20,6 +20,16 @@ class WebSocketService {
     this.subscriptions = new Map()
   }
 
+  isActive() {
+    // Guard to ensure underlying connection exists
+    if (!this.connected || !this.stompClient) return false
+    // Some versions expose `connected` boolean
+    if (Object.prototype.hasOwnProperty.call(this.stompClient, 'connected')) {
+      return !!this.stompClient.connected
+    }
+    return true
+  }
+
   connect(channelName, userId, senderName, senderRole, callbacks = {}) {
     return new Promise((resolve, reject) => {
       try {
@@ -145,12 +155,22 @@ class WebSocketService {
         }
 
         this.stompClient.onStompError = () => {
+          this.connected = false
           reject(new Error('STOMP connection failed'))
         }
 
         this.stompClient.onWebSocketError = (error) => {
           console.error('WebSocket Error:', error)
+          this.connected = false
           reject(error)
+        }
+
+        this.stompClient.onDisconnect = () => {
+          this.connected = false
+        }
+
+        this.stompClient.onWebSocketClose = () => {
+          this.connected = false
         }
 
         // 연결 시작
@@ -176,7 +196,7 @@ class WebSocketService {
   }
 
   sendMessage(channelName, message) {
-    if (this.connected && this.stompClient) {
+    if (this.isActive()) {
       try {
         const messageData = {
           ...message,
@@ -195,7 +215,7 @@ class WebSocketService {
   }
 
   sendNotice(channelName, message) {
-    if (this.connected && this.stompClient) {
+    if (this.isActive()) {
       try {
         const messageData = {
           ...message,
@@ -214,7 +234,7 @@ class WebSocketService {
   }
 
   sendOnlineStatus(channelName, userId, isOnline) {
-    if (this.connected && this.stompClient) {
+    if (this.isActive()) {
       try {
         const status = {
           userId: userId,
@@ -236,7 +256,7 @@ class WebSocketService {
   }
 
   updateOnlineStatus(channelName, userId, userName, userRole, status) {
-    if (this.connected && this.stompClient) {
+    if (this.isActive()) {
       try {
         const statusData = {
           channelName: channelName,
@@ -262,7 +282,7 @@ class WebSocketService {
   getOnlineStatus(channelName, userId) {
     console.log('📊 getOnlineStatus 호출:', { channelName, userId, connected: this.connected })
     
-    if (this.connected && this.stompClient) {
+    if (this.isActive()) {
       try {
         const requestData = {
           channelName: channelName,
@@ -288,7 +308,7 @@ class WebSocketService {
   }
 
   sendExamStatus(channelName, message) {
-    if (this.connected && this.stompClient) {
+    if (this.isActive()) {
       try {
         const messageData = {
           content: message,
@@ -308,7 +328,7 @@ class WebSocketService {
   }
 
   getExamStatus(channelName) {
-    if (this.connected && this.stompClient) {
+    if (this.isActive()) {
       try {
         const requestData = {
           channelName: channelName,
