@@ -461,14 +461,18 @@ const loadExams = async () => {
   try {
     // 선생님이 생성한 실시간 시험 로드 (TeacherLiveExam 또는 CBT 생성본)
     if (classInfo.value?.classId) {
+      const user = JSON.parse(localStorage.getItem('userInfo') || '{}')
+      const isTeacher = user?.role === 'TEACHER'
       // 1) 우선 TeacherLiveExam 목록 시도
-      try {
-        const liveResponse = await teacherLiveExamAPI.getClassLiveExams(classInfo.value.classId)
-        if (liveResponse.success && Array.isArray(liveResponse.data)) {
-          liveExams.value = liveResponse.data
+      if (isTeacher) {
+        try {
+          const liveResponse = await teacherLiveExamAPI.getClassLiveExams(classInfo.value.classId)
+          if (liveResponse.success && Array.isArray(liveResponse.data)) {
+            liveExams.value = liveResponse.data
+          }
+        } catch (e) {
+          console.warn('TeacherLiveExam 목록 조회 실패:', e)
         }
-      } catch (e) {
-        console.warn('TeacherLiveExam 목록 조회 실패:', e)
       }
 
       // 2) 비어있으면 클래스의 CBT 시험을 기본으로 노출 (생성 이벤트 수신 전 초기 표시용)
