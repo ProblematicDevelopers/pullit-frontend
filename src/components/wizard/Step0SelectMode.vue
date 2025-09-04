@@ -75,17 +75,17 @@
         </div>
 
         <!-- 빠른 필터 칩들 -->
-        <div class="quick-filters">
-          <button
-            v-for="filter in quickFilters"
-            :key="filter.id"
-            class="filter-chip"
-            :class="{ active: filter.active }"
-            @click="toggleQuickFilter(filter)">
-            {{ filter.label }}
-            <span class="chip-count">{{ filter.count }}</span>
-          </button>
-        </div>
+<!--        <div class="quick-filters">-->
+<!--          <button-->
+<!--            v-for="filter in quickFilters"-->
+<!--            :key="filter.id"-->
+<!--            class="filter-chip"-->
+<!--            :class="{ active: filter.active }"-->
+<!--            @click="toggleQuickFilter(filter)">-->
+<!--            {{ filter.label }}-->
+<!--            <span class="chip-count">{{ filter.count }}</span>-->
+<!--          </button>-->
+<!--        </div>-->
       </div>
     </div>
 
@@ -178,26 +178,26 @@
         </div>
 
         <!-- 문항 수 필터 -->
-        <div class="filter-group">
-          <h4 class="filter-title">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M9 12h6m-3-3v6m-9 1V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2"/>
-            </svg>
-            문항 수
-          </h4>
-          <div class="range-filter">
-            <div class="range-values">
-              <span>{{ filters.itemCount[0] }}문항</span>
-              <span>{{ filters.itemCount[1] }}문항</span>
-            </div>
-            <div class="range-slider">
-              <input type="range" v-model="filters.itemCount[0]" min="5" max="50" class="range-min">
-              <input type="range" v-model="filters.itemCount[1]" min="5" max="50" class="range-max">
-              <div class="range-track"></div>
-              <div class="range-progress" :style="rangeProgressStyle"></div>
-            </div>
-          </div>
-        </div>
+<!--        <div class="filter-group">-->
+<!--          <h4 class="filter-title">-->
+<!--            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">-->
+<!--              <path d="M9 12h6m-3-3v6m-9 1V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" stroke="currentColor" stroke-width="2"/>-->
+<!--            </svg>-->
+<!--            문항 수-->
+<!--          </h4>-->
+<!--          <div class="range-filter">-->
+<!--            <div class="range-values">-->
+<!--              <span>{{ filters.itemCount[0] }}문항</span>-->
+<!--              <span>{{ filters.itemCount[1] }}문항</span>-->
+<!--            </div>-->
+<!--            <div class="range-slider">-->
+<!--              <input type="range" v-model="filters.itemCount[0]" min="5" max="50" class="range-min">-->
+<!--              <input type="range" v-model="filters.itemCount[1]" min="5" max="50" class="range-max">-->
+<!--              <div class="range-track"></div>-->
+<!--              <div class="range-progress" :style="rangeProgressStyle"></div>-->
+<!--            </div>-->
+<!--          </div>-->
+<!--        </div>-->
 
         <!-- 공개 범위 필터 -->
         <div class="filter-group">
@@ -230,8 +230,10 @@
 
       <!-- 우측: 결과 영역 -->
       <main class="results-section">
-        <!-- 추천 섹션 (검색 전 기본 화면) -->
-        <div v-if="!searchQuery && !hasActiveFilters" class="recommendations">
+        <!-- 추천 섹션 (검색 전 기본 화면)
+             - '전체' 선택 시에도 검색 결과가 있으면 결과를 보여주도록 조건 보완
+             - 로딩 중에는 추천 섹션 깜빡임 방지 -->
+        <div v-if="!searchQuery && !hasActiveFilters && searchResults.length === 0 && !isLoading" class="recommendations">
           <!-- 새 시험지 만들기 카드 -->
           <div class="create-section">
             <div class="new-exam-card" @click="createNewExam">
@@ -283,7 +285,7 @@
             </div>
           </section>
 
-          
+
         </div>
 
         <!-- 검색 결과 -->
@@ -310,12 +312,12 @@
                   </svg>
                 </button>
               </div>
-              <select v-model="sortBy" class="sort-select">
-                <option value="relevance">관련도순</option>
-                <option value="recent">최신순</option>
-                <option value="popular">인기순</option>
-                <option value="name">이름순</option>
-              </select>
+<!--              <select v-model="sortBy" class="sort-select">-->
+<!--                <option value="relevance">관련도순</option>-->
+<!--                <option value="recent">최신순</option>-->
+<!--                <option value="popular">인기순</option>-->
+<!--                <option value="name">이름순</option>-->
+<!--              </select>-->
             </div>
           </div>
 
@@ -372,17 +374,17 @@
                 </div>
                 <div class="card-footer">
                   <div class="usage-stats">
-                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">
-                      <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" stroke="currentColor" stroke-width="2"/>
-                    </svg>
-                    {{ exam.useCount }}회 사용
+<!--                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none">-->
+<!--                      <path d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" stroke="currentColor" stroke-width="2"/>-->
+<!--                    </svg>-->
+<!--                    {{ exam.smallchapterName }}-->
                   </div>
                   <div class="card-actions">
-                    <button @click.stop="previewExam(exam)" class="btn-icon" title="미리보기">
-                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                        <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke="currentColor" stroke-width="2"/>
-                      </svg>
-                    </button>
+<!--                    <button @click.stop="previewExam(exam)" class="btn-icon" title="미리보기">-->
+<!--                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none">-->
+<!--                        <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" stroke="currentColor" stroke-width="2"/>-->
+<!--                      </svg>-->
+<!--                    </button>-->
                     <button @click.stop="editExam(exam)" class="btn-primary-small">
                       선택
                     </button>
@@ -1030,7 +1032,7 @@ const proceedToNext = () => {
     const exam = searchResults.value.find(e => e.id === selectedExamId.value) ||
                  recentExams.value.find(e => e.id === selectedExamId.value) ||
                  selectedExamObject.value
-    
+
     if (exam) {
       // selectExisting 이벤트만 발생시킴
       // TestWizardView의 handleSelectExisting에서 Step2로 이동 처리

@@ -342,6 +342,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { useLayoutStore } from '@/store/layoutStore'
 import authService from '@/services/auth'
+import { authAPI, userAPI } from '@/services/api'
 
 const router = useRouter()
 const layoutStore = useLayoutStore()
@@ -492,32 +493,23 @@ const findUsername = async () => {
     }
     console.log('요청 데이터:', requestBody)
     
-    // 먼저 서버 연결 테스트
+    // 먼저 서버 연결 테스트 (선택)
     try {
-      const testResponse = await fetch('http://localhost:8080/api/users/check/username/test12')
+      const testResponse = await userAPI.checkUsername('test12')
       console.log('서버 연결 테스트:', testResponse.status)
     } catch (error) {
       console.error('서버 연결 실패:', error)
     }
-    
-    const response = await fetch('http://localhost:8080/api/users/find/username', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    })
+
+    const response = await userAPI.findUsername(requestBody.fullName, requestBody.phone)
 
     console.log('응답 상태:', response.status)
-    console.log('응답 상태 텍스트:', response.statusText)
-    
-    const data = await response.json()
-    console.log('응답 데이터:', data)
+    console.log('응답 데이터:', response.data)
 
-    if (response.ok) {
-      findResult.value = `회원님의 아이디는 ${data.data} 입니다.`
+    if (response.status === 200 && response.data?.success) {
+      findResult.value = `회원님의 아이디는 ${response.data.data} 입니다.`
     } else {
-      throw new Error(data.message || '아이디를 찾을 수 없습니다.')
+      throw new Error(response.data?.message || '아이디를 찾을 수 없습니다.')
     }
   } catch (error) {
     console.error('아이디 찾기 에러:', error)
@@ -539,18 +531,10 @@ const sendVerificationCode = async () => {
       return
     }
     
-    // 실제 SMS 발송 API 호출 (회원가입에서 사용하는 것과 동일)
-    const response = await fetch('http://localhost:8080/api/auth/verification/send', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        phoneNumber: normalizedPhone
-      })
-    })
+    // 실제 SMS 발송 API 호출
+    const response = await authAPI.sendVerificationCode(normalizedPhone)
 
-    if (response.ok) {
+    if (response.status === 200) {
       verificationSent.value = true
       alert('인증번호가 발송되었습니다.')
     } else {
@@ -580,18 +564,9 @@ const verifyCode = async () => {
     }
     
     // 실제 인증번호 확인 API 호출
-    const response = await fetch('http://localhost:8080/api/auth/verification/verify', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        phoneNumber: normalizedPhone,
-        code: findForm.value.verificationCode
-      })
-    })
+    const response = await authAPI.verifyCode(normalizedPhone, findForm.value.verificationCode)
 
-    if (response.ok) {
+    if (response.status === 200) {
       phoneVerified.value = true
       showPasswordChangeForm.value = true // 새 비밀번호 입력 화면으로 전환
       alert('인증이 완료되었습니다. 새 비밀번호를 입력해주세요.')
@@ -617,29 +592,21 @@ const findPassword = async () => {
     // 휴대폰 번호 정규화 (하이픈 제거)
     const normalizedPhone = findForm.value.phone.replace(/[^0-9]/g, '')
     
-    const response = await fetch('http://localhost:8080/api/users/find/password', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        username: findForm.value.username,
-        phone: normalizedPhone,
-        verificationCode: findForm.value.verificationCode,
-        newPassword: findForm.value.newPassword,
-        confirmPassword: findForm.value.confirmPassword
-      })
+    const response = await userAPI.resetPassword({
+      username: findForm.value.username,
+      phone: normalizedPhone,
+      verificationCode: findForm.value.verificationCode,
+      newPassword: findForm.value.newPassword,
+      confirmPassword: findForm.value.confirmPassword
     })
 
-    const data = await response.json()
-
-    if (response.ok) {
+    if (response.status === 200 && response.data?.success) {
       findResult.value = '비밀번호가 성공적으로 변경되었습니다.'
       setTimeout(() => {
         closeFindModal()
       }, 2000)
     } else {
-      throw new Error(data.message || '비밀번호 변경에 실패했습니다.')
+      throw new Error(response.data?.message || '비밀번호 변경에 실패했습니다.')
     }
   } catch (error) {
     console.error('비밀번호 찾기 에러:', error)

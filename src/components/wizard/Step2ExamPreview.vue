@@ -246,8 +246,11 @@ import { useItemSelectionStore } from '@/stores/itemSelection'
 import examApiService from '@/services/examApi'
 import api from '@/services/api'
 import DOMPurify from 'dompurify'
+import { normalizeImgTags } from '@/utils/question-to-image-converter'
 import { useMathJax } from '@/composables/useMathJax'
+import { replaceExternalImagesWithDataUrls } from '@/utils/question-to-image-converter'
 import SimilarItemsModal from '@/components/common/SimilarItemsModal.vue'
+import { convertQuestionsToImages } from '@/utils/question-to-image-converter'
 
 const props = defineProps({
   examInfo: {
@@ -318,6 +321,8 @@ const getItemNumber = (item, index) => {
 // HTML 정화 - 도수분포표와 지문 콘텐츠 보존
 const sanitizeHtml = (html) => {
   if (!html) return ''
+  // IMG 태그 정규화 (data-src/srcset -> src, lazy 제거 등)
+  html = normalizeImgTags(html)
   
   // DOMPurify를 사용한 안전한 HTML 정화
   // LaTeX 수식, MathJax, 테이블, 이미지 모두 보존
@@ -330,7 +335,9 @@ const sanitizeHtml = (html) => {
       // 기본 HTML 태그
       'span', 'div', 'p', 'br', 'hr', 'strong', 'em', 'u', 'sub', 'sup',
       // 리스트 태그
-      'ul', 'ol', 'li'
+      'ul', 'ol', 'li',
+      // 이미지 태그
+      'img'
     ],
     ADD_ATTR: [
       // MathJax 속성
@@ -340,7 +347,7 @@ const sanitizeHtml = (html) => {
       // 테이블 속성
       'colspan', 'rowspan', 'border', 'cellpadding', 'cellspacing', 'align', 'valign',
       // 이미지 속성
-      'src', 'alt', 'width', 'height', 'title'
+      'src', 'srcset', 'alt', 'width', 'height', 'title', 'crossorigin'
     ],
     KEEP_CONTENT: true,
     ALLOW_DATA_ATTR: true,
@@ -482,6 +489,14 @@ const loadExamItems = async () => {
     // MathJax 렌더링
     await nextTick()
     await renderMath()
+
+    // 외부 이미지 프록시 처리 (표시용 CORS 회피)
+    try {
+      const container = document.querySelector('.step2-exam-preview') || document.body
+      await replaceExternalImagesWithDataUrls(container)
+    } catch (e) {
+      console.warn('외부 이미지 프록시 처리 실패:', e)
+    }
   }
 }
 
@@ -519,10 +534,65 @@ const handleAddSimilarItems = (similarItems) => {
   }
 }
 
-// 다음 단계로
-const handleNext = () => {
-  // Step3로 이동
-  emit('next')
+// 다음 단계로 (이미지 변환 후 진행)
+const handleNext = async () => {
+  if (items.value.length === 0) {
+    alert('변환할 문항이 없습니다.')
+    return
+  }
+
+  // 변환 진행 오버레이 표시
+  const overlay = document.createElement('div')
+  overlay.style.cssText = `
+    position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 9999;
+    display: flex; align-items: center; justify-content: center; color: #fff; flex-direction: column;`
+  overlay.innerHTML = `
+    <div style="text-align:center">
+      <div style="margin-bottom: 16px;">
+        <svg width="48" height="48" viewBox="0 0 50 50" style="animation: spin 1s linear infinite;">
+          <circle cx="25" cy="25" r="20" stroke="white" stroke-width="4" fill="none" stroke-dasharray="80" stroke-dashoffset="60"></circle>
+        </svg>
+      </div>
+      <div id="img-progress-text">문항을 이미지로 변환 중...</div>
+      <div id="img-progress-rate" style="margin-top:8px;font-size:13px;opacity:.9;">0%</div>
+    </div>
+    <style>@keyframes spin{to{transform:rotate(360deg)}}</style>`
+  document.body.appendChild(overlay)
+
+  try {
+    // MathJax 렌더 완료 보장 후 변환
+    await nextTick()
+    await renderMath()
+
+    // 표시 번호 부여
+    const itemsWithNumbers = items.value.map((it, idx) => ({
+      ...it,
+      displayNumber: idx + 1,
+      itemNumber: idx + 1
+    }))
+
+    const images = await convertQuestionsToImages(
+      itemsWithNumbers,
+      (progress) => {
+        const t = document.getElementById('img-progress-text')
+        const r = document.getElementById('img-progress-rate')
+        if (t && progress?.message) t.textContent = progress.message
+        if (r && typeof progress?.percentage === 'number') r.textContent = `${progress.percentage}%`
+      }
+    )
+
+    // Store에 선택 문항과 이미지 저장
+    itemSelectionStore.setSelectedItems(itemsWithNumbers)
+    itemSelectionStore.setConvertedImages(images)
+
+    // 다음 단계로 이동
+    emit('next')
+  } catch (e) {
+    console.error('이미지 변환 실패:', e)
+    alert('문항을 이미지로 변환하는 중 오류가 발생했습니다.')
+  } finally {
+    document.body.removeChild(overlay)
+  }
 }
 
 // items 변경 시 MathJax 렌더링

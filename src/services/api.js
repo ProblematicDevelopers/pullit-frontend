@@ -123,6 +123,22 @@ export const userAPI = {
   checkEmail: (email) => {
     const encoded = encodeURIComponent(email)
     return api.get(`/users/check/email/${encoded}`)
+  },
+
+  // 아이디 찾기
+  findUsername: (fullName, phone) => {
+    return api.post('/users/find/username', { fullName, phone })
+  },
+
+  // 비밀번호 찾기/재설정
+  resetPassword: ({ username, phone, verificationCode, newPassword, confirmPassword }) => {
+    return api.post('/users/find/password', {
+      username,
+      phone,
+      verificationCode,
+      newPassword,
+      confirmPassword
+    })
   }
 }
 
